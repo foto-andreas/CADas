@@ -34,6 +34,8 @@
   Fachliches Projektmodell für Etagen, Räume, Wände, Türen, Fenster und Treppen.
 * `de.andreas.cadas.infrastructure.dxf`
   Konkreter Adapter für ASCII-DXF-Import und -Export.
+* `de.andreas.cadas.application.layers`
+  Berechnung rechteckiger Kachelbelegungen für zusätzliche Oberflächen-Ebenen.
 
 ## Verantwortlichkeiten
 
@@ -61,7 +63,17 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 ### Domäne
 
-`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement` und `Staircase` bilden den aktuellen Grundrisskern ab. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
+`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement`, `Staircase`, `Roof` und `SurfaceLayerStack` bilden den aktuellen Grundrisskern ab. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
+
+## Dach- und Ebenenmodell
+
+Der aktuelle Domänenstand enthält bereits die fachlichen Grundlagen für die nächsten Ausbaustufen:
+
+* `Roof` modelliert das erste Satteldach mit Winkel, Überstand und Dachrinne.
+* `SurfaceLayer` und `SurfaceLayerStack` modellieren zusätzliche Aufbau-Ebenen auf Flächen.
+* `TileLayoutService` berechnet rechteckige Kachel- beziehungsweise Plattenbelegungen mit Versatz und Mindestversatz.
+
+Diese Teile sind bewusst zunächst im Modell und in Tests abgesichert, bevor dafür eine eigene Oberfläche ergänzt wird.
 
 ## Dateiformatstrategie
 
@@ -90,6 +102,7 @@ Aktuell abgesichert sind unter anderem:
 * Flächen- und Volumenberechnung von Räumen
 * DXF-Roundtrip für die Grundobjekte des MVP
 * Standardteil-Bibliothek für Türen, Fenster und Treppen
+* Dach- und Ebenendomäne für weitere Ausbaustufen
 * Grundverhalten des Projektmodells
 
 Build und Tests laufen über:

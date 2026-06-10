@@ -8,6 +8,7 @@ public final class ProjectModel {
 
     private final String name;
     private final List<Level> levels = new ArrayList<>();
+    private Roof roof;
 
     private ProjectModel(String name, List<Level> initialLevels) {
         this.name = Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -38,5 +39,13 @@ public final class ProjectModel {
         Level level = new Level(levelName);
         addLevel(level);
         return level;
+    }
+
+    public java.util.Optional<Roof> roof() {
+        return java.util.Optional.ofNullable(roof);
+    }
+
+    public void defineRoof(Roof roof) {
+        this.roof = Objects.requireNonNull(roof, "roof darf nicht null sein.");
     }
 }

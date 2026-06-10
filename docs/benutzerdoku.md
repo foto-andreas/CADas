@@ -75,7 +75,7 @@ Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es 
 
 Die aktuelle Version konzentriert sich bewusst auf den 2D-Grundrisskern. Noch nicht umgesetzt sind unter anderem:
 
-* Dachmodelle und zusätzliche Flächen-Ebenen
+* grafische Verwaltung von Dachmodellen und zusätzlichen Flächen-Ebenen
 * vollständige DWG-Verarbeitung
 
 ## Nächste fachliche Ausbaustufen
