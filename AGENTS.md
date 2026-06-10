@@ -41,6 +41,8 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Externe Teilebibliotheken folgen nach der internen Basisbibliothek.
 * Räume werden im ersten MVP als rechteckige Polygone angelegt und später auf komplexere Konturen erweitert.
 * Türen und Fenster werden im Modell wandgebunden über Offset und Breite gespeichert, damit Wandbearbeitungen diese Öffnungen mitführen können.
+* Die erste Dateiformat-Schnittstelle wird als separater DXF-Adapter umgesetzt, damit spätere DWG-Unterstützung ohne Eingriff in die Fachlogik ergänzt werden kann.
+* Der erste Treppenumfang basiert auf Presets für gerade Treppen, 180°-Treppen und Wendeltreppen mit platzierbarer Grundfläche.
 
 ## Empfohlene Umsetzungsreihenfolge
 1. Technisches Grundgerüst, Architektur, Tests und Qualitätswerkzeuge.

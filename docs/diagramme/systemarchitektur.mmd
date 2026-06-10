@@ -6,16 +6,20 @@ flowchart LR
     Zeichensteuerung --> Snap[SnapService]
     Zeichensteuerung --> Editing[WallEditingService]
     Zeichensteuerung --> Openings[OpeningPlacementService]
+    Zeichensteuerung --> Parts[StandardPartLibrary]
+    Zeichensteuerung --> Exchange[LevelExchangeService]
     Zeichensteuerung --> Modell[ProjectModel]
     Drafting --> Geometrie[Geometriekern]
     Snap --> Geometrie
     Editing --> Geometrie
     Openings --> Geometrie
+    Exchange --> Dxf[DxfLevelExchangeService]
     Modell --> Etage[Level]
     Etage --> Wand[Wall]
     Etage --> Raum[Room]
     Etage --> Tuer[Door]
     Etage --> Fenster[WindowElement]
+    Etage --> Treppe[Staircase]
     Build[Gradle und JaCoCo] --> UI
     Build --> Drafting
     Build --> Modell

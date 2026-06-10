@@ -38,9 +38,9 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 * Kleinteilige Ecken und Kanten ohne instabile Geometrie ermöglichen.
 
 ## Phase 4: Erweiterte Bauteile
-* Erweiterte Bauteile erst nach Abschluss des 2D-Grundriss-MVP angehen.
-* Treppenmodell für gerade Treppen, Podeste und Wendeltreppen definieren.
-* 180°-Treppen für Altbau-Szenarien gezielt unterstützen.
+✓ Erweiterte Bauteile erst nach Abschluss des 2D-Grundriss-MVP angehen.
+✓ Treppenmodell für gerade Treppen, Podeste und Wendeltreppen definieren.
+✓ 180°-Treppen für Altbau-Szenarien gezielt unterstützen.
 * Dachstuhl- und Dachmodell für Satteldach, Winkel, Überstand und Dachrinnen definieren.
 * Vorbereitung für spätere frei drehbare 3D-Ansichten sauber in der Architektur verankern.
 
@@ -52,10 +52,10 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 * Konsistenzregeln für gleiche Ebenenfolgen in gleichen Bereichen definieren.
 
 ## Phase 6: Dateiformate und Teilebibliotheken
-* DXF als erstes AutoCAD-kompatibles Austauschformat fest einplanen.
-* Import/Export für DXF als ersten Format-Meilenstein umsetzen.
-* Spätere Nutzung der vorhandenen `Variotherm Vorlage 2024 PARTNER_deutsch.dwg` architektonisch vorbereiten.
-* Basis an Standard-Teilen für Türen, Fenster und einfache Treppen definieren und bereitstellen.
+✓ DXF als erstes AutoCAD-kompatibles Austauschformat fest einplanen.
+✓ Import/Export für DXF als ersten Format-Meilenstein umsetzen.
+✓ Spätere Nutzung der vorhandenen `Variotherm Vorlage 2024 PARTNER_deutsch.dwg` architektonisch vorbereiten.
+✓ Basis an Standard-Teilen für Türen, Fenster und einfache Treppen definieren und bereitstellen.
 * Import zusätzlicher Teilebibliotheken ermöglichen.
 * Strukturierte Verwaltung und Nutzung importierter Teilebibliotheken umsetzen.
 

@@ -40,6 +40,13 @@ Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es 
 * Mit dem Werkzeug `Tür` klickst du auf eine bestehende Wand, um dort eine Tür zu platzieren.
 * Mit dem Werkzeug `Fenster` klickst du auf eine bestehende Wand, um dort ein Fenster zu platzieren.
 * Türbreite, Türhöhe, Schwelle, Fensterbreite, Fensterhöhe und Brüstungshöhe werden über die Eingabefelder festgelegt.
+* Über `Tür-Preset` und `Fenster-Preset` übernimmst du Maße aus der internen Standardbibliothek.
+
+### Treppen
+
+* Mit dem Werkzeug `Treppe` ziehst du die Grundfläche einer Treppe auf.
+* Über `Treppen-Preset` wählst du zwischen gerader Treppe, 180°-Treppe und Wendeltreppe.
+* Treppenhöhe und Stufenanzahl können zusätzlich direkt angepasst werden.
 
 ### Hilfslinien und Bearbeiten
 
@@ -61,13 +68,15 @@ Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es 
 * `Hilfslinien` blendet gezogene Hilfslinien ein oder aus.
 * `Nordpfeil` zeigt die Himmelsrichtung in der Zeichenfläche an.
 * Über die sechs Ansichtsbuttons kann zwischen den orthogonalen Ansichten umgeschaltet werden.
+* `DXF exportieren` speichert die aktive Etage als DXF-Datei.
+* `DXF importieren` liest eine DXF-Datei als neue Etage ein.
 
 ## Aktuelle Grenzen
 
 Die aktuelle Version konzentriert sich bewusst auf den 2D-Grundrisskern. Noch nicht umgesetzt sind unter anderem:
 
-* Treppen, Dächer und zusätzliche Flächen-Ebenen
-* DXF- und DWG-Verarbeitung
+* Dachmodelle und zusätzliche Flächen-Ebenen
+* vollständige DWG-Verarbeitung
 
 ## Nächste fachliche Ausbaustufen
 
