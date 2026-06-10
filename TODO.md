@@ -76,7 +76,7 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 - [x] Import zusätzlicher Teilebibliotheken ermöglichen.
 - [x] Strukturierte Verwaltung und Nutzung importierter Teilebibliotheken umsetzen.
 
-## Querschnittsthemen
+## Querschnittsthemen (laufend)
 - [ ] Für alle UI-Aktionen ausführliche deutsche Tooltips pflegen.
 - [ ] Kommentare und Dokumentation konsequent auf Deutsch halten.
 - [ ] Fachliche Randfälle früh als Unit-Tests absichern.
@@ -87,7 +87,7 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 - [x] Projekt-Setup, Build und Testbasis anlegen.
 - [x] 2D-Kern für Linien, Raster, Snap und Längen-/Winkel-Eingabe liefern.
 - [x] Gebäudemodell für Geschosse, Räume, Wände, Türen, Fenster und Bemaßungen anbinden.
-- [ ] Danach Dateiformate, Bibliotheken, Treppen, Dach und Flächen-Ebenen ergänzen.
+- [x] Danach Dateiformate, Bibliotheken, Treppen, Dach und Flächen-Ebenen ergänzen.
 
 ## Sonstiges
 - [x] GitHub-README.md erstellen mit wichtichen Informationen
