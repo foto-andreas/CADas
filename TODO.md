@@ -3,35 +3,35 @@
 Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert werden. Also nichts entfernen, von dem du denkst, dass es aus Versehen reingekommen ist. Tausch bei abgearbeiteten Punkten das `*` durch ein Check-Symbol aus.
 
 ## Phase 0: Projektbasis und Leitplanken
-* Gradle-Projekt mit Wrapper 9.5, JDK 25 und sauberer Modulstruktur anlegen.
-* JavaFX-Projektgrundlage für das CAD-Programm anlegen und bootstrapen.
-* Testbasis mit JUnit 5 Jupiter, Coverage-Messung und klarer Teststruktur einrichten.
-* Formatierungs-, Qualitäts- und Build-Konventionen technisch absichern.
-* Zielarchitektur für `Domäne`, `Anwendung`, `UI` und `Infrastruktur` dokumentieren.
-* Plattformneutrale Architektur mit aktiver Verifikation zunächst auf macOS festziehen.
+✓ Gradle-Projekt mit Wrapper 9.5, JDK 25 und sauberer Modulstruktur anlegen.
+✓ JavaFX-Projektgrundlage für das CAD-Programm anlegen und bootstrapen.
+✓ Testbasis mit JUnit 5 Jupiter, Coverage-Messung und klarer Teststruktur einrichten.
+✓ Formatierungs-, Qualitäts- und Build-Konventionen technisch absichern.
+✓ Zielarchitektur für `Domäne`, `Anwendung`, `UI` und `Infrastruktur` dokumentieren.
+✓ Plattformneutrale Architektur mit aktiver Verifikation zunächst auf macOS festziehen.
 
 ## Phase 1: CAD-Kern und Gebäudemodell
-* Geometrische Grundlagen definieren: Punkte, Vektoren, Strecken, Winkel, Einheiten, Bounding-Boxen.
-* Einheitensystem für `mm`, `cm` und `m` mit verlustarmer interner Repräsentation festlegen.
+✓ Geometrische Grundlagen definieren: Punkte, Vektoren, Strecken, Winkel, Einheiten, Bounding-Boxen.
+✓ Einheitensystem für `mm`, `cm` und `m` mit verlustarmer interner Repräsentation festlegen.
 * Kernmodell für Projekt, Geschoss, Raum, Wand, Tür, Fenster, Boden und Decke aufbauen.
 * Höhen- und Dickenangaben für Räume, Wände, Decken, Fenster und Türschwellen modellieren.
 * Modellregeln für verbundene Linien-Enden und konsistente Topologie definieren.
 
 ## Phase 2: 2D-Zeichenoberfläche als erstes MVP
-* Unendlichen Canvas mit Pan und Zoom umsetzen.
-* Maßstäbliche Lineale an den Rändern umsetzen.
+✓ Unendlichen Canvas mit Pan und Zoom umsetzen.
+✓ Maßstäbliche Lineale an den Rändern umsetzen.
 * Hilfslinien aus Linealen herausziehbar, ausblendbar und entfernbar machen.
-* Magnetischen Snap zu Raster und vorhandenen Elementen umsetzen.
-* Standard-Zeichenmodus mit 90°-Zwang und `Shift`-Umschaltung auf freie Punkte umsetzen.
-* Live-Anzeige für Länge und Winkel während des Zeichnens einbauen.
-* Direkte numerische Eingabe für Länge mit Einheit und Winkel in Grad unterstützen.
+✓ Magnetischen Snap zu Raster und vorhandenen Elementen umsetzen.
+✓ Standard-Zeichenmodus mit 90°-Zwang und `Shift`-Umschaltung auf freie Punkte umsetzen.
+✓ Live-Anzeige für Länge und Winkel während des Zeichnens einbauen.
+✓ Direkte numerische Eingabe für Länge mit Einheit und Winkel in Grad unterstützen.
 * Grundlegende Bearbeitung für Auswahl, Verschieben und Anpassen verbundener Geometrie umsetzen.
-* Umschaltung zwischen den sechs orthogonalen Ansichten vorbereiten oder umsetzen.
-* Optionale Himmelsrichtung in der Zeichenfläche unterstützen.
+✓ Umschaltung zwischen den sechs orthogonalen Ansichten vorbereiten oder umsetzen.
+✓ Optionale Himmelsrichtung in der Zeichenfläche unterstützen.
 
 ## Phase 3: Fachliche Funktionen für Grundrisse
 * Erstes fachliches MVP auf Etagen, Wände, Türen, Fenster und Bemaßungen begrenzen und dafür robust abschließen.
-* Bemaßungen ein- und ausblendbar machen.
+✓ Bemaßungen ein- und ausblendbar machen.
 * Flächen- und Volumenmaße berechnen und ein- und ausblendbar machen.
 * Mehrere Etagen sauber verwalten und visualisieren.
 * Wände, Türen und Fenster fachlich korrekt platzieren und bearbeiten können.
@@ -67,7 +67,7 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 * Entscheidungen, Annahmen und offene Punkte fortlaufend in Markdown dokumentieren.
 
 ## Empfohlene erste Umsetzungsschritte
-* Projekt-Setup, Build und Testbasis anlegen.
-* 2D-Kern für Linien, Raster, Snap und Längen-/Winkel-Eingabe liefern.
+✓ Projekt-Setup, Build und Testbasis anlegen.
+✓ 2D-Kern für Linien, Raster, Snap und Längen-/Winkel-Eingabe liefern.
 * Gebäudemodell für Geschosse, Räume, Wände, Türen, Fenster und Bemaßungen anbinden.
 * Danach Dateiformate, Bibliotheken, Treppen, Dach und Flächen-Ebenen ergänzen.

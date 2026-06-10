@@ -8,7 +8,9 @@ import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
+
 import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 
 class DraftingServiceTest {

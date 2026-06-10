@@ -3,6 +3,7 @@ package de.andreas.cadas.domain.geometry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigDecimal;
+
 import org.junit.jupiter.api.Test;
 
 class LengthTest {

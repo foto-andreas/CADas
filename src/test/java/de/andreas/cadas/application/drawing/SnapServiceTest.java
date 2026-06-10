@@ -8,8 +8,10 @@ import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Wall;
+
 import java.util.List;
 import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 
 class SnapServiceTest {
