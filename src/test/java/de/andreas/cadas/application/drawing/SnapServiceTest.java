@@ -34,7 +34,8 @@ class SnapServiceTest {
     void bevorzugtVorhandeneEndpunkteVorDemRaster() {
         Wall wall = Wall.create(
                 new PlanSegment(new PlanPoint(1000, 1000), new PlanPoint(2000, 1000)),
-                Length.of(17.5, LengthUnit.CENTIMETER)
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
         );
 
         PlanPoint snapped = snapService.snap(
@@ -60,4 +61,3 @@ class SnapServiceTest {
         );
     }
 }
-

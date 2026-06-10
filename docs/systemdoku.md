@@ -23,11 +23,11 @@
 * `de.andreas.cadas.ui`
   JavaFX-Workbench, Ansichten und Interaktion mit der Zeichenfläche.
 * `de.andreas.cadas.application.drawing`
-  Anwendungslogik für orthogonales Zeichnen, manuelle Längen- und Winkeleingabe sowie Snap-Verhalten.
+  Anwendungslogik für orthogonales Zeichnen, manuelle Längen- und Winkeleingabe, Snap-Verhalten, Öffnungsplatzierung und Bearbeitung verbundener Wand-Endpunkte.
 * `de.andreas.cadas.domain.geometry`
   Geometrische Grundbausteine wie Längen, Winkel, Raster, Punkte und Segmente.
 * `de.andreas.cadas.domain.model`
-  Fachliches Projektmodell für Etagen und Wände.
+  Fachliches Projektmodell für Etagen, Räume, Wände, Türen und Fenster.
 
 ## Verantwortlichkeiten
 
@@ -37,19 +37,22 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 * pann- und zoombare Zeichenfläche
 * Rasterdarstellung
+* Hilfslinien aus Linealen
 * magnetisches Snap auf Raster und Endpunkte
 * sechs orthogonale Ansichtsumschalter
 * optionale Himmelsrichtung
 * Live-Anzeige von Länge und Winkel
 * ein- und ausblendbare Bemaßung für Wände
+* Werkzeugmodus für Wände, Räume, Türen, Fenster und Bearbeitung
+* Flächen- und Volumenanzeige für Räume
 
 ### Anwendungslogik
 
-`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird.
+`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam.
 
 ### Domäne
 
-`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level` und `Wall` bilden den aktuellen Grundrisskern ab. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
+`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door` und `WindowElement` bilden den aktuellen Grundrisskern ab. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
 
 ## Rendering-Modell
 
@@ -63,6 +66,9 @@ Aktuell abgesichert sind unter anderem:
 * orthogonales Zeichnen
 * freie Längen- und Winkelvorgaben
 * Snap auf Raster und Endpunkte
+* Platzierung von Türen und Fenstern auf Wänden
+* Verschieben verbundener Wand-Endpunkte
+* Flächen- und Volumenberechnung von Räumen
 * Grundverhalten des Projektmodells
 
 Build und Tests laufen über:

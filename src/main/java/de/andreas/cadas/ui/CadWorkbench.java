@@ -2,16 +2,22 @@ package de.andreas.cadas.ui;
 
 import de.andreas.cadas.application.drawing.DraftingConstraints;
 import de.andreas.cadas.application.drawing.DraftingService;
+import de.andreas.cadas.application.drawing.OpeningPlacementService;
 import de.andreas.cadas.application.drawing.SnapService;
+import de.andreas.cadas.application.drawing.WallEditingService;
+import de.andreas.cadas.application.drawing.WallEndpointSelection;
 import de.andreas.cadas.domain.geometry.Angle;
 import de.andreas.cadas.domain.geometry.Grid;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
+import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
+import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.Wall;
+import de.andreas.cadas.domain.model.WindowElement;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -54,10 +60,21 @@ public final class CadWorkbench extends BorderPane {
     private static final double RULER_SIZE = 32.0;
     private static final Length DEFAULT_GRID = Length.of(25, LengthUnit.CENTIMETER);
     private static final Length DEFAULT_WALL_THICKNESS = Length.of(17.5, LengthUnit.CENTIMETER);
+    private static final Length DEFAULT_WALL_HEIGHT = Length.of(2.75, LengthUnit.METER);
+    private static final Length DEFAULT_ROOM_HEIGHT = Length.of(2.60, LengthUnit.METER);
+    private static final Length DEFAULT_FLOOR_THICKNESS = Length.of(18, LengthUnit.CENTIMETER);
+    private static final Length DEFAULT_CEILING_THICKNESS = Length.of(20, LengthUnit.CENTIMETER);
+    private static final Length DEFAULT_DOOR_WIDTH = Length.of(1.01, LengthUnit.METER);
+    private static final Length DEFAULT_DOOR_HEIGHT = Length.of(2.01, LengthUnit.METER);
+    private static final Length DEFAULT_WINDOW_WIDTH = Length.of(1.20, LengthUnit.METER);
+    private static final Length DEFAULT_WINDOW_HEIGHT = Length.of(1.20, LengthUnit.METER);
+    private static final Length DEFAULT_WINDOW_SILL = Length.of(90, LengthUnit.CENTIMETER);
     private static final Length SNAP_TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
 
     private final DraftingService draftingService = new DraftingService();
     private final SnapService snapService = new SnapService();
+    private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
+    private final WallEditingService wallEditingService = new WallEditingService();
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
 
     private final ObjectProperty<Level> activeLevel = new SimpleObjectProperty<>(project.primaryLevel());
@@ -67,6 +84,8 @@ public final class CadWorkbench extends BorderPane {
     private final BooleanProperty snapToEndpoints = new SimpleBooleanProperty(true);
     private final BooleanProperty showCompass = new SimpleBooleanProperty(true);
     private final BooleanProperty showDimensions = new SimpleBooleanProperty(true);
+    private final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
+    private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
 
     private final Canvas drawingCanvas = new Canvas();
     private final Canvas horizontalRuler = new Canvas();
@@ -81,12 +100,36 @@ public final class CadWorkbench extends BorderPane {
     private final TextField angleField = new TextField();
     private final TextField wallThicknessField = new TextField("17,5");
     private final ComboBox<LengthUnit> wallThicknessUnit = new ComboBox<>();
+    private final TextField wallHeightField = new TextField("2,75");
+    private final ComboBox<LengthUnit> wallHeightUnit = new ComboBox<>();
+    private final TextField roomNameField = new TextField("Raum");
+    private final TextField roomHeightField = new TextField("2,60");
+    private final ComboBox<LengthUnit> roomHeightUnit = new ComboBox<>();
+    private final TextField floorThicknessField = new TextField("18");
+    private final ComboBox<LengthUnit> floorThicknessUnit = new ComboBox<>();
+    private final TextField ceilingThicknessField = new TextField("20");
+    private final ComboBox<LengthUnit> ceilingThicknessUnit = new ComboBox<>();
+    private final TextField doorWidthField = new TextField("1,01");
+    private final ComboBox<LengthUnit> doorWidthUnit = new ComboBox<>();
+    private final TextField doorHeightField = new TextField("2,01");
+    private final ComboBox<LengthUnit> doorHeightUnit = new ComboBox<>();
+    private final TextField thresholdField = new TextField("0");
+    private final ComboBox<LengthUnit> thresholdUnit = new ComboBox<>();
+    private final TextField windowWidthField = new TextField("1,20");
+    private final ComboBox<LengthUnit> windowWidthUnit = new ComboBox<>();
+    private final TextField windowHeightField = new TextField("1,20");
+    private final ComboBox<LengthUnit> windowHeightUnit = new ComboBox<>();
+    private final TextField sillHeightField = new TextField("90");
+    private final ComboBox<LengthUnit> sillHeightUnit = new ComboBox<>();
     private final ComboBox<Level> levelSelector = new ComboBox<>();
+    private final ComboBox<DrawingTool> toolSelector = new ComboBox<>();
 
     private final Label zoomLabel = new Label();
     private final Label cursorLabel = new Label();
     private final Label draftLabel = new Label();
     private final Label viewLabel = new Label();
+
+    private final ObservableList<GuideLine> guideLines = FXCollections.observableArrayList();
 
     private double zoom = 1.0;
     private double offsetX = 240.0;
@@ -99,6 +142,9 @@ public final class CadWorkbench extends BorderPane {
     private PlanPoint draftStart;
     private PlanSegment previewSegment;
     private PlanPoint lastCursor = new PlanPoint(0.0, 0.0);
+    private WallEndpointSelection selectedEndpointGroup;
+    private GuideOrientation pendingGuideOrientation;
+    private double pendingGuideWorldMillimeters;
 
     public CadWorkbench() {
         setPadding(new Insets(12));
@@ -118,8 +164,30 @@ public final class CadWorkbench extends BorderPane {
         lengthUnit.setValue(LengthUnit.CENTIMETER);
         wallThicknessUnit.getItems().addAll(LengthUnit.values());
         wallThicknessUnit.setValue(LengthUnit.CENTIMETER);
+        wallHeightUnit.getItems().addAll(LengthUnit.values());
+        wallHeightUnit.setValue(LengthUnit.METER);
+        roomHeightUnit.getItems().addAll(LengthUnit.values());
+        roomHeightUnit.setValue(LengthUnit.METER);
+        floorThicknessUnit.getItems().addAll(LengthUnit.values());
+        floorThicknessUnit.setValue(LengthUnit.CENTIMETER);
+        ceilingThicknessUnit.getItems().addAll(LengthUnit.values());
+        ceilingThicknessUnit.setValue(LengthUnit.CENTIMETER);
+        doorWidthUnit.getItems().addAll(LengthUnit.values());
+        doorWidthUnit.setValue(LengthUnit.METER);
+        doorHeightUnit.getItems().addAll(LengthUnit.values());
+        doorHeightUnit.setValue(LengthUnit.METER);
+        thresholdUnit.getItems().addAll(LengthUnit.values());
+        thresholdUnit.setValue(LengthUnit.CENTIMETER);
+        windowWidthUnit.getItems().addAll(LengthUnit.values());
+        windowWidthUnit.setValue(LengthUnit.METER);
+        windowHeightUnit.getItems().addAll(LengthUnit.values());
+        windowHeightUnit.setValue(LengthUnit.METER);
+        sillHeightUnit.getItems().addAll(LengthUnit.values());
+        sillHeightUnit.setValue(LengthUnit.CENTIMETER);
         levelSelector.setItems(availableLevels);
         levelSelector.setValue(activeLevel.get());
+        toolSelector.getItems().addAll(DrawingTool.values());
+        toolSelector.setValue(DrawingTool.WALL);
         levelSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
                 activeLevel.set(newValue);
@@ -127,6 +195,7 @@ public final class CadWorkbench extends BorderPane {
             }
         });
 
+        applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Je nach Werkzeug werden Wände, Räume, Türen oder Fenster platziert.");
         applyTooltip(gridField, "Legt die Rasterweite für die Zeichenfläche fest. Werte werden mit der gewählten Einheit interpretiert.");
         applyTooltip(gridUnit, "Bestimmt die Einheit für die Rasterweite, damit Eingaben in Millimeter, Zentimeter oder Meter erfolgen können.");
         applyTooltip(lengthField, "Optionaler Längenwert für die gerade gezeichnete Wand. Wenn ein Wert eingetragen ist, wird die Wand auf diese Länge gesetzt.");
@@ -134,6 +203,27 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(angleField, "Optionaler Winkel in Grad für die aktuelle Wand. Ohne Eingabe bleibt der orthogonale 90°-Modus aktiv.");
         applyTooltip(wallThicknessField, "Definiert die Wandstärke für neu gezeichnete Wände.");
         applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
+        applyTooltip(wallHeightField, "Legt die Raum- beziehungsweise Wandhöhe für neu gezeichnete Wände fest.");
+        applyTooltip(wallHeightUnit, "Bestimmt die Einheit für die Wandhöhe.");
+        applyTooltip(roomNameField, "Legt den Namen für den nächsten anzulegenden Raum fest.");
+        applyTooltip(roomHeightField, "Legt die lichte Raumhöhe für den nächsten Raum fest.");
+        applyTooltip(roomHeightUnit, "Bestimmt die Einheit für die Raumhöhe.");
+        applyTooltip(floorThicknessField, "Legt die Boden- oder Fußbodenstärke des nächsten Raums fest.");
+        applyTooltip(floorThicknessUnit, "Bestimmt die Einheit für die Bodenstärke.");
+        applyTooltip(ceilingThicknessField, "Legt die Deckenstärke des nächsten Raums fest.");
+        applyTooltip(ceilingThicknessUnit, "Bestimmt die Einheit für die Deckenstärke.");
+        applyTooltip(doorWidthField, "Legt die Breite der nächsten Tür fest.");
+        applyTooltip(doorWidthUnit, "Bestimmt die Einheit für die Türbreite.");
+        applyTooltip(doorHeightField, "Legt die Höhe der nächsten Tür fest.");
+        applyTooltip(doorHeightUnit, "Bestimmt die Einheit für die Türhöhe.");
+        applyTooltip(thresholdField, "Legt den Höhenversatz der Türschwelle für die nächste Tür fest.");
+        applyTooltip(thresholdUnit, "Bestimmt die Einheit für die Türschwellenhöhe.");
+        applyTooltip(windowWidthField, "Legt die Breite des nächsten Fensters fest.");
+        applyTooltip(windowWidthUnit, "Bestimmt die Einheit für die Fensterbreite.");
+        applyTooltip(windowHeightField, "Legt die Höhe des nächsten Fensters fest.");
+        applyTooltip(windowHeightUnit, "Bestimmt die Einheit für die Fensterhöhe.");
+        applyTooltip(sillHeightField, "Legt die Brüstungshöhe des nächsten Fensters fest.");
+        applyTooltip(sillHeightUnit, "Bestimmt die Einheit für die Brüstungshöhe.");
         applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
 
         showGrid.addListener((ignored, oldValue, newValue) -> render());
@@ -141,6 +231,8 @@ public final class CadWorkbench extends BorderPane {
         snapToEndpoints.addListener((ignored, oldValue, newValue) -> render());
         showCompass.addListener((ignored, oldValue, newValue) -> render());
         showDimensions.addListener((ignored, oldValue, newValue) -> render());
+        showAreaVolume.addListener((ignored, oldValue, newValue) -> render());
+        showGuides.addListener((ignored, oldValue, newValue) -> render());
         activeView.addListener((ignored, oldValue, newValue) -> render());
     }
 
@@ -186,6 +278,14 @@ public final class CadWorkbench extends BorderPane {
         dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
         applyTooltip(dimensionsBox, "Blendet die Längenbeschriftung der gezeichneten Wände ein oder aus.");
 
+        CheckBox areaVolumeBox = new CheckBox("Fläche & Volumen");
+        areaVolumeBox.selectedProperty().bindBidirectional(showAreaVolume);
+        applyTooltip(areaVolumeBox, "Blendet Flächen- und Volumenwerte der Räume ein oder aus.");
+
+        CheckBox guideBox = new CheckBox("Hilfslinien");
+        guideBox.selectedProperty().bindBidirectional(showGuides);
+        applyTooltip(guideBox, "Blendet gezogene Hilfslinien aus den Linealen ein oder aus.");
+
         Button resetViewButton = new Button("Ansicht zentrieren");
         resetViewButton.setOnAction(event -> {
             zoom = 1.0;
@@ -201,6 +301,8 @@ public final class CadWorkbench extends BorderPane {
 
         settingsBarStyling(resetViewButton, addLevelButton);
         return new ToolBar(
+                labelledNode("Werkzeug", toolSelector),
+                new Separator(Orientation.VERTICAL),
                 labelledNode("Etage", levelSelector),
                 addLevelButton,
                 new Separator(Orientation.VERTICAL),
@@ -212,11 +314,37 @@ public final class CadWorkbench extends BorderPane {
                 labelledNode("Winkel", angleField),
                 labelledNode("Wandstärke", wallThicknessField),
                 wallThicknessUnit,
+                labelledNode("Wandhöhe", wallHeightField),
+                wallHeightUnit,
+                new Separator(Orientation.VERTICAL),
+                labelledNode("Raum", roomNameField),
+                labelledNode("Raumhöhe", roomHeightField),
+                roomHeightUnit,
+                labelledNode("Boden", floorThicknessField),
+                floorThicknessUnit,
+                labelledNode("Decke", ceilingThicknessField),
+                ceilingThicknessUnit,
+                new Separator(Orientation.VERTICAL),
+                labelledNode("Türbreite", doorWidthField),
+                doorWidthUnit,
+                labelledNode("Türhöhe", doorHeightField),
+                doorHeightUnit,
+                labelledNode("Schwelle", thresholdField),
+                thresholdUnit,
+                new Separator(Orientation.VERTICAL),
+                labelledNode("Fensterbreite", windowWidthField),
+                windowWidthUnit,
+                labelledNode("Fensterhöhe", windowHeightField),
+                windowHeightUnit,
+                labelledNode("Brüstung", sillHeightField),
+                sillHeightUnit,
                 new Separator(Orientation.VERTICAL),
                 rasterBox,
                 snapRasterBox,
                 snapPointsBox,
                 dimensionsBox,
+                areaVolumeBox,
+                guideBox,
                 compassBox,
                 new Separator(Orientation.VERTICAL),
                 resetViewButton
@@ -248,7 +376,19 @@ public final class CadWorkbench extends BorderPane {
         lengthField.setPrefColumnCount(6);
         angleField.setPrefColumnCount(5);
         wallThicknessField.setPrefColumnCount(5);
+        wallHeightField.setPrefColumnCount(5);
+        roomNameField.setPrefColumnCount(8);
+        roomHeightField.setPrefColumnCount(5);
+        floorThicknessField.setPrefColumnCount(4);
+        ceilingThicknessField.setPrefColumnCount(4);
+        doorWidthField.setPrefColumnCount(5);
+        doorHeightField.setPrefColumnCount(5);
+        thresholdField.setPrefColumnCount(4);
+        windowWidthField.setPrefColumnCount(5);
+        windowHeightField.setPrefColumnCount(5);
+        sillHeightField.setPrefColumnCount(4);
         levelSelector.setPrefWidth(180);
+        toolSelector.setPrefWidth(140);
     }
 
     private HBox labelledNode(String label, javafx.scene.Node node) {
@@ -263,6 +403,12 @@ public final class CadWorkbench extends BorderPane {
 
         drawingPane.widthProperty().addListener((ignored, oldValue, newValue) -> resizeCanvases());
         drawingPane.heightProperty().addListener((ignored, oldValue, newValue) -> resizeCanvases());
+        horizontalRuler.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> startGuideDrag(GuideOrientation.VERTICAL, screenToWorld(event.getX(), 0).xMillimeters()));
+        horizontalRuler.addEventHandler(MouseEvent.MOUSE_DRAGGED, event -> updateGuideDrag(GuideOrientation.VERTICAL, screenToWorld(event.getX(), 0).xMillimeters()));
+        horizontalRuler.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> finishGuideDrag(GuideOrientation.VERTICAL, screenToWorld(event.getX(), 0).xMillimeters()));
+        verticalRuler.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> startGuideDrag(GuideOrientation.HORIZONTAL, screenToWorld(0, event.getY()).yMillimeters()));
+        verticalRuler.addEventHandler(MouseEvent.MOUSE_DRAGGED, event -> updateGuideDrag(GuideOrientation.HORIZONTAL, screenToWorld(0, event.getY()).yMillimeters()));
+        verticalRuler.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> finishGuideDrag(GuideOrientation.HORIZONTAL, screenToWorld(0, event.getY()).yMillimeters()));
 
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
             lastCursor = screenToWorld(event.getX(), event.getY());
@@ -284,6 +430,11 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void handleMousePressed(MouseEvent event) {
+        if (event.getButton() == MouseButton.SECONDARY && event.isAltDown()) {
+            removeNearestGuide(screenToWorld(event.getX(), event.getY()));
+            return;
+        }
+
         if (event.getButton() == MouseButton.SECONDARY || event.getButton() == MouseButton.MIDDLE) {
             panning = true;
             panStartX = event.getX();
@@ -297,9 +448,26 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
 
+        if (currentTool() == DrawingTool.EDIT) {
+            DraftingConstraints constraints = currentConstraints(false);
+            PlanPoint editPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
+            selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, SNAP_TOLERANCE).orElse(null);
+            render();
+            return;
+        }
+
         DraftingConstraints constraints = currentConstraints(!event.isShiftDown());
         draftStart = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
         previewSegment = new PlanSegment(draftStart, draftStart);
+        if (currentTool() == DrawingTool.DOOR) {
+            placeDoor(draftStart);
+            draftStart = null;
+            previewSegment = null;
+        } else if (currentTool() == DrawingTool.WINDOW) {
+            placeWindow(draftStart);
+            draftStart = null;
+            previewSegment = null;
+        }
         render();
     }
 
@@ -312,6 +480,16 @@ public final class CadWorkbench extends BorderPane {
         }
 
         if (draftStart == null) {
+            if (selectedEndpointGroup != null) {
+                DraftingConstraints constraints = currentConstraints(false);
+                PlanPoint snappedPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
+                activeLevel.get().replaceWalls(wallEditingService.moveEndpointGroup(activeLevel.get().walls(), selectedEndpointGroup, snappedPoint));
+                render();
+            }
+            return;
+        }
+
+        if (currentTool().isPointTool()) {
             return;
         }
 
@@ -329,12 +507,29 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
 
+        if (selectedEndpointGroup != null) {
+            selectedEndpointGroup = null;
+            render();
+            return;
+        }
+
         if (event.getButton() != MouseButton.PRIMARY || draftStart == null || previewSegment == null) {
             return;
         }
 
         if (previewSegment.length().toMillimeters() > 1.0) {
-            activeLevel.get().addWall(Wall.create(previewSegment, currentWallThickness()));
+            if (currentTool() == DrawingTool.WALL) {
+                activeLevel.get().addWall(Wall.create(previewSegment, currentWallThickness(), currentWallHeight()));
+            } else if (currentTool() == DrawingTool.ROOM) {
+                activeLevel.get().addRoom(Room.rectangular(
+                        currentRoomName(),
+                        previewSegment.start(),
+                        previewSegment.end(),
+                        currentRoomHeight(),
+                        currentFloorThickness(),
+                        currentCeilingThickness()
+                ));
+            }
         }
         draftStart = null;
         previewSegment = null;
@@ -359,7 +554,13 @@ public final class CadWorkbench extends BorderPane {
         if (showGrid.get()) {
             drawGrid(graphics);
         }
+        if (showGuides.get()) {
+            drawGuides(graphics);
+        }
+        drawRooms(graphics);
         drawWalls(graphics);
+        drawDoors(graphics);
+        drawWindows(graphics);
         if (previewSegment != null) {
             drawPreview(graphics);
         }
@@ -369,6 +570,29 @@ public final class CadWorkbench extends BorderPane {
         }
         drawRulers();
         updateStatus();
+    }
+
+    private void drawGuides(GraphicsContext graphics) {
+        graphics.setStroke(Color.color(0.73, 0.2, 0.2, 0.75));
+        graphics.setLineWidth(1.2);
+        for (GuideLine guideLine : guideLines) {
+            if (guideLine.orientation() == GuideOrientation.VERTICAL) {
+                double x = toScreenX(guideLine.worldMillimeters());
+                graphics.strokeLine(x, 0, x, drawingCanvas.getHeight());
+            } else {
+                double y = toScreenY(guideLine.worldMillimeters());
+                graphics.strokeLine(0, y, drawingCanvas.getWidth(), y);
+            }
+        }
+        if (pendingGuideOrientation != null) {
+            if (pendingGuideOrientation == GuideOrientation.VERTICAL) {
+                double x = toScreenX(pendingGuideWorldMillimeters);
+                graphics.strokeLine(x, 0, x, drawingCanvas.getHeight());
+            } else {
+                double y = toScreenY(pendingGuideWorldMillimeters);
+                graphics.strokeLine(0, y, drawingCanvas.getWidth(), y);
+            }
+        }
     }
 
     private void drawGrid(GraphicsContext graphics) {
@@ -403,6 +627,66 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
+    private void drawRooms(GraphicsContext graphics) {
+        for (Room room : activeLevel.get().rooms()) {
+            double[] xPoints = room.outline().stream().mapToDouble(point -> toScreenX(point.xMillimeters())).toArray();
+            double[] yPoints = room.outline().stream().mapToDouble(point -> toScreenY(point.yMillimeters())).toArray();
+            graphics.setFill(Color.color(0.77, 0.64, 0.45, 0.22));
+            graphics.fillPolygon(xPoints, yPoints, xPoints.length);
+            graphics.setStroke(Color.color(0.55, 0.43, 0.25, 0.8));
+            graphics.setLineWidth(2.0);
+            graphics.strokePolygon(xPoints, yPoints, xPoints.length);
+            if (showAreaVolume.get()) {
+                PlanPoint center = room.centerPoint();
+                drawRoomLabel(graphics, room, center);
+            }
+        }
+    }
+
+    private void drawRoomLabel(GraphicsContext graphics, Room room, PlanPoint center) {
+        graphics.setFill(Color.web("#5d4527"));
+        graphics.setFont(Font.font("Menlo", 12));
+        graphics.fillText(room.name(), toScreenX(center.xMillimeters()) - 26, toScreenY(center.yMillimeters()) - 6);
+        graphics.setFont(Font.font("Menlo", 11));
+        graphics.fillText(
+                String.format(Locale.GERMAN, "%.2f m² | %.2f m³", room.areaSquareMeters(), room.volumeCubicMeters()),
+                toScreenX(center.xMillimeters()) - 42,
+                toScreenY(center.yMillimeters()) + 12
+        );
+    }
+
+    private void drawDoors(GraphicsContext graphics) {
+        for (Door door : activeLevel.get().doors()) {
+            Wall hostWall = activeLevel.get().findWall(door.wallId());
+            PlanPoint openingStart = hostWall.axis().pointAt(door.offsetFromStart());
+            PlanPoint openingEnd = hostWall.axis().pointAt(door.offsetFromStart().add(door.width()));
+            graphics.setStroke(Color.web("#d66b2d"));
+            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * 0.55, 3.0));
+            graphics.strokeLine(
+                    toScreenX(openingStart.xMillimeters()),
+                    toScreenY(openingStart.yMillimeters()),
+                    toScreenX(openingEnd.xMillimeters()),
+                    toScreenY(openingEnd.yMillimeters())
+            );
+        }
+    }
+
+    private void drawWindows(GraphicsContext graphics) {
+        for (WindowElement window : activeLevel.get().windows()) {
+            Wall hostWall = activeLevel.get().findWall(window.wallId());
+            PlanPoint openingStart = hostWall.axis().pointAt(window.offsetFromStart());
+            PlanPoint openingEnd = hostWall.axis().pointAt(window.offsetFromStart().add(window.width()));
+            graphics.setStroke(Color.web("#4da8da"));
+            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * 0.35, 3.0));
+            graphics.strokeLine(
+                    toScreenX(openingStart.xMillimeters()),
+                    toScreenY(openingStart.yMillimeters()),
+                    toScreenX(openingEnd.xMillimeters()),
+                    toScreenY(openingEnd.yMillimeters())
+            );
+        }
+    }
+
     private void drawWall(GraphicsContext graphics, PlanSegment segment, Length thickness, Color color) {
         double screenStartX = toScreenX(segment.start().xMillimeters());
         double screenStartY = toScreenY(segment.start().yMillimeters());
@@ -414,7 +698,29 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawPreview(GraphicsContext graphics) {
-        drawWall(graphics, previewSegment, currentWallThickness(), Color.web("#c26d32"));
+        if (currentTool() == DrawingTool.ROOM) {
+            double startX = Math.min(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
+            double startY = Math.min(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
+            double endX = Math.max(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
+            double endY = Math.max(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
+            graphics.setFill(Color.color(0.76, 0.49, 0.27, 0.18));
+            graphics.fillRect(
+                    toScreenX(startX),
+                    toScreenY(startY),
+                    (endX - startX) * scale(),
+                    (endY - startY) * scale()
+            );
+            graphics.setStroke(Color.web("#c26d32"));
+            graphics.setLineWidth(2.0);
+            graphics.strokeRect(
+                    toScreenX(startX),
+                    toScreenY(startY),
+                    (endX - startX) * scale(),
+                    (endY - startY) * scale()
+            );
+        } else {
+            drawWall(graphics, previewSegment, currentWallThickness(), Color.web("#c26d32"));
+        }
         drawDimensionLabel(
                 graphics,
                 previewSegment,
@@ -529,6 +835,54 @@ public final class CadWorkbench extends BorderPane {
         return parseLength(wallThicknessField, wallThicknessUnit.getValue()).orElse(DEFAULT_WALL_THICKNESS);
     }
 
+    private Length currentWallHeight() {
+        return parseLength(wallHeightField, wallHeightUnit.getValue()).orElse(DEFAULT_WALL_HEIGHT);
+    }
+
+    private String currentRoomName() {
+        String roomName = roomNameField.getText();
+        if (roomName == null || roomName.isBlank()) {
+            return "Raum";
+        }
+        return roomName.trim();
+    }
+
+    private Length currentRoomHeight() {
+        return parseLength(roomHeightField, roomHeightUnit.getValue()).orElse(DEFAULT_ROOM_HEIGHT);
+    }
+
+    private Length currentFloorThickness() {
+        return parseLength(floorThicknessField, floorThicknessUnit.getValue()).orElse(DEFAULT_FLOOR_THICKNESS);
+    }
+
+    private Length currentCeilingThickness() {
+        return parseLength(ceilingThicknessField, ceilingThicknessUnit.getValue()).orElse(DEFAULT_CEILING_THICKNESS);
+    }
+
+    private Length currentDoorWidth() {
+        return parseLength(doorWidthField, doorWidthUnit.getValue()).orElse(DEFAULT_DOOR_WIDTH);
+    }
+
+    private Length currentDoorHeight() {
+        return parseLength(doorHeightField, doorHeightUnit.getValue()).orElse(DEFAULT_DOOR_HEIGHT);
+    }
+
+    private Length currentThresholdHeight() {
+        return parseLength(thresholdField, thresholdUnit.getValue()).orElse(Length.zero());
+    }
+
+    private Length currentWindowWidth() {
+        return parseLength(windowWidthField, windowWidthUnit.getValue()).orElse(DEFAULT_WINDOW_WIDTH);
+    }
+
+    private Length currentWindowHeight() {
+        return parseLength(windowHeightField, windowHeightUnit.getValue()).orElse(DEFAULT_WINDOW_HEIGHT);
+    }
+
+    private Length currentSillHeight() {
+        return parseLength(sillHeightField, sillHeightUnit.getValue()).orElse(DEFAULT_WINDOW_SILL);
+    }
+
     private Optional<Length> parseLength(TextField field, LengthUnit unit) {
         String text = field.getText();
         if (text == null || text.isBlank()) {
@@ -558,7 +912,7 @@ public final class CadWorkbench extends BorderPane {
         zoomLabel.setText(String.format(Locale.GERMAN, "Zoom: %.2f x", zoom));
         cursorLabel.setText(String.format(Locale.GERMAN, "Cursor: %.2f m / %.2f m", lastCursor.xMillimeters() / 1000.0, lastCursor.yMillimeters() / 1000.0));
         if (previewSegment == null) {
-            draftLabel.setText("Zeichnen: Linke Maustaste für Wände, Shift für freie Winkel, rechte Maustaste zum Verschieben.");
+            draftLabel.setText("Werkzeug: " + currentTool().label() + " | Linke Maustaste platziert, rechte Maustaste verschiebt, Alt+Rechtsklick entfernt Hilfslinien.");
         } else {
             draftLabel.setText("Zeichnen: " + previewSegment.length().format(LengthUnit.METER, 2) + " | " + previewSegment.angle().format());
         }
@@ -585,6 +939,69 @@ public final class CadWorkbench extends BorderPane {
                     availableLevels.add(level);
                     levelSelector.setValue(level);
                 });
+    }
+
+    private DrawingTool currentTool() {
+        return Optional.ofNullable(toolSelector.getValue()).orElse(DrawingTool.WALL);
+    }
+
+    private void placeDoor(PlanPoint clickPoint) {
+        openingPlacementService.placeDoor(
+                        clickPoint,
+                        activeLevel.get().walls(),
+                        currentDoorWidth(),
+                        currentDoorHeight(),
+                        currentThresholdHeight(),
+                        SNAP_TOLERANCE)
+                .ifPresent(door -> activeLevel.get().addDoor(door));
+    }
+
+    private void placeWindow(PlanPoint clickPoint) {
+        openingPlacementService.placeWindow(
+                        clickPoint,
+                        activeLevel.get().walls(),
+                        currentWindowWidth(),
+                        currentSillHeight(),
+                        currentWindowHeight(),
+                        SNAP_TOLERANCE)
+                .ifPresent(window -> activeLevel.get().addWindow(window));
+    }
+
+    private void startGuideDrag(GuideOrientation orientation, double worldMillimeters) {
+        pendingGuideOrientation = orientation;
+        pendingGuideWorldMillimeters = worldMillimeters;
+        render();
+    }
+
+    private void updateGuideDrag(GuideOrientation orientation, double worldMillimeters) {
+        if (pendingGuideOrientation == orientation) {
+            pendingGuideWorldMillimeters = worldMillimeters;
+            render();
+        }
+    }
+
+    private void finishGuideDrag(GuideOrientation orientation, double worldMillimeters) {
+        if (pendingGuideOrientation != orientation) {
+            return;
+        }
+        guideLines.add(new GuideLine(orientation, worldMillimeters));
+        pendingGuideOrientation = null;
+        render();
+    }
+
+    private void removeNearestGuide(PlanPoint clickPoint) {
+        guideLines.stream()
+                .filter(guideLine -> guideDistance(guideLine, clickPoint) <= SNAP_TOLERANCE.toMillimeters())
+                .findFirst()
+                .ifPresent(guideLines::remove);
+        render();
+    }
+
+    private double guideDistance(GuideLine guideLine, PlanPoint clickPoint) {
+        if (guideLine.orientation() == GuideOrientation.VERTICAL) {
+            return Math.abs(guideLine.worldMillimeters() - clickPoint.xMillimeters());
+        }
+        return Math.abs(guideLine.worldMillimeters() - clickPoint.yMillimeters());
     }
 
     private PlanPoint screenToWorld(double screenX, double screenY) {
