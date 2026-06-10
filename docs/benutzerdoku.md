@@ -70,6 +70,7 @@ Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es 
 * Über die sechs Ansichtsbuttons kann zwischen den orthogonalen Ansichten umgeschaltet werden.
 * `DXF exportieren` speichert die aktive Etage als DXF-Datei.
 * `DXF importieren` liest eine DXF-Datei als neue Etage ein.
+* `Teilebibliothek laden` importiert zusätzliche Presets aus einer `.cadasparts`-Datei.
 
 ## Aktuelle Grenzen
 

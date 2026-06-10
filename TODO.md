@@ -56,8 +56,8 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 ✓ Import/Export für DXF als ersten Format-Meilenstein umsetzen.
 ✓ Spätere Nutzung der vorhandenen `Variotherm Vorlage 2024 PARTNER_deutsch.dwg` architektonisch vorbereiten.
 ✓ Basis an Standard-Teilen für Türen, Fenster und einfache Treppen definieren und bereitstellen.
-* Import zusätzlicher Teilebibliotheken ermöglichen.
-* Strukturierte Verwaltung und Nutzung importierter Teilebibliotheken umsetzen.
+✓ Import zusätzlicher Teilebibliotheken ermöglichen.
+✓ Strukturierte Verwaltung und Nutzung importierter Teilebibliotheken umsetzen.
 
 ## Querschnittsthemen
 * Für alle UI-Aktionen ausführliche deutsche Tooltips pflegen.
@@ -71,3 +71,6 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 ✓ 2D-Kern für Linien, Raster, Snap und Längen-/Winkel-Eingabe liefern.
 ✓ Gebäudemodell für Geschosse, Räume, Wände, Türen, Fenster und Bemaßungen anbinden.
 * Danach Dateiformate, Bibliotheken, Treppen, Dach und Flächen-Ebenen ergänzen.
+
+## Sonstiges
+* GitHub-README.md erstellen mit wichtichen Informationen
