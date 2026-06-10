@@ -2,7 +2,7 @@
 
 ## Zielbild
 
-`CADas` ist aktuell als Java-Desktop-Anwendung für Gebäude-Grundrisse aufgesetzt. Der erste technische Schwerpunkt liegt auf einer stabilen 2D-Zeichenfläche mit sauberem Geometriekern, damit spätere fachliche Ausbaustufen wie Räume, Öffnungen, DXF-Import/Export, Teilebibliotheken und 3D-Projektionen nicht auf instabilen Grundlagen aufbauen.
+`CADas` ist aktuell als Java-Desktop-Anwendung für Gebäude-Grundrisse mit kombinierter 2D- und 3D-Workbench aufgesetzt. Der technische Schwerpunkt liegt weiterhin auf einem sauberen Geometriekern, damit DXF-Import/Export, Teilebibliotheken und die 3D-Ableitung auf konsistenten Fachobjekten aufbauen.
 
 ![Systemarchitektur](diagramme/systemarchitektur.svg)
 
@@ -52,6 +52,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * Live-Anzeige von Länge und Winkel
 * ein- und ausblendbare Bemaßung für Wände
 * Werkzeugmodus für Wände, Räume, Türen, Fenster und Bearbeitung
+* parallele 3D-Ansicht mit Orbit, Zoom, Pan und Auswahlrückkopplung
 * DXF-Import und DXF-Export für die aktive Etage
 * Standardteil-Presets für Türen, Fenster und Treppen
 * erste Treppenplatzierung für gerade, 180°- und Wendeltreppen
@@ -59,7 +60,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 ### Anwendungslogik
 
-`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam.
+`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam. `ThreeDSceneModelBuilder` leitet aus denselben Domänenobjekten einen renderbaren 3D-Szenengraphen ab, und `ThreeDCameraController` kapselt Orbit-, Pan-, Zoom- und Projektionswechsel der 3D-Kamera.
 
 ### Domäne
 
@@ -95,7 +96,9 @@ Die Standardteilversorgung besteht aus drei Ebenen:
 
 ## Rendering-Modell
 
-Die Zeichenfläche arbeitet intern in Millimetern und transformiert diese Weltkoordinaten mit Offset und Zoom auf Bildschirmkoordinaten. Dadurch bleiben Raster, Snap und Bemaßung konsistent, auch wenn die Ansicht verschoben oder skaliert wird.
+Die 2D-Zeichenfläche arbeitet intern in Millimetern und transformiert diese Weltkoordinaten mit Offset und Zoom auf Bildschirmkoordinaten. Dadurch bleiben Raster, Snap und Bemaßung konsistent, auch wenn die Ansicht verschoben oder skaliert wird.
+
+Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Dachflächen und optionale Oberflächen-Ebenen ab. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert.
 
 ## Qualitätssicherung
 
@@ -111,6 +114,8 @@ Aktuell abgesichert sind unter anderem:
 * DXF-Roundtrip für die Grundobjekte des MVP
 * Standardteil-Bibliothek für Türen, Fenster und Treppen
 * Dach- und Ebenendomäne für weitere Ausbaustufen
+* 3D-Geometrieableitung für Wände, Räume, Öffnungen, Treppen und Dach
+* Kameragrundverhalten für Orbit, Pan, Zoom und Projektionswechsel
 * Grundverhalten des Projektmodells
 
 Build und Tests laufen über:
@@ -123,11 +128,9 @@ Build und Tests laufen über:
 
 Die bestehende Struktur ist absichtlich so geschnitten, dass die nächsten Ausbauschritte sauber ergänzt werden können:
 
-* Räume, Türen, Fenster und Decken im Fachmodell ergänzen
-* Bearbeitungslogik für verbundene Linienenden ergänzen
-* DXF zuerst als Import-/Export-Format anbinden
 * die vorhandene `DWG`-Datei später über eine separat gekapselte Formatadapter-Schicht nutzbar machen
-* zusätzliche Flächen-Ebenen, Treppen und Dachaufbauten als weitere Domänenmodule ergänzen
+* komplexere 3D-Geometrie jenseits von Box-Ableitungen ergänzen
+* grafische Verwaltungsoberflächen für Dach- und Oberflächen-Ebenen ergänzen
 
 ## Plattformstrategie
 
