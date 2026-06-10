@@ -1,0 +1,79 @@
+package de.andreas.cadas.application.view;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import de.andreas.cadas.domain.geometry.Angle;
+import de.andreas.cadas.domain.geometry.Length;
+import de.andreas.cadas.domain.geometry.LengthUnit;
+import de.andreas.cadas.domain.geometry.PlanPoint;
+import de.andreas.cadas.domain.geometry.PlanSegment;
+import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.ProjectModel;
+import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.Roof;
+import de.andreas.cadas.domain.model.RoofType;
+import de.andreas.cadas.domain.model.StairType;
+import de.andreas.cadas.domain.model.Staircase;
+import de.andreas.cadas.domain.model.Wall;
+import de.andreas.cadas.domain.model.WindowElement;
+
+import java.util.Set;
+
+import org.junit.jupiter.api.Test;
+
+class ThreeDSceneModelBuilderTest {
+
+    private final ThreeDSceneModelBuilder builder = new ThreeDSceneModelBuilder();
+
+    @Test
+    void leitetVolumenkoerperFuerMvpObjekteAb() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        level.addRoom(Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 3000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        ));
+        level.addDoor(Door.create(
+                wall.id(),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(2.01, LengthUnit.METER),
+                Length.zero()
+        ));
+        level.addWindow(WindowElement.create(
+                wall.id(),
+                Length.of(2.4, LengthUnit.METER),
+                Length.of(1.2, LengthUnit.METER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(1.2, LengthUnit.METER)
+        ));
+        level.addStaircase(Staircase.create(
+                StairType.STRAIGHT,
+                new PlanPoint(500, 500),
+                new PlanPoint(1500, 3000),
+                Length.of(2.8, LengthUnit.METER),
+                14
+        ));
+        project.defineRoof(new Roof(RoofType.SADDLE, Angle.ofDegrees(38), Length.of(45, LengthUnit.CENTIMETER), true));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+
+        assertFalse(sceneModel.boxes().isEmpty());
+        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.WALL));
+        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.DOOR));
+        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.WINDOW));
+        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.STAIR));
+        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOF));
+    }
+}

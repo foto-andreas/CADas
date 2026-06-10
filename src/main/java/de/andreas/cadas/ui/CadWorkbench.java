@@ -13,6 +13,8 @@ import de.andreas.cadas.application.parts.StairPreset;
 import de.andreas.cadas.application.parts.StandardPartLibrary;
 import de.andreas.cadas.application.parts.StandardPartLibraryService;
 import de.andreas.cadas.application.parts.WindowPreset;
+import de.andreas.cadas.application.view.RenderableKind;
+import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.domain.geometry.Angle;
 import de.andreas.cadas.domain.geometry.Grid;
 import de.andreas.cadas.domain.geometry.Length;
@@ -50,6 +52,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleButton;
@@ -150,6 +153,7 @@ public final class CadWorkbench extends BorderPane {
     private final ObservableList<DoorPreset> availableDoorPresets = FXCollections.observableArrayList();
     private final ObservableList<WindowPreset> availableWindowPresets = FXCollections.observableArrayList();
     private final ObservableList<StairPreset> availableStairPresets = FXCollections.observableArrayList();
+    private final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection);
 
     private final Label zoomLabel = new Label();
     private final Label cursorLabel = new Label();
@@ -170,8 +174,10 @@ public final class CadWorkbench extends BorderPane {
     private PlanSegment previewSegment;
     private PlanPoint lastCursor = new PlanPoint(0.0, 0.0);
     private WallEndpointSelection selectedEndpointGroup;
+    private final ObjectProperty<SelectionKey> selectedSelection = new SimpleObjectProperty<>();
     private GuideOrientation pendingGuideOrientation;
     private double pendingGuideWorldMillimeters;
+    private boolean threeDDirty = true;
 
     public CadWorkbench() {
         setPadding(new Insets(12));
@@ -180,6 +186,11 @@ public final class CadWorkbench extends BorderPane {
         configureControls();
         configureLayout();
         configureCanvas();
+        threeDViewport.syncLevels(availableLevels, activeLevel.get().name());
+        selectedSelection.addListener((ignored, oldValue, newValue) -> {
+            threeDViewport.setSelectedSelection(newValue);
+            render();
+        });
         updateStatus();
         render();
     }
@@ -235,6 +246,8 @@ public final class CadWorkbench extends BorderPane {
         levelSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
                 activeLevel.set(newValue);
+                threeDViewport.syncLevels(availableLevels, newValue.name());
+                markThreeDDirty();
                 render();
             }
         });
@@ -283,7 +296,10 @@ public final class CadWorkbench extends BorderPane {
         showDimensions.addListener((ignored, oldValue, newValue) -> render());
         showAreaVolume.addListener((ignored, oldValue, newValue) -> render());
         showGuides.addListener((ignored, oldValue, newValue) -> render());
-        activeView.addListener((ignored, oldValue, newValue) -> render());
+        activeView.addListener((ignored, oldValue, newValue) -> {
+            markThreeDDirty();
+            render();
+        });
     }
 
     private void configureLayout() {
@@ -298,7 +314,9 @@ public final class CadWorkbench extends BorderPane {
         drawingArea.setLeft(verticalRuler);
         drawingArea.setCenter(new StackPane(drawingPane));
         drawingArea.setStyle("-fx-background-color: rgba(255,255,255,0.55); -fx-background-radius: 16;");
-        setCenter(drawingArea);
+        SplitPane splitPane = new SplitPane(drawingArea, threeDViewport);
+        splitPane.setDividerPositions(0.64);
+        setCenter(splitPane);
 
         HBox statusBar = new HBox(18.0, viewLabel, zoomLabel, cursorLabel, draftLabel);
         statusBar.setPadding(new Insets(10, 16, 0, 16));
@@ -532,6 +550,14 @@ public final class CadWorkbench extends BorderPane {
             DraftingConstraints constraints = currentConstraints(false);
             PlanPoint editPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
             selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, SNAP_TOLERANCE).orElse(null);
+            if (selectedEndpointGroup != null) {
+                activeLevel.get().walls().stream()
+                        .filter(wall -> selectedEndpointGroup.startWallIds().contains(wall.id()) || selectedEndpointGroup.endWallIds().contains(wall.id()))
+                        .findFirst()
+                        .ifPresent(wall -> selectedSelection.set(new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString())));
+            } else {
+                selectedSelection.set(findSelectionAt(editPoint));
+            }
             render();
             return;
         }
@@ -564,6 +590,7 @@ public final class CadWorkbench extends BorderPane {
                 DraftingConstraints constraints = currentConstraints(false);
                 PlanPoint snappedPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
                 activeLevel.get().replaceWalls(wallEditingService.moveEndpointGroup(activeLevel.get().walls(), selectedEndpointGroup, snappedPoint));
+                markThreeDDirty();
                 render();
             }
             return;
@@ -599,25 +626,32 @@ public final class CadWorkbench extends BorderPane {
 
         if (previewSegment.length().toMillimeters() > 1.0) {
             if (currentTool() == DrawingTool.WALL) {
-                activeLevel.get().addWall(Wall.create(previewSegment, currentWallThickness(), currentWallHeight()));
+                Wall wall = Wall.create(previewSegment, currentWallThickness(), currentWallHeight());
+                activeLevel.get().addWall(wall);
+                selectedSelection.set(new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()));
             } else if (currentTool() == DrawingTool.ROOM) {
-                activeLevel.get().addRoom(Room.rectangular(
+                Room room = Room.rectangular(
                         currentRoomName(),
                         previewSegment.start(),
                         previewSegment.end(),
                         currentRoomHeight(),
                         currentFloorThickness(),
                         currentCeilingThickness()
-                ));
+                );
+                activeLevel.get().addRoom(room);
+                selectedSelection.set(new SelectionKey(RenderableKind.ROOM_VOLUME, activeLevel.get().name(), room.id().toString()));
             } else if (currentTool() == DrawingTool.STAIR) {
-                activeLevel.get().addStaircase(Staircase.create(
+                Staircase staircase = Staircase.create(
                         currentStairType(),
                         previewSegment.start(),
                         previewSegment.end(),
                         currentStairHeight(),
                         currentStairSteps()
-                ));
+                );
+                activeLevel.get().addStaircase(staircase);
+                selectedSelection.set(new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), staircase.id().toString()));
             }
+            markThreeDDirty();
         }
         draftStart = null;
         previewSegment = null;
@@ -658,6 +692,7 @@ public final class CadWorkbench extends BorderPane {
             drawCompass(graphics);
         }
         drawRulers();
+        refreshThreeDIfNeeded();
         updateStatus();
     }
 
@@ -704,12 +739,12 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawWalls(GraphicsContext graphics) {
-        graphics.setStroke(Color.web("#2f2a24"));
         graphics.setFill(Color.web("#2f2a24"));
         graphics.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
 
         for (Wall wall : activeLevel.get().walls()) {
-            drawWall(graphics, wall.axis(), wall.thickness(), Color.web("#274c77"));
+            boolean selected = isSelected(RenderableKind.WALL, wall.id().toString());
+            drawWall(graphics, wall.axis(), wall.thickness(), selected ? Color.web("#d97f2f") : Color.web("#274c77"), selected ? 1.18 : 1.0);
             if (showDimensions.get()) {
                 drawDimensionLabel(graphics, wall.axis(), wall.axis().length().format(LengthUnit.METER, 2));
             }
@@ -720,10 +755,13 @@ public final class CadWorkbench extends BorderPane {
         for (Room room : activeLevel.get().rooms()) {
             double[] xPoints = room.outline().stream().mapToDouble(point -> toScreenX(point.xMillimeters())).toArray();
             double[] yPoints = room.outline().stream().mapToDouble(point -> toScreenY(point.yMillimeters())).toArray();
-            graphics.setFill(Color.color(0.77, 0.64, 0.45, 0.22));
+            boolean selected = isSelected(RenderableKind.ROOM_VOLUME, room.id().toString())
+                    || isSelected(RenderableKind.ROOM_FLOOR, room.id().toString())
+                    || isSelected(RenderableKind.ROOM_CEILING, room.id().toString());
+            graphics.setFill(selected ? Color.color(0.87, 0.58, 0.24, 0.30) : Color.color(0.77, 0.64, 0.45, 0.22));
             graphics.fillPolygon(xPoints, yPoints, xPoints.length);
-            graphics.setStroke(Color.color(0.55, 0.43, 0.25, 0.8));
-            graphics.setLineWidth(2.0);
+            graphics.setStroke(selected ? Color.color(0.78, 0.42, 0.14, 0.96) : Color.color(0.55, 0.43, 0.25, 0.8));
+            graphics.setLineWidth(selected ? 2.8 : 2.0);
             graphics.strokePolygon(xPoints, yPoints, xPoints.length);
             if (showAreaVolume.get()) {
                 PlanPoint center = room.centerPoint();
@@ -749,8 +787,9 @@ public final class CadWorkbench extends BorderPane {
             Wall hostWall = activeLevel.get().findWall(door.wallId());
             PlanPoint openingStart = hostWall.axis().pointAt(door.offsetFromStart());
             PlanPoint openingEnd = hostWall.axis().pointAt(door.offsetFromStart().add(door.width()));
-            graphics.setStroke(Color.web("#d66b2d"));
-            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * 0.55, 3.0));
+            boolean selected = isSelected(RenderableKind.DOOR, door.id().toString());
+            graphics.setStroke(selected ? Color.web("#f08f3c") : Color.web("#d66b2d"));
+            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * (selected ? 0.72 : 0.55), 3.0));
             graphics.strokeLine(
                     toScreenX(openingStart.xMillimeters()),
                     toScreenY(openingStart.yMillimeters()),
@@ -765,8 +804,9 @@ public final class CadWorkbench extends BorderPane {
             Wall hostWall = activeLevel.get().findWall(window.wallId());
             PlanPoint openingStart = hostWall.axis().pointAt(window.offsetFromStart());
             PlanPoint openingEnd = hostWall.axis().pointAt(window.offsetFromStart().add(window.width()));
-            graphics.setStroke(Color.web("#4da8da"));
-            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * 0.35, 3.0));
+            boolean selected = isSelected(RenderableKind.WINDOW, window.id().toString());
+            graphics.setStroke(selected ? Color.web("#7bc8eb") : Color.web("#4da8da"));
+            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * (selected ? 0.48 : 0.35), 3.0));
             graphics.strokeLine(
                     toScreenX(openingStart.xMillimeters()),
                     toScreenY(openingStart.yMillimeters()),
@@ -782,9 +822,10 @@ public final class CadWorkbench extends BorderPane {
             double y = toScreenY(staircase.minY());
             double width = staircase.widthMillimeters() * scale();
             double height = staircase.heightMillimeters() * scale();
-            graphics.setStroke(Color.web("#5e503f"));
-            graphics.setFill(Color.color(0.52, 0.46, 0.37, 0.16));
-            graphics.setLineWidth(2.0);
+            boolean selected = isSelected(RenderableKind.STAIR, staircase.id().toString());
+            graphics.setStroke(selected ? Color.web("#8a6848") : Color.web("#5e503f"));
+            graphics.setFill(selected ? Color.color(0.63, 0.47, 0.27, 0.24) : Color.color(0.52, 0.46, 0.37, 0.16));
+            graphics.setLineWidth(selected ? 2.8 : 2.0);
             graphics.fillRect(x, y, width, height);
             graphics.strokeRect(x, y, width, height);
             switch (staircase.stairType()) {
@@ -819,13 +860,13 @@ public final class CadWorkbench extends BorderPane {
         graphics.strokeOval(x + width * 0.25, y + height * 0.25, width * 0.5, height * 0.5);
     }
 
-    private void drawWall(GraphicsContext graphics, PlanSegment segment, Length thickness, Color color) {
+    private void drawWall(GraphicsContext graphics, PlanSegment segment, Length thickness, Color color, double widthFactor) {
         double screenStartX = toScreenX(segment.start().xMillimeters());
         double screenStartY = toScreenY(segment.start().yMillimeters());
         double screenEndX = toScreenX(segment.end().xMillimeters());
         double screenEndY = toScreenY(segment.end().yMillimeters());
         graphics.setStroke(color);
-        graphics.setLineWidth(Math.max(thickness.toMillimeters() * scale(), 2.0));
+        graphics.setLineWidth(Math.max(thickness.toMillimeters() * scale() * widthFactor, 2.0));
         graphics.strokeLine(screenStartX, screenStartY, screenEndX, screenEndY);
     }
 
@@ -867,7 +908,7 @@ public final class CadWorkbench extends BorderPane {
                     (endY - startY) * scale()
             );
         } else {
-            drawWall(graphics, previewSegment, currentWallThickness(), Color.web("#c26d32"));
+            drawWall(graphics, previewSegment, currentWallThickness(), Color.web("#c26d32"), 1.0);
         }
         drawDimensionLabel(
                 graphics,
@@ -1104,6 +1145,8 @@ public final class CadWorkbench extends BorderPane {
                     Level level = project.createLevel(levelName);
                     availableLevels.add(level);
                     levelSelector.setValue(level);
+                    threeDViewport.syncLevels(availableLevels, level.name());
+                    markThreeDDirty();
                 });
     }
 
@@ -1116,21 +1159,29 @@ public final class CadWorkbench extends BorderPane {
                         clickPoint,
                         activeLevel.get().walls(),
                         currentDoorWidth(),
-                        currentDoorHeight(),
-                        currentThresholdHeight(),
-                        SNAP_TOLERANCE)
-                .ifPresent(door -> activeLevel.get().addDoor(door));
+                currentDoorHeight(),
+                currentThresholdHeight(),
+                SNAP_TOLERANCE)
+                .ifPresent(door -> {
+                    activeLevel.get().addDoor(door);
+                    selectedSelection.set(new SelectionKey(RenderableKind.DOOR, activeLevel.get().name(), door.id().toString()));
+                    markThreeDDirty();
+                });
     }
 
     private void placeWindow(PlanPoint clickPoint) {
         openingPlacementService.placeWindow(
                         clickPoint,
                         activeLevel.get().walls(),
-                        currentWindowWidth(),
-                        currentSillHeight(),
-                        currentWindowHeight(),
-                        SNAP_TOLERANCE)
-                .ifPresent(window -> activeLevel.get().addWindow(window));
+                currentWindowWidth(),
+                currentSillHeight(),
+                currentWindowHeight(),
+                SNAP_TOLERANCE)
+                .ifPresent(window -> {
+                    activeLevel.get().addWindow(window);
+                    selectedSelection.set(new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString()));
+                    markThreeDDirty();
+                });
     }
 
     private void startGuideDrag(GuideOrientation orientation, double worldMillimeters) {
@@ -1199,6 +1250,8 @@ public final class CadWorkbench extends BorderPane {
             project.addLevel(importedLevel);
             availableLevels.add(importedLevel);
             levelSelector.setValue(importedLevel);
+            threeDViewport.syncLevels(availableLevels, importedLevel.name());
+            markThreeDDirty();
             draftLabel.setText("DXF importiert: " + file.getName());
         } catch (IOException exception) {
             draftLabel.setText("DXF-Import fehlgeschlagen: " + exception.getMessage());
@@ -1308,5 +1361,98 @@ public final class CadWorkbench extends BorderPane {
 
     private double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private void handleThreeDSelection(SelectionKey selectionKey) {
+        if (selectionKey == null) {
+            return;
+        }
+        availableLevels.stream()
+                .filter(level -> level.name().equals(selectionKey.levelName()))
+                .findFirst()
+                .ifPresent(levelSelector::setValue);
+        selectedSelection.set(selectionKey);
+    }
+
+    private void markThreeDDirty() {
+        threeDDirty = true;
+    }
+
+    private void refreshThreeDIfNeeded() {
+        if (!threeDDirty) {
+            return;
+        }
+        threeDViewport.syncLevels(availableLevels, activeLevel.get().name());
+        threeDViewport.refresh(project);
+        threeDDirty = false;
+    }
+
+    private boolean isSelected(RenderableKind kind, String elementId) {
+        return selectedSelection.get() != null
+                && selectedSelection.get().kind() == kind
+                && selectedSelection.get().levelName().equals(activeLevel.get().name())
+                && selectedSelection.get().elementId().equals(elementId);
+    }
+
+    private SelectionKey findSelectionAt(PlanPoint point) {
+        for (Door door : activeLevel.get().doors()) {
+            Wall wall = activeLevel.get().findWall(door.wallId());
+            PlanSegment segment = new PlanSegment(
+                    wall.axis().pointAt(door.offsetFromStart()),
+                    wall.axis().pointAt(door.offsetFromStart().add(door.width()))
+            );
+            if (segment.distanceTo(point).compareTo(SNAP_TOLERANCE) <= 0) {
+                return new SelectionKey(RenderableKind.DOOR, activeLevel.get().name(), door.id().toString());
+            }
+        }
+        for (WindowElement window : activeLevel.get().windows()) {
+            Wall wall = activeLevel.get().findWall(window.wallId());
+            PlanSegment segment = new PlanSegment(
+                    wall.axis().pointAt(window.offsetFromStart()),
+                    wall.axis().pointAt(window.offsetFromStart().add(window.width()))
+            );
+            if (segment.distanceTo(point).compareTo(SNAP_TOLERANCE) <= 0) {
+                return new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString());
+            }
+        }
+        for (Room room : activeLevel.get().rooms()) {
+            if (containsPoint(room, point)) {
+                return new SelectionKey(RenderableKind.ROOM_VOLUME, activeLevel.get().name(), room.id().toString());
+            }
+        }
+        for (Staircase staircase : activeLevel.get().staircases()) {
+            if (point.xMillimeters() >= staircase.minX()
+                    && point.xMillimeters() <= staircase.maxX()
+                    && point.yMillimeters() >= staircase.minY()
+                    && point.yMillimeters() <= staircase.maxY()) {
+                return new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), staircase.id().toString());
+            }
+        }
+        return activeLevel.get().walls().stream()
+                .filter(wall -> wall.axis().distanceTo(point).compareTo(SNAP_TOLERANCE) <= 0)
+                .min((left, right) -> Double.compare(
+                        left.axis().distanceTo(point).toMillimeters(),
+                        right.axis().distanceTo(point).toMillimeters()))
+                .map(wall -> new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()))
+                .orElse(null);
+    }
+
+    private boolean containsPoint(Room room, PlanPoint point) {
+        boolean inside = false;
+        int lastIndex = room.outline().size() - 1;
+        for (int currentIndex = 0; currentIndex < room.outline().size(); currentIndex++) {
+            PlanPoint current = room.outline().get(currentIndex);
+            PlanPoint previous = room.outline().get(lastIndex);
+            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
+                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
+                    * (point.yMillimeters() - current.yMillimeters())
+                    / (previous.yMillimeters() - current.yMillimeters())
+                    + current.xMillimeters();
+            if (intersects) {
+                inside = !inside;
+            }
+            lastIndex = currentIndex;
+        }
+        return inside;
     }
 }

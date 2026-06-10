@@ -2,7 +2,7 @@
 
 ## Zweck der aktuellen Version
 
-Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es lassen sich bereits Wände auf einer pann- und zoombaren Zeichenfläche mit Raster, Snap, manueller Maßeingabe und orthogonalem Zeichnen erfassen.
+Die aktuelle Version ist ein Grundriss-MVP mit kombinierter 2D- und 3D-Ansicht für Gebäude-Grundrisse. Es lassen sich Wände, Räume, Türen, Fenster und Treppen auf einer pann- und zoombaren Zeichenfläche erfassen und parallel als 3D-Ableitung kontrollieren.
 
 ![Zeichenablauf](diagramme/zeichenablauf.svg)
 
@@ -22,6 +22,17 @@ Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es 
 * Mit `Ansicht zentrieren` setzt du Zoom und Position auf die Ausgangslage zurück.
 * Über die Etagenauswahl wechselst du zwischen vorhandenen Geschossen.
 * Mit `Etage hinzufügen` legst du ein weiteres Geschoss an.
+
+### 3D-Ansicht
+
+* Rechts neben der Zeichenfläche befindet sich die 3D-Ansicht des aktuellen Projekts.
+* Mit gedrückter linker Maustaste drehst du die Kamera frei um das Modell.
+* Mit der rechten Maustaste verschiebst du die 3D-Kamera seitlich über das Modell.
+* Mit dem Mausrad zoomst du in der 3D-Ansicht näher heran oder weiter heraus.
+* Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
+* Über die Geschoss-Checkboxen blendest du einzelne Etagen in der 3D-Ansicht ein oder aus.
+* Die Option `3D Ebenen` blendet zusätzliche Oberflächen-Schichten aus dem Modell ein oder aus.
+* Ein Klick auf ein 3D-Bauteil markiert das Element und springt bei Bedarf auf die passende Etage.
 
 ### Wände zeichnen
 
@@ -48,11 +59,12 @@ Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es 
 * Über `Treppen-Preset` wählst du zwischen gerader Treppe, 180°-Treppe und Wendeltreppe.
 * Treppenhöhe und Stufenanzahl können zusätzlich direkt angepasst werden.
 
-### Hilfslinien und Bearbeiten
+### Hilfslinien, Auswahl und Bearbeiten
 
 * Ziehe aus dem oberen Lineal eine vertikale Hilfslinie in die Zeichnung.
 * Ziehe aus dem linken Lineal eine horizontale Hilfslinie in die Zeichnung.
 * Mit dem Werkzeug `Bearbeiten` kannst du verbundene Wand-Endpunkte gemeinsam verschieben.
+* Im Bearbeitungsmodus kannst du Wände, Räume, Türen, Fenster und Treppen auswählen. Die Auswahl wird in 2D und 3D gemeinsam hervorgehoben.
 
 ### Raster und Snap
 
@@ -74,8 +86,9 @@ Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es 
 
 ## Aktuelle Grenzen
 
-Die aktuelle Version konzentriert sich bewusst auf den 2D-Grundrisskern. Noch nicht umgesetzt sind unter anderem:
+Die aktuelle Version konzentriert sich bewusst auf einen robusten Grundrisskern mit erster 3D-Ableitung. Noch nicht umgesetzt sind unter anderem:
 
+* freie 3D-Modellierung jenseits der aus dem Grundriss abgeleiteten Körper
 * grafische Verwaltung von Dachmodellen und zusätzlichen Flächen-Ebenen
 * vollständige DWG-Verarbeitung
 
@@ -83,7 +96,6 @@ Die aktuelle Version konzentriert sich bewusst auf den 2D-Grundrisskern. Noch ni
 
 Die nächsten geplanten Schritte sind:
 
-* Erweiterung des Fachmodells um Räume, Türen und Fenster
-* strukturierter DXF-Import und -Export
-* interne Standardbibliothek für Bauteile
-* robuste Mehr-Etagen-Unterstützung
+* komplexere 3D-Geometrien und Materialdarstellungen
+* grafische Verwaltung für Dach- und Oberflächen-Ebenen
+* vollständige DWG-Anbindung

@@ -46,6 +46,7 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Zusätzliche Oberflächen-Ebenen werden zunächst als allgemeine Layer-Stacks mit rechteckiger Kachelbelegung modelliert, bevor dafür eine eigene UI-Verwaltung ergänzt wird.
 * Der erste Dachumfang fokussiert das Satteldach als separates Domänenobjekt mit Winkel, Überstand und Dachrinne.
 * Externe Teilebibliotheken werden im ersten Schritt über das textbasierte Format `.cadasparts` importiert und in die bestehende Preset-Verwaltung integriert.
+* Die erste 3D-Visualisierung wird als JavaFX-`SubScene` mit gemeinsamem Auswahlmodell zwischen 2D und 3D sowie aus dem Fachmodell abgeleiteten Volumenkörpern umgesetzt.
 
 ## Empfohlene Umsetzungsreihenfolge
 1. Technisches Grundgerüst, Architektur, Tests und Qualitätswerkzeuge.

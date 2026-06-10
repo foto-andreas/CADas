@@ -4,7 +4,8 @@ public record CameraPose(
         ProjectionMode projectionMode,
         double azimuthDegrees,
         double elevationDegrees,
-        double distance
+        double distance,
+        double panX,
+        double panZ
 ) {
 }
-

@@ -45,21 +45,21 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 - [x] Vorbereitung für spätere frei drehbare 3D-Ansichten sauber in der Architektur verankern.
 
 ## Phase 4a: 3D-Visualisierung
-- [ ] 3D-Szenengraph für Wände, Räume, Türen, Fenster, Treppen und Dach aus dem bestehenden Fachmodell ableiten.
-- [ ] Projektion zwischen 2D-Grundriss und 3D-Szene fachlich konsistent definieren.
-- [ ] Erste 3D-Kamera mit Orbit, Zoom und Pan umsetzen.
-- [ ] Umschaltung zwischen orthografischer und perspektivischer Darstellung ergänzen.
-- [ ] Geschosse in der 3D-Ansicht ein- und ausblendbar machen.
-- [ ] Wände mit Wandhöhe, Wandstärke und Öffnungen als echte Volumenkörper darstellen.
-- [ ] Räume mit Boden- und Deckenstärken räumlich darstellen.
-- [ ] Türen, Fenster und Treppen in 3D aus den bestehenden Domänenobjekten ableiten.
-- [ ] Dachgeometrie für das erste Satteldach visualisieren.
-- [ ] Zusätzliche Flächen-Ebenen optional als gestapelte Schichten visualisieren.
-- [ ] Einfache Material- und Farbzuordnung für Bauteilarten definieren.
-- [ ] Auswahl und Hervorhebung von 3D-Objekten vorbereiten.
-- [ ] Synchronisation zwischen 2D-Auswahl und 3D-Auswahl vorbereiten.
-- [ ] Performance-Basis für größere Grundrisse durch gruppiertes Rendering und Caching absichern.
-- [ ] Technische Tests für Geometrieableitung und Kameragrundverhalten ergänzen.
+- [x] 3D-Szenengraph für Wände, Räume, Türen, Fenster, Treppen und Dach aus dem bestehenden Fachmodell ableiten.
+- [x] Projektion zwischen 2D-Grundriss und 3D-Szene fachlich konsistent definieren.
+- [x] Erste 3D-Kamera mit Orbit, Zoom und Pan umsetzen.
+- [x] Umschaltung zwischen orthografischer und perspektivischer Darstellung ergänzen.
+- [x] Geschosse in der 3D-Ansicht ein- und ausblendbar machen.
+- [x] Wände mit Wandhöhe, Wandstärke und Öffnungen als echte Volumenkörper darstellen.
+- [x] Räume mit Boden- und Deckenstärken räumlich darstellen.
+- [x] Türen, Fenster und Treppen in 3D aus den bestehenden Domänenobjekten ableiten.
+- [x] Dachgeometrie für das erste Satteldach visualisieren.
+- [x] Zusätzliche Flächen-Ebenen optional als gestapelte Schichten visualisieren.
+- [x] Einfache Material- und Farbzuordnung für Bauteilarten definieren.
+- [x] Auswahl und Hervorhebung von 3D-Objekten vorbereiten.
+- [x] Synchronisation zwischen 2D-Auswahl und 3D-Auswahl vorbereiten.
+- [x] Performance-Basis für größere Grundrisse durch gruppiertes Rendering und Caching absichern.
+- [x] Technische Tests für Geometrieableitung und Kameragrundverhalten ergänzen.
 
 ## Phase 5: Ebenen auf Flächen
 - [x] Datenmodell für zusätzliche Ebenen auf Flächen definieren.
