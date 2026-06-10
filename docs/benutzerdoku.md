@@ -19,6 +19,8 @@ Die aktuelle Version ist ein erstes 2D-Zeichen-MVP für Gebäude-Grundrisse. Es 
 * Mit dem Mausrad zoomst du in die Zeichnung hinein oder heraus.
 * Mit der rechten Maustaste verschiebst du die Zeichenfläche.
 * Mit `Ansicht zentrieren` setzt du Zoom und Position auf die Ausgangslage zurück.
+* Über die Etagenauswahl wechselst du zwischen vorhandenen Geschossen.
+* Mit `Etage hinzufügen` legst du ein weiteres Geschoss an.
 
 ### Wände zeichnen
 
@@ -60,4 +62,3 @@ Die nächsten geplanten Schritte sind:
 * strukturierter DXF-Import und -Export
 * interne Standardbibliothek für Bauteile
 * robuste Mehr-Etagen-Unterstützung
-

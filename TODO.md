@@ -33,7 +33,7 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 * Erstes fachliches MVP auf Etagen, Wände, Türen, Fenster und Bemaßungen begrenzen und dafür robust abschließen.
 ✓ Bemaßungen ein- und ausblendbar machen.
 * Flächen- und Volumenmaße berechnen und ein- und ausblendbar machen.
-* Mehrere Etagen sauber verwalten und visualisieren.
+✓ Mehrere Etagen sauber verwalten und visualisieren.
 * Wände, Türen und Fenster fachlich korrekt platzieren und bearbeiten können.
 * Kleinteilige Ecken und Kanten ohne instabile Geometrie ermöglichen.
 

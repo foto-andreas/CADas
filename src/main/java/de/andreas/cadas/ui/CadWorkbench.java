@@ -16,6 +16,8 @@ import de.andreas.cadas.domain.model.Wall;
 import java.util.Locale;
 import java.util.Optional;
 
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -31,6 +33,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
@@ -69,6 +72,7 @@ public final class CadWorkbench extends BorderPane {
     private final Canvas horizontalRuler = new Canvas();
     private final Canvas verticalRuler = new Canvas();
     private final Pane drawingPane = new Pane(drawingCanvas);
+    private final ObservableList<Level> availableLevels = FXCollections.observableArrayList(project.levels());
 
     private final TextField gridField = new TextField("25");
     private final ComboBox<LengthUnit> gridUnit = new ComboBox<>();
@@ -77,6 +81,7 @@ public final class CadWorkbench extends BorderPane {
     private final TextField angleField = new TextField();
     private final TextField wallThicknessField = new TextField("17,5");
     private final ComboBox<LengthUnit> wallThicknessUnit = new ComboBox<>();
+    private final ComboBox<Level> levelSelector = new ComboBox<>();
 
     private final Label zoomLabel = new Label();
     private final Label cursorLabel = new Label();
@@ -113,6 +118,14 @@ public final class CadWorkbench extends BorderPane {
         lengthUnit.setValue(LengthUnit.CENTIMETER);
         wallThicknessUnit.getItems().addAll(LengthUnit.values());
         wallThicknessUnit.setValue(LengthUnit.CENTIMETER);
+        levelSelector.setItems(availableLevels);
+        levelSelector.setValue(activeLevel.get());
+        levelSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
+            if (newValue != null) {
+                activeLevel.set(newValue);
+                render();
+            }
+        });
 
         applyTooltip(gridField, "Legt die Rasterweite für die Zeichenfläche fest. Werte werden mit der gewählten Einheit interpretiert.");
         applyTooltip(gridUnit, "Bestimmt die Einheit für die Rasterweite, damit Eingaben in Millimeter, Zentimeter oder Meter erfolgen können.");
@@ -121,6 +134,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(angleField, "Optionaler Winkel in Grad für die aktuelle Wand. Ohne Eingabe bleibt der orthogonale 90°-Modus aktiv.");
         applyTooltip(wallThicknessField, "Definiert die Wandstärke für neu gezeichnete Wände.");
         applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
+        applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
 
         showGrid.addListener((ignored, oldValue, newValue) -> render());
         snapToGrid.addListener((ignored, oldValue, newValue) -> render());
@@ -181,8 +195,15 @@ public final class CadWorkbench extends BorderPane {
         });
         applyTooltip(resetViewButton, "Setzt Zoom und Verschiebung der Zeichenfläche auf die Startansicht zurück.");
 
-        settingsBarStyling(resetViewButton);
+        Button addLevelButton = new Button("Etage hinzufügen");
+        addLevelButton.setOnAction(event -> createLevel());
+        applyTooltip(addLevelButton, "Legt eine neue Etage für den aktuellen Grundriss an und wechselt direkt in diese Etage.");
+
+        settingsBarStyling(resetViewButton, addLevelButton);
         return new ToolBar(
+                labelledNode("Etage", levelSelector),
+                addLevelButton,
+                new Separator(Orientation.VERTICAL),
                 labelledNode("Rasterweite", gridField),
                 gridUnit,
                 new Separator(Orientation.VERTICAL),
@@ -220,12 +241,14 @@ public final class CadWorkbench extends BorderPane {
         return box;
     }
 
-    private void settingsBarStyling(Button resetViewButton) {
+    private void settingsBarStyling(Button resetViewButton, Button addLevelButton) {
         resetViewButton.setStyle("-fx-background-color: #4b6a88; -fx-text-fill: white; -fx-background-radius: 999;");
+        addLevelButton.setStyle("-fx-background-color: #7f5539; -fx-text-fill: white; -fx-background-radius: 999;");
         gridField.setPrefColumnCount(5);
         lengthField.setPrefColumnCount(6);
         angleField.setPrefColumnCount(5);
         wallThicknessField.setPrefColumnCount(5);
+        levelSelector.setPrefWidth(180);
     }
 
     private HBox labelledNode(String label, javafx.scene.Node node) {
@@ -548,6 +571,22 @@ public final class CadWorkbench extends BorderPane {
         Tooltip.install(node, tooltip);
     }
 
+    private void createLevel() {
+        TextInputDialog dialog = new TextInputDialog("Etage " + (availableLevels.size() + 1));
+        dialog.setTitle("Neue Etage");
+        dialog.setHeaderText("Neue Etage anlegen");
+        dialog.setContentText("Name der Etage:");
+        dialog.getDialogPane().setPrefWidth(420);
+        dialog.showAndWait()
+                .map(String::trim)
+                .filter(name -> !name.isBlank())
+                .ifPresent(levelName -> {
+                    Level level = project.createLevel(levelName);
+                    availableLevels.add(level);
+                    levelSelector.setValue(level);
+                });
+    }
+
     private PlanPoint screenToWorld(double screenX, double screenY) {
         return new PlanPoint((screenX - offsetX) / scale(), (screenY - offsetY) / scale());
     }
@@ -568,4 +607,3 @@ public final class CadWorkbench extends BorderPane {
         return Math.max(min, Math.min(max, value));
     }
 }
-
