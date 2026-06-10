@@ -81,19 +81,14 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void syncLevels(List<Level> levels, String activeLevelName) {
-        boolean changed = false;
         for (Level level : levels) {
             if (!levelVisibility.containsKey(level.name())) {
                 levelVisibility.put(level.name(), new SimpleBooleanProperty(level.name().equals(activeLevelName) || levels.size() == 1));
-                changed = true;
-            }
-            if (level.name().equals(activeLevelName)) {
-                levelVisibility.get(level.name()).set(true);
             }
         }
         levelVisibility.keySet().removeIf(name -> levels.stream().noneMatch(level -> level.name().equals(name)));
         rebuildLevelTogglePane();
-        if (changed && currentProject != null) {
+        if (currentProject != null) {
             refresh(currentProject);
         }
     }
