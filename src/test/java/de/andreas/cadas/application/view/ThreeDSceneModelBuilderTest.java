@@ -15,6 +15,9 @@ import de.andreas.cadas.domain.model.Roof;
 import de.andreas.cadas.domain.model.RoofType;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
+import de.andreas.cadas.domain.model.SurfaceLayer;
+import de.andreas.cadas.domain.model.SurfaceLayerStack;
+import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
 
@@ -75,5 +78,45 @@ class ThreeDSceneModelBuilderTest {
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.WINDOW));
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.STAIR));
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOF));
+    }
+
+    @Test
+    void beruecksichtigtGeschossfilterUndOberflaechenEbenen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var erdgeschoss = project.primaryLevel();
+        Room wohnen = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(5000, 4000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        erdgeschoss.addRoom(wohnen);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, wohnen.id().toString());
+        stack.addLayer(SurfaceLayer.create(
+                "Estrich",
+                Length.of(6, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.zero()
+        ));
+        erdgeschoss.addSurfaceLayerStack(stack);
+
+        var obergeschoss = project.createLevel("Obergeschoss");
+        obergeschoss.addRoom(Room.rectangular(
+                "Kind",
+                new PlanPoint(1000, 1000),
+                new PlanPoint(2000, 2000),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(16, LengthUnit.CENTIMETER),
+                Length.of(18, LengthUnit.CENTIMETER)
+        ));
+
+        ThreeDSceneModel nurObergeschoss = builder.build(project, Set.of("Obergeschoss"), true);
+        ThreeDSceneModel mitEbenen = builder.build(project, Set.of("Erdgeschoss"), true);
+
+        assertFalse(nurObergeschoss.boxes().stream().anyMatch(box -> "Erdgeschoss".equals(box.levelName())));
+        assertTrue(mitEbenen.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.SURFACE_LAYER));
     }
 }

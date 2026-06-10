@@ -24,5 +24,17 @@ class ThreeDCameraControllerTest {
         assertEquals(250.0, pose.panX());
         assertEquals(-180.0, pose.panZ());
     }
-}
 
+    @Test
+    void begrenztElevationUndZoomAufSichereGrenzen() {
+        CameraPose pose = new CameraPose(ProjectionMode.PERSPECTIVE, 0.0, 0.0, 10_000.0, 0.0, 0.0);
+
+        CameraPose starkGeneigt = controller.orbit(pose, 0.0, 140.0);
+        CameraPose starkVerkleinert = controller.zoom(starkGeneigt, 0.0001);
+        CameraPose starkVergroessert = controller.zoom(starkGeneigt, 1000.0);
+
+        assertEquals(89.0, starkGeneigt.elevationDegrees());
+        assertEquals(1_000.0, starkVerkleinert.distance());
+        assertEquals(200_000.0, starkVergroessert.distance());
+    }
+}
