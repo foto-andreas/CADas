@@ -2,6 +2,11 @@
 
 `CADas` ist eine JavaFX-basierte Desktop-Anwendung für Gebäude-Grundrisse und angrenzende CAD-Funktionen.
 
+## Status
+
+Achtung: Wir sind in einem frühen Status der Programmierung. Nix ist fest, wenig getestet. Alles wird per KI erstellt.
+
+
 ## Technik
 
 * `JDK 25`
