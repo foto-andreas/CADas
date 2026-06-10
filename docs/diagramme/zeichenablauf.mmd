@@ -1,0 +1,14 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart TD
+    Start[Zeichenvorgang starten] --> Klick[Linke Maustaste drücken]
+    Klick --> Snap[Startpunkt auf Raster oder Endpunkt einrasten]
+    Snap --> Ziehen[Zielpunkt ziehen]
+    Ziehen --> Modus{Shift gedrückt?}
+    Modus -- Nein --> Orthogonal[90°-Modus anwenden]
+    Modus -- Ja --> Frei[Freie Richtung übernehmen]
+    Orthogonal --> Werte[Optionale Länge und optionalen Winkel anwenden]
+    Frei --> Werte
+    Werte --> Vorschau[Vorschau mit Live-Länge und Live-Winkel anzeigen]
+    Vorschau --> Loslassen[Maustaste loslassen]
+    Loslassen --> Speichern[Wand im aktiven Geschoss speichern]
+

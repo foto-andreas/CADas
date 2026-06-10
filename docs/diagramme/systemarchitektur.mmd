@@ -1,0 +1,15 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart LR
+    Benutzer[Benutzer] --> UI[JavaFX Workbench]
+    UI --> Zeichensteuerung[UI-Interaktion]
+    Zeichensteuerung --> Drafting[DraftingService]
+    Zeichensteuerung --> Snap[SnapService]
+    Zeichensteuerung --> Modell[ProjectModel]
+    Drafting --> Geometrie[Geometriekern]
+    Snap --> Geometrie
+    Modell --> Etage[Level]
+    Etage --> Wand[Wall]
+    Build[Gradle und JaCoCo] --> UI
+    Build --> Drafting
+    Build --> Modell
+
