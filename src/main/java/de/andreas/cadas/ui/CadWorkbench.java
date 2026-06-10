@@ -3,6 +3,7 @@ package de.andreas.cadas.ui;
 import de.andreas.cadas.application.drawing.DraftingConstraints;
 import de.andreas.cadas.application.drawing.DraftingService;
 import de.andreas.cadas.application.drawing.OpeningPlacementService;
+import de.andreas.cadas.application.drawing.SelectionQueryService;
 import de.andreas.cadas.application.drawing.SnapService;
 import de.andreas.cadas.application.drawing.WallEditingService;
 import de.andreas.cadas.application.drawing.WallEndpointSelection;
@@ -93,6 +94,7 @@ public final class CadWorkbench extends BorderPane {
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final DraftingService draftingService = new DraftingService();
     private final SnapService snapService = new SnapService();
+    private final SelectionQueryService selectionQueryService = new SelectionQueryService();
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     private final WallEditingService wallEditingService = new WallEditingService();
     private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
@@ -208,42 +210,7 @@ public final class CadWorkbench extends BorderPane {
             }
         });
 
-        applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Je nach Werkzeug werden Wände, Räume, Türen oder Fenster platziert.");
-        applyTooltip(gridField, "Legt die Rasterweite für die Zeichenfläche fest. Werte werden mit der gewählten Einheit interpretiert.");
-        applyTooltip(gridUnit, "Bestimmt die Einheit für die Rasterweite, damit Eingaben in Millimeter, Zentimeter oder Meter erfolgen können.");
-        applyTooltip(lengthField, "Optionaler Längenwert für die gerade gezeichnete Wand. Wenn ein Wert eingetragen ist, wird die Wand auf diese Länge gesetzt.");
-        applyTooltip(lengthUnit, "Bestimmt die Einheit für die manuelle Längeneingabe während des Zeichnens.");
-        applyTooltip(angleField, "Optionaler Winkel in Grad für die aktuelle Wand. Ohne Eingabe bleibt der orthogonale 90°-Modus aktiv.");
-        applyTooltip(wallThicknessField, "Definiert die Wandstärke für neu gezeichnete Wände.");
-        applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
-        applyTooltip(wallHeightField, "Legt die Raum- beziehungsweise Wandhöhe für neu gezeichnete Wände fest.");
-        applyTooltip(wallHeightUnit, "Bestimmt die Einheit für die Wandhöhe.");
-        applyTooltip(roomNameField, "Legt den Namen für den nächsten anzulegenden Raum fest.");
-        applyTooltip(roomHeightField, "Legt die lichte Raumhöhe für den nächsten Raum fest.");
-        applyTooltip(roomHeightUnit, "Bestimmt die Einheit für die Raumhöhe.");
-        applyTooltip(floorThicknessField, "Legt die Boden- oder Fußbodenstärke des nächsten Raums fest.");
-        applyTooltip(floorThicknessUnit, "Bestimmt die Einheit für die Bodenstärke.");
-        applyTooltip(ceilingThicknessField, "Legt die Deckenstärke des nächsten Raums fest.");
-        applyTooltip(ceilingThicknessUnit, "Bestimmt die Einheit für die Deckenstärke.");
-        applyTooltip(doorWidthField, "Legt die Breite der nächsten Tür fest.");
-        applyTooltip(doorWidthUnit, "Bestimmt die Einheit für die Türbreite.");
-        applyTooltip(doorHeightField, "Legt die Höhe der nächsten Tür fest.");
-        applyTooltip(doorHeightUnit, "Bestimmt die Einheit für die Türhöhe.");
-        applyTooltip(thresholdField, "Legt den Höhenversatz der Türschwelle für die nächste Tür fest.");
-        applyTooltip(thresholdUnit, "Bestimmt die Einheit für die Türschwellenhöhe.");
-        applyTooltip(doorPresetSelector, "Wählt eine Standardtür aus der internen Teilebibliothek und übernimmt deren Maße.");
-        applyTooltip(windowWidthField, "Legt die Breite des nächsten Fensters fest.");
-        applyTooltip(windowWidthUnit, "Bestimmt die Einheit für die Fensterbreite.");
-        applyTooltip(windowHeightField, "Legt die Höhe des nächsten Fensters fest.");
-        applyTooltip(windowHeightUnit, "Bestimmt die Einheit für die Fensterhöhe.");
-        applyTooltip(sillHeightField, "Legt die Brüstungshöhe des nächsten Fensters fest.");
-        applyTooltip(sillHeightUnit, "Bestimmt die Einheit für die Brüstungshöhe.");
-        applyTooltip(windowPresetSelector, "Wählt ein Standardfenster aus der internen Teilebibliothek und übernimmt dessen Maße.");
-        applyTooltip(stairPresetSelector, "Wählt eine Standardtreppe aus der internen Teilebibliothek und übernimmt Typ, Höhe und Stufenanzahl.");
-        applyTooltip(stairHeightField, "Legt die Gesamthöhe der nächsten Treppe fest.");
-        applyTooltip(stairHeightUnit, "Bestimmt die Einheit für die Treppenhöhe.");
-        applyTooltip(stairStepsField, "Legt die Stufenanzahl der nächsten Treppe fest.");
-        applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
+        applyFormTooltips();
 
         registerRenderListener(showGrid);
         registerRenderListener(snapToGrid);
@@ -499,6 +466,45 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
+    private void applyFormTooltips() {
+        applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Je nach Werkzeug werden Wände, Räume, Türen oder Fenster platziert.");
+        applyTooltip(gridField, "Legt die Rasterweite für die Zeichenfläche fest. Werte werden mit der gewählten Einheit interpretiert.");
+        applyTooltip(gridUnit, "Bestimmt die Einheit für die Rasterweite, damit Eingaben in Millimeter, Zentimeter oder Meter erfolgen können.");
+        applyTooltip(lengthField, "Optionaler Längenwert für die gerade gezeichnete Wand. Wenn ein Wert eingetragen ist, wird die Wand auf diese Länge gesetzt.");
+        applyTooltip(lengthUnit, "Bestimmt die Einheit für die manuelle Längeneingabe während des Zeichnens.");
+        applyTooltip(angleField, "Optionaler Winkel in Grad für die aktuelle Wand. Ohne Eingabe bleibt der orthogonale 90°-Modus aktiv.");
+        applyTooltip(wallThicknessField, "Definiert die Wandstärke für neu gezeichnete Wände.");
+        applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
+        applyTooltip(wallHeightField, "Legt die Raum- beziehungsweise Wandhöhe für neu gezeichnete Wände fest.");
+        applyTooltip(wallHeightUnit, "Bestimmt die Einheit für die Wandhöhe.");
+        applyTooltip(roomNameField, "Legt den Namen für den nächsten anzulegenden Raum fest.");
+        applyTooltip(roomHeightField, "Legt die lichte Raumhöhe für den nächsten Raum fest.");
+        applyTooltip(roomHeightUnit, "Bestimmt die Einheit für die Raumhöhe.");
+        applyTooltip(floorThicknessField, "Legt die Boden- oder Fußbodenstärke des nächsten Raums fest.");
+        applyTooltip(floorThicknessUnit, "Bestimmt die Einheit für die Bodenstärke.");
+        applyTooltip(ceilingThicknessField, "Legt die Deckenstärke des nächsten Raums fest.");
+        applyTooltip(ceilingThicknessUnit, "Bestimmt die Einheit für die Deckenstärke.");
+        applyTooltip(doorWidthField, "Legt die Breite der nächsten Tür fest.");
+        applyTooltip(doorWidthUnit, "Bestimmt die Einheit für die Türbreite.");
+        applyTooltip(doorHeightField, "Legt die Höhe der nächsten Tür fest.");
+        applyTooltip(doorHeightUnit, "Bestimmt die Einheit für die Türhöhe.");
+        applyTooltip(thresholdField, "Legt den Höhenversatz der Türschwelle für die nächste Tür fest.");
+        applyTooltip(thresholdUnit, "Bestimmt die Einheit für die Türschwellenhöhe.");
+        applyTooltip(doorPresetSelector, "Wählt eine Standardtür aus der internen Teilebibliothek und übernimmt deren Maße.");
+        applyTooltip(windowWidthField, "Legt die Breite des nächsten Fensters fest.");
+        applyTooltip(windowWidthUnit, "Bestimmt die Einheit für die Fensterbreite.");
+        applyTooltip(windowHeightField, "Legt die Höhe des nächsten Fensters fest.");
+        applyTooltip(windowHeightUnit, "Bestimmt die Einheit für die Fensterhöhe.");
+        applyTooltip(sillHeightField, "Legt die Brüstungshöhe des nächsten Fensters fest.");
+        applyTooltip(sillHeightUnit, "Bestimmt die Einheit für die Brüstungshöhe.");
+        applyTooltip(windowPresetSelector, "Wählt ein Standardfenster aus der internen Teilebibliothek und übernimmt dessen Maße.");
+        applyTooltip(stairPresetSelector, "Wählt eine Standardtreppe aus der internen Teilebibliothek und übernimmt Typ, Höhe und Stufenanzahl.");
+        applyTooltip(stairHeightField, "Legt die Gesamthöhe der nächsten Treppe fest.");
+        applyTooltip(stairHeightUnit, "Bestimmt die Einheit für die Treppenhöhe.");
+        applyTooltip(stairStepsField, "Legt die Stufenanzahl der nächsten Treppe fest.");
+        applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
+    }
+
     private void registerRenderListener(BooleanProperty property) {
         property.addListener((ignored, oldValue, newValue) -> render());
     }
@@ -572,7 +578,7 @@ public final class CadWorkbench extends BorderPane {
                         .findFirst()
                         .ifPresent(wall -> selectedSelection.set(new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString())));
             } else {
-                selectedSelection.set(findSelectionAt(editPoint));
+                selectedSelection.set(selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null));
             }
             render();
             return;
@@ -1424,65 +1430,4 @@ public final class CadWorkbench extends BorderPane {
                 && selectedSelection.get().elementId().equals(elementId);
     }
 
-    private SelectionKey findSelectionAt(PlanPoint point) {
-        for (Door door : activeLevel.get().doors()) {
-            Wall wall = activeLevel.get().findWall(door.wallId());
-            PlanSegment segment = new PlanSegment(
-                    wall.axis().pointAt(door.offsetFromStart()),
-                    wall.axis().pointAt(door.offsetFromStart().add(door.width()))
-            );
-            if (segment.distanceTo(point).compareTo(SNAP_TOLERANCE) <= 0) {
-                return new SelectionKey(RenderableKind.DOOR, activeLevel.get().name(), door.id().toString());
-            }
-        }
-        for (WindowElement window : activeLevel.get().windows()) {
-            Wall wall = activeLevel.get().findWall(window.wallId());
-            PlanSegment segment = new PlanSegment(
-                    wall.axis().pointAt(window.offsetFromStart()),
-                    wall.axis().pointAt(window.offsetFromStart().add(window.width()))
-            );
-            if (segment.distanceTo(point).compareTo(SNAP_TOLERANCE) <= 0) {
-                return new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString());
-            }
-        }
-        for (Room room : activeLevel.get().rooms()) {
-            if (containsPoint(room, point)) {
-                return new SelectionKey(RenderableKind.ROOM_VOLUME, activeLevel.get().name(), room.id().toString());
-            }
-        }
-        for (Staircase staircase : activeLevel.get().staircases()) {
-            if (point.xMillimeters() >= staircase.minX()
-                    && point.xMillimeters() <= staircase.maxX()
-                    && point.yMillimeters() >= staircase.minY()
-                    && point.yMillimeters() <= staircase.maxY()) {
-                return new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), staircase.id().toString());
-            }
-        }
-        return activeLevel.get().walls().stream()
-                .filter(wall -> wall.axis().distanceTo(point).compareTo(SNAP_TOLERANCE) <= 0)
-                .min((left, right) -> Double.compare(
-                        left.axis().distanceTo(point).toMillimeters(),
-                        right.axis().distanceTo(point).toMillimeters()))
-                .map(wall -> new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()))
-                .orElse(null);
-    }
-
-    private boolean containsPoint(Room room, PlanPoint point) {
-        boolean inside = false;
-        int lastIndex = room.outline().size() - 1;
-        for (int currentIndex = 0; currentIndex < room.outline().size(); currentIndex++) {
-            PlanPoint current = room.outline().get(currentIndex);
-            PlanPoint previous = room.outline().get(lastIndex);
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            lastIndex = currentIndex;
-        }
-        return inside;
-    }
 }
