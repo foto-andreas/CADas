@@ -6,6 +6,12 @@ import de.andreas.cadas.application.drawing.OpeningPlacementService;
 import de.andreas.cadas.application.drawing.SnapService;
 import de.andreas.cadas.application.drawing.WallEditingService;
 import de.andreas.cadas.application.drawing.WallEndpointSelection;
+import de.andreas.cadas.application.exchange.LevelExchangeService;
+import de.andreas.cadas.application.parts.DoorPreset;
+import de.andreas.cadas.application.parts.StairPreset;
+import de.andreas.cadas.application.parts.StandardPartLibrary;
+import de.andreas.cadas.application.parts.StandardPartLibraryService;
+import de.andreas.cadas.application.parts.WindowPreset;
 import de.andreas.cadas.domain.geometry.Angle;
 import de.andreas.cadas.domain.geometry.Grid;
 import de.andreas.cadas.domain.geometry.Length;
@@ -16,9 +22,14 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.StairType;
+import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
+import de.andreas.cadas.infrastructure.dxf.DxfLevelExchangeService;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -53,6 +64,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
 
 public final class CadWorkbench extends BorderPane {
 
@@ -69,12 +82,15 @@ public final class CadWorkbench extends BorderPane {
     private static final Length DEFAULT_WINDOW_WIDTH = Length.of(1.20, LengthUnit.METER);
     private static final Length DEFAULT_WINDOW_HEIGHT = Length.of(1.20, LengthUnit.METER);
     private static final Length DEFAULT_WINDOW_SILL = Length.of(90, LengthUnit.CENTIMETER);
+    private static final Length DEFAULT_STAIR_HEIGHT = Length.of(2.80, LengthUnit.METER);
     private static final Length SNAP_TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
 
+    private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final DraftingService draftingService = new DraftingService();
     private final SnapService snapService = new SnapService();
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     private final WallEditingService wallEditingService = new WallEditingService();
+    private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
 
     private final ObjectProperty<Level> activeLevel = new SimpleObjectProperty<>(project.primaryLevel());
@@ -121,6 +137,12 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> windowHeightUnit = new ComboBox<>();
     private final TextField sillHeightField = new TextField("90");
     private final ComboBox<LengthUnit> sillHeightUnit = new ComboBox<>();
+    private final ComboBox<DoorPreset> doorPresetSelector = new ComboBox<>();
+    private final ComboBox<WindowPreset> windowPresetSelector = new ComboBox<>();
+    private final ComboBox<StairPreset> stairPresetSelector = new ComboBox<>();
+    private final TextField stairHeightField = new TextField("2,80");
+    private final ComboBox<LengthUnit> stairHeightUnit = new ComboBox<>();
+    private final TextField stairStepsField = new TextField("16");
     private final ComboBox<Level> levelSelector = new ComboBox<>();
     private final ComboBox<DrawingTool> toolSelector = new ComboBox<>();
 
@@ -184,10 +206,24 @@ public final class CadWorkbench extends BorderPane {
         windowHeightUnit.setValue(LengthUnit.METER);
         sillHeightUnit.getItems().addAll(LengthUnit.values());
         sillHeightUnit.setValue(LengthUnit.CENTIMETER);
+        stairHeightUnit.getItems().addAll(LengthUnit.values());
+        stairHeightUnit.setValue(LengthUnit.METER);
         levelSelector.setItems(availableLevels);
         levelSelector.setValue(activeLevel.get());
         toolSelector.getItems().addAll(DrawingTool.values());
         toolSelector.setValue(DrawingTool.WALL);
+        doorPresetSelector.getItems().setAll(partLibrary.doorPresets());
+        windowPresetSelector.getItems().setAll(partLibrary.windowPresets());
+        stairPresetSelector.getItems().setAll(partLibrary.stairPresets());
+        doorPresetSelector.setValue(partLibrary.doorPresets().getFirst());
+        windowPresetSelector.setValue(partLibrary.windowPresets().getFirst());
+        stairPresetSelector.setValue(partLibrary.stairPresets().getFirst());
+        applyDoorPreset(doorPresetSelector.getValue());
+        applyWindowPreset(windowPresetSelector.getValue());
+        applyStairPreset(stairPresetSelector.getValue());
+        doorPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyDoorPreset(newValue));
+        windowPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyWindowPreset(newValue));
+        stairPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyStairPreset(newValue));
         levelSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
                 activeLevel.set(newValue);
@@ -218,12 +254,18 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(doorHeightUnit, "Bestimmt die Einheit für die Türhöhe.");
         applyTooltip(thresholdField, "Legt den Höhenversatz der Türschwelle für die nächste Tür fest.");
         applyTooltip(thresholdUnit, "Bestimmt die Einheit für die Türschwellenhöhe.");
+        applyTooltip(doorPresetSelector, "Wählt eine Standardtür aus der internen Teilebibliothek und übernimmt deren Maße.");
         applyTooltip(windowWidthField, "Legt die Breite des nächsten Fensters fest.");
         applyTooltip(windowWidthUnit, "Bestimmt die Einheit für die Fensterbreite.");
         applyTooltip(windowHeightField, "Legt die Höhe des nächsten Fensters fest.");
         applyTooltip(windowHeightUnit, "Bestimmt die Einheit für die Fensterhöhe.");
         applyTooltip(sillHeightField, "Legt die Brüstungshöhe des nächsten Fensters fest.");
         applyTooltip(sillHeightUnit, "Bestimmt die Einheit für die Brüstungshöhe.");
+        applyTooltip(windowPresetSelector, "Wählt ein Standardfenster aus der internen Teilebibliothek und übernimmt dessen Maße.");
+        applyTooltip(stairPresetSelector, "Wählt eine Standardtreppe aus der internen Teilebibliothek und übernimmt Typ, Höhe und Stufenanzahl.");
+        applyTooltip(stairHeightField, "Legt die Gesamthöhe der nächsten Treppe fest.");
+        applyTooltip(stairHeightUnit, "Bestimmt die Einheit für die Treppenhöhe.");
+        applyTooltip(stairStepsField, "Legt die Stufenanzahl der nächsten Treppe fest.");
         applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
 
         showGrid.addListener((ignored, oldValue, newValue) -> render());
@@ -299,12 +341,22 @@ public final class CadWorkbench extends BorderPane {
         addLevelButton.setOnAction(event -> createLevel());
         applyTooltip(addLevelButton, "Legt eine neue Etage für den aktuellen Grundriss an und wechselt direkt in diese Etage.");
 
-        settingsBarStyling(resetViewButton, addLevelButton);
+        Button exportDxfButton = new Button("DXF exportieren");
+        exportDxfButton.setOnAction(event -> exportCurrentLevel());
+        applyTooltip(exportDxfButton, "Exportiert die aktuell aktive Etage als DXF-Datei. Räume, Wände, Türen und Fenster werden einschließlich CADas-Metadaten geschrieben.");
+
+        Button importDxfButton = new Button("DXF importieren");
+        importDxfButton.setOnAction(event -> importLevel());
+        applyTooltip(importDxfButton, "Importiert eine DXF-Datei als neue Etage. CADas-Metadaten werden bevorzugt ausgewertet, einfache Geometrien werden ersatzweise als Grundriss übernommen.");
+
+        settingsBarStyling(resetViewButton, addLevelButton, exportDxfButton, importDxfButton);
         return new ToolBar(
                 labelledNode("Werkzeug", toolSelector),
                 new Separator(Orientation.VERTICAL),
                 labelledNode("Etage", levelSelector),
                 addLevelButton,
+                exportDxfButton,
+                importDxfButton,
                 new Separator(Orientation.VERTICAL),
                 labelledNode("Rasterweite", gridField),
                 gridUnit,
@@ -331,6 +383,7 @@ public final class CadWorkbench extends BorderPane {
                 doorHeightUnit,
                 labelledNode("Schwelle", thresholdField),
                 thresholdUnit,
+                labelledNode("Tür-Preset", doorPresetSelector),
                 new Separator(Orientation.VERTICAL),
                 labelledNode("Fensterbreite", windowWidthField),
                 windowWidthUnit,
@@ -338,6 +391,12 @@ public final class CadWorkbench extends BorderPane {
                 windowHeightUnit,
                 labelledNode("Brüstung", sillHeightField),
                 sillHeightUnit,
+                labelledNode("Fenster-Preset", windowPresetSelector),
+                new Separator(Orientation.VERTICAL),
+                labelledNode("Treppen-Preset", stairPresetSelector),
+                labelledNode("Treppenhöhe", stairHeightField),
+                stairHeightUnit,
+                labelledNode("Stufen", stairStepsField),
                 new Separator(Orientation.VERTICAL),
                 rasterBox,
                 snapRasterBox,
@@ -369,9 +428,11 @@ public final class CadWorkbench extends BorderPane {
         return box;
     }
 
-    private void settingsBarStyling(Button resetViewButton, Button addLevelButton) {
+    private void settingsBarStyling(Button resetViewButton, Button addLevelButton, Button exportDxfButton, Button importDxfButton) {
         resetViewButton.setStyle("-fx-background-color: #4b6a88; -fx-text-fill: white; -fx-background-radius: 999;");
         addLevelButton.setStyle("-fx-background-color: #7f5539; -fx-text-fill: white; -fx-background-radius: 999;");
+        exportDxfButton.setStyle("-fx-background-color: #3b7b58; -fx-text-fill: white; -fx-background-radius: 999;");
+        importDxfButton.setStyle("-fx-background-color: #5d648f; -fx-text-fill: white; -fx-background-radius: 999;");
         gridField.setPrefColumnCount(5);
         lengthField.setPrefColumnCount(6);
         angleField.setPrefColumnCount(5);
@@ -387,8 +448,13 @@ public final class CadWorkbench extends BorderPane {
         windowWidthField.setPrefColumnCount(5);
         windowHeightField.setPrefColumnCount(5);
         sillHeightField.setPrefColumnCount(4);
+        stairHeightField.setPrefColumnCount(5);
+        stairStepsField.setPrefColumnCount(3);
         levelSelector.setPrefWidth(180);
         toolSelector.setPrefWidth(140);
+        doorPresetSelector.setPrefWidth(190);
+        windowPresetSelector.setPrefWidth(210);
+        stairPresetSelector.setPrefWidth(190);
     }
 
     private HBox labelledNode(String label, javafx.scene.Node node) {
@@ -529,6 +595,14 @@ public final class CadWorkbench extends BorderPane {
                         currentFloorThickness(),
                         currentCeilingThickness()
                 ));
+            } else if (currentTool() == DrawingTool.STAIR) {
+                activeLevel.get().addStaircase(Staircase.create(
+                        currentStairType(),
+                        previewSegment.start(),
+                        previewSegment.end(),
+                        currentStairHeight(),
+                        currentStairSteps()
+                ));
             }
         }
         draftStart = null;
@@ -559,6 +633,7 @@ public final class CadWorkbench extends BorderPane {
         }
         drawRooms(graphics);
         drawWalls(graphics);
+        drawStaircases(graphics);
         drawDoors(graphics);
         drawWindows(graphics);
         if (previewSegment != null) {
@@ -687,6 +762,49 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
+    private void drawStaircases(GraphicsContext graphics) {
+        for (Staircase staircase : activeLevel.get().staircases()) {
+            double x = toScreenX(staircase.minX());
+            double y = toScreenY(staircase.minY());
+            double width = staircase.widthMillimeters() * scale();
+            double height = staircase.heightMillimeters() * scale();
+            graphics.setStroke(Color.web("#5e503f"));
+            graphics.setFill(Color.color(0.52, 0.46, 0.37, 0.16));
+            graphics.setLineWidth(2.0);
+            graphics.fillRect(x, y, width, height);
+            graphics.strokeRect(x, y, width, height);
+            switch (staircase.stairType()) {
+                case STRAIGHT -> drawStraightStairTreads(graphics, staircase, x, y, width, height);
+                case HALF_TURN -> drawHalfTurnStair(graphics, staircase, x, y, width, height);
+                case SPIRAL -> drawSpiralStair(graphics, x, y, width, height);
+            }
+        }
+    }
+
+    private void drawStraightStairTreads(GraphicsContext graphics, Staircase staircase, double x, double y, double width, double height) {
+        double stepHeight = height / staircase.stepCount();
+        for (int step = 1; step < staircase.stepCount(); step++) {
+            double yStep = y + stepHeight * step;
+            graphics.strokeLine(x, yStep, x + width, yStep);
+        }
+    }
+
+    private void drawHalfTurnStair(GraphicsContext graphics, Staircase staircase, double x, double y, double width, double height) {
+        double halfHeight = height / 2.0;
+        double flightWidth = width / 2.0;
+        graphics.strokeLine(x + flightWidth, y, x + flightWidth, y + halfHeight);
+        for (int step = 1; step < staircase.stepCount() / 2; step++) {
+            double localY = y + (halfHeight / (staircase.stepCount() / 2.0)) * step;
+            graphics.strokeLine(x, localY, x + flightWidth, localY);
+            graphics.strokeLine(x + flightWidth, y + height - (localY - y), x + width, y + height - (localY - y));
+        }
+    }
+
+    private void drawSpiralStair(GraphicsContext graphics, double x, double y, double width, double height) {
+        graphics.strokeOval(x, y, width, height);
+        graphics.strokeOval(x + width * 0.25, y + height * 0.25, width * 0.5, height * 0.5);
+    }
+
     private void drawWall(GraphicsContext graphics, PlanSegment segment, Length thickness, Color color) {
         double screenStartX = toScreenX(segment.start().xMillimeters());
         double screenStartY = toScreenY(segment.start().yMillimeters());
@@ -698,11 +816,11 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawPreview(GraphicsContext graphics) {
+        double startX = Math.min(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
+        double startY = Math.min(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
+        double endX = Math.max(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
+        double endY = Math.max(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
         if (currentTool() == DrawingTool.ROOM) {
-            double startX = Math.min(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
-            double startY = Math.min(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
-            double endX = Math.max(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
-            double endY = Math.max(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
             graphics.setFill(Color.color(0.76, 0.49, 0.27, 0.18));
             graphics.fillRect(
                     toScreenX(startX),
@@ -712,6 +830,22 @@ public final class CadWorkbench extends BorderPane {
             );
             graphics.setStroke(Color.web("#c26d32"));
             graphics.setLineWidth(2.0);
+            graphics.strokeRect(
+                    toScreenX(startX),
+                    toScreenY(startY),
+                    (endX - startX) * scale(),
+                    (endY - startY) * scale()
+            );
+        } else if (currentTool() == DrawingTool.STAIR) {
+            graphics.setFill(Color.color(0.45, 0.37, 0.29, 0.18));
+            graphics.setStroke(Color.web("#7f6a55"));
+            graphics.setLineWidth(2.0);
+            graphics.fillRect(
+                    toScreenX(startX),
+                    toScreenY(startY),
+                    (endX - startX) * scale(),
+                    (endY - startY) * scale()
+            );
             graphics.strokeRect(
                     toScreenX(startX),
                     toScreenY(startY),
@@ -883,6 +1017,24 @@ public final class CadWorkbench extends BorderPane {
         return parseLength(sillHeightField, sillHeightUnit.getValue()).orElse(DEFAULT_WINDOW_SILL);
     }
 
+    private StairType currentStairType() {
+        return Optional.ofNullable(stairPresetSelector.getValue())
+                .map(StairPreset::stairType)
+                .orElse(StairType.STRAIGHT);
+    }
+
+    private Length currentStairHeight() {
+        return parseLength(stairHeightField, stairHeightUnit.getValue()).orElse(DEFAULT_STAIR_HEIGHT);
+    }
+
+    private int currentStairSteps() {
+        try {
+            return Math.max(1, Integer.parseInt(stairStepsField.getText()));
+        } catch (NumberFormatException ignored) {
+            return 16;
+        }
+    }
+
     private Optional<Length> parseLength(TextField field, LengthUnit unit) {
         String text = field.getText();
         if (text == null || text.isBlank()) {
@@ -1002,6 +1154,97 @@ public final class CadWorkbench extends BorderPane {
             return Math.abs(guideLine.worldMillimeters() - clickPoint.xMillimeters());
         }
         return Math.abs(guideLine.worldMillimeters() - clickPoint.yMillimeters());
+    }
+
+    private void exportCurrentLevel() {
+        FileChooser fileChooser = createDxfFileChooser();
+        fileChooser.setInitialFileName(activeLevel.get().name().replace(' ', '_') + ".dxf");
+        Window window = getScene() != null ? getScene().getWindow() : null;
+        java.io.File file = fileChooser.showSaveDialog(window);
+        if (file == null) {
+            return;
+        }
+        try {
+            levelExchangeService.exportLevel(activeLevel.get(), file.toPath());
+            draftLabel.setText("DXF exportiert: " + file.getName());
+        } catch (IOException exception) {
+            draftLabel.setText("DXF-Export fehlgeschlagen: " + exception.getMessage());
+        }
+    }
+
+    private void importLevel() {
+        FileChooser fileChooser = createDxfFileChooser();
+        Window window = getScene() != null ? getScene().getWindow() : null;
+        java.io.File file = fileChooser.showOpenDialog(window);
+        if (file == null) {
+            return;
+        }
+        try {
+            String levelName = uniqueLevelName(stripExtension(file.toPath()));
+            Level importedLevel = levelExchangeService.importLevel(file.toPath(), levelName);
+            project.addLevel(importedLevel);
+            availableLevels.add(importedLevel);
+            levelSelector.setValue(importedLevel);
+            draftLabel.setText("DXF importiert: " + file.getName());
+        } catch (IOException exception) {
+            draftLabel.setText("DXF-Import fehlgeschlagen: " + exception.getMessage());
+        }
+    }
+
+    private FileChooser createDxfFileChooser() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("DXF-Datei auswählen");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("DXF-Dateien", "*.dxf"));
+        return fileChooser;
+    }
+
+    private String stripExtension(Path path) {
+        String filename = path.getFileName().toString();
+        int dotIndex = filename.lastIndexOf('.');
+        if (dotIndex <= 0) {
+            return filename;
+        }
+        return filename.substring(0, dotIndex);
+    }
+
+    private String uniqueLevelName(String baseName) {
+        String candidate = baseName;
+        int suffix = 2;
+        while (containsLevelName(candidate)) {
+            candidate = baseName + " " + suffix;
+            suffix++;
+        }
+        return candidate;
+    }
+
+    private boolean containsLevelName(String candidate) {
+        return availableLevels.stream().anyMatch(level -> level.name().equalsIgnoreCase(candidate));
+    }
+
+    private void applyDoorPreset(DoorPreset preset) {
+        if (preset == null) {
+            return;
+        }
+        doorWidthField.setText(preset.width().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
+        doorHeightField.setText(preset.height().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
+        thresholdField.setText(preset.thresholdHeight().format(LengthUnit.CENTIMETER, 0).replace(" cm", "").replace('.', ','));
+    }
+
+    private void applyWindowPreset(WindowPreset preset) {
+        if (preset == null) {
+            return;
+        }
+        windowWidthField.setText(preset.width().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
+        windowHeightField.setText(preset.height().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
+        sillHeightField.setText(preset.sillHeight().format(LengthUnit.CENTIMETER, 0).replace(" cm", "").replace('.', ','));
+    }
+
+    private void applyStairPreset(StairPreset preset) {
+        if (preset == null) {
+            return;
+        }
+        stairHeightField.setText(preset.totalHeight().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
+        stairStepsField.setText(Integer.toString(preset.stepCount()));
     }
 
     private PlanPoint screenToWorld(double screenX, double screenY) {

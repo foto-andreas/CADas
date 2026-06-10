@@ -12,6 +12,7 @@ public final class Level {
     private final List<Room> rooms = new ArrayList<>();
     private final List<Door> doors = new ArrayList<>();
     private final List<WindowElement> windows = new ArrayList<>();
+    private final List<Staircase> staircases = new ArrayList<>();
 
     public Level(String name) {
         this.name = Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -42,6 +43,11 @@ public final class Level {
         rooms.add(Objects.requireNonNull(room, "room darf nicht null sein."));
     }
 
+    public void replaceRooms(List<Room> updatedRooms) {
+        rooms.clear();
+        rooms.addAll(Objects.requireNonNull(updatedRooms, "updatedRooms darf nicht null sein."));
+    }
+
     public List<Door> doors() {
         return List.copyOf(doors);
     }
@@ -50,12 +56,35 @@ public final class Level {
         doors.add(Objects.requireNonNull(door, "door darf nicht null sein."));
     }
 
+    public void replaceDoors(List<Door> updatedDoors) {
+        doors.clear();
+        doors.addAll(Objects.requireNonNull(updatedDoors, "updatedDoors darf nicht null sein."));
+    }
+
     public List<WindowElement> windows() {
         return List.copyOf(windows);
     }
 
     public void addWindow(WindowElement window) {
         windows.add(Objects.requireNonNull(window, "window darf nicht null sein."));
+    }
+
+    public void replaceWindows(List<WindowElement> updatedWindows) {
+        windows.clear();
+        windows.addAll(Objects.requireNonNull(updatedWindows, "updatedWindows darf nicht null sein."));
+    }
+
+    public List<Staircase> staircases() {
+        return List.copyOf(staircases);
+    }
+
+    public void addStaircase(Staircase staircase) {
+        staircases.add(Objects.requireNonNull(staircase, "staircase darf nicht null sein."));
+    }
+
+    public void replaceStaircases(List<Staircase> updatedStaircases) {
+        staircases.clear();
+        staircases.addAll(Objects.requireNonNull(updatedStaircases, "updatedStaircases darf nicht null sein."));
     }
 
     public Wall findWall(UUID wallId) {

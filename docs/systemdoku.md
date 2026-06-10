@@ -24,10 +24,16 @@
   JavaFX-Workbench, Ansichten und Interaktion mit der Zeichenfläche.
 * `de.andreas.cadas.application.drawing`
   Anwendungslogik für orthogonales Zeichnen, manuelle Längen- und Winkeleingabe, Snap-Verhalten, Öffnungsplatzierung und Bearbeitung verbundener Wand-Endpunkte.
+* `de.andreas.cadas.application.exchange`
+  Formatunabhängige Schnittstellen für Import und Export.
+* `de.andreas.cadas.application.parts`
+  Interne Standard-Teilebibliothek für Türen, Fenster und Treppen-Presets.
 * `de.andreas.cadas.domain.geometry`
   Geometrische Grundbausteine wie Längen, Winkel, Raster, Punkte und Segmente.
 * `de.andreas.cadas.domain.model`
-  Fachliches Projektmodell für Etagen, Räume, Wände, Türen und Fenster.
+  Fachliches Projektmodell für Etagen, Räume, Wände, Türen, Fenster und Treppen.
+* `de.andreas.cadas.infrastructure.dxf`
+  Konkreter Adapter für ASCII-DXF-Import und -Export.
 
 ## Verantwortlichkeiten
 
@@ -44,6 +50,9 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * Live-Anzeige von Länge und Winkel
 * ein- und ausblendbare Bemaßung für Wände
 * Werkzeugmodus für Wände, Räume, Türen, Fenster und Bearbeitung
+* DXF-Import und DXF-Export für die aktive Etage
+* Standardteil-Presets für Türen, Fenster und Treppen
+* erste Treppenplatzierung für gerade, 180°- und Wendeltreppen
 * Flächen- und Volumenanzeige für Räume
 
 ### Anwendungslogik
@@ -52,7 +61,17 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 ### Domäne
 
-`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door` und `WindowElement` bilden den aktuellen Grundrisskern ab. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
+`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement` und `Staircase` bilden den aktuellen Grundrisskern ab. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
+
+## Dateiformatstrategie
+
+Der erste konkrete Austauschadapter ist `DxfLevelExchangeService`. Er kapselt den DXF-Import und -Export bewusst hinter `LevelExchangeService`, damit eine spätere `DWG`-Unterstützung als weiterer Infrastrukturadapter ergänzt werden kann.
+
+Für den aktuellen Stand gilt:
+
+* Wände, Räume, Türen und Fenster werden sichtbar als DXF-Geometrie exportiert.
+* Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
+* Fällt diese Metadaten-Spur weg, importiert der Adapter zumindest einfache Wände und Räume aus der reinen Geometrie.
 
 ## Rendering-Modell
 
@@ -69,6 +88,8 @@ Aktuell abgesichert sind unter anderem:
 * Platzierung von Türen und Fenstern auf Wänden
 * Verschieben verbundener Wand-Endpunkte
 * Flächen- und Volumenberechnung von Räumen
+* DXF-Roundtrip für die Grundobjekte des MVP
+* Standardteil-Bibliothek für Türen, Fenster und Treppen
 * Grundverhalten des Projektmodells
 
 Build und Tests laufen über:

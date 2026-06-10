@@ -14,6 +14,8 @@ flowchart TD
     Loslassen --> Speichern[Wand im aktiven Geschoss speichern]
     Werkzeug -- Raum --> Raumziehen[Rechteck aufziehen]
     Raumziehen --> RaumSpeichern[Raum mit Höhe, Boden und Decke speichern]
+    Werkzeug -- Treppe --> TreppeAufziehen[Treppengrundfläche aufziehen]
+    TreppeAufziehen --> TreppeSpeichern[Treppe mit Preset, Höhe und Stufenanzahl speichern]
     Werkzeug -- Tür oder Fenster --> Oeffnung[Auf Wand klicken]
     Oeffnung --> Binden[Öffnung wandgebunden mit Offset speichern]
     Werkzeug -- Bearbeiten --> Endpunkt[Verknüpften Wand-Endpunkt wählen]
