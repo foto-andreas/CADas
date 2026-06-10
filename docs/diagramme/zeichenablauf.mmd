@@ -1,7 +1,8 @@
 %%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
 flowchart TD
     Start[Zeichenvorgang starten] --> Klick[Linke Maustaste drücken]
-    Klick --> Snap[Startpunkt auf Raster oder Endpunkt einrasten]
+    Klick --> Werkzeug{Werkzeug}
+    Werkzeug -- Wand --> Snap[Startpunkt auf Raster oder Endpunkt einrasten]
     Snap --> Ziehen[Zielpunkt ziehen]
     Ziehen --> Modus{Shift gedrückt?}
     Modus -- Nein --> Orthogonal[90°-Modus anwenden]
@@ -11,4 +12,9 @@ flowchart TD
     Werte --> Vorschau[Vorschau mit Live-Länge und Live-Winkel anzeigen]
     Vorschau --> Loslassen[Maustaste loslassen]
     Loslassen --> Speichern[Wand im aktiven Geschoss speichern]
-
+    Werkzeug -- Raum --> Raumziehen[Rechteck aufziehen]
+    Raumziehen --> RaumSpeichern[Raum mit Höhe, Boden und Decke speichern]
+    Werkzeug -- Tür oder Fenster --> Oeffnung[Auf Wand klicken]
+    Oeffnung --> Binden[Öffnung wandgebunden mit Offset speichern]
+    Werkzeug -- Bearbeiten --> Endpunkt[Verknüpften Wand-Endpunkt wählen]
+    Endpunkt --> Verschieben[Alle verbundenen Endpunkte gemeinsam verschieben]

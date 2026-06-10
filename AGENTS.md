@@ -39,6 +39,8 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Treppen, Dächer und zusätzliche Flächen-Ebenen folgen nach dem robusten 2D-Grundrisskern.
 * Zuerst eine kleine interne Standardbibliothek für Türen, Fenster und einfache Treppen bereitstellen.
 * Externe Teilebibliotheken folgen nach der internen Basisbibliothek.
+* Räume werden im ersten MVP als rechteckige Polygone angelegt und später auf komplexere Konturen erweitert.
+* Türen und Fenster werden im Modell wandgebunden über Offset und Breite gespeichert, damit Wandbearbeitungen diese Öffnungen mitführen können.
 
 ## Empfohlene Umsetzungsreihenfolge
 1. Technisches Grundgerüst, Architektur, Tests und Qualitätswerkzeuge.

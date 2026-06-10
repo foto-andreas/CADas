@@ -24,7 +24,8 @@ class ProjectModelTest {
         Level level = new Level("Obergeschoss");
         level.addWall(Wall.create(
                 new PlanSegment(new PlanPoint(0, 0), new PlanPoint(3000, 0)),
-                Length.of(17.5, LengthUnit.CENTIMETER)
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
         ));
 
         assertEquals(1, level.walls().size());
