@@ -45,4 +45,21 @@ class WallEditingServiceTest {
         assertEquals(300.0, updatedWalls.get(1).axis().start().xMillimeters(), 0.1);
         assertEquals(400.0, updatedWalls.get(1).axis().start().yMillimeters(), 0.1);
     }
+
+    @Test
+    void bleibtAuchBeiKleinteiligenEckenStabil() {
+        List<Wall> walls = List.of(
+                Wall.create(new PlanSegment(new PlanPoint(0, 0), new PlanPoint(50, 0)), Length.of(17.5, LengthUnit.CENTIMETER), Length.of(2.75, LengthUnit.METER)),
+                Wall.create(new PlanSegment(new PlanPoint(50, 0), new PlanPoint(50, 75)), Length.of(17.5, LengthUnit.CENTIMETER), Length.of(2.75, LengthUnit.METER)),
+                Wall.create(new PlanSegment(new PlanPoint(50, 75), new PlanPoint(400, 75)), Length.of(17.5, LengthUnit.CENTIMETER), Length.of(2.75, LengthUnit.METER))
+        );
+
+        WallEndpointSelection selection = wallEditingService.findConnectedEndpoint(walls, new PlanPoint(50, 0), Length.of(4, LengthUnit.CENTIMETER)).orElseThrow();
+        List<Wall> updatedWalls = wallEditingService.moveEndpointGroup(walls, selection, new PlanPoint(60, 10));
+
+        assertEquals(60.0, updatedWalls.getFirst().axis().end().xMillimeters(), 0.1);
+        assertEquals(10.0, updatedWalls.getFirst().axis().end().yMillimeters(), 0.1);
+        assertEquals(60.0, updatedWalls.get(1).axis().start().xMillimeters(), 0.1);
+        assertEquals(10.0, updatedWalls.get(1).axis().start().yMillimeters(), 0.1);
+    }
 }

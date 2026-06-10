@@ -1,0 +1,21 @@
+package de.andreas.cadas.application.layers;
+
+import de.andreas.cadas.domain.model.SurfaceLayer;
+import de.andreas.cadas.domain.model.SurfaceLayerStack;
+
+import java.util.List;
+
+public final class SurfaceLayerConsistencyService {
+
+    public boolean haveEqualSequence(SurfaceLayerStack first, SurfaceLayerStack second) {
+        return signature(first.layers()).equals(signature(second.layers()));
+    }
+
+    public String signature(List<SurfaceLayer> layers) {
+        return layers.stream()
+                .map(layer -> layer.name() + ":" + layer.thickness().toMillimeters() + ":" + layer.tileWidth().toMillimeters() + ":" + layer.tileHeight().toMillimeters())
+                .reduce((left, right) -> left + "|" + right)
+                .orElse("");
+    }
+}
+
