@@ -13,6 +13,7 @@ public final class Level {
     private final List<Door> doors = new ArrayList<>();
     private final List<WindowElement> windows = new ArrayList<>();
     private final List<Staircase> staircases = new ArrayList<>();
+    private final List<SurfaceLayerStack> surfaceLayerStacks = new ArrayList<>();
 
     public Level(String name) {
         this.name = Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -85,6 +86,14 @@ public final class Level {
     public void replaceStaircases(List<Staircase> updatedStaircases) {
         staircases.clear();
         staircases.addAll(Objects.requireNonNull(updatedStaircases, "updatedStaircases darf nicht null sein."));
+    }
+
+    public List<SurfaceLayerStack> surfaceLayerStacks() {
+        return List.copyOf(surfaceLayerStacks);
+    }
+
+    public void addSurfaceLayerStack(SurfaceLayerStack stack) {
+        surfaceLayerStacks.add(Objects.requireNonNull(stack, "stack darf nicht null sein."));
     }
 
     public Wall findWall(UUID wallId) {

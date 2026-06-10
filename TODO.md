@@ -15,7 +15,7 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 ✓ Einheitensystem für `mm`, `cm` und `m` mit verlustarmer interner Repräsentation festlegen.
 ✓ Kernmodell für Projekt, Geschoss, Raum, Wand, Tür, Fenster, Boden und Decke aufbauen.
 ✓ Höhen- und Dickenangaben für Räume, Wände, Decken, Fenster und Türschwellen modellieren.
-* Modellregeln für verbundene Linien-Enden und konsistente Topologie definieren.
+✓ Modellregeln für verbundene Linien-Enden und konsistente Topologie definieren.
 
 ## Phase 2: 2D-Zeichenoberfläche als erstes MVP
 ✓ Unendlichen Canvas mit Pan und Zoom umsetzen.
@@ -41,14 +41,14 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 ✓ Erweiterte Bauteile erst nach Abschluss des 2D-Grundriss-MVP angehen.
 ✓ Treppenmodell für gerade Treppen, Podeste und Wendeltreppen definieren.
 ✓ 180°-Treppen für Altbau-Szenarien gezielt unterstützen.
-* Dachstuhl- und Dachmodell für Satteldach, Winkel, Überstand und Dachrinnen definieren.
+✓ Dachstuhl- und Dachmodell für Satteldach, Winkel, Überstand und Dachrinnen definieren.
 * Vorbereitung für spätere frei drehbare 3D-Ansichten sauber in der Architektur verankern.
 
 ## Phase 5: Ebenen auf Flächen
-* Datenmodell für zusätzliche Ebenen auf Flächen definieren.
-* CRUD, Sichtbarkeit und Reihenfolge von Ebenen je Fläche, Raum, Etage und Modell unterstützen.
-* Schichtstärken pro Ebene verarbeiten.
-* Rechteckige Kachelbelegung mit Richtung, automatischem Versatz und Mindestversatz umsetzen.
+✓ Datenmodell für zusätzliche Ebenen auf Flächen definieren.
+✓ CRUD, Sichtbarkeit und Reihenfolge von Ebenen je Fläche, Raum, Etage und Modell unterstützen.
+✓ Schichtstärken pro Ebene verarbeiten.
+✓ Rechteckige Kachelbelegung mit Richtung, automatischem Versatz und Mindestversatz umsetzen.
 * Konsistenzregeln für gleiche Ebenenfolgen in gleichen Bereichen definieren.
 
 ## Phase 6: Dateiformate und Teilebibliotheken
