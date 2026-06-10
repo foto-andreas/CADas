@@ -35,21 +35,21 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 ✓ Flächen- und Volumenmaße berechnen und ein- und ausblendbar machen.
 ✓ Mehrere Etagen sauber verwalten und visualisieren.
 ✓ Wände, Türen und Fenster fachlich korrekt platzieren und bearbeiten können.
-* Kleinteilige Ecken und Kanten ohne instabile Geometrie ermöglichen.
+✓ Kleinteilige Ecken und Kanten ohne instabile Geometrie ermöglichen.
 
 ## Phase 4: Erweiterte Bauteile
 ✓ Erweiterte Bauteile erst nach Abschluss des 2D-Grundriss-MVP angehen.
 ✓ Treppenmodell für gerade Treppen, Podeste und Wendeltreppen definieren.
 ✓ 180°-Treppen für Altbau-Szenarien gezielt unterstützen.
 ✓ Dachstuhl- und Dachmodell für Satteldach, Winkel, Überstand und Dachrinnen definieren.
-* Vorbereitung für spätere frei drehbare 3D-Ansichten sauber in der Architektur verankern.
+✓ Vorbereitung für spätere frei drehbare 3D-Ansichten sauber in der Architektur verankern.
 
 ## Phase 5: Ebenen auf Flächen
 ✓ Datenmodell für zusätzliche Ebenen auf Flächen definieren.
 ✓ CRUD, Sichtbarkeit und Reihenfolge von Ebenen je Fläche, Raum, Etage und Modell unterstützen.
 ✓ Schichtstärken pro Ebene verarbeiten.
 ✓ Rechteckige Kachelbelegung mit Richtung, automatischem Versatz und Mindestversatz umsetzen.
-* Konsistenzregeln für gleiche Ebenenfolgen in gleichen Bereichen definieren.
+✓ Konsistenzregeln für gleiche Ebenenfolgen in gleichen Bereichen definieren.
 
 ## Phase 6: Dateiformate und Teilebibliotheken
 ✓ DXF als erstes AutoCAD-kompatibles Austauschformat fest einplanen.
@@ -73,4 +73,4 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 * Danach Dateiformate, Bibliotheken, Treppen, Dach und Flächen-Ebenen ergänzen.
 
 ## Sonstiges
-* GitHub-README.md erstellen mit wichtichen Informationen
+✓ GitHub-README.md erstellen mit wichtichen Informationen

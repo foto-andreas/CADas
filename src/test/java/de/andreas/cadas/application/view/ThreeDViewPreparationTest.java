@@ -1,0 +1,20 @@
+package de.andreas.cadas.application.view;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
+
+class ThreeDViewPreparationTest {
+
+    private final ThreeDViewPreparation preparation = new ThreeDViewPreparation();
+
+    @Test
+    void liefertEinenStartpunktFuerSpaetere3dAnsichten() {
+        CameraPose pose = preparation.defaultPose();
+
+        assertEquals(ProjectionMode.ORTHOGRAPHIC, pose.projectionMode());
+        assertEquals(45.0, pose.azimuthDegrees());
+        assertEquals(30.0, pose.elevationDegrees());
+    }
+}
+
