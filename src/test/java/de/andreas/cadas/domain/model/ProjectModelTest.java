@@ -30,4 +30,14 @@ class ProjectModelTest {
         assertEquals(1, level.walls().size());
         assertEquals(3000.0, level.walls().getFirst().axis().length().toMillimeters(), 0.1);
     }
+
+    @Test
+    void projektKannWeitereEtagenAnlegen() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+
+        Level level = model.createLevel("Obergeschoss");
+
+        assertEquals(2, model.levels().size());
+        assertEquals("Obergeschoss", level.name());
+    }
 }

@@ -33,5 +33,10 @@ public final class ProjectModel {
     public void addLevel(Level level) {
         levels.add(Objects.requireNonNull(level, "level darf nicht null sein."));
     }
-}
 
+    public Level createLevel(String levelName) {
+        Level level = new Level(levelName);
+        addLevel(level);
+        return level;
+    }
+}
