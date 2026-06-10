@@ -8,6 +8,7 @@ import de.andreas.cadas.application.drawing.WallEditingService;
 import de.andreas.cadas.application.drawing.WallEndpointSelection;
 import de.andreas.cadas.application.exchange.LevelExchangeService;
 import de.andreas.cadas.application.parts.DoorPreset;
+import de.andreas.cadas.application.parts.PartLibraryImportService;
 import de.andreas.cadas.application.parts.StairPreset;
 import de.andreas.cadas.application.parts.StandardPartLibrary;
 import de.andreas.cadas.application.parts.StandardPartLibraryService;
@@ -86,6 +87,7 @@ public final class CadWorkbench extends BorderPane {
     private static final Length SNAP_TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
 
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
+    private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final DraftingService draftingService = new DraftingService();
     private final SnapService snapService = new SnapService();
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
@@ -145,6 +147,9 @@ public final class CadWorkbench extends BorderPane {
     private final TextField stairStepsField = new TextField("16");
     private final ComboBox<Level> levelSelector = new ComboBox<>();
     private final ComboBox<DrawingTool> toolSelector = new ComboBox<>();
+    private final ObservableList<DoorPreset> availableDoorPresets = FXCollections.observableArrayList();
+    private final ObservableList<WindowPreset> availableWindowPresets = FXCollections.observableArrayList();
+    private final ObservableList<StairPreset> availableStairPresets = FXCollections.observableArrayList();
 
     private final Label zoomLabel = new Label();
     private final Label cursorLabel = new Label();
@@ -212,9 +217,12 @@ public final class CadWorkbench extends BorderPane {
         levelSelector.setValue(activeLevel.get());
         toolSelector.getItems().addAll(DrawingTool.values());
         toolSelector.setValue(DrawingTool.WALL);
-        doorPresetSelector.getItems().setAll(partLibrary.doorPresets());
-        windowPresetSelector.getItems().setAll(partLibrary.windowPresets());
-        stairPresetSelector.getItems().setAll(partLibrary.stairPresets());
+        availableDoorPresets.setAll(partLibrary.doorPresets());
+        availableWindowPresets.setAll(partLibrary.windowPresets());
+        availableStairPresets.setAll(partLibrary.stairPresets());
+        doorPresetSelector.setItems(availableDoorPresets);
+        windowPresetSelector.setItems(availableWindowPresets);
+        stairPresetSelector.setItems(availableStairPresets);
         doorPresetSelector.setValue(partLibrary.doorPresets().getFirst());
         windowPresetSelector.setValue(partLibrary.windowPresets().getFirst());
         stairPresetSelector.setValue(partLibrary.stairPresets().getFirst());
@@ -349,7 +357,11 @@ public final class CadWorkbench extends BorderPane {
         importDxfButton.setOnAction(event -> importLevel());
         applyTooltip(importDxfButton, "Importiert eine DXF-Datei als neue Etage. CADas-Metadaten werden bevorzugt ausgewertet, einfache Geometrien werden ersatzweise als Grundriss übernommen.");
 
-        settingsBarStyling(resetViewButton, addLevelButton, exportDxfButton, importDxfButton);
+        Button importLibraryButton = new Button("Teilebibliothek laden");
+        importLibraryButton.setOnAction(event -> importPartLibrary());
+        applyTooltip(importLibraryButton, "Importiert zusätzliche Tür-, Fenster- und Treppen-Presets aus einer externen `.cadasparts`-Datei und stellt sie direkt in den Auswahllisten bereit.");
+
+        settingsBarStyling(resetViewButton, addLevelButton, exportDxfButton, importDxfButton, importLibraryButton);
         return new ToolBar(
                 labelledNode("Werkzeug", toolSelector),
                 new Separator(Orientation.VERTICAL),
@@ -357,6 +369,7 @@ public final class CadWorkbench extends BorderPane {
                 addLevelButton,
                 exportDxfButton,
                 importDxfButton,
+                importLibraryButton,
                 new Separator(Orientation.VERTICAL),
                 labelledNode("Rasterweite", gridField),
                 gridUnit,
@@ -428,11 +441,12 @@ public final class CadWorkbench extends BorderPane {
         return box;
     }
 
-    private void settingsBarStyling(Button resetViewButton, Button addLevelButton, Button exportDxfButton, Button importDxfButton) {
+    private void settingsBarStyling(Button resetViewButton, Button addLevelButton, Button exportDxfButton, Button importDxfButton, Button importLibraryButton) {
         resetViewButton.setStyle("-fx-background-color: #4b6a88; -fx-text-fill: white; -fx-background-radius: 999;");
         addLevelButton.setStyle("-fx-background-color: #7f5539; -fx-text-fill: white; -fx-background-radius: 999;");
         exportDxfButton.setStyle("-fx-background-color: #3b7b58; -fx-text-fill: white; -fx-background-radius: 999;");
         importDxfButton.setStyle("-fx-background-color: #5d648f; -fx-text-fill: white; -fx-background-radius: 999;");
+        importLibraryButton.setStyle("-fx-background-color: #8a5f8f; -fx-text-fill: white; -fx-background-radius: 999;");
         gridField.setPrefColumnCount(5);
         lengthField.setPrefColumnCount(6);
         angleField.setPrefColumnCount(5);
@@ -1219,6 +1233,35 @@ public final class CadWorkbench extends BorderPane {
 
     private boolean containsLevelName(String candidate) {
         return availableLevels.stream().anyMatch(level -> level.name().equalsIgnoreCase(candidate));
+    }
+
+    private void importPartLibrary() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Teilebibliothek auswählen");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CADas Teilebibliothek", "*.cadasparts"));
+        Window window = getScene() != null ? getScene().getWindow() : null;
+        java.io.File file = fileChooser.showOpenDialog(window);
+        if (file == null) {
+            return;
+        }
+        try {
+            StandardPartLibrary importedLibrary = partLibraryImportService.importLibrary(file.toPath());
+            availableDoorPresets.addAll(importedLibrary.doorPresets());
+            availableWindowPresets.addAll(importedLibrary.windowPresets());
+            availableStairPresets.addAll(importedLibrary.stairPresets());
+            if (!importedLibrary.doorPresets().isEmpty()) {
+                doorPresetSelector.setValue(importedLibrary.doorPresets().getFirst());
+            }
+            if (!importedLibrary.windowPresets().isEmpty()) {
+                windowPresetSelector.setValue(importedLibrary.windowPresets().getFirst());
+            }
+            if (!importedLibrary.stairPresets().isEmpty()) {
+                stairPresetSelector.setValue(importedLibrary.stairPresets().getFirst());
+            }
+            draftLabel.setText("Teilebibliothek geladen: " + file.getName());
+        } catch (IOException exception) {
+            draftLabel.setText("Teilebibliothek fehlgeschlagen: " + exception.getMessage());
+        }
     }
 
     private void applyDoorPreset(DoorPreset preset) {

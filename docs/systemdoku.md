@@ -27,7 +27,7 @@
 * `de.andreas.cadas.application.exchange`
   Formatunabhängige Schnittstellen für Import und Export.
 * `de.andreas.cadas.application.parts`
-  Interne Standard-Teilebibliothek für Türen, Fenster und Treppen-Presets.
+  Interne Standard-Teilebibliothek sowie Import zusätzlicher Presets für Türen, Fenster und Treppen.
 * `de.andreas.cadas.domain.geometry`
   Geometrische Grundbausteine wie Längen, Winkel, Raster, Punkte und Segmente.
 * `de.andreas.cadas.domain.model`
@@ -84,6 +84,14 @@ Für den aktuellen Stand gilt:
 * Wände, Räume, Türen und Fenster werden sichtbar als DXF-Geometrie exportiert.
 * Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
 * Fällt diese Metadaten-Spur weg, importiert der Adapter zumindest einfache Wände und Räume aus der reinen Geometrie.
+
+## Teilebibliotheken
+
+Die Standardteilversorgung besteht aus drei Ebenen:
+
+* interne Standard-Presets für Türen, Fenster und Treppen
+* UI-Auswahllisten, die diese Presets direkt auf Eingabefelder anwenden
+* externer Import über `.cadasparts`, damit weitere Bibliotheken ohne Codeänderung ergänzt werden können
 
 ## Rendering-Modell
 
