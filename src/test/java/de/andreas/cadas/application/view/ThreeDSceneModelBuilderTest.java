@@ -1,6 +1,7 @@
 package de.andreas.cadas.application.view;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.andreas.cadas.domain.geometry.Angle;
@@ -25,6 +26,7 @@ import de.andreas.cadas.domain.model.WindowElement;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -178,5 +180,56 @@ class ThreeDSceneModelBuilderTest {
         ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
 
         assertTrue(sceneModel.boxes().stream().filter(box -> box.kind() == RenderableKind.ROOM_VOLUME).count() > 1);
+    }
+
+    @Test
+    void leitetPolygonaleDeckenhoehenUndSchraegeWandkoerperIn3dAb() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
+        var level = project.primaryLevel();
+        level.addWall(new Wall(
+                UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(2.4, LengthUnit.METER),
+                Length.of(3.1, LengthUnit.METER)
+        ));
+        level.addRoom(new Room(
+                UUID.randomUUID(),
+                "Ausbau",
+                List.of(
+                        new PlanPoint(100, 100),
+                        new PlanPoint(3900, 100),
+                        new PlanPoint(3900, 2900),
+                        new PlanPoint(100, 2900)
+                ),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                null,
+                List.of(
+                        Length.of(2.4, LengthUnit.METER),
+                        Length.of(3.1, LengthUnit.METER),
+                        Length.of(3.1, LengthUnit.METER),
+                        Length.of(2.6, LengthUnit.METER)
+                )
+        ));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Dachgeschoss"), false);
+
+        assertTrue(sceneModel.boxes().stream().filter(box -> box.kind() == RenderableKind.ROOM_VOLUME).count() > 1);
+        assertNotEquals(
+                sceneModel.boxes().stream()
+                        .filter(box -> box.kind() == RenderableKind.WALL)
+                        .mapToDouble(RenderableBox::height)
+                        .min()
+                        .orElseThrow(),
+                sceneModel.boxes().stream()
+                        .filter(box -> box.kind() == RenderableKind.WALL)
+                        .mapToDouble(RenderableBox::height)
+                        .max()
+                        .orElseThrow(),
+                0.001
+        );
     }
 }

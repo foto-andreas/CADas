@@ -34,7 +34,7 @@ public final class WallEditingService {
             if (selection.endWallIds().contains(wall.id())) {
                 axis = new PlanSegment(axis.start(), newPoint);
             }
-            updatedWalls.add(new Wall(wall.id(), axis, wall.thickness(), wall.height()));
+            updatedWalls.add(new Wall(wall.id(), axis, wall.thickness(), wall.height(), wall.startHeight(), wall.endHeight()));
         }
         return updatedWalls;
     }
@@ -58,4 +58,3 @@ public final class WallEditingService {
                 && Math.abs(first.yMillimeters() - second.yMillimeters()) < 0.001;
     }
 }
-

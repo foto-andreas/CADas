@@ -114,6 +114,54 @@ class AutoRoomGenerationServiceTest {
         assertTrue(rooms.getFirst().minYMillimeters() > 0.0);
     }
 
+    @Test
+    void leitetEckhoehenInPolygonaleRaumdeckeUndVolumenAb() {
+        Level level = new Level("Dachgeschoss");
+        level.addWall(new Wall(
+                java.util.UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(2.4, LengthUnit.METER),
+                Length.of(3.1, LengthUnit.METER)
+        ));
+        level.addWall(new Wall(
+                java.util.UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(4000, 0), new PlanPoint(4000, 3000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(3.1, LengthUnit.METER)
+        ));
+        level.addWall(new Wall(
+                java.util.UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(4000, 3000), new PlanPoint(0, 3000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(2.6, LengthUnit.METER)
+        ));
+        level.addWall(new Wall(
+                java.util.UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 3000), new PlanPoint(0, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(2.4, LengthUnit.METER)
+        ));
+
+        List<Room> rooms = service.synchronize(level, defaults());
+
+        assertEquals(1, rooms.size());
+        assertEquals(4, rooms.getFirst().ceilingVertexHeights().size());
+        assertTrue(rooms.getFirst().minimumCeilingHeightMillimeters() > 2400.0);
+        assertTrue(rooms.getFirst().minimumCeilingHeightMillimeters() < 2450.0);
+        assertTrue(rooms.getFirst().maximumCeilingHeightMillimeters() > 3050.0);
+        assertTrue(rooms.getFirst().maximumCeilingHeightMillimeters() <= 3100.0);
+        assertTrue(rooms.getFirst().volumeCubicMeters() > 29.5);
+        assertTrue(rooms.getFirst().volumeCubicMeters() < 30.1);
+    }
+
     private AutoRoomGenerationService.RoomDefaults defaults() {
         return new AutoRoomGenerationService.RoomDefaults(
                 "Dachraum",

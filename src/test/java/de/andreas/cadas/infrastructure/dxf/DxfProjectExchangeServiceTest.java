@@ -29,10 +29,13 @@ class DxfProjectExchangeServiceTest {
     @Test
     void exportiertUndImportiertMehrereEtagenUndDachInEinerDatei() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
-        project.primaryLevel().addWall(Wall.create(
+        project.primaryLevel().addWall(new Wall(
+                java.util.UUID.randomUUID(),
                 new PlanSegment(new PlanPoint(0, 0), new PlanPoint(5000, 0)),
                 Length.of(17.5, LengthUnit.CENTIMETER),
-                Length.of(2.75, LengthUnit.METER)
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(3.1, LengthUnit.METER)
         ));
         project.primaryLevel().addRoom(Room.rectangular(
                 "Wohnen",
@@ -71,6 +74,8 @@ class DxfProjectExchangeServiceTest {
         assertTrue(imported.roof().isPresent());
         assertEquals(1, imported.primaryLevel().staircases().size());
         assertEquals("Obergeschoss", imported.levels().get(1).name());
+        assertEquals(2500.0, imported.primaryLevel().walls().getFirst().startHeight().toMillimeters(), 0.001);
+        assertEquals(3100.0, imported.primaryLevel().walls().getFirst().endHeight().toMillimeters(), 0.001);
     }
 
     @Test

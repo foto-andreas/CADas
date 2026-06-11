@@ -34,14 +34,14 @@ public final class AutoRoomGenerationService {
         if (wallRectangles.size() == level.walls().size()) {
             List<DetectedRoom> detectedRooms = detectRooms(wallRectangles);
             if (!detectedRooms.isEmpty()) {
-                return matchWithExistingRooms(level.rooms(), detectedRooms, defaults);
+                return matchWithExistingRooms(level.rooms(), detectedRooms, defaults, level.walls());
             }
         }
         List<DetectedRoom> detectedRooms = detectRoomsFromWallLoops(level.walls());
         if (detectedRooms.isEmpty()) {
             return List.of();
         }
-        return matchWithExistingRooms(level.rooms(), detectedRooms, defaults);
+        return matchWithExistingRooms(level.rooms(), detectedRooms, defaults, level.walls());
     }
 
     private List<WallRectangle> wallRectangles(List<Wall> walls) {
@@ -111,7 +111,7 @@ public final class AutoRoomGenerationService {
                 }
                 List<PlanPoint> outline = buildOutline(component, xCoordinates, yCoordinates);
                 if (outline.size() >= 3) {
-                    rooms.add(new DetectedRoom(outline));
+                    rooms.add(new DetectedRoom(outline, List.of()));
                 }
             }
         }
@@ -135,9 +135,8 @@ public final class AutoRoomGenerationService {
                 continue;
             }
             orderedLoop(componentWalls, graph)
-                    .map(this::offsetLoopToInnerContour)
-                    .filter(outline -> outline.size() >= 3)
-                    .map(DetectedRoom::new)
+                    .map(loop -> new DetectedRoom(offsetLoopToInnerContour(loop), deriveLoopVertexHeights(loop)))
+                    .filter(detectedRoom -> detectedRoom.outline().size() >= 3)
                     .ifPresent(rooms::add);
         }
         return rooms;
@@ -412,11 +411,15 @@ public final class AutoRoomGenerationService {
         return Optional.of(new PlanPoint(intersectionX, intersectionY));
     }
 
-    private List<Room> matchWithExistingRooms(List<Room> existingRooms, List<DetectedRoom> detectedRooms, RoomDefaults defaults) {
+    private List<Room> matchWithExistingRooms(List<Room> existingRooms, List<DetectedRoom> detectedRooms, RoomDefaults defaults, List<Wall> walls) {
         List<Room> updatedRooms = new ArrayList<>();
         Set<UUID> matchedIds = new HashSet<>();
         int roomIndex = 1;
         for (DetectedRoom detectedRoom : detectedRooms) {
+            List<Length> vertexHeights = detectedRoom.vertexHeights().isEmpty()
+                    ? deriveVertexHeights(detectedRoom.outline(), walls, defaults.roomHeight())
+                    : detectedRoom.vertexHeights();
+            Length derivedRoomHeight = Length.ofMillimeters(vertexHeights.stream().mapToDouble(Length::toMillimeters).max().orElse(defaults.roomHeight().toMillimeters()));
             Optional<Room> matchedRoom = existingRooms.stream()
                     .filter(room -> !matchedIds.contains(room.id()))
                     .filter(room -> containsPoint(detectedRoom.outline(), room.centerPoint()) || containsPoint(room.outline(), detectedRoom.centerPoint()))
@@ -429,25 +432,76 @@ public final class AutoRoomGenerationService {
                         previous.id(),
                         previous.name(),
                         detectedRoom.outline(),
-                        previous.roomHeight(),
+                        derivedRoomHeight,
                         previous.floorThickness(),
                         previous.ceilingThickness(),
-                        previous.slopedCeiling()
+                        hasVariableHeights(vertexHeights) ? null : previous.slopedCeiling(),
+                        vertexHeights
                 );
             } else {
                 room = new Room(
                         UUID.randomUUID(),
                         defaults.generatedName(roomIndex++),
                         detectedRoom.outline(),
-                        defaults.roomHeight(),
+                        derivedRoomHeight,
                         defaults.floorThickness(),
                         defaults.ceilingThickness(),
-                        defaults.slopedCeiling()
+                        hasVariableHeights(vertexHeights) ? null : defaults.slopedCeiling(),
+                        vertexHeights
                 );
             }
             updatedRooms.add(room);
         }
         return updatedRooms;
+    }
+
+    private boolean hasVariableHeights(List<Length> vertexHeights) {
+        if (vertexHeights.isEmpty()) {
+            return false;
+        }
+        double reference = vertexHeights.getFirst().toMillimeters();
+        return vertexHeights.stream().anyMatch(length -> Math.abs(length.toMillimeters() - reference) > EPSILON);
+    }
+
+    private List<Length> deriveVertexHeights(List<PlanPoint> outline, List<Wall> walls, Length defaultHeight) {
+        if (outline.isEmpty()) {
+            return List.of();
+        }
+        List<Length> heights = new ArrayList<>();
+        for (PlanPoint point : outline) {
+            double sum = 0.0;
+            int count = 0;
+            for (Wall wall : walls) {
+                double distance = wall.axis().distanceTo(point).toMillimeters();
+                double tolerance = wall.thickness().toMillimeters() / 2.0 + 40.0;
+                if (distance > tolerance) {
+                    continue;
+                }
+                double offset = wall.axis().projectedLength(point).toMillimeters();
+                sum += wall.heightAt(offset);
+                count++;
+            }
+            if (count == 0) {
+                heights.add(defaultHeight == null ? Length.zero() : defaultHeight);
+            } else {
+                heights.add(Length.ofMillimeters(sum / count));
+            }
+        }
+        return List.copyOf(heights);
+    }
+
+    private List<Length> deriveLoopVertexHeights(List<LoopEdge> loop) {
+        if (loop.isEmpty()) {
+            return List.of();
+        }
+        List<Length> heights = new ArrayList<>();
+        for (int index = 0; index < loop.size(); index++) {
+            LoopEdge previous = loop.get((index - 1 + loop.size()) % loop.size());
+            LoopEdge current = loop.get(index);
+            double averaged = (previous.endHeightMillimeters() + current.startHeightMillimeters()) / 2.0;
+            heights.add(Length.ofMillimeters(averaged));
+        }
+        return List.copyOf(heights);
     }
 
     private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
@@ -509,9 +563,28 @@ public final class AutoRoomGenerationService {
     }
 
     private record LoopEdge(Wall wall, PlanPoint start, PlanPoint end) {
+
+        double startHeightMillimeters() {
+            if (samePlanPoint(start, wall.axis().start())) {
+                return wall.heightAtStart();
+            }
+            return wall.heightAtEnd();
+        }
+
+        double endHeightMillimeters() {
+            if (samePlanPoint(end, wall.axis().end())) {
+                return wall.heightAtEnd();
+            }
+            return wall.heightAtStart();
+        }
+
+        private boolean samePlanPoint(PlanPoint first, PlanPoint second) {
+            return Math.abs(first.xMillimeters() - second.xMillimeters()) < EPSILON
+                    && Math.abs(first.yMillimeters() - second.yMillimeters()) < EPSILON;
+        }
     }
 
-    private record DetectedRoom(List<PlanPoint> outline) {
+    private record DetectedRoom(List<PlanPoint> outline, List<Length> vertexHeights) {
 
         PlanPoint centerPoint() {
             double sumX = 0.0;

@@ -46,7 +46,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Treppenmodell für gerade Treppen, Podeste und Wendeltreppen definieren.
 - [x] 180°-Treppen für Altbau-Szenarien gezielt unterstützen.
 - [x] Dachstuhl- und Dachmodell für Satteldach, Winkel, Überstand und Dachrinnen definieren.
-- [x] Dachschrägen und schräge Decken als raumgebundene Innenflächen mit niedriger Kante und Sockelhöhe modellieren.
+- [x] Dachschrägen und schräge Decken über Wand-Endpunkt-Höhen und polygonale Raumdecken modellieren; der einfache raumgebundene Rechteck-Fallback bleibt erhalten.
 - [x] Dachschrägen in Flächen-, Volumen-, 2D-, 3D- und DXF-Logik berücksichtigen.
 - [x] Vorbereitung für spätere frei drehbare 3D-Ansichten sauber in der Architektur verankern.
 

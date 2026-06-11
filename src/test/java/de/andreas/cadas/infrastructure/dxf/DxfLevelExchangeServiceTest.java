@@ -124,4 +124,46 @@ class DxfLevelExchangeServiceTest {
         assertEquals(SlopedCeilingSide.SOUTH, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().lowSide());
         assertEquals(1100.0, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().kneeWallHeight().toMillimeters(), 0.001);
     }
+
+    @Test
+    void exportiertUndImportiertWandEndpunktHoehenUndPolygonaleDecken() throws Exception {
+        Level level = new Level("Dachgeschoss");
+        level.addWall(new Wall(
+                java.util.UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(2.4, LengthUnit.METER),
+                Length.of(3.1, LengthUnit.METER)
+        ));
+        level.addRoom(new Room(
+                java.util.UUID.randomUUID(),
+                "Ausbau",
+                java.util.List.of(
+                        new PlanPoint(0, 0),
+                        new PlanPoint(4000, 0),
+                        new PlanPoint(4000, 3000),
+                        new PlanPoint(0, 3000)
+                ),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                null,
+                java.util.List.of(
+                        Length.of(2.4, LengthUnit.METER),
+                        Length.of(3.1, LengthUnit.METER),
+                        Length.of(3.1, LengthUnit.METER),
+                        Length.of(2.6, LengthUnit.METER)
+                )
+        ));
+
+        Path file = tempDir.resolve("decke.dxf");
+        exchangeService.exportLevel(level, file);
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertEquals(2400.0, imported.walls().getFirst().startHeight().toMillimeters(), 0.001);
+        assertEquals(3100.0, imported.walls().getFirst().endHeight().toMillimeters(), 0.001);
+        assertEquals(4, imported.rooms().getFirst().ceilingVertexHeights().size());
+        assertEquals(2600.0, imported.rooms().getFirst().ceilingVertexHeights().get(3).toMillimeters(), 0.001);
+    }
 }
