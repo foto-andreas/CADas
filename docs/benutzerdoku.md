@@ -262,6 +262,7 @@ Derzeit gilt:
 * Mit dem Mausrad zoomst du in der 3D-Ansicht.
 * Die 3D-Ansicht dreht jetzt um die Modellmitte; `Modell einpassen` und `Ansicht zentrieren` halten das Modell im Blick.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
+* `Oberflächenrendering` blendet die transparenten Raumvolumina aus und zeigt stattdessen die sichtbaren Flächen, Beläge und Öffnungen als baunähere Ansicht.
 * Über `Iso`, `Oben`, `Vorne` und `Rechts` wechselst du auf schnelle 3D-Kamerapresets.
 * Über die Geschoss-Checkboxen blendest du einzelne Etagen in der 3D-Ansicht ein oder aus.
 * Die Option `3D Ebenen` blendet zusätzliche Oberflächen-Schichten ein oder aus.
@@ -309,16 +310,16 @@ Wichtige Kürzel der aktuellen Oberfläche:
 
 ## Ansichten umschalten
 
-Die sechs orthogonalen Ansichten werden oberhalb der Zeichenfläche über Pfeiltasten umgeschaltet:
+Die sechs orthogonalen Ansichten werden oberhalb der Zeichenfläche über feste Tasten für `Oben` und `Unten` sowie über relative Pfeiltasten umgeschaltet:
 
-* `↑` für die Frontansicht
-* `↓` für die Rückansicht
-* `←` für die linke Seitenansicht
-* `→` für die rechte Seitenansicht
-* `⤒ Oben`
-* `⤓ Unten`
+* `⤒ Oben` setzt die Draufsicht.
+* `⤓ Unten` setzt die Ansicht von unten.
+* `↑` kippt das Modell aus der aktuellen Sicht nach oben.
+* `↓` kippt das Modell aus der aktuellen Sicht nach unten.
+* `←` dreht das Modell aus der aktuellen Sicht nach links.
+* `→` dreht das Modell aus der aktuellen Sicht nach rechts.
 
-Die Umschaltung wirkt auf die 3D-Kamera und auf die Kompassdarstellung. Besonders bei `Oben` ist der Nordwinkel relevant.
+Die Umschaltung wirkt auf die 2D-Projektion und auf die Kompassdarstellung. Besonders bei `Oben` ist der Nordwinkel relevant.
 Die 3D-Kamera bleibt davon bewusst unabhängig und wird über die 3D-Bedienelemente gesteuert.
 
 ## Zwischen 2D und 3D umschalten
@@ -328,6 +329,35 @@ Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D` und `3D`.
 * `2D` zeigt die Zeichenfläche mit Linealen und Grundrisswerkzeugen.
 * `3D` nutzt denselben Platz für die räumliche Modellansicht.
 * Dadurch bleibt mehr Platz für die aktive Arbeitsansicht, statt 2D und 3D ständig parallel einzublenden.
+
+## DWG-Blöcke für Oberflächen verwenden
+
+Für geladene `DWG`-Bibliotheken gibt es jetzt zwei Wege, konkrete Blöcke als Oberflächen-Presets auswählbar zu machen:
+
+* automatisch über eine optionale Katalogdatei neben der `DWG`
+* manuell über das Feld `DWG-Block` in der Ebenenverwaltung
+
+### Automatischer Katalog
+
+Lege neben die Bibliothek eine Textdatei mit dem Namen `<dateiname>.blocks` oder `<basisname>.blocks`.
+
+Beispiel:
+
+```text
+Rigips_1250x2000
+OSB_2500x675
+Daemmplatte_1200x600
+```
+
+Jede nichtleere Zeile wird dann beim Laden der `DWG` als eigener auswählbarer `DWG-Block` registriert.
+
+### Manuelle Registrierung
+
+1. Lade die `DWG` über `Teilebibliothek laden`.
+2. Wechsle zu einer Wand- oder Raumfläche im Bereich `Ebenen`.
+3. Trage unter `DWG-Block` einen konkreten Blocknamen ein.
+4. Klicke auf `DWG-Block hinzufügen`.
+5. Das neue Preset erscheint danach direkt in der Preset-Auswahl.
 
 ## Werkzeuge
 
@@ -643,6 +673,9 @@ Der Export enthält aktuell:
 * sichtbare DXF-Geometrie für Wände, Räume, Öffnungen und Treppen
 * CADas-Metadaten für verlustärmeren Re-Import
 * metrische DXF-Kennzeichnung für Millimeter und Model-Space
+* DXF-Tabellen für Layer, Linientypen, Textstil und Block-Records
+* wiederverwendbare Tür-, Fenster- und Treppenblöcke mit `INSERT`-Referenzen
+* Handles sowie eine einfache `OBJECTS`- und Layout-Grundstruktur
 
 ### Dateinamen
 
@@ -664,12 +697,13 @@ Die Anwendung bringt Standard-Presets für:
 Über `Teilebibliothek laden` können zwei Typen eingebunden werden:
 
 * `.cadasparts` für direkt importierbare CADas-Presets
-* `.dwg` als registrierte externe CAD-Bibliothek für spätere Nutzung
+* `.dwg` als registrierte externe CAD-Bibliothek für Oberflächen-Presets und Blockquellen
 
 Aktuell gilt:
 
 * `.cadasparts` erweitert die auswählbaren Presets sofort.
-* `.dwg` wird zunächst registriert und in der Eigenschaftenleiste dokumentiert.
+* `.dwg` wird registriert und in der Eigenschaftenleiste dokumentiert.
+* Konkrete `DWG`-Blöcke lassen sich über `.blocks`-Kataloge oder manuell als Oberflächen-Presets freischalten.
 
 ## Automatisierung für Tests
 
@@ -711,8 +745,7 @@ Damit kann ein Testablauf beispielsweise so aussehen:
 Die aktuelle Version konzentriert sich bewusst auf einen robusten Grundrisskern mit erster 3D-Ableitung. Noch nicht umgesetzt oder noch nicht vollständig ausgebaut sind unter anderem:
 
 * freie 3D-Modellierung jenseits der aus dem Grundriss abgeleiteten Körper
-* vollständige DWG-Verarbeitung statt bloßer Registrierung externer DWG-Bibliotheken
-* vollständige DXF-Symboltabellen, Blockdefinitionen und Layout-Metadaten
+* vollständige binäre `DWG`-Verarbeitung direkt aus dem Dateiformat statt der heutigen Blockkatalog- und Referenznutzung
 * grafische Verwaltung von Dachmodellen und zusätzlichen Flächen-Ebenen
 
 ## Nächste fachliche Ausbaustufen
@@ -721,5 +754,5 @@ Die nächsten geplanten Schritte sind:
 
 * komplexere 3D-Geometrien und Materialdarstellungen
 * grafische Verwaltung für Dach- und Oberflächen-Ebenen
-* vollständige DWG-Anbindung
-* tiefere AutoCAD-Kompatibilität über DXF-Tabellen, Blöcke und weitere Zeichnungsmetadaten
+* vollständige `DWG`-Anbindung direkt aus dem Format
+* tiefere AutoCAD-Kompatibilität über zusätzliche DXF-Datentypen und weitergehende Zeichnungsmetadaten

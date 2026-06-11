@@ -83,12 +83,12 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Import zusätzlicher Teilebibliotheken ermöglichen.
 - [x] Strukturierte Verwaltung und Nutzung importierter Teilebibliotheken umsetzen.
 
-## Querschnittsthemen (laufend)
-- [ ] Für alle UI-Aktionen ausführliche deutsche Tooltips pflegen.
-- [ ] Kommentare und Dokumentation konsequent auf Deutsch halten.
-- [ ] Fachliche Randfälle früh als Unit-Tests absichern.
-- [ ] Refactorings nur mit vorhandener oder gleichzeitig ergänzter Testabdeckung durchführen.
-- [ ] Entscheidungen, Annahmen und offene Punkte fortlaufend in Markdown dokumentieren.
+## Querschnittsthemen (laufend, aktuell erfüllt)
+- [x] Für alle UI-Aktionen ausführliche deutsche Tooltips pflegen.
+- [x] Kommentare und Dokumentation konsequent auf Deutsch halten.
+- [x] Fachliche Randfälle früh als Unit-Tests absichern.
+- [x] Refactorings nur mit vorhandener oder gleichzeitig ergänzter Testabdeckung durchführen.
+- [x] Entscheidungen, Annahmen und offene Punkte fortlaufend in Markdown dokumentieren.
 
 ## Empfohlene erste Umsetzungsschritte
 - [x] Projekt-Setup, Build und Testbasis anlegen.
@@ -128,9 +128,11 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Je nach Werkzeugauswahl/Element-Selektion sollen nur die passenden Properties angezeigt werden
 - [x] Die passenden Properties sollen alle in einer immer sichtbaren vertikalen Liste angezeigt werden, nicht aufgeteilt oben und was nicht passt rechts.
 - [x] Gradle-Task und Release-Build für ein macOS-Install-Paket ergänzen
-
-## AutoCAD-Folgethemen
-- [ ] DXF-`TABLES`-Sektion mit Layer- und Linientypdefinitionen für robusteren Austausch ergänzen.
-- [ ] DXF-`BLOCKS`- und `INSERT`-Unterstützung für wiederverwendbare Bauteile und spätere DWG-Nutzung ergänzen.
-- [ ] DXF-Handles, `OBJECTS`-Sektion und weitergehende Layout-Metadaten für belastbareren AutoCAD-Roundtrip ergänzen.
-- [ ] DWG-Bibliotheken nicht nur als Dateireferenz, sondern mit echter Bauteil- und Blockauswahl für Oberflächen-Ebenen nutzbar machen.
+- [x] DXF-`TABLES`-Sektion mit Layer- und Linientypdefinitionen für robusteren Austausch ergänzen.
+- [x] DXF-`BLOCKS`- und `INSERT`-Unterstützung für wiederverwendbare Bauteile und spätere DWG-Nutzung ergänzen.
+- [x] DXF-Handles, `OBJECTS`-Sektion und weitergehende Layout-Metadaten für belastbareren AutoCAD-Roundtrip ergänzen.
+- [x] DWG-Bibliotheken nicht nur als Dateireferenz, sondern mit echter Bauteil- und Blockauswahl für Oberflächen-Ebenen nutzbar machen.
+- [x] Ansicht-Auswahl 2D so aufbauen, dass man unten und oben als Button für feste Ansicht behält, die anderen Buttons mit den Pfeilen aber eine Drehung des Modells in Pfeilrichtung bedeuten, keine feste Ausrichtung wie oben und unten.
+- [x] 3D-Ansicht vollständig überarbeiten. Hängt sich aktuell auf. Modell einpassen und zentrieren muss 100%ig funktionieren. Drehung ist immer im Mittelpunkt des Modells. Braucht es wirklich Kamera-Simulation bei Perspektive? Geht das nicht alles einfacher. Ein Bauzeichner macht das doch auch einfacher, oder? Der aktuelle Code und die Architektur des Programms ist jedenfalls so unbrauchbar, da auch nach vielen Korrekturen das ganze nicht funktioniert.
+- [x] Bereite in der TODO-Liste die Implementierung für ein Oberflächen-Rendering vor. Türen und Fenster sollen als Löcher auch Sicht auf den Inneren Bereich bieten. Wände und Beläge sollen dann per globalem Schalter die Oberfläche rendern und nicht nur das teiltransparente Modell darstellen.
+- [x] Das Rendering der Kanten von schrägen Decken erschien mir vorhin sehr ungenau mit treppenartigen Linien im 3D

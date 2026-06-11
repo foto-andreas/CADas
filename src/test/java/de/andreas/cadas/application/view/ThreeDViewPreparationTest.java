@@ -12,9 +12,9 @@ class ThreeDViewPreparationTest {
     void liefertEinenStartpunktFuerSpaetere3dAnsichten() {
         CameraPose pose = preparation.defaultPose();
 
-        assertEquals(ProjectionMode.PERSPECTIVE, pose.projectionMode());
+        assertEquals(ProjectionMode.ORTHOGRAPHIC, pose.projectionMode());
         assertEquals(45.0, pose.azimuthDegrees());
-        assertEquals(30.0, pose.elevationDegrees());
+        assertEquals(35.0, pose.elevationDegrees());
     }
 
     @Test
