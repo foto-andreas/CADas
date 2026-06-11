@@ -81,10 +81,18 @@ class DxfProjectExchangeServiceTest {
     @Test
     void exportiertMetrischeHeaderUndProjektnamenFuerSpaeterenUiImport() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Importname", "Erdgeschoss");
-        project.primaryLevel().addWall(Wall.create(
+        Wall wall = Wall.create(
                 new PlanSegment(new PlanPoint(0, 0), new PlanPoint(1500, 0)),
                 Length.of(17.5, LengthUnit.CENTIMETER),
                 Length.of(2.75, LengthUnit.METER)
+        );
+        project.primaryLevel().addWall(wall);
+        project.primaryLevel().addStaircase(Staircase.create(
+                StairType.STRAIGHT,
+                new PlanPoint(500, 500),
+                new PlanPoint(1500, 2500),
+                Length.of(2.75, LengthUnit.METER),
+                14
         ));
 
         Path file = tempDir.resolve("projekt-header.dxf");
@@ -94,6 +102,11 @@ class DxfProjectExchangeServiceTest {
 
         assertTrue(dxf.contains("$INSUNITS\n70\n4"));
         assertTrue(dxf.contains("$MEASUREMENT\n70\n1"));
+        assertTrue(dxf.contains("\n2\nTABLES\n"));
+        assertTrue(dxf.contains("\n2\nBLOCKS\n"));
+        assertTrue(dxf.contains("\n2\nOBJECTS\n"));
+        assertTrue(dxf.contains("\n0\nINSERT\n"));
+        assertTrue(dxf.contains("\n2\nCADAS_STAIR\n"));
         assertEquals("Importname", imported.name());
     }
 }

@@ -18,11 +18,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public final class DxfLevelExchangeService implements LevelExchangeService {
@@ -45,11 +47,15 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             Files.createDirectories(parent);
         }
         StringBuilder dxf = new StringBuilder();
-        DxfDocumentSupport.appendStandardHeader(dxf);
+        DxfDocumentSupport.DxfWriteContext context = DxfDocumentSupport.startDocument(
+                dxf,
+                collectLevelLayers(),
+                Set.of(DxfDocumentSupport.BLOCK_DOOR, DxfDocumentSupport.BLOCK_WINDOW, DxfDocumentSupport.BLOCK_STAIR)
+        );
 
         for (Wall wall : level.walls()) {
-            appendLineEntity(dxf, DxfLayer.WALLS, wall.axis().start(), wall.axis().end());
-            appendMetadataText(dxf, wall.axis().start(), String.format(
+            appendLineEntity(dxf, context, DxfLayer.WALLS, wall.axis().start(), wall.axis().end());
+            appendMetadataText(dxf, context, wall.axis().start(), String.format(
                     Locale.US,
                     "WALL|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
                     wall.id(),
@@ -65,8 +71,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         }
 
         for (Room room : level.rooms()) {
-            appendClosedPolyline(dxf, DxfLayer.ROOMS, room.outline());
-            appendMetadataText(dxf, room.centerPoint(), String.format(
+            appendClosedPolyline(dxf, context, DxfLayer.ROOMS, room.outline());
+            appendMetadataText(dxf, context, room.centerPoint(), String.format(
                     Locale.US,
                     "ROOM|%s|%.3f|%.3f|%.3f|%s|%s|%s",
                     sanitize(room.name()),
@@ -83,8 +89,18 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             Wall hostWall = level.findWall(door.wallId());
             PlanPoint start = hostWall.axis().pointAt(door.offsetFromStart());
             PlanPoint end = hostWall.axis().pointAt(door.offsetFromStart().add(door.width()));
-            appendLineEntity(dxf, DxfLayer.DOORS, start, end);
-            appendMetadataText(dxf, start, String.format(
+            appendLineEntity(dxf, context, DxfLayer.DOORS, start, end);
+            DxfDocumentSupport.appendInsert(
+                    dxf,
+                    context,
+                    DxfLayer.DOORS.name(),
+                    DxfDocumentSupport.BLOCK_DOOR,
+                    start,
+                    Math.max(0.001, door.width().toMillimeters() / 1000.0),
+                    1.0,
+                    hostWall.axis().angle().degrees()
+            );
+            appendMetadataText(dxf, context, start, String.format(
                     Locale.US,
                     "DOOR|%s|%.3f|%.3f|%.3f|%.3f",
                     door.wallId(),
@@ -99,8 +115,18 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             Wall hostWall = level.findWall(window.wallId());
             PlanPoint start = hostWall.axis().pointAt(window.offsetFromStart());
             PlanPoint end = hostWall.axis().pointAt(window.offsetFromStart().add(window.width()));
-            appendLineEntity(dxf, DxfLayer.WINDOWS, start, end);
-            appendMetadataText(dxf, start, String.format(
+            appendLineEntity(dxf, context, DxfLayer.WINDOWS, start, end);
+            DxfDocumentSupport.appendInsert(
+                    dxf,
+                    context,
+                    DxfLayer.WINDOWS.name(),
+                    DxfDocumentSupport.BLOCK_WINDOW,
+                    start,
+                    Math.max(0.001, window.width().toMillimeters() / 1000.0),
+                    1.0,
+                    hostWall.axis().angle().degrees()
+            );
+            appendMetadataText(dxf, context, start, String.format(
                     Locale.US,
                     "WINDOW|%s|%.3f|%.3f|%.3f|%.3f",
                     window.wallId(),
@@ -112,13 +138,23 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         }
 
         for (Staircase staircase : level.staircases()) {
-            appendClosedPolyline(dxf, DxfLayer.STAIRS, List.of(
+            appendClosedPolyline(dxf, context, DxfLayer.STAIRS, List.of(
                     staircase.pointAtLocalPosition(0, 0),
                     staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0),
                     staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()),
                     staircase.pointAtLocalPosition(0, staircase.heightMillimeters())
             ));
-            appendMetadataText(dxf, staircase.firstCorner(), String.format(
+            DxfDocumentSupport.appendInsert(
+                    dxf,
+                    context,
+                    DxfLayer.STAIRS.name(),
+                    DxfDocumentSupport.BLOCK_STAIR,
+                    new PlanPoint(staircase.minX(), staircase.minY()),
+                    Math.max(0.001, staircase.widthMillimeters() / 1000.0),
+                    Math.max(0.001, staircase.heightMillimeters() / 1000.0),
+                    staircase.rotationQuarterTurns() * 90.0
+            );
+            appendMetadataText(dxf, context, staircase.firstCorner(), String.format(
                     Locale.US,
                     "STAIR|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d",
                     staircase.id(),
@@ -133,8 +169,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             ));
         }
 
-        appendPair(dxf, 0, "ENDSEC");
-        appendPair(dxf, 0, "EOF");
+        DxfDocumentSupport.finishDocument(context);
         Files.writeString(targetFile, dxf.toString());
     }
 
@@ -287,18 +322,20 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         return entities;
     }
 
-    private void appendLineEntity(StringBuilder dxf, DxfLayer layer, PlanPoint start, PlanPoint end) {
-        appendPair(dxf, 0, "LINE");
-        DxfDocumentSupport.appendModelSpace(dxf, layer.name());
+    private void appendLineEntity(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, DxfLayer layer, PlanPoint start, PlanPoint end) {
+        DxfDocumentSupport.appendModelSpaceEntityStart(context, "LINE", layer.name());
+        appendPair(dxf, 100, "AcDbLine");
         appendPair(dxf, 10, start.xMillimeters());
         appendPair(dxf, 20, start.yMillimeters());
+        appendPair(dxf, 30, 0.0);
         appendPair(dxf, 11, end.xMillimeters());
         appendPair(dxf, 21, end.yMillimeters());
+        appendPair(dxf, 31, 0.0);
     }
 
-    private void appendClosedPolyline(StringBuilder dxf, DxfLayer layer, List<PlanPoint> points) {
-        appendPair(dxf, 0, "LWPOLYLINE");
-        DxfDocumentSupport.appendModelSpace(dxf, layer.name());
+    private void appendClosedPolyline(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, DxfLayer layer, List<PlanPoint> points) {
+        DxfDocumentSupport.appendModelSpaceEntityStart(context, "LWPOLYLINE", layer.name());
+        appendPair(dxf, 100, "AcDbPolyline");
         appendPair(dxf, 90, points.size());
         appendPair(dxf, 70, 1);
         for (PlanPoint point : points) {
@@ -307,13 +344,15 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         }
     }
 
-    private void appendMetadataText(StringBuilder dxf, PlanPoint anchor, String value) {
-        appendPair(dxf, 0, "TEXT");
-        DxfDocumentSupport.appendModelSpace(dxf, DxfLayer.CADAS_META.name());
+    private void appendMetadataText(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, PlanPoint anchor, String value) {
+        DxfDocumentSupport.appendModelSpaceEntityStart(context, "TEXT", DxfLayer.CADAS_META.name());
+        appendPair(dxf, 100, "AcDbText");
         appendPair(dxf, 10, anchor.xMillimeters());
         appendPair(dxf, 20, anchor.yMillimeters());
+        appendPair(dxf, 30, 0.0);
         appendPair(dxf, 40, 100.0);
         appendPair(dxf, 1, value);
+        appendPair(dxf, 7, "Standard");
     }
 
     private static void appendPair(StringBuilder dxf, int code, Object value) {
@@ -392,6 +431,14 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             heights.add(Length.ofMillimeters(parseDouble(part)));
         }
         return List.copyOf(heights);
+    }
+
+    private Set<String> collectLevelLayers() {
+        Set<String> layers = new LinkedHashSet<>();
+        for (DxfLayer layer : DxfLayer.values()) {
+            layers.add(layer.name());
+        }
+        return layers;
     }
 
     private record DxfEntity(String type, Map<Integer, List<String>> values) {
