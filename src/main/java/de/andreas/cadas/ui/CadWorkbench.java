@@ -1099,7 +1099,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void drawWalls(GraphicsContext graphics) {
         graphics.setFill(Color.web("#2f2a24"));
-        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.BUTT);
+        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.SQUARE);
 
         for (Wall wall : activeLevel.get().walls()) {
             boolean selected = isSelected(RenderableKind.WALL, wall.id().toString());
