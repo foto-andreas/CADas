@@ -2312,18 +2312,26 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void importPartLibrary() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Teilebibliothek auswählen");
-        fileChooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("CADas Teilebibliothek", "*.cadasparts"),
-                new FileChooser.ExtensionFilter("AutoCAD-Bibliothek", "*.dwg")
-        );
+        FileChooser fileChooser = createPartLibraryFileChooser();
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showOpenDialog(window);
         if (file == null) {
             return;
         }
         importPartLibrary(file.toPath());
+    }
+
+    private FileChooser createPartLibraryFileChooser() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Teilebibliothek auswählen");
+        fileChooser.getExtensionFilters().setAll(
+                new FileChooser.ExtensionFilter("Unterstützte Bibliotheken", "*.cadasparts", "*.dwg", "*.DWG"),
+                new FileChooser.ExtensionFilter("CADas Teilebibliothek", "*.cadasparts"),
+                new FileChooser.ExtensionFilter("AutoCAD-Bibliothek", "*.dwg", "*.DWG"),
+                new FileChooser.ExtensionFilter("Alle Dateien", "*.*")
+        );
+        fileChooser.setSelectedExtensionFilter(fileChooser.getExtensionFilters().getFirst());
+        return fileChooser;
     }
 
     private void importPartLibrary(Path sourceFile) {
