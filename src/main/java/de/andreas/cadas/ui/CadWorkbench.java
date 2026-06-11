@@ -30,6 +30,8 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SlopedCeilingProfile;
+import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
@@ -159,6 +161,10 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> floorThicknessUnit = new ComboBox<>();
     private final TextField ceilingThicknessField = new TextField("20");
     private final ComboBox<LengthUnit> ceilingThicknessUnit = new ComboBox<>();
+    private final ComboBox<String> slopedCeilingModeSelector = new ComboBox<>();
+    private final ComboBox<SlopedCeilingSide> slopedCeilingSideSelector = new ComboBox<>();
+    private final TextField kneeWallHeightField = new TextField("1,00");
+    private final ComboBox<LengthUnit> kneeWallHeightUnit = new ComboBox<>();
     private final TextField doorWidthField = new TextField("1,01");
     private final ComboBox<LengthUnit> doorWidthUnit = new ComboBox<>();
     private final TextField doorHeightField = new TextField("2,01");
@@ -184,6 +190,7 @@ public final class CadWorkbench extends BorderPane {
     private final ObservableList<StairPreset> availableStairPresets = FXCollections.observableArrayList();
     private final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection);
     private final ViewProjectionService projectionService = new ViewProjectionService();
+    private final ProjectedModelBoundsService projectedBoundsService = new ProjectedModelBoundsService();
     private final UndoRedoStack<WorkbenchSnapshot> history = new UndoRedoStack<>();
     private final VBox propertySections = new VBox(12.0);
     private final Label selectionSummaryLabel = new Label("Keine Auswahl");
@@ -249,12 +256,14 @@ public final class CadWorkbench extends BorderPane {
         });
         updatePropertySectionVisibility();
         updateActionButtons();
+        fitCurrentViewToContent();
         updateStatus();
         render();
     }
 
     private void configureControls() {
         initializeUnitSelectors();
+        initializeSlopedCeilingControls();
         levelSelector.setItems(availableLevels);
         levelSelector.setValue(activeLevel.get());
         toolSelector.getItems().addAll(DrawingTool.values());
@@ -277,6 +286,7 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(showGuides);
         activeView.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.applyViewOrientation(newValue);
+            fitCurrentViewToContent();
             render();
         });
         toolSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
@@ -407,6 +417,9 @@ public final class CadWorkbench extends BorderPane {
         roomHeightField.setPrefColumnCount(5);
         floorThicknessField.setPrefColumnCount(4);
         ceilingThicknessField.setPrefColumnCount(4);
+        slopedCeilingModeSelector.setPrefWidth(160);
+        slopedCeilingSideSelector.setPrefWidth(160);
+        kneeWallHeightField.setPrefColumnCount(4);
         doorWidthField.setPrefColumnCount(5);
         doorHeightField.setPrefColumnCount(5);
         thresholdField.setPrefColumnCount(4);
@@ -509,7 +522,10 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Name", roomNameField),
                         propertyRow("Raumhöhe", roomHeightField, roomHeightUnit),
                         propertyRow("Boden", floorThicknessField, floorThicknessUnit),
-                        propertyRow("Decke", ceilingThicknessField, ceilingThicknessUnit)
+                        propertyRow("Decke", ceilingThicknessField, ceilingThicknessUnit),
+                        propertyRow("Dachschräge", slopedCeilingModeSelector),
+                        propertyRow("Niedrige Seite", slopedCeilingSideSelector),
+                        propertyRow("Sockelhöhe", kneeWallHeightField, kneeWallHeightUnit)
                 ),
                 createPropertySection(
                         "Tür",
@@ -683,6 +699,7 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(roomHeightUnit, LengthUnit.METER);
         initializeUnitSelector(floorThicknessUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(ceilingThicknessUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(kneeWallHeightUnit, LengthUnit.METER);
         initializeUnitSelector(doorWidthUnit, LengthUnit.METER);
         initializeUnitSelector(doorHeightUnit, LengthUnit.METER);
         initializeUnitSelector(thresholdUnit, LengthUnit.CENTIMETER);
@@ -695,6 +712,13 @@ public final class CadWorkbench extends BorderPane {
     private void initializeUnitSelector(ComboBox<LengthUnit> selector, LengthUnit defaultUnit) {
         selector.getItems().addAll(LengthUnit.values());
         selector.setValue(defaultUnit);
+    }
+
+    private void initializeSlopedCeilingControls() {
+        slopedCeilingModeSelector.getItems().setAll("Ohne Dachschräge", "Mit Dachschräge");
+        slopedCeilingModeSelector.setValue("Ohne Dachschräge");
+        slopedCeilingSideSelector.getItems().setAll(SlopedCeilingSide.values());
+        slopedCeilingSideSelector.setValue(SlopedCeilingSide.NORTH);
     }
 
     private void initializePresetSelectors() {
@@ -740,6 +764,10 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(floorThicknessUnit, "Bestimmt die Einheit für die Bodenstärke.");
         applyTooltip(ceilingThicknessField, "Legt die Deckenstärke des nächsten Raums fest.");
         applyTooltip(ceilingThicknessUnit, "Bestimmt die Einheit für die Deckenstärke.");
+        applyTooltip(slopedCeilingModeSelector, "Aktiviert optional eine innere Dachschräge beziehungsweise schräge Decke für rechteckige Räume. Ohne Aktivierung bleibt die Decke waagerecht.");
+        applyTooltip(slopedCeilingSideSelector, "Legt fest, an welcher Raumkante die niedrige Sockelhöhe liegt. Die Schräge steigt immer zur gegenüberliegenden Kante an.");
+        applyTooltip(kneeWallHeightField, "Legt die Sockel- beziehungsweise Kniestockhöhe der Dachschräge an der niedrigen Raumkante fest.");
+        applyTooltip(kneeWallHeightUnit, "Bestimmt die Einheit für die Sockelhöhe der Dachschräge.");
         applyTooltip(doorWidthField, "Legt die Breite der nächsten Tür fest.");
         applyTooltip(doorWidthUnit, "Bestimmt die Einheit für die Türbreite.");
         applyTooltip(doorHeightField, "Legt die Höhe der nächsten Tür fest.");
@@ -950,7 +978,8 @@ public final class CadWorkbench extends BorderPane {
                         previewSegment.end(),
                         currentRoomHeight(),
                         currentFloorThickness(),
-                        currentCeilingThickness()
+                        currentCeilingThickness(),
+                        currentSlopedCeilingProfile()
                 );
                 activeLevel.get().addRoom(room);
                 selectSingle(new SelectionKey(RenderableKind.ROOM_VOLUME, activeLevel.get().name(), room.id().toString()));
@@ -1096,6 +1125,7 @@ public final class CadWorkbench extends BorderPane {
                 PlanPoint center = room.centerPoint();
                 drawRoomLabel(graphics, room, center);
             }
+            drawRoomSlopeMarker(graphics, room);
         }
     }
 
@@ -1109,6 +1139,92 @@ public final class CadWorkbench extends BorderPane {
                 toScreenProjectedX(center, 0.0) - 42,
                 toScreenProjectedY(center, 0.0) + 12
         );
+    }
+
+    private void drawRoomSlopeMarker(GraphicsContext graphics, Room room) {
+        if (!projectionService.isPlanView(activeView.get()) || room.slopedCeilingProfile().isEmpty()) {
+            return;
+        }
+        SlopedCeilingProfile profile = room.slopedCeilingProfile().orElseThrow();
+        graphics.setStroke(Color.color(0.52, 0.29, 0.14, 0.9));
+        graphics.setLineWidth(1.6);
+        graphics.setLineDashes(10.0, 8.0);
+        PlanPoint start = room.centerPoint();
+        PlanPoint end = room.centerPoint();
+        PlanPoint arrowCenter = room.centerPoint();
+        switch (profile.lowSide()) {
+            case NORTH -> {
+                start = new PlanPoint(room.minXMillimeters(), room.minYMillimeters());
+                end = new PlanPoint(room.maxXMillimeters(), room.minYMillimeters());
+                arrowCenter = new PlanPoint(room.centerPoint().xMillimeters(), room.minYMillimeters() + room.depthMillimeters() * 0.18);
+            }
+            case SOUTH -> {
+                start = new PlanPoint(room.minXMillimeters(), room.maxYMillimeters());
+                end = new PlanPoint(room.maxXMillimeters(), room.maxYMillimeters());
+                arrowCenter = new PlanPoint(room.centerPoint().xMillimeters(), room.maxYMillimeters() - room.depthMillimeters() * 0.18);
+            }
+            case EAST -> {
+                start = new PlanPoint(room.maxXMillimeters(), room.minYMillimeters());
+                end = new PlanPoint(room.maxXMillimeters(), room.maxYMillimeters());
+                arrowCenter = new PlanPoint(room.maxXMillimeters() - room.widthMillimeters() * 0.18, room.centerPoint().yMillimeters());
+            }
+            case WEST -> {
+                start = new PlanPoint(room.minXMillimeters(), room.minYMillimeters());
+                end = new PlanPoint(room.minXMillimeters(), room.maxYMillimeters());
+                arrowCenter = new PlanPoint(room.minXMillimeters() + room.widthMillimeters() * 0.18, room.centerPoint().yMillimeters());
+            }
+        }
+        graphics.strokeLine(
+                toScreenProjectedX(start, 0.0),
+                toScreenProjectedY(start, 0.0),
+                toScreenProjectedX(end, 0.0),
+                toScreenProjectedY(end, 0.0)
+        );
+        graphics.setLineDashes();
+        drawSlopeArrow(graphics, arrowCenter, profile.lowSide());
+        graphics.setFill(Color.web("#6b4627"));
+        graphics.setFont(Font.font("Menlo", 10));
+        graphics.fillText(
+                String.format(Locale.GERMAN, "Schräge %.2f m → %.2f m | %.1f°",
+                        profile.kneeWallHeight().toMillimeters() / 1000.0,
+                        room.maximumCeilingHeightMillimeters() / 1000.0,
+                        room.slopeAngleDegrees()),
+                toScreenProjectedX(room.centerPoint(), 0.0) - 72,
+                toScreenProjectedY(room.centerPoint(), 0.0) + 28
+        );
+    }
+
+    private void drawSlopeArrow(GraphicsContext graphics, PlanPoint arrowCenter, SlopedCeilingSide lowSide) {
+        double arrowLength = 28.0;
+        double startX = toScreenProjectedX(arrowCenter, 0.0);
+        double startY = toScreenProjectedY(arrowCenter, 0.0);
+        double endX = startX;
+        double endY = startY;
+        switch (lowSide) {
+            case NORTH -> endY += arrowLength;
+            case SOUTH -> endY -= arrowLength;
+            case EAST -> endX -= arrowLength;
+            case WEST -> endX += arrowLength;
+        }
+        graphics.strokeLine(startX, startY, endX, endY);
+        switch (lowSide) {
+            case NORTH -> {
+                graphics.strokeLine(endX, endY, endX - 5, endY - 6);
+                graphics.strokeLine(endX, endY, endX + 5, endY - 6);
+            }
+            case SOUTH -> {
+                graphics.strokeLine(endX, endY, endX - 5, endY + 6);
+                graphics.strokeLine(endX, endY, endX + 5, endY + 6);
+            }
+            case EAST -> {
+                graphics.strokeLine(endX, endY, endX + 6, endY - 5);
+                graphics.strokeLine(endX, endY, endX + 6, endY + 5);
+            }
+            case WEST -> {
+                graphics.strokeLine(endX, endY, endX - 6, endY - 5);
+                graphics.strokeLine(endX, endY, endX - 6, endY + 5);
+            }
+        }
     }
 
     private void drawDoors(GraphicsContext graphics) {
@@ -1325,12 +1441,44 @@ public final class CadWorkbench extends BorderPane {
         double left = toScreenHorizontal(minProjectedX);
         double right = toScreenHorizontal(maxProjectedX);
         double floorY = toScreenVertical(0.0);
-        double topY = toScreenVertical(-room.roomHeight().toMillimeters());
+        double topY = toScreenVertical(-room.maximumCeilingHeightMillimeters());
+        if (isSlopeVisibleInCurrentElevation(room)) {
+            drawSlopedRoomElevation(graphics, room, left, right, floorY, topY);
+            return;
+        }
         graphics.setFill(Color.color(0.77, 0.64, 0.45, 0.16));
         graphics.fillRect(Math.min(left, right), Math.min(floorY, topY), Math.max(Math.abs(right - left), 3.0), Math.max(Math.abs(floorY - topY), 3.0));
         graphics.setStroke(Color.color(0.55, 0.43, 0.25, 0.65));
         graphics.setLineWidth(1.6);
         graphics.strokeRect(Math.min(left, right), Math.min(floorY, topY), Math.max(Math.abs(right - left), 3.0), Math.max(Math.abs(floorY - topY), 3.0));
+    }
+
+    private boolean isSlopeVisibleInCurrentElevation(Room room) {
+        return switch (activeView.get()) {
+            case EAST, WEST -> room.slopeVisibleInEastWestView();
+            case NORTH, SOUTH -> room.slopeVisibleInNorthSouthView();
+            default -> false;
+        };
+    }
+
+    private void drawSlopedRoomElevation(GraphicsContext graphics, Room room, double left, double right, double floorY, double topY) {
+        double lowY = toScreenVertical(-room.minimumCeilingHeightMillimeters());
+        boolean risesToRight = switch (activeView.get()) {
+            case EAST -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.NORTH).orElse(false);
+            case WEST -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.SOUTH).orElse(false);
+            case NORTH -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.WEST).orElse(false);
+            case SOUTH -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.EAST).orElse(false);
+            default -> false;
+        };
+        double firstTopY = risesToRight ? lowY : topY;
+        double secondTopY = risesToRight ? topY : lowY;
+        double[] xPoints = {left, right, right, left};
+        double[] yPoints = {floorY, floorY, secondTopY, firstTopY};
+        graphics.setFill(Color.color(0.77, 0.64, 0.45, 0.16));
+        graphics.fillPolygon(xPoints, yPoints, xPoints.length);
+        graphics.setStroke(Color.color(0.55, 0.43, 0.25, 0.72));
+        graphics.setLineWidth(1.8);
+        graphics.strokePolygon(xPoints, yPoints, xPoints.length);
     }
 
     private void drawStairElevation(GraphicsContext graphics, Staircase staircase) {
@@ -1554,6 +1702,16 @@ public final class CadWorkbench extends BorderPane {
 
     private Length currentCeilingThickness() {
         return parseLength(ceilingThicknessField, ceilingThicknessUnit.getValue()).orElse(DEFAULT_CEILING_THICKNESS);
+    }
+
+    private SlopedCeilingProfile currentSlopedCeilingProfile() {
+        if (!"Mit Dachschräge".equals(slopedCeilingModeSelector.getValue())) {
+            return null;
+        }
+        return new SlopedCeilingProfile(
+                Optional.ofNullable(slopedCeilingSideSelector.getValue()).orElse(SlopedCeilingSide.NORTH),
+                parseLength(kneeWallHeightField, kneeWallHeightUnit.getValue()).orElse(Length.of(1.0, LengthUnit.METER))
+        );
     }
 
     private Length currentDoorWidth() {
@@ -2023,16 +2181,35 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void resetTwoDView() {
-        zoom = 1.0;
-        offsetX = 240.0;
-        offsetY = 160.0;
+        fitCurrentViewToContent();
         render();
+    }
+
+    private void fitCurrentViewToContent() {
+        double viewportWidth = Math.max(drawingPane.getWidth(), 640.0);
+        double viewportHeight = Math.max(drawingPane.getHeight(), 420.0);
+        projectedBoundsService.bounds(activeLevel.get(), activeView.get()).ifPresentOrElse(bounds -> {
+            double contentWidth = Math.max(bounds.widthMillimeters(), 1_000.0);
+            double contentHeight = Math.max(bounds.heightMillimeters(), 1_000.0);
+            double horizontalPadding = projectionService.isPlanView(activeView.get()) ? 80.0 : 64.0;
+            double verticalPadding = projectionService.isPlanView(activeView.get()) ? 96.0 : 72.0;
+            double availableWidth = Math.max(220.0, viewportWidth - horizontalPadding);
+            double availableHeight = Math.max(180.0, viewportHeight - verticalPadding);
+            double fitScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
+            zoom = clamp(fitScale / BASE_PIXELS_PER_MILLIMETER, 0.25, 8.0);
+            offsetX = viewportWidth / 2.0 - bounds.centerHorizontalMillimeters() * scale();
+            offsetY = viewportHeight / 2.0 - bounds.centerVerticalMillimeters() * scale();
+        }, () -> {
+            zoom = 1.0;
+            offsetX = viewportWidth / 2.0;
+            offsetY = viewportHeight / 2.0;
+        });
     }
 
     private void clearProject() {
         Alert alert = new Alert(
                 Alert.AlertType.CONFIRMATION,
-                "Alle Etagen, Bauteile, Hilfslinien und Dachinformationen des aktuellen Projekts werden entfernt. Dieser Schritt kann derzeit nicht rückgängig gemacht werden.",
+                "Alle Etagen, Bauteile, Hilfslinien und Dachinformationen des aktuellen Projekts werden entfernt. Dieser Schritt kann über Rückgängig wiederhergestellt werden, solange der Verlauf erhalten bleibt.",
                 ButtonType.OK,
                 ButtonType.CANCEL
         );
@@ -2226,6 +2403,14 @@ public final class CadWorkbench extends BorderPane {
                         roomHeightField.setText(formatValue(room.roomHeight(), LengthUnit.METER, 2));
                         floorThicknessField.setText(formatValue(room.floorThickness(), LengthUnit.CENTIMETER, 1));
                         ceilingThicknessField.setText(formatValue(room.ceilingThickness(), LengthUnit.CENTIMETER, 1));
+                        if (room.slopedCeilingProfile().isPresent()) {
+                            SlopedCeilingProfile profile = room.slopedCeilingProfile().orElseThrow();
+                            slopedCeilingModeSelector.setValue("Mit Dachschräge");
+                            slopedCeilingSideSelector.setValue(profile.lowSide());
+                            kneeWallHeightField.setText(formatValue(profile.kneeWallHeight(), LengthUnit.METER, 2));
+                        } else {
+                            slopedCeilingModeSelector.setValue("Ohne Dachschräge");
+                        }
                     });
             case DOOR -> activeLevel.get().doors().stream()
                     .filter(door -> door.id().toString().equals(selectedSelection.get().elementId()))
@@ -2268,7 +2453,7 @@ public final class CadWorkbench extends BorderPane {
                     .toList());
             case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> activeLevel.get().replaceRooms(activeLevel.get().rooms().stream()
                     .map(room -> selectedIds().contains(room.id().toString())
-                            ? new Room(room.id(), currentRoomName(), room.outline(), currentRoomHeight(), currentFloorThickness(), currentCeilingThickness())
+                            ? new Room(room.id(), currentRoomName(), room.outline(), currentRoomHeight(), currentFloorThickness(), currentCeilingThickness(), currentSlopedCeilingProfile())
                             : room)
                     .toList());
             case DOOR -> activeLevel.get().replaceDoors(activeLevel.get().doors().stream()
@@ -2336,6 +2521,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.set(level);
         threeDViewport.syncLevels(availableLevels, level.name());
         markThreeDDirty();
+        fitCurrentViewToContent();
         updatePropertySectionVisibility();
         updateActionButtons();
         render();
@@ -2490,6 +2676,7 @@ public final class CadWorkbench extends BorderPane {
             case "roomHeight" -> roomHeightField;
             case "floorThickness" -> floorThicknessField;
             case "ceilingThickness" -> ceilingThicknessField;
+            case "kneeWallHeight" -> kneeWallHeightField;
             case "doorWidth" -> doorWidthField;
             case "doorHeight" -> doorHeightField;
             case "threshold" -> thresholdField;
@@ -2511,6 +2698,7 @@ public final class CadWorkbench extends BorderPane {
             case "roomHeight" -> roomHeightUnit;
             case "floorThickness" -> floorThicknessUnit;
             case "ceilingThickness" -> ceilingThicknessUnit;
+            case "kneeWallHeight" -> kneeWallHeightUnit;
             case "doorWidth" -> doorWidthUnit;
             case "doorHeight" -> doorHeightUnit;
             case "threshold" -> thresholdUnit;

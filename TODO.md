@@ -44,6 +44,8 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Treppenmodell für gerade Treppen, Podeste und Wendeltreppen definieren.
 - [x] 180°-Treppen für Altbau-Szenarien gezielt unterstützen.
 - [x] Dachstuhl- und Dachmodell für Satteldach, Winkel, Überstand und Dachrinnen definieren.
+- [x] Dachschrägen und schräge Decken als raumgebundene Innenflächen mit niedriger Kante und Sockelhöhe modellieren.
+- [x] Dachschrägen in Flächen-, Volumen-, 2D-, 3D- und DXF-Logik berücksichtigen.
 - [x] Vorbereitung für spätere frei drehbare 3D-Ansichten sauber in der Architektur verankern.
 
 ## Phase 4a: 3D-Visualisierung
@@ -97,10 +99,12 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 ## Nächste Aktionen
 - [x] Undo und Restore implementieren
 - [x] Das Umschalten der Ansichten ändert die Ansicht nicht
+- [x] Orthogonale Ansichten beim Umschalten automatisch auf den sichtbaren Inhalt zentrieren
 - [x] Elemente auswählen, abwählen, mehrere selektieren und deren Einstellungen ändern
 - [x] Treppe die ohne Absatz in einem rechteckigen Bereich untergebracht ist, am Anfang und am Ende in der gleichen Linie endet. Frag nach, wenn du nciht genau weißt, was gemeint ist.
 - [x] Aufbau der normalen Treppe passt nicht, Podest muss von einem Teil der Treppe erreichbar sein und der andere Teil vom Podest wegführen. Aber die Stufenbereiche liegen nebeneinander.
 - [x] 3D-Ansicht ist leer
+- [x] 3D-Kamera und Szenenaufbau gegen leere und neu gefüllte Szenen robust machen
 - [x] DWG-Dateien könne nicht als Teilebibliothek ausgewählt werden
 - [x] Projekt leeren, Nachfrage-Dialog davor
 - [x] Menü ergänzen und sinnvoll füllen, Key-Shortcuts passend ergänzen und implementieren

@@ -11,6 +11,8 @@ import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SlopedCeilingProfile;
+import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
@@ -60,5 +62,26 @@ class QuarterTurnRotationServiceTest {
         assertEquals(2000.0, result.rooms().getFirst().centerPoint().xMillimeters(), 0.001);
         assertEquals(1000.0, result.rooms().getFirst().centerPoint().yMillimeters(), 0.001);
         assertEquals(1, result.staircases().getFirst().rotationQuarterTurns());
+    }
+
+    @Test
+    void drehtAuchDieNiedrigeSeiteEinerDachschraegeMit() {
+        Level level = new Level("Dachgeschoss");
+        Room room = Room.rectangular(
+                "Dachzimmer",
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 2000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.of(1.0, LengthUnit.METER))
+        );
+        level.addRoom(room);
+
+        QuarterTurnRotationService.RotationResult result = service.rotate(level, Set.of(
+                new SelectionKey(RenderableKind.ROOM_VOLUME, level.name(), room.id().toString())
+        ), true);
+
+        assertEquals(SlopedCeilingSide.EAST, result.rooms().getFirst().slopedCeilingProfile().orElseThrow().lowSide());
     }
 }

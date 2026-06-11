@@ -13,6 +13,8 @@ import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.Roof;
 import de.andreas.cadas.domain.model.RoofType;
+import de.andreas.cadas.domain.model.SlopedCeilingProfile;
+import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.SurfaceLayer;
@@ -118,5 +120,36 @@ class ThreeDSceneModelBuilderTest {
 
         assertFalse(nurObergeschoss.boxes().stream().anyMatch(box -> "Erdgeschoss".equals(box.levelName())));
         assertTrue(mitEbenen.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.SURFACE_LAYER));
+    }
+
+    @Test
+    void leitetSchraegeRaumdeckenUndDeckenebenenIn3dAb() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
+        var level = project.primaryLevel();
+        Room room = Room.rectangular(
+                "Studio",
+                new PlanPoint(0, 0),
+                new PlanPoint(5000, 3000),
+                Length.of(2.8, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.of(1.0, LengthUnit.METER))
+        );
+        level.addRoom(room);
+        SurfaceLayerStack decke = new SurfaceLayerStack(SurfaceType.CEILING, room.id().toString());
+        decke.addLayer(SurfaceLayer.create(
+                "Gipskarton",
+                Length.of(1.25, LengthUnit.CENTIMETER),
+                Length.of(125, LengthUnit.CENTIMETER),
+                Length.of(62.5, LengthUnit.CENTIMETER),
+                Length.zero()
+        ));
+        level.addSurfaceLayerStack(decke);
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Dachgeschoss"), true);
+
+        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_VOLUME));
+        assertTrue(sceneModel.boxes().stream().filter(box -> box.kind() == RenderableKind.ROOM_VOLUME).count() > 1);
+        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.SURFACE_LAYER));
     }
 }

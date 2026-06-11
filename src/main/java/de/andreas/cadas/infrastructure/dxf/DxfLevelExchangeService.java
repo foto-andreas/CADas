@@ -7,6 +7,8 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SlopedCeilingProfile;
+import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
@@ -64,12 +66,13 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             appendClosedPolyline(dxf, DxfLayer.ROOMS, room.outline());
             appendMetadataText(dxf, room.centerPoint(), String.format(
                     Locale.US,
-                    "ROOM|%s|%.3f|%.3f|%.3f|%s",
+                    "ROOM|%s|%.3f|%.3f|%.3f|%s|%s",
                     sanitize(room.name()),
                     room.roomHeight().toMillimeters(),
                     room.floorThickness().toMillimeters(),
                     room.ceilingThickness().toMillimeters(),
-                    serializePoints(room.outline())
+                    serializePoints(room.outline()),
+                    serializeSlopedCeiling(room)
             ));
         }
 
@@ -182,7 +185,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                         deserializePoints(parts[5]),
                         Length.ofMillimeters(parseDouble(parts[2])),
                         Length.ofMillimeters(parseDouble(parts[3])),
-                        Length.ofMillimeters(parseDouble(parts[4]))
+                        Length.ofMillimeters(parseDouble(parts[4])),
+                        parts.length >= 7 ? deserializeSlopedCeiling(parts[6]) : null
                 ));
                 case "DOOR" -> pendingDoors.add(Door.create(
                         UUID.fromString(parts[1]),
@@ -246,7 +250,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                         points,
                         DEFAULT_ROOM_HEIGHT,
                         DEFAULT_FLOOR_THICKNESS,
-                        DEFAULT_CEILING_THICKNESS
+                        DEFAULT_CEILING_THICKNESS,
+                        null
                 ));
             }
         }
@@ -333,6 +338,31 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
 
     private static double parseDouble(String value) {
         return Double.parseDouble(value);
+    }
+
+    private static String serializeSlopedCeiling(Room room) {
+        return room.slopedCeilingProfile()
+                .map(profile -> String.format(
+                        Locale.US,
+                        "SLOPE,%s,%.3f",
+                        profile.lowSide().name(),
+                        profile.kneeWallHeight().toMillimeters()
+                ))
+                .orElse("NONE");
+    }
+
+    private static SlopedCeilingProfile deserializeSlopedCeiling(String value) {
+        if (value == null || value.isBlank() || value.equals("NONE")) {
+            return null;
+        }
+        String[] parts = value.split(",");
+        if (parts.length != 3 || !parts[0].equals("SLOPE")) {
+            return null;
+        }
+        return new SlopedCeilingProfile(
+                SlopedCeilingSide.valueOf(parts[1]),
+                Length.ofMillimeters(parseDouble(parts[2]))
+        );
     }
 
     private record DxfEntity(String type, Map<Integer, List<String>> values) {
