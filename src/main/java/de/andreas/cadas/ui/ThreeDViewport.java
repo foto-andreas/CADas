@@ -79,7 +79,9 @@ public final class ThreeDViewport extends BorderPane {
     private double sceneCenterY;
     private double sceneCenterZ;
     private double sceneSpan;
-    private double modelTranslateY;
+    private double baseTranslateX;
+    private double baseTranslateY;
+    private double baseTranslateZ;
     private double dragStartX;
     private double dragStartY;
     private CameraPose dragStartPose;
@@ -204,7 +206,7 @@ public final class ThreeDViewport extends BorderPane {
             if (dragButton == MouseButton.PRIMARY) {
                 cameraPose = cameraController.orbit(dragStartPose, deltaX * 0.35, -deltaY * 0.35);
             } else if (dragButton == MouseButton.SECONDARY) {
-                cameraPose = cameraController.pan(dragStartPose, deltaX * 22.0, -deltaY * 22.0);
+                cameraPose = cameraController.pan(dragStartPose, deltaX, deltaY);
             }
             fitToSceneRequested = false;
             updateCamera();
@@ -371,7 +373,9 @@ public final class ThreeDViewport extends BorderPane {
             sceneCenterY = 0.0;
             sceneCenterZ = 0.0;
             sceneSpan = 8_000.0;
-            modelTranslateY = 0.0;
+            baseTranslateX = 0.0;
+            baseTranslateY = 0.0;
+            baseTranslateZ = 0.0;
         } else {
             sceneCenterX = (minX + maxX) / 2.0;
             sceneCenterY = (minY + maxY) / 2.0;
@@ -460,9 +464,9 @@ public final class ThreeDViewport extends BorderPane {
             parallelCamera.getTransforms().setAll(cameraTransforms());
             subScene.setCamera(parallelCamera);
         }
-        modelRoot.setTranslateX(cameraPose.panX());
-        modelRoot.setTranslateY(modelTranslateY);
-        modelRoot.setTranslateZ(cameraPose.panZ());
+        modelRoot.setTranslateX(baseTranslateX + cameraPose.panX());
+        modelRoot.setTranslateY(baseTranslateY + cameraPose.panZ());
+        modelRoot.setTranslateZ(baseTranslateZ);
         cameraStatusLabel.setText(String.format(
                 "3D Kamera: %s | Azimut %.1f° | Elevation %.1f° | Abstand %.1f m | Szene %.0f mm",
                 cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC ? "orthografisch" : "perspektivisch",
@@ -480,14 +484,16 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private void fitCameraToScene() {
-        modelTranslateY = sceneCenterY * WORLD_SCALE;
+        baseTranslateX = -sceneCenterX * WORLD_SCALE;
+        baseTranslateY = sceneCenterY * WORLD_SCALE;
+        baseTranslateZ = -sceneCenterZ * WORLD_SCALE;
         cameraPose = new CameraPose(
                 projectionModeSelector.getValue(),
                 cameraPose.azimuthDegrees(),
                 cameraPose.elevationDegrees(),
                 Math.max(6_000.0, sceneSpan * 1.8),
-                -sceneCenterX * WORLD_SCALE,
-                -sceneCenterZ * WORLD_SCALE
+                0.0,
+                0.0
         );
         fitToSceneRequested = false;
         updateCamera();
