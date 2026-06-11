@@ -72,7 +72,7 @@ public final class SelectionQueryService {
 
     private Optional<SelectionKey> findWallSelection(Level level, PlanPoint point, Length tolerance) {
         return level.walls().stream()
-                .filter(wall -> wall.axis().distanceTo(point).compareTo(tolerance) <= 0)
+                .filter(wall -> wall.axis().distanceTo(point).toMillimeters() <= Math.max(tolerance.toMillimeters(), wall.thickness().toMillimeters() / 2.0))
                 .min(Comparator.comparingDouble(wall -> wall.axis().distanceTo(point).toMillimeters()))
                 .map(wall -> new SelectionKey(RenderableKind.WALL, level.name(), wall.id().toString()));
     }

@@ -39,13 +39,14 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Treppen, Dächer und zusätzliche Flächen-Ebenen folgen nach dem robusten 2D-Grundrisskern.
 * Zuerst eine kleine interne Standardbibliothek für Türen, Fenster und einfache Treppen bereitstellen.
 * Externe Teilebibliotheken folgen nach der internen Basisbibliothek.
-* Räume werden im ersten MVP als rechteckige Polygone angelegt und später auf komplexere Konturen erweitert.
+* Räume werden fachlich aus geschlossenen orthogonalen Wandzügen automatisch aus der Innenkante der Wandkörper abgeleitet; Namen und Raum-Properties hängen am abgeleiteten Raum und werden bei Wandänderungen mitgeführt.
 * Türen und Fenster werden im Modell wandgebunden über Offset und Breite gespeichert, damit Wandbearbeitungen diese Öffnungen mitführen können.
 * Die erste Dateiformat-Schnittstelle wird als separater DXF-Adapter umgesetzt, damit spätere DWG-Unterstützung ohne Eingriff in die Fachlogik ergänzt werden kann.
 * Der erste Treppenumfang basiert auf Presets für gerade Treppen, 180°-Treppen und Wendeltreppen mit platzierbarer Grundfläche.
 * Zusätzliche Oberflächen-Ebenen werden zunächst als allgemeine Layer-Stacks mit rechteckiger Kachelbelegung modelliert, bevor dafür eine eigene UI-Verwaltung ergänzt wird.
 * Der erste Dachumfang fokussiert das Satteldach als separates Domänenobjekt mit Winkel, Überstand und Dachrinne.
 * Dachschrägen und schräge Decken werden im Raummodell zunächst als rechteckige, raumgebundene Innenflächen mit niedriger Kante und Sockelhöhe modelliert; die hohe Seite ergibt sich aus der Raumhöhe.
+* Spätere Wand-Innenbeläge und weitere Wandebenen müssen die effektive Raum-Innenkante zusätzlich verschieben; aktuell basiert die automatische Raumkontur auf der nackten Wandstärke.
 * Externe Teilebibliotheken werden im ersten Schritt über das textbasierte Format `.cadasparts` importiert und in die bestehende Preset-Verwaltung integriert.
 * Die erste 3D-Visualisierung wird als JavaFX-`SubScene` mit gemeinsamem Auswahlmodell zwischen 2D und 3D sowie aus dem Fachmodell abgeleiteten Volumenkörpern umgesetzt.
 * Die JavaFX-Anwendung wird modular mit `module-info.java` und `mainModule` betrieben, damit Launcher, Distribution und zukünftige Paketierung sauber zusammenpassen.
