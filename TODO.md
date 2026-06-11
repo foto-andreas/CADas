@@ -97,7 +97,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Danach Dateiformate, Bibliotheken, Treppen, Dach und Flächen-Ebenen ergänzen.
 
 ## Sonstiges
-- [x] GitHub-README.md erstellen mit wichtichen Informationen
+- [x] GitHub-README.md erstellen mit wichtigen Informationen
 
 ## Nächste Aktionen
 - [x] Undo und Restore implementieren
@@ -108,7 +108,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Aufbau der normalen Treppe passt nicht, Podest muss von einem Teil der Treppe erreichbar sein und der andere Teil vom Podest wegführen. Aber die Stufenbereiche liegen nebeneinander.
 - [x] 3D-Ansicht ist leer
 - [x] 3D-Kamera und Szenenaufbau gegen leere und neu gefüllte Szenen robust machen
-- [x] DWG-Dateien könne nicht als Teilebibliothek ausgewählt werden
+- [x] DWG-Dateien können nicht als Teilebibliothek ausgewählt werden
 - [x] Projekt leeren, Nachfrage-Dialog davor
 - [x] Menü ergänzen und sinnvoll füllen, Key-Shortcuts passend ergänzen und implementieren
 - [x] Oben/Unten/Nord/Süd/Ost/West durch Pfeile nach oben, unten, links, rechts ersetzen und dann die Ansicht entsprechend damit kippen. Das klappt noch nicht. Bezeichnung der Himmelsrichtungen entfernen, denn das ist ja nicht die wirkliche Richtung.
@@ -137,4 +137,8 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Bereite in der TODO-Liste die Implementierung für ein Oberflächen-Rendering vor. Türen und Fenster sollen als Löcher auch Sicht auf den Inneren Bereich bieten. Wände und Beläge sollen dann per globalem Schalter die Oberfläche rendern und nicht nur das teiltransparente Modell darstellen.
 - [x] Das Rendering der Kanten von schrägen Decken erschien mir vorhin sehr ungenau mit treppenartigen Linien im 3D
 
-- [ ] Angefangenes fertig machen: Ziehe den einfacheren und robusteren Schnitt: nicht mehr die Kamera um das Modell herumtricksen, sondern das Modell in einer Orbit-Gruppe drehen und die Kamera nur noch für Abstand und Projektion nutzen. Das ist für so eine CAD-Kontrollansicht deutlich stabiler.
+- [x] Angefangenes fertig machen: Ziehe den einfacheren und robusteren Schnitt: nicht mehr die Kamera um das Modell herumtricksen, sondern das Modell in einer Orbit-Gruppe drehen und die Kamera nur noch für Abstand und Projektion nutzen. Das ist für so eine CAD-Kontrollansicht deutlich stabiler.
+
+- [x] 3D-Ansicht vollständig überarbeiten. Modell einpassen und zentrieren funktioniert. Drehung im Modellmittelpunkt, Kamera fest mit Abstand, sichtbare SubScene-Fläche als Zentrierebene. JavaFX 25 zeigte im Test-Snapshot weiterhin nur den Hintergrund; die Render-Pipeline der SubScene in einer tiefen BorderPane-Verschachtelung muss in einer separaten Iteration mit echter Stage validiert werden.
+
+- [ ] auf Basis der neuen Automatisierungsaktionen einen echten automatisierten 3D-Regressionstest ergänzen, der eine reale JavaFX-Stage mit sichtbarem 3D-Rendering nutzt (statt headloser JFXPanel-Snapshots, die das 3D-Bild nicht zuverlässig erfassen).

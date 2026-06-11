@@ -27,6 +27,17 @@ class ThreeDCameraControllerTest {
     }
 
     @Test
+    void panBleibtVonOrbitwinkelnUnabhaengigUndArbeitetInBildschirmachsen() {
+        CameraPose pose = new CameraPose(ProjectionMode.PERSPECTIVE, 47.0, 28.0, 12_000.0, 10.0, 20.0, 30.0);
+
+        CameraPose verschoben = controller.pan(pose, 90.0, 40.0);
+
+        assertEquals(1_810.0, verschoben.panX());
+        assertEquals(-780.0, verschoben.panY());
+        assertEquals(30.0, verschoben.panZ());
+    }
+
+    @Test
     void begrenztElevationUndZoomAufSichereGrenzen() {
         CameraPose pose = new CameraPose(ProjectionMode.PERSPECTIVE, 0.0, 0.0, 10_000.0, 0.0, 0.0, 0.0);
 
