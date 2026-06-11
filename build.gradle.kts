@@ -81,9 +81,12 @@ fun normalizedAppVersion(): String {
     return numericParts.joinToString(".")
 }
 
-fun artifactVersionSuffix(): String {
-    val rawVersion = version.toString()
-    return if (rawVersion.contains('-')) "-$rawVersion" else ""
+fun artifactFileVersion(): String {
+    return version.toString()
+}
+
+fun snapshotAppImageName(): String {
+    return if (artifactFileVersion().contains('-')) "CADas-${artifactFileVersion()}.app" else "CADas.app"
 }
 
 abstract class RenamePackagedFileTask : DefaultTask() {
@@ -159,13 +162,13 @@ val cleanMacOsDmg by tasks.registering(Delete::class) {
 val renameMacOsAppImage by tasks.registering(RenamePackagedDirectoryTask::class) {
     outputDirectory.set(appImageOutputDirectory)
     generatedDirectoryName.set("CADas.app")
-    targetDirectoryName.set("CADas${artifactVersionSuffix()}.app")
+    targetDirectoryName.set(snapshotAppImageName())
 }
 
 val renameMacOsDmg by tasks.registering(RenamePackagedFileTask::class) {
     outputDirectory.set(dmgOutputDirectory)
     expectedExtension.set("dmg")
-    targetFileName.set("CADas-${normalizedAppVersion()}${artifactVersionSuffix()}.dmg")
+    targetFileName.set("CADas-${artifactFileVersion()}.dmg")
 }
 
 tasks.register<Exec>("packageMacOsAppImage") {
