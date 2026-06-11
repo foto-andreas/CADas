@@ -52,4 +52,3 @@ public final class PartLibraryImportService {
         return new StandardPartLibrary(List.copyOf(doorPresets), List.copyOf(windowPresets), List.copyOf(stairPresets));
     }
 }
-

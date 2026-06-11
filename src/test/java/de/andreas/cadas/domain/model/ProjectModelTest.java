@@ -77,4 +77,15 @@ class ProjectModelTest {
         assertEquals(1, model.primaryLevel().walls().size());
         assertNotSame(snapshot.primaryLevel(), model.primaryLevel());
     }
+
+    @Test
+    void projektnameWirdBeimWiederherstellenMitUebernommen() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Alt", "Erdgeschoss");
+        ProjectModel snapshot = ProjectModel.withDefaultLevel("Neu", "Import");
+
+        model.replaceWith(snapshot);
+
+        assertEquals("Neu", model.name());
+        assertEquals("Import", model.primaryLevel().name());
+    }
 }

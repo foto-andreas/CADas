@@ -64,6 +64,7 @@ public final class ThreeDViewport extends BorderPane {
     private final CheckBox surfaceLayersCheckBox = new CheckBox("3D Ebenen");
     private final FlowPane levelTogglePane = new FlowPane(8, 8);
     private final Label cameraStatusLabel = new Label();
+    private final Label sceneHintLabel = new Label("Die 3D-Ansicht wird gefüllt, sobald auf der aktiven Etage Wände, Räume oder Treppen vorhanden sind.");
     private final Map<String, BooleanProperty> levelVisibility = new LinkedHashMap<>();
     private final Consumer<SelectionKey> selectionConsumer;
 
@@ -71,9 +72,15 @@ public final class ThreeDViewport extends BorderPane {
     private CameraPose cameraPose = viewPreparation.defaultPose();
     private ViewOrientation currentOrientation = ViewOrientation.TOP;
     private SelectionKey selectedSelection;
+    private Set<SelectionKey> selectedSelections = Set.of();
+    private boolean fitToSceneRequested = true;
+    private double sceneCenterX;
+    private double sceneCenterZ;
+    private double sceneSpan;
     private double dragStartX;
     private double dragStartY;
     private CameraPose dragStartPose;
+    private MouseButton dragButton = MouseButton.NONE;
 
     public ThreeDViewport(Consumer<SelectionKey> selectionConsumer) {
         this.selectionConsumer = selectionConsumer;
@@ -107,10 +114,22 @@ public final class ThreeDViewport extends BorderPane {
         }
         ThreeDSceneModel sceneModel = modelBuilder.build(project, visibleLevels, surfaceLayersCheckBox.isSelected());
         rebuildScene(sceneModel);
+        sceneHintLabel.setVisible(sceneModel.boxes().isEmpty());
+        sceneHintLabel.setManaged(sceneModel.boxes().isEmpty());
+        if (!sceneModel.boxes().isEmpty() && fitToSceneRequested) {
+            fitCameraToScene();
+        }
     }
 
     public void setSelectedSelection(SelectionKey selectedSelection) {
         this.selectedSelection = selectedSelection;
+        if (currentProject != null) {
+            refresh(currentProject);
+        }
+    }
+
+    public void setSelectedSelections(Set<SelectionKey> selectedSelections) {
+        this.selectedSelections = Set.copyOf(selectedSelections);
         if (currentProject != null) {
             refresh(currentProject);
         }
@@ -123,6 +142,7 @@ public final class ThreeDViewport extends BorderPane {
                 viewOrientation.cameraAzimuthDegrees(),
                 viewOrientation.cameraElevationDegrees()
         );
+        fitToSceneRequested = true;
         updateCamera();
     }
 
@@ -147,6 +167,7 @@ public final class ThreeDViewport extends BorderPane {
             dragStartX = event.getSceneX();
             dragStartY = event.getSceneY();
             dragStartPose = cameraPose;
+            dragButton = event.getButton();
         });
         subScene.setOnMouseDragged(event -> {
             if (dragStartPose == null) {
@@ -154,15 +175,18 @@ public final class ThreeDViewport extends BorderPane {
             }
             double deltaX = event.getSceneX() - dragStartX;
             double deltaY = event.getSceneY() - dragStartY;
-            if (event.getButton() == MouseButton.PRIMARY) {
+            if (dragButton == MouseButton.PRIMARY) {
                 cameraPose = cameraController.orbit(dragStartPose, deltaX * 0.35, -deltaY * 0.35);
-            } else if (event.getButton() == MouseButton.SECONDARY) {
+            } else if (dragButton == MouseButton.SECONDARY) {
                 cameraPose = cameraController.pan(dragStartPose, deltaX * 22.0, -deltaY * 22.0);
             }
+            fitToSceneRequested = false;
             updateCamera();
         });
+        subScene.setOnMouseReleased(event -> dragButton = MouseButton.NONE);
         subScene.setOnScroll(event -> {
             cameraPose = cameraController.zoom(cameraPose, event.getDeltaY() > 0 ? 0.92 : 1.08);
+            fitToSceneRequested = false;
             updateCamera();
         });
         subScene.widthProperty().addListener((ignored, oldValue, newValue) -> updateCamera());
@@ -194,11 +218,29 @@ public final class ThreeDViewport extends BorderPane {
         Label title = new Label("3D-Ansicht");
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         Label projectionLabel = new Label("Projektion");
+        Label interactionHintLabel = new Label("Links drehen, rechts verschieben, Mausrad zoomen");
+        interactionHintLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #685d52;");
+        Button orbitLeftButton = new Button("⟲");
+        orbitLeftButton.setOnAction(event -> nudgeOrbit(-15.0, 0.0));
+        Button orbitRightButton = new Button("⟳");
+        orbitRightButton.setOnAction(event -> nudgeOrbit(15.0, 0.0));
+        Button orbitUpButton = new Button("↑");
+        orbitUpButton.setOnAction(event -> nudgeOrbit(0.0, 8.0));
+        Button orbitDownButton = new Button("↓");
+        orbitDownButton.setOnAction(event -> nudgeOrbit(0.0, -8.0));
+        Button fitSceneButton = new Button("Modell einpassen");
+        fitSceneButton.setOnAction(event -> fitCameraToScene());
         Button resetViewButton = new Button("Ansicht zentrieren");
         resetViewButton.setOnAction(event -> resetToCurrentOrientation());
         resetViewButton.setStyle("-fx-background-color: #4b6a88; -fx-text-fill: white; -fx-background-radius: 999;");
         applyTooltip(resetViewButton, "Setzt die 3D-Kamera auf die Standardansicht zurück und richtet das Modell wieder übersichtlich aus.");
-        HBox header = new HBox(12.0, title, projectionLabel, projectionModeSelector, surfaceLayersCheckBox, resetViewButton);
+        applyTooltip(orbitLeftButton, "Dreht die 3D-Kamera schrittweise nach links.");
+        applyTooltip(orbitRightButton, "Dreht die 3D-Kamera schrittweise nach rechts.");
+        applyTooltip(orbitUpButton, "Hebt die 3D-Kamera schrittweise an.");
+        applyTooltip(orbitDownButton, "Senkt die 3D-Kamera schrittweise ab.");
+        applyTooltip(fitSceneButton, "Richtet Kameraabstand und Mittelpunkt so aus, dass das aktuelle Modell vollständig sichtbar wird.");
+        applyTooltip(interactionHintLabel, "Erinnert an die direkte Maussteuerung der 3D-Ansicht: linke Maustaste dreht, rechte verschiebt und das Mausrad zoomt.");
+        HBox header = new HBox(12.0, title, projectionLabel, projectionModeSelector, orbitLeftButton, orbitRightButton, orbitUpButton, orbitDownButton, fitSceneButton, surfaceLayersCheckBox, resetViewButton, interactionHintLabel);
         header.setAlignment(Pos.CENTER_LEFT);
 
         ScrollPane levelScrollPane = new ScrollPane(levelTogglePane);
@@ -206,7 +248,10 @@ public final class ThreeDViewport extends BorderPane {
         levelScrollPane.setPrefViewportHeight(88);
         levelScrollPane.setStyle("-fx-background-color: transparent;");
 
-        StackPane scenePane = new StackPane(subScene);
+        sceneHintLabel.setWrapText(true);
+        sceneHintLabel.setMaxWidth(280);
+        sceneHintLabel.setStyle("-fx-background-color: rgba(255,255,255,0.85); -fx-padding: 12; -fx-background-radius: 12; -fx-text-fill: #5f5548;");
+        StackPane scenePane = new StackPane(subScene, sceneHintLabel);
         scenePane.setStyle("-fx-background-color: rgba(255,255,255,0.6); -fx-background-radius: 16;");
         subScene.widthProperty().bind(scenePane.widthProperty());
         subScene.heightProperty().bind(scenePane.heightProperty());
@@ -238,6 +283,10 @@ public final class ThreeDViewport extends BorderPane {
     private void rebuildScene(ThreeDSceneModel sceneModel) {
         modelRoot.getChildren().clear();
         Map<String, Group> groupedByLevel = new LinkedHashMap<>();
+        double minX = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double minZ = Double.POSITIVE_INFINITY;
+        double maxZ = Double.NEGATIVE_INFINITY;
         for (RenderableBox renderableBox : sceneModel.boxes()) {
             Group levelGroup = groupedByLevel.computeIfAbsent(renderableBox.levelName(), ignored -> {
                 Group group = new Group();
@@ -246,8 +295,21 @@ public final class ThreeDViewport extends BorderPane {
                 return group;
             });
             levelGroup.getChildren().add(createNode(renderableBox));
+            minX = Math.min(minX, renderableBox.centerX() - renderableBox.width() / 2.0);
+            maxX = Math.max(maxX, renderableBox.centerX() + renderableBox.width() / 2.0);
+            minZ = Math.min(minZ, renderableBox.centerZ() - renderableBox.depth() / 2.0);
+            maxZ = Math.max(maxZ, renderableBox.centerZ() + renderableBox.depth() / 2.0);
         }
         modelRoot.getChildren().addAll(groupedByLevel.values());
+        if (sceneModel.boxes().isEmpty()) {
+            sceneCenterX = 0.0;
+            sceneCenterZ = 0.0;
+            sceneSpan = 8_000.0;
+        } else {
+            sceneCenterX = (minX + maxX) / 2.0;
+            sceneCenterZ = (minZ + maxZ) / 2.0;
+            sceneSpan = Math.max(4_000.0, Math.max(maxX - minX, maxZ - minZ));
+        }
     }
 
     private Node createNode(RenderableBox renderableBox) {
@@ -294,7 +356,8 @@ public final class ThreeDViewport extends BorderPane {
             case "surface-layer" -> Color.web("#8e7b5e");
             default -> Color.web("#8c877f");
         };
-        if (selectedSelection != null && selectedSelection.equals(renderableBox.selectionKey())) {
+        if ((selectedSelection != null && selectedSelection.equals(renderableBox.selectionKey()))
+                || selectedSelections.contains(renderableBox.selectionKey())) {
             color = color.deriveColor(0, 1.0, 1.2, 1.0);
         }
         PhongMaterial material = new PhongMaterial(color);
@@ -325,6 +388,25 @@ public final class ThreeDViewport extends BorderPane {
                 cameraPose.elevationDegrees(),
                 cameraPose.distance() / 1000.0
         ));
+    }
+
+    private void nudgeOrbit(double azimuthDelta, double elevationDelta) {
+        fitToSceneRequested = false;
+        cameraPose = cameraController.orbit(cameraPose, azimuthDelta, elevationDelta);
+        updateCamera();
+    }
+
+    private void fitCameraToScene() {
+        cameraPose = new CameraPose(
+                projectionModeSelector.getValue(),
+                currentOrientation.cameraAzimuthDegrees(),
+                currentOrientation.cameraElevationDegrees(),
+                Math.max(8_000.0, sceneSpan * 1.9),
+                -sceneCenterX * WORLD_SCALE,
+                -sceneCenterZ * WORLD_SCALE
+        );
+        fitToSceneRequested = false;
+        updateCamera();
     }
 
     private javafx.scene.transform.Transform[] cameraTransforms() {

@@ -1,6 +1,7 @@
 package de.andreas.cadas.infrastructure.dxf;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
@@ -9,10 +10,13 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.StairType;
+import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -55,6 +59,15 @@ class DxfLevelExchangeServiceTest {
                 Length.of(90, LengthUnit.CENTIMETER),
                 Length.of(1.2, LengthUnit.METER)
         ));
+        level.addStaircase(new Staircase(
+                java.util.UUID.randomUUID(),
+                StairType.SWITCHBACK,
+                new PlanPoint(500, 500),
+                new PlanPoint(2200, 4200),
+                Length.of(2.9, LengthUnit.METER),
+                18,
+                1
+        ));
 
         Path file = tempDir.resolve("grundriss.dxf");
         exchangeService.exportLevel(level, file);
@@ -64,7 +77,28 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1, imported.rooms().size());
         assertEquals(1, imported.doors().size());
         assertEquals(1, imported.windows().size());
+        assertEquals(1, imported.staircases().size());
         assertEquals("Küche", imported.rooms().getFirst().name());
         assertEquals(14.0, imported.rooms().getFirst().areaSquareMeters(), 0.001);
+        assertEquals(StairType.SWITCHBACK, imported.staircases().getFirst().stairType());
+        assertEquals(1, imported.staircases().getFirst().rotationQuarterTurns());
+    }
+
+    @Test
+    void exportiertMetrischeHeaderUndModelSpaceKennung() throws Exception {
+        Level level = new Level("Erdgeschoss");
+        level.addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(1000, 0)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        ));
+
+        Path file = tempDir.resolve("header.dxf");
+        exchangeService.exportLevel(level, file);
+        String dxf = Files.readString(file);
+
+        assertTrue(dxf.contains("$INSUNITS\n70\n4"));
+        assertTrue(dxf.contains("$MEASUREMENT\n70\n1"));
+        assertTrue(dxf.contains("\n67\n0\n410\nModel\n"));
     }
 }

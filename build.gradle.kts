@@ -79,6 +79,7 @@ val commonJpackageArguments = listOf(
     "--name", "CADas",
     "--app-version", normalizedAppVersion(),
     "--vendor", "Andreas",
+    "--icon", file("src/main/resources/icons/CADas.icns").absolutePath,
     "--module-path", installLibDirectory.absolutePath,
     "--module", "de.andreas.cadas/de.andreas.cadas.CadLauncher",
     "--java-options", "--enable-native-access=javafx.graphics,ALL-UNNAMED"
@@ -118,4 +119,12 @@ tasks.register<Exec>("packageMacOsDmg") {
         "--type", "dmg",
         "--dest", dmgOutputDirectory.absolutePath
     ) + commonJpackageArguments
+}
+
+tasks.register<Exec>("runMitAutomatisierung") {
+    group = "application"
+    description = "Startet CADas mit lokalem HTTP-Automatisierungszugriff für manuelle und agentische Tests."
+    dependsOn(tasks.installDist)
+    executable = layout.buildDirectory.file("install/CADas/bin/CADas").get().asFile.absolutePath
+    environment("JAVA_OPTS", "-Dcadas.automation.enabled=true")
 }

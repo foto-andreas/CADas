@@ -327,6 +327,7 @@ public final class ThreeDSceneModelBuilder {
             switch (staircase.stairType()) {
                 case STRAIGHT -> boxes.addAll(buildStraightStair(level.name(), staircase, baseHeight));
                 case HALF_TURN -> boxes.addAll(buildHalfTurnStair(level.name(), staircase, baseHeight));
+                case SWITCHBACK -> boxes.addAll(buildSwitchbackStair(level.name(), staircase, baseHeight));
                 case SPIRAL -> boxes.addAll(buildSpiralStair(level.name(), staircase, baseHeight));
             }
         }
@@ -338,21 +339,15 @@ public final class ThreeDSceneModelBuilder {
         double stepHeight = staircase.totalHeight().toMillimeters() / staircase.stepCount();
         double stepDepth = staircase.heightMillimeters() / staircase.stepCount();
         for (int step = 0; step < staircase.stepCount(); step++) {
-            double centerZ = staircase.minY() + stepDepth * step + stepDepth / 2.0;
-            boxes.add(new RenderableBox(
-                    new SelectionKey(RenderableKind.STAIR, levelName, staircase.id().toString()),
+            boxes.add(stairBox(
                     levelName,
-                    RenderableKind.STAIR,
-                    staircase.minX() + staircase.widthMillimeters() / 2.0,
+                    staircase,
                     baseHeight + stepHeight * (step + 0.5),
-                    centerZ,
+                    staircase.widthMillimeters() / 2.0,
+                    stepDepth * step + stepDepth / 2.0,
                     staircase.widthMillimeters(),
-                    stepHeight,
                     stepDepth,
-                    RotationAxis.Y,
-                    0.0,
-                    "stair",
-                    1.0
+                    0.0
             ));
         }
         return boxes;
@@ -363,42 +358,76 @@ public final class ThreeDSceneModelBuilder {
         int firstFlightSteps = staircase.stepCount() / 2;
         int secondFlightSteps = staircase.stepCount() - firstFlightSteps;
         double stepHeight = staircase.totalHeight().toMillimeters() / staircase.stepCount();
-        double flightWidth = staircase.widthMillimeters() / 2.0;
-        double flightDepth = staircase.heightMillimeters() / 2.0;
+        double totalWidth = staircase.widthMillimeters();
+        double totalHeight = staircase.heightMillimeters();
+        double landingDepth = totalHeight * 0.22;
+        double flightDepth = (totalHeight - landingDepth) / 2.0;
+        double flightWidth = totalWidth * 0.48;
         double firstStepDepth = flightDepth / Math.max(1, firstFlightSteps);
         for (int step = 0; step < firstFlightSteps; step++) {
-            boxes.add(new RenderableBox(
-                    new SelectionKey(RenderableKind.STAIR, levelName, staircase.id().toString()),
-                    levelName,
-                    RenderableKind.STAIR,
-                    staircase.minX() + flightWidth / 2.0,
-                    baseHeight + stepHeight * (step + 0.5),
-                    staircase.minY() + firstStepDepth * step + firstStepDepth / 2.0,
-                    flightWidth,
-                    stepHeight,
-                    firstStepDepth,
-                    RotationAxis.Y,
-                    0.0,
-                    "stair",
-                    1.0
-            ));
+            boxes.add(stairBox(levelName, staircase, baseHeight + stepHeight * (step + 0.5), flightWidth / 2.0, firstStepDepth * step + firstStepDepth / 2.0, flightWidth, firstStepDepth, 0.0));
         }
+        boxes.add(stairBox(
+                levelName,
+                staircase,
+                baseHeight + stepHeight * firstFlightSteps,
+                totalWidth / 2.0,
+                flightDepth + landingDepth / 2.0,
+                totalWidth,
+                landingDepth,
+                0.0
+        ));
         double secondStepDepth = flightDepth / Math.max(1, secondFlightSteps);
         for (int step = 0; step < secondFlightSteps; step++) {
-            boxes.add(new RenderableBox(
-                    new SelectionKey(RenderableKind.STAIR, levelName, staircase.id().toString()),
+            boxes.add(stairBox(
                     levelName,
-                    RenderableKind.STAIR,
-                    staircase.minX() + flightWidth + flightWidth / 2.0,
+                    staircase,
                     baseHeight + stepHeight * (firstFlightSteps + step + 0.5),
-                    staircase.minY() + staircase.heightMillimeters() - secondStepDepth * step - secondStepDepth / 2.0,
-                    flightWidth,
-                    stepHeight,
+                    flightWidth + (totalWidth - flightWidth) / 2.0,
+                    flightDepth + landingDepth + secondStepDepth * step + secondStepDepth / 2.0,
+                    totalWidth - flightWidth,
                     secondStepDepth,
-                    RotationAxis.Y,
-                    0.0,
-                    "stair",
-                    1.0
+                    0.0
+            ));
+        }
+        return boxes;
+    }
+
+    private List<RenderableBox> buildSwitchbackStair(String levelName, Staircase staircase, double baseHeight) {
+        List<RenderableBox> boxes = new ArrayList<>();
+        int firstFlightSteps = staircase.stepCount() / 2;
+        int secondFlightSteps = staircase.stepCount() - firstFlightSteps;
+        double stepHeight = staircase.totalHeight().toMillimeters() / staircase.stepCount();
+        double totalWidth = staircase.widthMillimeters();
+        double totalHeight = staircase.heightMillimeters();
+        double turnZoneDepth = totalHeight * 0.18;
+        double flightDepth = totalHeight - turnZoneDepth;
+        double flightWidth = totalWidth / 2.0;
+        double firstStepDepth = flightDepth / Math.max(1, firstFlightSteps);
+        double secondStepDepth = flightDepth / Math.max(1, secondFlightSteps);
+        for (int step = 0; step < firstFlightSteps; step++) {
+            boxes.add(stairBox(levelName, staircase, baseHeight + stepHeight * (step + 0.5), flightWidth / 2.0, firstStepDepth * step + firstStepDepth / 2.0, flightWidth, firstStepDepth, 0.0));
+        }
+        boxes.add(stairBox(
+                levelName,
+                staircase,
+                baseHeight + stepHeight * firstFlightSteps,
+                totalWidth / 2.0,
+                flightDepth + turnZoneDepth / 2.0,
+                totalWidth,
+                turnZoneDepth,
+                0.0
+        ));
+        for (int step = 0; step < secondFlightSteps; step++) {
+            boxes.add(stairBox(
+                    levelName,
+                    staircase,
+                    baseHeight + stepHeight * (firstFlightSteps + step + 0.5),
+                    flightWidth + flightWidth / 2.0,
+                    flightDepth - secondStepDepth * step - secondStepDepth / 2.0,
+                    flightWidth,
+                    secondStepDepth,
+                    180.0
             ));
         }
         return boxes;
@@ -407,31 +436,50 @@ public final class ThreeDSceneModelBuilder {
     private List<RenderableBox> buildSpiralStair(String levelName, Staircase staircase, double baseHeight) {
         List<RenderableBox> boxes = new ArrayList<>();
         double radius = Math.min(staircase.widthMillimeters(), staircase.heightMillimeters()) / 2.0;
-        double centerX = staircase.minX() + staircase.widthMillimeters() / 2.0;
-        double centerZ = staircase.minY() + staircase.heightMillimeters() / 2.0;
         double stepHeight = staircase.totalHeight().toMillimeters() / staircase.stepCount();
         for (int step = 0; step < staircase.stepCount(); step++) {
             double angleDegrees = (360.0 / staircase.stepCount()) * step;
             double angleRadians = Math.toRadians(angleDegrees);
-            double localX = centerX + Math.cos(angleRadians) * radius * 0.55;
-            double localZ = centerZ + Math.sin(angleRadians) * radius * 0.55;
-            boxes.add(new RenderableBox(
-                    new SelectionKey(RenderableKind.STAIR, levelName, staircase.id().toString()),
+            boxes.add(stairBox(
                     levelName,
-                    RenderableKind.STAIR,
-                    localX,
+                    staircase,
                     baseHeight + stepHeight * (step + 0.5),
-                    localZ,
+                    staircase.widthMillimeters() / 2.0 + Math.cos(angleRadians) * radius * 0.55,
+                    staircase.heightMillimeters() / 2.0 + Math.sin(angleRadians) * radius * 0.55,
                     radius,
-                    stepHeight,
                     radius * 0.28,
-                    RotationAxis.Y,
-                    angleDegrees,
-                    "stair",
-                    1.0
+                    angleDegrees
             ));
         }
         return boxes;
+    }
+
+    private RenderableBox stairBox(
+            String levelName,
+            Staircase staircase,
+            double centerY,
+            double localCenterX,
+            double localCenterZ,
+            double localWidth,
+            double localDepth,
+            double rotationDegrees
+    ) {
+        var center = staircase.pointAtLocalPosition(localCenterX, localCenterZ);
+        return new RenderableBox(
+                new SelectionKey(RenderableKind.STAIR, levelName, staircase.id().toString()),
+                levelName,
+                RenderableKind.STAIR,
+                center.xMillimeters(),
+                centerY,
+                center.yMillimeters(),
+                staircase.orientedWidth(localWidth, localDepth),
+                staircase.totalHeight().toMillimeters() / staircase.stepCount(),
+                staircase.orientedHeight(localWidth, localDepth),
+                RotationAxis.Y,
+                rotationDegrees + staircase.rotationQuarterTurns() * 90.0,
+                "stair",
+                1.0
+        );
     }
 
     private List<RenderableBox> buildRoof(ProjectModel project, Roof roof, Map<String, Double> levelBaseHeights, Set<String> visibleLevelNames) {
