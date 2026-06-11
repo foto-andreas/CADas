@@ -3450,6 +3450,12 @@ public final class CadWorkbench extends BorderPane {
                 });
     }
 
+    public void automationSetWorkspace(String workspaceName) {
+        activeWorkspaceMode.set(WorkspaceMode.valueOf(workspaceName.trim().toUpperCase(Locale.ROOT)));
+        updateWorkspaceMode();
+        refreshThreeDIfNeeded();
+    }
+
     public void automationSetField(String fieldName, String value) {
         textFieldByName(fieldName).setText(value);
         updatePropertySectionVisibility();
@@ -3495,6 +3501,12 @@ public final class CadWorkbench extends BorderPane {
             case "exportLevelDxf" -> exportCurrentLevel(requirePath(path, actionName));
             case "importLevelDxf" -> importLevel(requirePath(path, actionName));
             case "importPartLibrary" -> importPartLibrary(requirePath(path, actionName));
+            case "exportThreeDSnapshot" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.exportSnapshot(requirePath(path, actionName));
+            }
             case "clearProject" -> clearProjectWithoutDialog();
             default -> throw new IllegalArgumentException("Automatisierungsaktion `" + actionName + "` ist unbekannt.");
         }

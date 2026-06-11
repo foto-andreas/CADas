@@ -25,7 +25,7 @@ java {
 
 javafx {
     version = "25"
-    modules("javafx.controls")
+    modules("javafx.controls", "javafx.swing")
 }
 
 application {
