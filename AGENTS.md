@@ -55,8 +55,13 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Eingabewerte und Bauteil-Properties werden in einer dauerhaft sichtbaren vertikalen Eigenschaftenleiste kontextabhängig nach Werkzeug oder Auswahl eingeblendet.
 * Gebäude-DXF ist die Standardfunktion für Import und Export; Etagen-DXF bleibt als Zusatzoption erhalten.
 * Für lokale App-Tests wird ein optionaler HTTP-Automatisierungszugriff auf `127.0.0.1:17845` bereitgestellt, startbar über `runMitAutomatisierung`.
-* Die aktuelle DXF-Basis schreibt metrische Header-Werte mit `$INSUNITS = 4`, `$MEASUREMENT = 1` sowie explizite Model-Space-Kennzeichnung.
+* Die aktuelle DXF-Basis schreibt metrische Header-Werte mit `$INSUNITS = 4`, `$MEASUREMENT = 1`, eigene Handles, `TABLES`, `BLOCKS`, `INSERT`-Referenzen sowie eine einfache `OBJECTS`- und Layout-Grundstruktur.
 * Rotierbare Bauteile werden zunächst über testbare 90°-Drehung für Wände, Räume und Treppen unterstützt.
+* Die 2D- und 3D-Workbench teilen sich einen gemeinsamen Mittelbereich; zwischen beiden wird explizit umgeschaltet, damit die aktive Arbeitsansicht maximalen Platz erhält.
+* In 2D bleiben `Oben` und `Unten` feste Ansichten, während die Pfeile `links`, `rechts`, `oben` und `unten` das Modell relativ zur aktuellen Sicht kippen.
+* Die 3D-Ansicht dreht immer um die Modellmitte, nutzt kamerabezogenes Panning und startet standardmäßig in einer orthografischen räumlichen Kontrollansicht.
+* Oberflächen-Ebenen können wahlweise als gestapelte 3D-Schichten oder im Oberflächenrendering ohne transparente Raumkörper visualisiert werden.
+* Registrierte `DWG`-Bibliotheken können zusätzlich konkrete Blocknamen als Oberflächen-Presets führen, entweder über begleitende `.blocks`-Katalogdateien oder über manuelle Eingabe in der Workbench.
 
 ## Empfohlene Umsetzungsreihenfolge
 1. Technisches Grundgerüst, Architektur, Tests und Qualitätswerkzeuge.

@@ -63,6 +63,7 @@ public final class ThreeDViewport extends BorderPane {
     private final SubScene subScene = new SubScene(worldRoot, 520, 720, true, SceneAntialiasing.BALANCED);
     private final ComboBox<ProjectionMode> projectionModeSelector = new ComboBox<>();
     private final CheckBox surfaceLayersCheckBox = new CheckBox("3D Ebenen");
+    private final CheckBox surfaceRenderingCheckBox = new CheckBox("Oberflächenrendering");
     private final FlowPane levelTogglePane = new FlowPane(8, 8);
     private final Label cameraStatusLabel = new Label();
     private final Label sceneStatsLabel = new Label("3D-Szene: 0 Körper");
@@ -119,7 +120,12 @@ public final class ThreeDViewport extends BorderPane {
         if (visibleLevels.isEmpty() && !project.levels().isEmpty()) {
             visibleLevels = Set.of(project.primaryLevel().name());
         }
-        ThreeDSceneModel sceneModel = modelBuilder.build(project, visibleLevels, surfaceLayersCheckBox.isSelected());
+        ThreeDSceneModel sceneModel = modelBuilder.build(
+                project,
+                visibleLevels,
+                surfaceLayersCheckBox.isSelected(),
+                surfaceRenderingCheckBox.isSelected()
+        );
         rebuildScene(sceneModel);
         sceneHintLabel.setVisible(sceneModel.boxes().isEmpty());
         sceneHintLabel.setManaged(sceneModel.boxes().isEmpty());
@@ -238,8 +244,15 @@ public final class ThreeDViewport extends BorderPane {
                 refresh(currentProject);
             }
         });
+        surfaceRenderingCheckBox.setSelected(false);
+        surfaceRenderingCheckBox.selectedProperty().addListener((ignored, oldValue, newValue) -> {
+            if (currentProject != null) {
+                refresh(currentProject);
+            }
+        });
         applyTooltip(projectionModeSelector, "Schaltet die 3D-Kamera zwischen orthografischer und perspektivischer Projektion um.");
         applyTooltip(surfaceLayersCheckBox, "Blendet zusätzliche Flächen-Ebenen als gestapelte 3D-Schichten ein oder aus.");
+        applyTooltip(surfaceRenderingCheckBox, "Schaltet von der transparenten Modellansicht auf eine flächenbetonte Oberflächenansicht um, in der die Öffnungen freien Blick in den Innenraum lassen.");
         applyTooltip(cameraStatusLabel, "Zeigt den aktuellen Zustand der 3D-Kamera mit Projektion, Winkel und Abstand an.");
         applyTooltip(sceneStatsLabel, "Zeigt an, wie viele 3D-Körper aktuell aus dem Fachmodell abgeleitet wurden.");
         levelTogglePane.setPadding(new Insets(6, 0, 0, 0));
@@ -300,6 +313,7 @@ public final class ThreeDViewport extends BorderPane {
                 orbitDownButton,
                 fitSceneButton,
                 surfaceLayersCheckBox,
+                surfaceRenderingCheckBox,
                 resetViewButton
         );
         controlRow.setAlignment(Pos.CENTER_LEFT);

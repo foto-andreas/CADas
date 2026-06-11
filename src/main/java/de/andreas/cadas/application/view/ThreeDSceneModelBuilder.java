@@ -35,11 +35,15 @@ public final class ThreeDSceneModelBuilder {
     private static final double DOOR_LEAF_DEPTH = 45.0;
     private static final double WINDOW_GLASS_DEPTH = 35.0;
     private static final double LEVEL_GAP = 600.0;
-    private static final int SLOPE_SEGMENTS = 12;
+    private static final int MIN_SLOPE_SEGMENTS = 24;
     private final OrthogonalPolygonDecompositionService decompositionService = new OrthogonalPolygonDecompositionService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
     public ThreeDSceneModel build(ProjectModel project, Set<String> visibleLevelNames, boolean renderSurfaceLayers) {
+        return build(project, visibleLevelNames, renderSurfaceLayers, false);
+    }
+
+    public ThreeDSceneModel build(ProjectModel project, Set<String> visibleLevelNames, boolean renderSurfaceLayers, boolean surfaceRenderingMode) {
         List<RenderableBox> boxes = new ArrayList<>();
         Map<String, Double> levelBaseHeights = computeLevelBaseHeights(project.levels());
 
@@ -48,8 +52,8 @@ public final class ThreeDSceneModelBuilder {
                 continue;
             }
             double baseHeight = levelBaseHeights.getOrDefault(level.name(), 0.0);
-            boxes.addAll(buildRooms(level, baseHeight, renderSurfaceLayers));
-            boxes.addAll(buildWalls(level, baseHeight));
+            boxes.addAll(buildRooms(level, baseHeight, renderSurfaceLayers, surfaceRenderingMode));
+            boxes.addAll(buildWalls(level, baseHeight, surfaceRenderingMode));
             if (renderSurfaceLayers) {
                 boxes.addAll(buildWallSurfaceLayers(level, baseHeight));
             }
@@ -86,17 +90,21 @@ public final class ThreeDSceneModelBuilder {
         return Math.max(wallHeight, Math.max(roomHeight, stairHeight));
     }
 
-    private List<RenderableBox> buildRooms(Level level, double baseHeight, boolean renderSurfaceLayers) {
+    private List<RenderableBox> buildRooms(Level level, double baseHeight, boolean renderSurfaceLayers, boolean surfaceRenderingMode) {
         List<RenderableBox> boxes = new ArrayList<>();
         for (Room room : level.rooms()) {
             List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles = roomRectangles(room);
-            boxes.addAll(buildRoomFloor(level, room, baseHeight, rectangles));
+            boxes.addAll(buildRoomFloor(level, room, baseHeight, rectangles, surfaceRenderingMode));
             if (room.hasVariableCeilingHeights()) {
-                boxes.addAll(buildSlopedRoomVolume(level, room, baseHeight, rectangles));
-                boxes.addAll(buildSlopedCeiling(level, room, baseHeight, rectangles));
+                if (!surfaceRenderingMode) {
+                    boxes.addAll(buildSlopedRoomVolume(level, room, baseHeight, rectangles));
+                }
+                boxes.addAll(buildSlopedCeiling(level, room, baseHeight, rectangles, surfaceRenderingMode));
             } else {
-                boxes.addAll(buildFlatRoomCeiling(level, room, baseHeight, rectangles));
-                boxes.addAll(buildFlatRoomVolume(level, room, baseHeight, rectangles));
+                boxes.addAll(buildFlatRoomCeiling(level, room, baseHeight, rectangles, surfaceRenderingMode));
+                if (!surfaceRenderingMode) {
+                    boxes.addAll(buildFlatRoomVolume(level, room, baseHeight, rectangles));
+                }
             }
 
             if (renderSurfaceLayers) {
@@ -106,7 +114,7 @@ public final class ThreeDSceneModelBuilder {
         return boxes;
     }
 
-    private List<RenderableBox> buildRoomFloor(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles) {
+    private List<RenderableBox> buildRoomFloor(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles, boolean surfaceRenderingMode) {
         List<RenderableBox> boxes = new ArrayList<>();
         for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
             boxes.add(new RenderableBox(
@@ -122,13 +130,13 @@ public final class ThreeDSceneModelBuilder {
                     RotationAxis.Y,
                     0.0,
                     "room-floor",
-                    1.0
+                    surfaceRenderingMode ? 1.0 : 1.0
             ));
         }
         return boxes;
     }
 
-    private List<RenderableBox> buildFlatRoomCeiling(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles) {
+    private List<RenderableBox> buildFlatRoomCeiling(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles, boolean surfaceRenderingMode) {
         List<RenderableBox> boxes = new ArrayList<>();
         for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
             boxes.add(new RenderableBox(
@@ -144,7 +152,7 @@ public final class ThreeDSceneModelBuilder {
                     RotationAxis.Y,
                     0.0,
                     "room-ceiling",
-                    1.0
+                    surfaceRenderingMode ? 1.0 : 1.0
             ));
         }
         return boxes;
@@ -297,7 +305,7 @@ public final class ThreeDSceneModelBuilder {
         );
     }
 
-    private List<RenderableBox> buildSlopedCeiling(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles) {
+    private List<RenderableBox> buildSlopedCeiling(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles, boolean surfaceRenderingMode) {
         return buildSlopedRoomSlices(
                 level,
                 level.name(),
@@ -306,7 +314,7 @@ public final class ThreeDSceneModelBuilder {
                 baseHeight + room.floorThickness().toMillimeters(),
                 room.ceilingThickness().toMillimeters(),
                 "room-ceiling",
-                1.0,
+                surfaceRenderingMode ? 1.0 : 1.0,
                 new SelectionKey(RenderableKind.ROOM_CEILING, level.name(), room.id().toString())
         );
     }
@@ -328,9 +336,10 @@ public final class ThreeDSceneModelBuilder {
                         || profile.lowSide() == de.andreas.cadas.domain.model.SlopedCeilingSide.SOUTH)
                 .orElse(room.depthMillimeters() >= room.widthMillimeters());
         for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
-            for (int index = 0; index < SLOPE_SEGMENTS; index++) {
-                double startRatio = (double) index / SLOPE_SEGMENTS;
-                double endRatio = (double) (index + 1) / SLOPE_SEGMENTS;
+            int slopeSegments = Math.max(MIN_SLOPE_SEGMENTS, (int) Math.ceil((variesAlongDepth ? rectangle.height() : rectangle.width()) / 120.0));
+            for (int index = 0; index < slopeSegments; index++) {
+                double startRatio = (double) index / slopeSegments;
+                double endRatio = (double) (index + 1) / slopeSegments;
                 double centerX = rectangle.centerX();
                 double centerZ = rectangle.centerY();
                 double width = rectangle.width();
@@ -374,34 +383,34 @@ public final class ThreeDSceneModelBuilder {
         return boxes;
     }
 
-    private List<RenderableBox> buildWalls(Level level, double baseHeight) {
+    private List<RenderableBox> buildWalls(Level level, double baseHeight, boolean surfaceRenderingMode) {
         List<RenderableBox> boxes = new ArrayList<>();
         for (Wall wall : level.walls()) {
             List<OpeningRange> openings = openingsForWall(level, wall);
             double cursor = 0.0;
             for (OpeningRange opening : openings) {
                 if (opening.startMillimeters() > cursor) {
-                    boxes.addAll(segmentToBoxes(level.name(), wall, cursor, opening.startMillimeters(), baseHeight, 0.0, "wall"));
+                    boxes.addAll(segmentToBoxes(level.name(), wall, cursor, opening.startMillimeters(), baseHeight, 0.0, "wall", surfaceRenderingMode));
                 }
                 if (opening.kind() == RenderableKind.DOOR) {
                     double upperHeight = Math.max(0.0, wall.minimumHeightMillimeters() - opening.upperHeightMillimeters());
                     if (upperHeight > 0.0 || wall.hasVariableTopHeight()) {
-                        boxes.addAll(segmentToBoxes(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), baseHeight + opening.upperHeightMillimeters(), opening.upperHeightMillimeters(), "wall"));
+                        boxes.addAll(segmentToBoxes(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), baseHeight + opening.upperHeightMillimeters(), opening.upperHeightMillimeters(), "wall", surfaceRenderingMode));
                     }
                 } else if (opening.kind() == RenderableKind.WINDOW) {
                     if (opening.lowerHeightMillimeters() > 0.0) {
-                        boxes.add(segmentToUniformBox(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), baseHeight, opening.lowerHeightMillimeters(), "wall"));
+                        boxes.add(segmentToUniformBox(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), baseHeight, opening.lowerHeightMillimeters(), "wall", surfaceRenderingMode));
                     }
                     double upperBase = baseHeight + opening.upperHeightMillimeters();
                     double upperHeight = Math.max(0.0, wall.minimumHeightMillimeters() - opening.upperHeightMillimeters());
                     if (upperHeight > 0.0 || wall.hasVariableTopHeight()) {
-                        boxes.addAll(segmentToBoxes(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), upperBase, opening.upperHeightMillimeters(), "wall"));
+                        boxes.addAll(segmentToBoxes(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), upperBase, opening.upperHeightMillimeters(), "wall", surfaceRenderingMode));
                     }
                 }
                 cursor = Math.max(cursor, opening.endMillimeters());
             }
             if (cursor < wall.axis().length().toMillimeters()) {
-                boxes.addAll(segmentToBoxes(level.name(), wall, cursor, wall.axis().length().toMillimeters(), baseHeight, 0.0, "wall"));
+                boxes.addAll(segmentToBoxes(level.name(), wall, cursor, wall.axis().length().toMillimeters(), baseHeight, 0.0, "wall", surfaceRenderingMode));
             }
         }
         return boxes;
@@ -500,14 +509,15 @@ public final class ThreeDSceneModelBuilder {
             double endMillimeters,
             double baseHeight,
             double subtractBottomMillimeters,
-            String materialKey
+            String materialKey,
+            boolean surfaceRenderingMode
     ) {
         if (!wall.hasVariableTopHeight()) {
             double heightMillimeters = Math.max(0.0, wall.heightAt((startMillimeters + endMillimeters) / 2.0) - subtractBottomMillimeters);
             if (heightMillimeters <= 0.0) {
                 return List.of();
             }
-            return List.of(segmentToUniformBox(levelName, wall, startMillimeters, endMillimeters, baseHeight, heightMillimeters, materialKey));
+            return List.of(segmentToUniformBox(levelName, wall, startMillimeters, endMillimeters, baseHeight, heightMillimeters, materialKey, surfaceRenderingMode));
         }
         List<RenderableBox> boxes = new ArrayList<>();
         double segmentLength = Math.max(1.0, endMillimeters - startMillimeters);
@@ -519,7 +529,7 @@ public final class ThreeDSceneModelBuilder {
             if (heightMillimeters <= 0.0) {
                 continue;
             }
-            boxes.add(segmentToUniformBox(levelName, wall, sliceStart, sliceEnd, baseHeight, heightMillimeters, materialKey));
+            boxes.add(segmentToUniformBox(levelName, wall, sliceStart, sliceEnd, baseHeight, heightMillimeters, materialKey, surfaceRenderingMode));
         }
         return boxes;
     }
@@ -531,7 +541,8 @@ public final class ThreeDSceneModelBuilder {
             double endMillimeters,
             double baseHeight,
             double heightMillimeters,
-            String materialKey
+            String materialKey,
+            boolean surfaceRenderingMode
     ) {
         Length startLength = Length.ofMillimeters(startMillimeters);
         Length endLength = Length.ofMillimeters(endMillimeters);
@@ -551,7 +562,7 @@ public final class ThreeDSceneModelBuilder {
                 RotationAxis.Y,
                 wall.axis().angle().degrees(),
                 materialKey,
-                1.0
+                surfaceRenderingMode ? 1.0 : 1.0
         );
     }
 

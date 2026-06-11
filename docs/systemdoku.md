@@ -63,7 +63,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * Rasterdarstellung
 * Hilfslinien aus Linealen
 * magnetisches Snap auf Raster und Endpunkte
-* sechs orthogonale Ansichtsumschalter mit Pfeilbeschriftung
+* feste `Oben`- und `Unten`-Ansicht plus relative Pfeilrotationen für die übrigen 2D-Orthogonalansichten
 * optionale Himmelsrichtung
 * Live-Anzeige von Länge und Winkel
 * ein- und ausblendbare Bemaßung für Wände
@@ -77,7 +77,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * Standardteil-Presets für Türen, Fenster und Treppen
 * erste Treppenplatzierung für gerade, 180°-, gegenläufige und Wendeltreppen
 * Flächen- und Volumenanzeige für Räume
-* Ebenenverwaltung für ausgewählte Wand- und Raumflächen mit Presets, Reihenfolge, Sichtbarkeit und DWG-Referenzen
+* Ebenenverwaltung für ausgewählte Wand- und Raumflächen mit Presets, Reihenfolge, Sichtbarkeit, DWG-Referenzen und konkreten DWG-Block-Presets
 
 ### Anwendungslogik
 
@@ -106,7 +106,8 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 * Ebenen lassen sich auf ausgewählten Wand- und Raumflächen anlegen, umbenennen, ein- und ausblenden, umsortieren und mit Presets vorbelegen.
 * Sichtbare Wand-Innenlagen verschieben die automatisch abgeleitete Raum-Innenkante.
 * Sichtbare Boden- und Deckenlagen verringern die lichte Raumhöhe und beeinflussen Volumen sowie 3D-Ableitung.
-* Registrierte `DWG`-Dateien werden aktuell als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
+* Registrierte `DWG`-Dateien werden als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
+* Über optionale `.blocks`-Katalogdateien oder manuelle Eingabe lassen sich zusätzlich konkrete DWG-Blocknamen als Oberflächen-Presets registrieren.
 
 ## Dateiformatstrategie
 
@@ -118,7 +119,10 @@ Für den aktuellen Stand gilt:
 * Wände, Räume, Türen, Fenster und Treppen werden sichtbar als DXF-Geometrie exportiert.
 * Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
 * Der Export schreibt aktuell metrische Kopfvariablen über `$INSUNITS = 4` und `$MEASUREMENT = 1`.
-* Exportierte Entities werden explizit als Model-Space-Elemente gekennzeichnet.
+* Exportierte Entities werden explizit als Model-Space-Elemente gekennzeichnet und mit eigenen Handles versehen.
+* `TABLES` für Layer-, Linientyp-, Textstil- und Block-Record-Grunddaten werden geschrieben.
+* `BLOCKS` und `INSERT` werden für wiederverwendbare Tür-, Fenster- und Treppenbausteine vorbereitet und exportiert.
+* `OBJECTS` enthält eine kleine Grundstruktur für Dictionaries und Layout-Metadaten.
 * Fällt diese Metadaten-Spur weg, importiert der Adapter zumindest einfache Wände und Räume aus der reinen Geometrie.
 
 ## Teilebibliotheken
@@ -133,7 +137,9 @@ Die Standardteilversorgung besteht aus drei Ebenen:
 
 Die 2D-Zeichenfläche arbeitet intern in Millimetern und transformiert diese Weltkoordinaten mit Offset und Zoom auf Bildschirmkoordinaten. Dadurch bleiben Raster, Snap und Bemaßung konsistent, auch wenn die Ansicht verschoben oder skaliert wird.
 
-Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Dachflächen und optionale Oberflächen-Ebenen ab. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Die 3D-Kamera ist inzwischen bewusst von den 2D-Orthogonalansichten entkoppelt und startet in einer nutzbaren räumlichen Perspektive; Einpassen verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
+Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Dachflächen und optionale Oberflächen-Ebenen ab. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Die 3D-Kamera ist bewusst von den 2D-Orthogonalansichten entkoppelt, dreht immer um die Modellmitte und nutzt kamerabezogenes Panning. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
+
+Zusätzlich gibt es einen Oberflächenmodus: Transparente Raumkörper werden ausgeblendet, während Wände, Beläge, Boden- und Deckenflächen sichtbar bleiben. Öffnungen in Wänden geben dadurch den Blick in den Innenraum frei. Schräge Decken werden mit erhöhter Segmentdichte diskretisiert, damit die Kanten in 3D weniger treppenartig erscheinen.
 
 ## Qualitätssicherung
 
@@ -147,8 +153,9 @@ Aktuell abgesichert sind unter anderem:
 * Verschieben verbundener Wand-Endpunkte
 * Flächen- und Volumenberechnung von Räumen
 * DXF-Roundtrip für die Grundobjekte des MVP
-* DXF-Header und Model-Space-Kennzeichnung für bessere AutoCAD-Kompatibilität
+* DXF-Header, Model-Space-Kennzeichnung, `TABLES`, `BLOCKS`, `INSERT` und `OBJECTS` für bessere AutoCAD-Kompatibilität
 * Dateinamennormalisierung für DXF-Import und -Export
+* DWG-Blockkataloge für Oberflächen-Presets
 * Standardteil-Bibliothek für Türen, Fenster und Treppen
 * Dach- und Ebenendomäne für weitere Ausbaustufen
 * 3D-Geometrieableitung für Wände, Räume, Öffnungen, Treppen und Dach
