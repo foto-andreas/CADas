@@ -54,6 +54,10 @@ public final class SurfaceLayerStack {
         replaceLayer(layerId, layer -> layer.withVisibility(visible));
     }
 
+    public void replaceLayer(UUID layerId, SurfaceLayer replacement) {
+        replaceLayer(layerId, ignored -> replacement);
+    }
+
     public void moveLayer(UUID layerId, int newIndex) {
         SurfaceLayer layer = layers.stream()
                 .filter(candidate -> candidate.id().equals(layerId))

@@ -73,7 +73,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Schichtstärken pro Ebene verarbeiten.
 - [x] Rechteckige Kachelbelegung mit Richtung, automatischem Versatz und Mindestversatz umsetzen.
 - [x] Konsistenzregeln für gleiche Ebenenfolgen in gleichen Bereichen definieren.
-- [ ] Raumkonturen zusätzlich um Wand-Innenbeläge und weitere wirksame Wandebenen verschieben, sobald diese auf Wänden fachlich geführt werden.
+- [x] Raumkonturen zusätzlich um sichtbare Wand-Innenbeläge und weitere wirksame Wandebenen verschieben, sobald diese auf Wänden fachlich geführt werden.
 
 ## Phase 6: Dateiformate und Teilebibliotheken
 - [x] DXF als erstes AutoCAD-kompatibles Austauschformat fest einplanen.
@@ -133,3 +133,4 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [ ] DXF-`TABLES`-Sektion mit Layer- und Linientypdefinitionen für robusteren Austausch ergänzen.
 - [ ] DXF-`BLOCKS`- und `INSERT`-Unterstützung für wiederverwendbare Bauteile und spätere DWG-Nutzung ergänzen.
 - [ ] DXF-Handles, `OBJECTS`-Sektion und weitergehende Layout-Metadaten für belastbareren AutoCAD-Roundtrip ergänzen.
+- [ ] DWG-Bibliotheken nicht nur als Dateireferenz, sondern mit echter Bauteil- und Blockauswahl für Oberflächen-Ebenen nutzbar machen.

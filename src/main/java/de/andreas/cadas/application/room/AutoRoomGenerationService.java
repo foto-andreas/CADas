@@ -1,5 +1,6 @@
 package de.andreas.cadas.application.room;
 
+import de.andreas.cadas.application.layers.SurfaceLayerEffectService;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
@@ -25,9 +26,10 @@ public final class AutoRoomGenerationService {
 
     private static final double EPSILON = 0.001;
     private static final double OUTER_MARGIN = 1_000.0;
+    private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
     public List<Room> synchronize(Level level, RoomDefaults defaults) {
-        List<WallRectangle> wallRectangles = wallRectangles(level.walls());
+        List<WallRectangle> wallRectangles = wallRectangles(level);
         if (level.walls().isEmpty()) {
             return List.of();
         }
@@ -37,19 +39,19 @@ public final class AutoRoomGenerationService {
                 return matchWithExistingRooms(level.rooms(), detectedRooms, defaults, level.walls());
             }
         }
-        List<DetectedRoom> detectedRooms = detectRoomsFromWallLoops(level.walls());
+        List<DetectedRoom> detectedRooms = detectRoomsFromWallLoops(level);
         if (detectedRooms.isEmpty()) {
             return List.of();
         }
         return matchWithExistingRooms(level.rooms(), detectedRooms, defaults, level.walls());
     }
 
-    private List<WallRectangle> wallRectangles(List<Wall> walls) {
+    private List<WallRectangle> wallRectangles(Level level) {
         List<WallRectangle> rectangles = new ArrayList<>();
-        for (Wall wall : walls) {
+        for (Wall wall : level.walls()) {
             double deltaX = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
             double deltaY = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
-            double halfThickness = wall.thickness().toMillimeters() / 2.0;
+            double halfThickness = wall.thickness().toMillimeters() / 2.0 + surfaceLayerEffectService.wallInteriorThicknessMillimeters(level, wall);
             if (Math.abs(deltaY) < EPSILON) {
                 rectangles.add(new WallRectangle(
                         Math.min(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()),
@@ -118,7 +120,8 @@ public final class AutoRoomGenerationService {
         return rooms;
     }
 
-    private List<DetectedRoom> detectRoomsFromWallLoops(List<Wall> walls) {
+    private List<DetectedRoom> detectRoomsFromWallLoops(Level level) {
+        List<Wall> walls = level.walls();
         Map<PointKey, List<WallConnection>> graph = buildGraph(walls);
         Set<UUID> visitedWalls = new HashSet<>();
         List<DetectedRoom> rooms = new ArrayList<>();
@@ -135,7 +138,7 @@ public final class AutoRoomGenerationService {
                 continue;
             }
             orderedLoop(componentWalls, graph)
-                    .map(loop -> new DetectedRoom(offsetLoopToInnerContour(loop), deriveLoopVertexHeights(loop)))
+                    .map(loop -> new DetectedRoom(offsetLoopToInnerContour(level, loop), deriveLoopVertexHeights(loop)))
                     .filter(detectedRoom -> detectedRoom.outline().size() >= 3)
                     .ifPresent(rooms::add);
         }
@@ -337,7 +340,7 @@ public final class AutoRoomGenerationService {
         return Optional.of(orderedEdges);
     }
 
-    private List<PlanPoint> offsetLoopToInnerContour(List<LoopEdge> edges) {
+    private List<PlanPoint> offsetLoopToInnerContour(Level level, List<LoopEdge> edges) {
         List<PlanPoint> axisPoints = new ArrayList<>();
         axisPoints.add(edges.getFirst().start());
         edges.forEach(edge -> axisPoints.add(edge.end()));
@@ -352,8 +355,8 @@ public final class AutoRoomGenerationService {
         for (int index = 0; index < edges.size(); index++) {
             LoopEdge previous = edges.get((index - 1 + edges.size()) % edges.size());
             LoopEdge current = edges.get(index);
-            OffsetLine previousLine = offsetLine(previous, orientation);
-            OffsetLine currentLine = offsetLine(current, orientation);
+            OffsetLine previousLine = offsetLine(level, previous, orientation);
+            OffsetLine currentLine = offsetLine(level, current, orientation);
             PlanPoint intersection = intersect(previousLine, currentLine)
                     .orElse(current.start());
             outline.add(intersection);
@@ -371,7 +374,7 @@ public final class AutoRoomGenerationService {
         return area / 2.0;
     }
 
-    private OffsetLine offsetLine(LoopEdge edge, double orientation) {
+    private OffsetLine offsetLine(Level level, LoopEdge edge, double orientation) {
         double dx = edge.end().xMillimeters() - edge.start().xMillimeters();
         double dy = edge.end().yMillimeters() - edge.start().yMillimeters();
         double length = Math.hypot(dx, dy);
@@ -384,7 +387,7 @@ public final class AutoRoomGenerationService {
             normalX = -normalX;
             normalY = -normalY;
         }
-        double offset = edge.wall().thickness().toMillimeters() / 2.0;
+        double offset = edge.wall().thickness().toMillimeters() / 2.0 + surfaceLayerEffectService.wallInteriorThicknessMillimeters(level, edge.wall());
         return new OffsetLine(
                 new PlanPoint(edge.start().xMillimeters() + normalX * offset, edge.start().yMillimeters() + normalY * offset),
                 new PlanPoint(edge.end().xMillimeters() + normalX * offset, edge.end().yMillimeters() + normalY * offset)

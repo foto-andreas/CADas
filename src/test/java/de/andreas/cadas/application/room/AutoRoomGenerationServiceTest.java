@@ -11,6 +11,9 @@ import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
 import de.andreas.cadas.domain.model.SlopedCeilingSide;
+import de.andreas.cadas.domain.model.SurfaceLayer;
+import de.andreas.cadas.domain.model.SurfaceLayerStack;
+import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -160,6 +163,28 @@ class AutoRoomGenerationServiceTest {
         assertTrue(rooms.getFirst().maximumCeilingHeightMillimeters() <= 3100.0);
         assertTrue(rooms.getFirst().volumeCubicMeters() > 29.5);
         assertTrue(rooms.getFirst().volumeCubicMeters() < 30.1);
+    }
+
+    @Test
+    void beruecksichtigtSichtbareWandInnenlagenBeiDerRaumkontur() {
+        Level level = new Level("Erdgeschoss");
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 0),
+                new PlanPoint(4000, 3000),
+                new PlanPoint(0, 3000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+        for (Wall wall : level.walls()) {
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, wall.id().toString());
+            stack.addLayer(SurfaceLayer.create("Rigips", Length.of(2, LengthUnit.CENTIMETER), Length.of(125, LengthUnit.CENTIMETER), Length.of(200, LengthUnit.CENTIMETER), Length.zero()));
+            level.addSurfaceLayerStack(stack);
+        }
+
+        List<Room> rooms = service.synchronize(level, defaults());
+
+        assertEquals(1, rooms.size());
+        assertEquals(120.0, rooms.getFirst().minXMillimeters(), 0.001);
+        assertEquals(3880.0, rooms.getFirst().maxXMillimeters(), 0.001);
     }
 
     private AutoRoomGenerationService.RoomDefaults defaults() {

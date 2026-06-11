@@ -13,9 +13,16 @@ public final class SurfaceLayerConsistencyService {
 
     public String signature(List<SurfaceLayer> layers) {
         return layers.stream()
-                .map(layer -> layer.name() + ":" + layer.thickness().toMillimeters() + ":" + layer.tileWidth().toMillimeters() + ":" + layer.tileHeight().toMillimeters())
+                .map(layer -> layer.name()
+                        + ":" + layer.thickness().toMillimeters()
+                        + ":" + layer.tileWidth().toMillimeters()
+                        + ":" + layer.tileHeight().toMillimeters()
+                        + ":" + layer.layoutMode()
+                        + ":" + layer.layoutOffset().toMillimeters()
+                        + ":" + layer.minimumOffset().toMillimeters()
+                        + ":" + layer.minimumEdgeWidth().toMillimeters()
+                        + ":" + layer.coveringSource())
                 .reduce((left, right) -> left + "|" + right)
                 .orElse("");
     }
 }
-
