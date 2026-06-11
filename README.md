@@ -1,11 +1,6 @@
 # CADas
 
-`CADas` ist eine JavaFX-basierte Desktop-Anwendung für Gebäude-Grundrisse und angrenzende CAD-Funktionen.
-
-## Status
-
-Achtung: Wir sind in einem frühen Status der Programmierung. Nix ist fest, wenig getestet. Alles wird per KI erstellt.
-
+`CADas` ist eine modulare JavaFX-Desktop-Anwendung für Gebäude-Grundrisse und angrenzende CAD-Funktionen.
 
 ## Technik
 
@@ -19,6 +14,12 @@ Achtung: Wir sind in einem frühen Status der Programmierung. Nix ist fest, weni
 
 ```bash
 ./gradlew run
+```
+
+Für einen lokalen HTTP-Testzugriff auf die laufende Anwendung:
+
+```bash
+./gradlew runMitAutomatisierung
 ```
 
 ## Distribution
@@ -50,11 +51,13 @@ Der aktuelle Schwerpunkt liegt auf dem 2D-Grundrisskern:
 
 * Wände, Räume, Türen, Fenster und Treppen
 * Etagenverwaltung
-* Raster, Snap, Hilfslinien und Bearbeitung verbundener Wand-Endpunkte
+* Raster, Snap, Hilfslinien, Nordwinkel und Bearbeitung verbundener Wand-Endpunkte
+* Mehrfachauswahl, Kontextmenü, Eigenschaftenübernahme auf Auswahl und 90°-Drehung rotierbarer Bauteile
 * Menü, Tastaturkürzel, Rückgängig/Wiederherstellen und kontextabhängige Properties-Leiste
 * modulare JavaFX-Startskripte ohne die bisherigen Startwarnungen
-* erste gekoppelte 3D-Ansicht mit Auswahlrückkopplung
-* DXF-Import und -Export
-* interne und externe Teilebibliotheken
+* gekoppelte 3D-Ansicht mit Auswahlrückkopplung, Kamerahilfe und Modell-Einpassung
+* Gebäude-DXF als Standard sowie Etagen-DXF als Zusatzoption
+* interne und externe Teilebibliotheken einschließlich registrierbarer `.dwg`-Referenzen
+* lokaler Automatisierungszugriff für direkte App-Tests
 
 Weitere fachliche Leitplanken und Entscheidungen stehen in [AGENTS.md](AGENTS.md) und [TODO.md](TODO.md).

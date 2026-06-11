@@ -51,6 +51,10 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Für macOS wird die erste Installationspaket-Erzeugung über `jpackage` aus dem Gradle-Build heraus bereitgestellt.
 * Datei-, Projekt- und Bearbeitungsaktionen werden primär über Menü und Tastaturkürzel angeboten; die Werkzeugleiste bleibt auf den schnellen Kernzugriff reduziert.
 * Eingabewerte und Bauteil-Properties werden in einer dauerhaft sichtbaren vertikalen Eigenschaftenleiste kontextabhängig nach Werkzeug oder Auswahl eingeblendet.
+* Gebäude-DXF ist die Standardfunktion für Import und Export; Etagen-DXF bleibt als Zusatzoption erhalten.
+* Für lokale App-Tests wird ein optionaler HTTP-Automatisierungszugriff auf `127.0.0.1:17845` bereitgestellt, startbar über `runMitAutomatisierung`.
+* Die aktuelle DXF-Basis schreibt metrische Header-Werte mit `$INSUNITS = 4`, `$MEASUREMENT = 1` sowie explizite Model-Space-Kennzeichnung.
+* Rotierbare Bauteile werden zunächst über testbare 90°-Drehung für Wände, Räume und Treppen unterstützt.
 
 ## Empfohlene Umsetzungsreihenfolge
 1. Technisches Grundgerüst, Architektur, Tests und Qualitätswerkzeuge.

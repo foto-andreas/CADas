@@ -2,7 +2,7 @@
 
 ## Zweck der aktuellen Version
 
-`CADas` ist aktuell ein CAD-MVP für Gebäude-Grundrisse mit kombinierter 2D- und 3D-Ansicht. Der Schwerpunkt liegt auf einem robusten Grundrisskern für Etagen, Wände, Räume, Türen, Fenster und Treppen. Die 3D-Ansicht dient als direkte räumliche Kontrolle des 2D-Modells.
+`CADas` ist aktuell ein CAD-MVP für Gebäude-Grundrisse mit kombinierter 2D- und 3D-Workbench. Der Schwerpunkt liegt auf einem robusten Grundrisskern für Etagen, Wände, Räume, Türen, Fenster und Treppen. Die 3D-Ansicht dient als direkte räumliche Kontrolle desselben Fachmodells.
 
 ![Zeichenablauf](diagramme/zeichenablauf.svg)
 
@@ -31,6 +31,24 @@ Danach kann die Anwendung über das erzeugte Startskript im Verzeichnis `build/i
 
 Diese Aufgaben laufen nur auf `macOS`.
 
+### Anwendung mit lokalem Automatisierungszugriff starten
+
+```bash
+./gradlew runMitAutomatisierung
+```
+
+Damit startet `CADas` zusätzlich mit einem lokalen HTTP-Zugriff auf `127.0.0.1:17845`. Dieser Modus ist für agentische oder manuelle Funktionstests gedacht.
+
+Beispiele:
+
+```bash
+curl http://127.0.0.1:17845/health
+curl http://127.0.0.1:17845/state
+curl "http://127.0.0.1:17845/tool?value=WALL"
+curl "http://127.0.0.1:17845/canvas/drag?fromX=120&fromY=120&toX=320&toY=120&button=PRIMARY"
+curl "http://127.0.0.1:17845/invoke?action=exportProjectDxf&path=/tmp/haus.dxf"
+```
+
 ## Aufbau der Oberfläche
 
 Die Oberfläche besteht aktuell aus fünf Hauptbereichen:
@@ -48,7 +66,8 @@ Die Menüleiste bündelt Datei-, Bearbeitungs-, Ansichts- und Werkzeugaktionen. 
 
 * Etage hinzufügen
 * Projekt leeren
-* DXF importieren und exportieren
+* Gebäude-DXF importieren und exportieren
+* Etagen-DXF importieren und exportieren
 * Teilebibliothek laden
 * Rückgängig und Wiederherstellen
 * Werkzeugwechsel per Menü
@@ -69,9 +88,10 @@ Die obere Werkzeugleiste ist bewusst kompakt gehalten. Dort liegen:
 
 Links befindet sich eine dauerhaft sichtbare vertikale Liste mit Properties. Dort stehen:
 
-* allgemeine Zeichenwerte wie Rasterweite, Länge und Winkel
+* allgemeine Zeichenwerte wie Rasterweite, Länge, Winkel und Nordwinkel
 * fachliche Eigenschaften für Wand, Raum, Tür, Fenster und Treppe
-* eine kurze Zusammenfassung der aktuellen Auswahl
+* eine Auswahlzusammenfassung
+* eine Übersicht registrierter externer CAD-Bibliotheken
 
 Die Eigenschaftenleiste blendet nur die Bereiche ein, die zum aktuellen Werkzeug oder zur aktiven Auswahl passen.
 
@@ -81,7 +101,7 @@ In der Mitte liegt die eigentliche Grundrissfläche. Dort werden Wände, Räume,
 
 ### 3D-Ansicht
 
-Rechts siehst du eine räumliche Ableitung des aktuellen Modells. Sie basiert direkt auf denselben Domänendaten wie die 2D-Ansicht.
+Rechts siehst du eine räumliche Ableitung des aktuellen Modells. Sie basiert direkt auf denselben Domänendaten wie die 2D-Ansicht. Auswahl, Sichtbarkeit und Hervorhebung sind mit der 2D-Ansicht gekoppelt.
 
 ### Statusleiste
 
@@ -107,25 +127,24 @@ Unten zeigt die Anwendung:
 ### Navigation in 3D
 
 * Mit gedrückter linker Maustaste drehst du die Kamera um das Modell.
-* Mit der rechten Maustaste verschiebst du die 3D-Kamera seitlich.
+* Mit gedrückter rechter Maustaste verschiebst du den Modellbezug seitlich.
 * Mit dem Mausrad zoomst du in der 3D-Ansicht.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
 * Über die Geschoss-Checkboxen blendest du einzelne Etagen in der 3D-Ansicht ein oder aus.
 * Die Option `3D Ebenen` blendet zusätzliche Oberflächen-Schichten ein oder aus.
-* `Ansicht zentrieren` in der 3D-Ansicht setzt die Kamera auf die Standardansicht zurück.
+* `Modell einpassen` richtet Abstand und Mittelpunkt auf das aktuell sichtbare Modell aus.
+* `Ansicht zentrieren` setzt die Kamera auf die Standardlage der aktuellen Blickrichtung zurück.
 
-### Auswahl und Bearbeiten
+### Auswahl, Mehrfachauswahl und Kontextmenü
 
 * Im Werkzeug `Bearbeiten` kannst du Bauteile auswählen.
+* Ein Klick auf leeren Raum hebt die Auswahl wieder auf.
+* Mit `Shift` oder `Cmd` beziehungsweise `Strg` erweiterst oder verringerst du die Auswahl.
 * Die Auswahl wird in 2D und 3D gemeinsam hervorgehoben.
-* `Auswahl aufheben` entfernt die aktuelle Hervorhebung.
-* `Auswahl löschen` entfernt das aktuell markierte Bauteil.
-* Wand-Endpunkte, die fachlich verbunden sind, werden gemeinsam verschoben.
-* Bei der Auswahl gilt aktuell folgende Priorität:
-  * Türen vor Fenstern
-  * Fenster vor Treppen
-  * Treppen vor Wänden
-  * Wände vor Räumen
+* Über `Auswahl aufheben` entfernst du die aktuelle Hervorhebung.
+* Über `Auswahl löschen` entfernst du alle aktuell markierten Bauteile.
+* Ein Rechtsklick auf eine Auswahl öffnet ein Kontextmenü mit passenden Aktionen.
+* Aktuell bietet das Kontextmenü insbesondere Eigenschaften übernehmen, Auswahl löschen, Auswahl aufheben und 90°-Drehung für rotierbare Bauteile.
 
 ### Rückgängig und Wiederherstellen
 
@@ -133,7 +152,7 @@ Die aktuelle Version besitzt einen Projektverlauf für fachliche Bearbeitungssch
 
 * `Rückgängig` stellt den letzten Schritt wieder her.
 * `Wiederherstellen` stellt einen zuvor zurückgenommenen Schritt erneut her.
-* Der Verlauf umfasst derzeit unter anderem Bauteil-Anlage, Löschen, Etagenanlage, Projektleeren, DXF-Import und Hilfslinien.
+* Der Verlauf umfasst unter anderem Bauteil-Anlage, Löschen, Etagenanlage, Projektleeren, DXF-Import, Hilfslinien und Eigenschaftsübernahmen.
 
 ## Tastaturkürzel
 
@@ -141,11 +160,14 @@ Wichtige Kürzel der aktuellen Oberfläche:
 
 * `Cmd+N` oder `Strg+N`: Etage hinzufügen
 * `Cmd+L` oder `Strg+L`: Projekt leeren
-* `Cmd+Shift+E` oder `Strg+Shift+E`: DXF exportieren
-* `Cmd+Shift+I` oder `Strg+Shift+I`: DXF importieren
+* `Cmd+Shift+E` oder `Strg+Shift+E`: Gebäude als DXF exportieren
+* `Cmd+Shift+I` oder `Strg+Shift+I`: Gebäude aus DXF importieren
 * `Cmd+Shift+B` oder `Strg+Shift+B`: Teilebibliothek laden
 * `Cmd+Z` oder `Strg+Z`: Rückgängig
 * `Cmd+Shift+Z` oder `Strg+Shift+Z`: Wiederherstellen
+* `Cmd+Shift+P` oder `Strg+Shift+P`: sichtbare Eigenschaften auf Auswahl anwenden
+* `Cmd+Shift+→` oder `Strg+Shift+→`: Auswahl 90° rechts drehen
+* `Cmd+Shift+←` oder `Strg+Shift+←`: Auswahl 90° links drehen
 * `Entf`: Auswahl löschen
 * `Esc`: Auswahl aufheben
 * `Cmd+0` oder `Strg+0`: 2D-Ansicht zentrieren
@@ -154,16 +176,16 @@ Wichtige Kürzel der aktuellen Oberfläche:
 
 ## Ansichten umschalten
 
-Die sechs orthogonalen Ansichten werden jetzt über Pfeil-Buttons oberhalb der Zeichenfläche umgeschaltet:
+Die sechs orthogonalen Ansichten werden oberhalb der Zeichenfläche über Pfeiltasten umgeschaltet:
 
-* `↑ Nord`
-* `↓ Süd`
-* `← West`
-* `→ Ost`
+* `↑` für die Frontansicht
+* `↓` für die Rückansicht
+* `←` für die linke Seitenansicht
+* `→` für die rechte Seitenansicht
 * `⤒ Oben`
 * `⤓ Unten`
 
-Die Umschaltung wirkt aktuell vor allem auf die gekoppelte 3D-Kamera. Dadurch kannst du das Modell direkt aus den wichtigsten Hauptrichtungen kontrollieren.
+Die Umschaltung wirkt auf die 3D-Kamera und auf die Kompassdarstellung. Besonders bei `Oben` ist der Nordwinkel relevant.
 
 ## Werkzeuge
 
@@ -174,7 +196,7 @@ Mit dem Werkzeug `Wand` zeichnest du lineare Wände.
 * Linke Maustaste drücken und ziehen.
 * Ohne `Shift` wird orthogonal gezeichnet.
 * Mit gedrückter `Shift`-Taste wird frei gezeichnet.
-* Die Wandstärke und Wandhöhe kommen aus den aktuellen Eingabefeldern.
+* Wandstärke und Wandhöhe kommen aus den aktuellen Eingabefeldern.
 
 ### Raum
 
@@ -189,12 +211,13 @@ Mit dem Werkzeug `Treppe` ziehst du die rechteckige Grundfläche einer Treppe au
 
 * Das Treppen-Preset bestimmt den Grundtyp.
 * Treppenhöhe und Stufenanzahl kannst du zusätzlich manuell anpassen.
+* Unterstützt sind aktuell gerade Treppen, 180°-Treppen, gegenläufige Treppen und Wendeltreppen.
 
 ### Tür
 
 Mit dem Werkzeug `Tür` klickst du auf eine bestehende Wand.
 
-* Die Tür wird an die Wand gebunden gespeichert.
+* Die Tür wird wandgebunden gespeichert.
 * Türbreite, Türhöhe und Schwelle kommen aus den aktuellen Eingaben.
 * `Tür-Preset` übernimmt Standardmaße aus der internen Bibliothek.
 
@@ -202,32 +225,35 @@ Mit dem Werkzeug `Tür` klickst du auf eine bestehende Wand.
 
 Mit dem Werkzeug `Fenster` klickst du auf eine bestehende Wand.
 
-* Das Fenster wird an die Wand gebunden gespeichert.
+* Das Fenster wird wandgebunden gespeichert.
 * Fensterbreite, Fensterhöhe und Brüstungshöhe kommen aus den aktuellen Eingaben.
 * `Fenster-Preset` übernimmt Standardmaße aus der internen Bibliothek.
 
 ### Bearbeiten
 
-Im Werkzeug `Bearbeiten` verschiebst du aktuell vor allem verbundene Wand-Endpunkte. Außerdem kannst du damit Bauteile für die optische Kontrolle auswählen.
+Im Werkzeug `Bearbeiten` verschiebst du aktuell vor allem verbundene Wand-Endpunkte und wählst Bauteile zur Bearbeitung oder Kontrolle aus.
 
 ## Arbeiten mit Eingabewerten
 
-Die Werteingabe ist einer der wichtigsten Teile der aktuellen Oberfläche. Sie steuert sowohl die Geometrie neuer Bauteile als auch das Verhalten während des Zeichnens.
+Die Werteingabe ist einer der wichtigsten Teile der aktuellen Oberfläche. Sie steuert sowohl die Geometrie neuer Bauteile als auch das Verhalten während des Zeichnens und beim Bearbeiten ausgewählter Elemente.
 
 ## Allgemeine Regeln für Werteingaben
 
-* Leere Felder verwenden den fachlichen Standardwert.
+* Leere Felder verwenden den fachlichen Standardwert des jeweiligen Bauteils.
 * Dezimalwerte dürfen mit Komma oder Punkt eingegeben werden.
 * Einheiten werden nicht direkt in das Textfeld geschrieben, sondern über das zugehörige Einheitenfeld daneben gewählt.
-* Ungültige Eingaben werden aktuell still verworfen. Dann greift der jeweilige Standardwert.
+* Ungültige Eingaben werden aktuell verworfen. Dann greift der jeweilige Standardwert.
+* Wenn eine Auswahl aktiv ist, kannst du die sichtbaren Werte mit `Werte auf Auswahl anwenden` auf alle passenden markierten Bauteile übernehmen.
 
 ### Beispiele
 
-* `1,20` mit Einheit `m` bedeutet `1,20 Meter`
-* `120` mit Einheit `cm` bedeutet ebenfalls `1,20 Meter`
-* `900` mit Einheit `mm` bedeutet `0,90 Meter`
+* `1,20` mit Einheit `m` bedeutet `1,20 Meter`.
+* `120` mit Einheit `cm` bedeutet ebenfalls `1,20 Meter`.
+* `900` mit Einheit `mm` bedeutet `0,90 Meter`.
 
-## Rasterweite
+## Zeichenwerte im Detail
+
+### Rasterweite
 
 Mit `Rasterweite` legst du das Zeichenraster fest.
 
@@ -235,17 +261,15 @@ Mit `Rasterweite` legst du das Zeichenraster fest.
 * Das Einheitenfeld daneben bestimmt, ob der Wert in `mm`, `cm` oder `m` verstanden wird.
 * Das Raster beeinflusst die Darstellung und bei aktivem `Snap Raster` auch die Fangpunkte.
 
-### Typische Nutzung
+Typische Nutzung:
 
 * `25 cm` für grobe Wandplanung
 * `10 cm` für detailliertere Innenwände
-* `1 m` für sehr grobe Vorplanung
-
-## Länge und Winkel beim Zeichnen
-
-Die Felder `Länge` und `Winkel` wirken auf das gerade entstehende lineare Element, vor allem auf Wände.
+* `1 m` für grobe Vorplanung
 
 ### Länge
+
+`Länge` wirkt auf das gerade entstehende lineare Element, vor allem auf Wände.
 
 Wenn `Länge` leer bleibt:
 
@@ -256,7 +280,14 @@ Wenn `Länge` gefüllt ist:
 * Die Wand wird auf genau diese Länge gesetzt.
 * Die Einheit rechts daneben bestimmt die Interpretation.
 
+Typische Beispiele:
+
+* `4,50` mit Einheit `m` erzeugt eine Wand mit exakt `4,50 m`.
+* `240` mit Einheit `cm` erzeugt eine Wand mit exakt `2,40 m`.
+
 ### Winkel
+
+`Winkel` wirkt auf die Richtung des aktuell gezogenen linearen Elements.
 
 Wenn `Winkel` leer bleibt:
 
@@ -268,150 +299,125 @@ Wenn `Winkel` gefüllt ist:
 * Der Winkel wird als Gradwert verwendet.
 * Damit kann eine Wand auch ohne freie Mausführung exakt in einem bestimmten Winkel erzeugt werden.
 
-### Praktische Beispiele
+Praktische Beispiele:
 
 * `Länge = 4,50 m`, `Winkel leer`:
-  Eine Wand wird exakt 4,50 m lang, aber weiter orthogonal ausgerichtet.
+  Eine Wand wird exakt 4,50 m lang und orthogonal ausgerichtet.
 * `Länge = 3,20 m`, `Winkel = 35`:
   Eine Wand wird 3,20 m lang und im Winkel von 35° erzeugt.
 
-## Wandparameter
+### Nordwinkel
 
-### Wandstärke
+`Nordwinkel` legt fest, wie das Gebäude relativ zur Planansicht ausgerichtet ist.
 
-`Wandstärke` gilt für neue Wände.
+* `0` bedeutet: oben im Plan ist Norden.
+* `90` bedeutet: Norden liegt nach rechts.
+* `180` bedeutet: Norden liegt unten.
+* Der Kompass in der Zeichenfläche wird entsprechend gedreht.
 
-Typische Beispiele:
+Diese Einstellung ist vor allem in der Draufsicht hilfreich, wenn das Gebäude nicht exakt achsparallel gezeichnet wurde.
 
-* `11,5 cm` für leichte Innenwand
-* `17,5 cm` für häufige massive Innenwand
+## Bauteilwerte im Detail
+
+### Wand
+
+`Wandstärke` und `Wandhöhe` gelten für neue Wände und für ausgewählte Wände beim Anwenden von Eigenschaften.
+
+Typische Wandstärken:
+
+* `11,5 cm` für leichte Innenwände
+* `17,5 cm` für häufige massive Innenwände
 * `24 cm` oder mehr für stärkere Außenwände
 
-### Wandhöhe
-
-`Wandhöhe` bestimmt die räumliche Höhe neuer Wände und damit auch die 3D-Darstellung.
-
-Typische Beispiele:
+Typische Wandhöhen:
 
 * `2,50 m`
 * `2,60 m`
 * `2,75 m`
 
-## Raumparameter
+### Raum
 
-### Raumname
+`Name`, `Raumhöhe`, `Boden` und `Decke` gelten für neue Räume und für ausgewählte Räume.
 
-`Raum` ist das Namensfeld des nächsten Raums.
-
-Typische Eingaben:
+Typische Raumnamen:
 
 * `Wohnen`
 * `Küche`
 * `Bad`
 * `Flur`
 
-### Raumhöhe
+Das Zusammenspiel in 3D:
 
-`Raumhöhe` ist die lichte Höhe des nächsten Raums.
+* `Raumhöhe` beeinflusst das Raumvolumen.
+* `Boden` beeinflusst die Bodenplatte.
+* `Decke` beeinflusst die Deckenplatte.
+* Aus diesen Werten werden später auch Geschosshöhen abgeleitet.
 
-### Boden
+### Tür
 
-`Boden` ist die Boden- oder Fußbodenstärke des nächsten Raums.
-
-### Decke
-
-`Decke` ist die Deckenstärke des nächsten Raums.
-
-### Zusammenspiel in 3D
-
-Die Kombination aus Raumhöhe, Boden und Decke beeinflusst direkt:
-
-* Bodenplatte des Raums
-* Raumvolumen
-* Deckenplatte
-* abgeleitete Geschosshöhen in der 3D-Darstellung
-
-## Türparameter
-
-### Türbreite
-
-Steuert die Breite der nächsten Türöffnung.
+`Türbreite`, `Türhöhe` und `Schwelle` gelten für neue Türen und für ausgewählte Türen.
 
 Typische Werte:
 
-* `88 cm` für Innentür
-* `101 cm` für breitere Tür
+* `88 cm` für Innentüren
+* `101 cm` für breitere Türen
 * `110 cm` für barriereärmere Durchgänge
+* `0 cm` Schwelle für schwellenlose Übergänge
 
-### Türhöhe
+Das Tür-Preset setzt mehrere Werte gleichzeitig und kann danach manuell überschrieben werden.
 
-Steuert die Höhe der nächsten Tür.
+### Fenster
 
-### Schwelle
-
-`Schwelle` ist der Höhenversatz der Türschwelle.
-
-* `0 cm` bedeutet schwellenlos
-* positive Werte bedeuten einen Höhenunterschied
-
-### Tür-Preset
-
-Das Preset setzt mehrere Werte gleichzeitig.
-
-Es überschreibt typischerweise:
-
-* Türbreite
-* Türhöhe
-* Schwellenwert
-
-Danach kannst du die einzelnen Felder weiter manuell anpassen.
-
-## Fensterparameter
-
-### Fensterbreite
-
-Steuert die Breite des nächsten Fensters.
-
-### Fensterhöhe
-
-Steuert die Höhe des nächsten Fensters.
-
-### Brüstung
-
-Steuert die Brüstungshöhe des nächsten Fensters, also die Höhe der Fensterunterkante über dem Boden.
+`Fensterbreite`, `Fensterhöhe` und `Brüstung` gelten für neue Fenster und für ausgewählte Fenster.
 
 Typische Werte:
 
-* `90 cm` für klassisches Fenster
-* `0 cm` für bodentiefes Element
+* `90 cm` Brüstung für klassische Fenster
+* `0 cm` Brüstung für bodentiefe Elemente
 
-### Fenster-Preset
+Das Fenster-Preset setzt Breite, Höhe und Brüstungshöhe gemeinsam.
 
-Ein Preset setzt Breite, Höhe und Brüstungshöhe gemeinsam.
+### Treppe
 
-## Treppenparameter
+`Treppen-Preset`, `Treppenhöhe` und `Stufen` gelten für neue Treppen und für ausgewählte Treppen.
 
-### Treppen-Preset
+Empfohlene Reihenfolge:
 
-Das Preset bestimmt den Grundtyp:
+* Erst Preset wählen.
+* Danach Höhe und Stufenzahl fachlich anpassen.
+* Danach Grundfläche in 2D aufziehen.
+* Bei Bedarf die fertige Treppe über Auswahl oder Kontextmenü um 90° drehen.
 
-* gerade Treppe
-* 180°-Treppe
-* Wendeltreppe
+## Eigenschaften auf Auswahl anwenden
 
-### Treppenhöhe
+Die Schaltfläche `Werte auf Auswahl anwenden` wirkt auf alle aktuell gewählten Bauteile, deren Typ zu den sichtbaren Feldern passt.
 
-`Treppenhöhe` beschreibt die zu überwindende Gesamthöhe.
+Beispiele:
 
-### Stufen
+* Mehrere Wände auswählen und anschließend `Wandstärke` und `Wandhöhe` gemeinsam ändern.
+* Mehrere Räume auswählen und allen dieselbe `Raumhöhe` geben.
+* Mehrere Treppen auswählen und die `Stufen` oder `Treppenhöhe` gemeinsam anpassen.
 
-`Stufen` beschreibt die Anzahl der Stufen des nächsten Treppenobjekts.
+Wichtig:
 
-### Typische Nutzung
+* Die Anwendung übernimmt nur sinnvolle Felder für den gerade aktiven Auswahltyp.
+* Bei gemischten Auswahlen solltest du gezielt nur gleichartige Bauteile zusammen bearbeiten.
 
-* Erst Preset wählen
-* Danach Höhe und Stufenzahl fachlich anpassen
-* Danach Grundfläche in 2D aufziehen
+## Drehen ausgewählter Bauteile
+
+Aktuell lassen sich folgende Bauteile in 90°-Schritten drehen:
+
+* Wände
+* Räume
+* Treppen
+
+Die Drehung ist erreichbar über:
+
+* Menü `Werkzeuge`
+* Kontextmenü der Auswahl
+* Tastaturkürzel `Cmd+Shift+→` oder `Cmd+Shift+←`
+
+Türen und Fenster bleiben wandgebunden. Wenn du eine Wand drehst, folgen ihre Öffnungen automatisch über die Wandbindung.
 
 ## Raster, Snap und Präzision
 
@@ -439,35 +445,46 @@ Das ist besonders wichtig, um geschlossene Grundrisskonturen konsistent aufzubau
 
 ## Hilfslinien
 
-* Ziehe aus dem oberen Lineal eine vertikale Hilfslinie.
-* Ziehe aus dem linken Lineal eine horizontale Hilfslinie.
+* Ziehe aus dem oberen Lineal eine horizontale Hilfslinie in die Zeichnung.
+* Ziehe aus dem linken Lineal eine vertikale Hilfslinie in die Zeichnung.
+* Während des Ziehens wird die aktuelle Zielposition als Länge angezeigt.
+* Beim Platzieren wird derselbe Snap-Mechanismus genutzt wie beim Zeichnen.
+* Die Position wird auf Basis des jeweils anderen Lineals in die Zeichnungsfläche projiziert.
 * Mit `Alt` + rechter Maustaste entfernst du eine nahe Hilfslinie.
 * Über `Hilfslinien` blendest du alle vorhandenen Hilfslinien aus oder ein.
 
-## Ansichten
-
-Oben gibt es Schalter für die orthogonalen Ansichten:
-
-* Oben
-* Unten
-* Nord
-* Süd
-* Ost
-* West
-
-Der aktuelle Stand blendet diese Ansichten sichtbar um und beschreibt sie im Overlay. Die vollständige fachliche Kipp- und Darstellungslogik ist noch ein Ausbaupunkt.
-
 ## DXF-Import und -Export
 
-### DXF exportieren
+### Gebäude-DXF als Standard
 
-* Exportiert aktuell die aktive Etage.
-* Die Anwendung sorgt nun dafür, dass die Dateiendung `.dxf` nicht doppelt angehängt wird.
+Die Standardfunktionen arbeiten auf Gebäudeebene:
 
-### DXF importieren
+* `Gebäude als DXF exportieren`
+* `Gebäude aus DXF importieren`
 
-* Importiert eine DXF-Datei als neue Etage.
-* Mehrfach angehängte `.dxf`-Endungen werden für den Etagennamen bereinigt.
+Damit werden alle aktuell vorhandenen Etagen gemeinsam verarbeitet.
+
+### Etagen-DXF als Zusatzfunktion
+
+Zusätzlich gibt es weiterhin:
+
+* `Aktive Etage als DXF exportieren`
+* `DXF als neue Etage importieren`
+
+Diese Funktionen sind nützlich, wenn du gezielt nur ein Geschoss austauschen willst.
+
+### Fachlicher Inhalt des Exports
+
+Der Export enthält aktuell:
+
+* sichtbare DXF-Geometrie für Wände, Räume, Öffnungen und Treppen
+* CADas-Metadaten für verlustärmeren Re-Import
+* metrische DXF-Kennzeichnung für Millimeter und Model-Space
+
+### Dateinamen
+
+* Die Anwendung sorgt dafür, dass `.dxf` nicht doppelt angehängt wird.
+* Wiederholte `.dxf`-Endungen werden beim Etagenimport für den Etagennamen bereinigt.
 
 ## Teilebibliotheken
 
@@ -479,19 +496,40 @@ Die Anwendung bringt Standard-Presets für:
 * Fenster
 * Treppen
 
-### Externe Bibliothek
+### Externe Bibliotheken
 
-Über `Teilebibliothek laden` können zusätzliche Presets aus `.cadasparts` importiert werden.
+Über `Teilebibliothek laden` können zwei Typen eingebunden werden:
 
-## Aktuelle Grenzen
+* `.cadasparts` für direkt importierbare CADas-Presets
+* `.dwg` als registrierte externe CAD-Bibliothek für spätere Nutzung
 
-Die aktuelle Version konzentriert sich bewusst auf einen robusten Grundrisskern mit erster 3D-Ableitung. Noch nicht umgesetzt oder noch nicht vollständig ausgebaut sind unter anderem:
+Aktuell gilt:
 
-* freie 3D-Modellierung jenseits der aus dem Grundriss abgeleiteten Körper
-* vollständige Projekt-Undo-/Redo-Funktion
-* konfigurierbare Kontextmenüs und breitere Mehrfachselektion
-* grafische Verwaltung von Dachmodellen und zusätzlichen Flächen-Ebenen
-* vollständige DWG-Verarbeitung
+* `.cadasparts` erweitert die auswählbaren Presets sofort.
+* `.dwg` wird zunächst registriert und in der Eigenschaftenleiste dokumentiert.
+
+## Automatisierung für Tests
+
+Der Automatisierungsmodus erlaubt direkte Tests gegen eine laufende App, ohne manuell zu klicken.
+
+Aktuell verfügbar sind insbesondere:
+
+* Werkzeug umschalten
+* Eingabefelder setzen
+* Einheiten umstellen
+* Etagen wechseln
+* Hilfslinien setzen
+* auf der Zeichenfläche klicken oder ziehen
+* Projekt- und Etagen-DXF importieren oder exportieren
+* Teilebibliotheken registrieren oder laden
+
+Damit kann ein Testablauf beispielsweise so aussehen:
+
+1. App mit `./gradlew runMitAutomatisierung` starten.
+2. Werkzeug per HTTP auf `WALL` setzen.
+3. Eine Wand per `/canvas/drag` anlegen.
+4. Projekt oder Etage per `/invoke` exportieren.
+5. Die erzeugte DXF-Datei fachlich prüfen.
 
 ## Typischer Arbeitsablauf
 
@@ -501,9 +539,18 @@ Die aktuelle Version konzentriert sich bewusst auf einen robusten Grundrisskern 
 4. Innenwände ergänzen.
 5. Werkzeug `Raum` wählen und Räume anlegen.
 6. Türen und Fenster mit Presets oder freien Werten setzen.
-7. Treppen platzieren.
+7. Treppen platzieren und bei Bedarf drehen.
 8. Ergebnis in der 3D-Ansicht kontrollieren.
-9. DXF exportieren.
+9. Gebäude als DXF exportieren.
+
+## Aktuelle Grenzen
+
+Die aktuelle Version konzentriert sich bewusst auf einen robusten Grundrisskern mit erster 3D-Ableitung. Noch nicht umgesetzt oder noch nicht vollständig ausgebaut sind unter anderem:
+
+* freie 3D-Modellierung jenseits der aus dem Grundriss abgeleiteten Körper
+* vollständige DWG-Verarbeitung statt bloßer Registrierung externer DWG-Bibliotheken
+* vollständige DXF-Symboltabellen, Blockdefinitionen und Layout-Metadaten
+* grafische Verwaltung von Dachmodellen und zusätzlichen Flächen-Ebenen
 
 ## Nächste fachliche Ausbaustufen
 
@@ -512,4 +559,4 @@ Die nächsten geplanten Schritte sind:
 * komplexere 3D-Geometrien und Materialdarstellungen
 * grafische Verwaltung für Dach- und Oberflächen-Ebenen
 * vollständige DWG-Anbindung
-* weitere Bearbeitungs- und Selektionsfunktionen
+* tiefere AutoCAD-Kompatibilität über DXF-Tabellen, Blöcke und weitere Zeichnungsmetadaten
