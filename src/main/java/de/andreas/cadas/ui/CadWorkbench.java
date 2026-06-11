@@ -86,6 +86,7 @@ import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
@@ -113,6 +114,21 @@ import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
 public final class CadWorkbench extends BorderPane {
+
+    private enum WorkspaceMode {
+        TWO_D("2D"),
+        THREE_D("3D");
+
+        private final String label;
+
+        WorkspaceMode(String label) {
+            this.label = label;
+        }
+
+        public String label() {
+            return label;
+        }
+    }
 
     private static final double BASE_PIXELS_PER_MILLIMETER = 0.10;
     private static final double RULER_SIZE = 32.0;
@@ -149,6 +165,7 @@ public final class CadWorkbench extends BorderPane {
 
     private final ObjectProperty<Level> activeLevel = new SimpleObjectProperty<>(project.primaryLevel());
     private final ObjectProperty<ViewOrientation> activeView = new SimpleObjectProperty<>(ViewOrientation.TOP);
+    private final ObjectProperty<WorkspaceMode> activeWorkspaceMode = new SimpleObjectProperty<>(WorkspaceMode.TWO_D);
     private final BooleanProperty showGrid = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToGrid = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToEndpoints = new SimpleBooleanProperty(true);
@@ -161,6 +178,8 @@ public final class CadWorkbench extends BorderPane {
     private final Canvas horizontalRuler = new Canvas();
     private final Canvas verticalRuler = new Canvas();
     private final Pane drawingPane = new Pane(drawingCanvas);
+    private final BorderPane drawingArea = new BorderPane();
+    private final StackPane workspacePane = new StackPane();
     private final ObservableList<Level> availableLevels = FXCollections.observableArrayList(project.levels());
 
     private final TextField gridField = new TextField("25");
@@ -306,6 +325,7 @@ public final class CadWorkbench extends BorderPane {
         });
         updatePropertySectionVisibility();
         updateActionButtons();
+        updateWorkspaceMode();
         fitCurrentViewToContent();
         updateStatus();
         render();
@@ -339,6 +359,13 @@ public final class CadWorkbench extends BorderPane {
             fitCurrentViewToContent();
             render();
         });
+        activeWorkspaceMode.addListener((ignored, oldValue, newValue) -> {
+            updateWorkspaceMode();
+            if (newValue == WorkspaceMode.THREE_D) {
+                refreshThreeDIfNeeded();
+            }
+            render();
+        });
         toolSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -355,7 +382,6 @@ public final class CadWorkbench extends BorderPane {
         topArea.setPadding(new Insets(0, 0, 12, 0));
         setTop(topArea);
 
-        BorderPane drawingArea = new BorderPane();
         Region rulerCorner = new Region();
         rulerCorner.setPrefSize(RULER_SIZE, RULER_SIZE);
         rulerCorner.setStyle("-fx-background-color: #e7decd;");
@@ -366,8 +392,9 @@ public final class CadWorkbench extends BorderPane {
         drawingArea.setLeft(verticalRuler);
         drawingArea.setCenter(new StackPane(drawingPane));
         drawingArea.setStyle("-fx-background-color: rgba(255,255,255,0.55); -fx-background-radius: 16;");
-        SplitPane splitPane = new SplitPane(buildPropertyPane(), drawingArea, threeDViewport);
-        splitPane.setDividerPositions(0.19, 0.69);
+        workspacePane.getChildren().setAll(drawingArea, threeDViewport);
+        SplitPane splitPane = new SplitPane(buildPropertyPane(), workspacePane);
+        splitPane.setDividerPositions(0.22);
         setCenter(splitPane);
 
         HBox statusBar = new HBox(18.0, viewLabel, zoomLabel, cursorLabel, draftLabel);
@@ -446,7 +473,11 @@ public final class CadWorkbench extends BorderPane {
     private HBox buildViewBar() {
         HBox box = new HBox(8.0);
         box.setAlignment(Pos.CENTER_LEFT);
-        box.getChildren().add(new Label("Ansichten:"));
+        box.getChildren().add(new Label("Arbeitsbereich:"));
+        box.getChildren().add(workspaceModeButton(WorkspaceMode.TWO_D));
+        box.getChildren().add(workspaceModeButton(WorkspaceMode.THREE_D));
+        box.getChildren().add(new Separator(Orientation.VERTICAL));
+        box.getChildren().add(new Label("2D-Ansichten:"));
         for (ViewOrientation viewOrientation : ViewOrientation.values()) {
             Button button = new Button(viewOrientation.buttonLabel());
             button.setOnAction(event -> activeView.set(viewOrientation));
@@ -455,6 +486,24 @@ public final class CadWorkbench extends BorderPane {
             box.getChildren().add(button);
         }
         return box;
+    }
+
+    private Button workspaceModeButton(WorkspaceMode workspaceMode) {
+        Button button = new Button(workspaceMode.label());
+        button.setOnAction(event -> activeWorkspaceMode.set(workspaceMode));
+        button.setStyle(workspaceModeButtonStyle(workspaceMode == activeWorkspaceMode.get()));
+        activeWorkspaceMode.addListener((ignored, oldValue, newValue) ->
+                button.setStyle(workspaceModeButtonStyle(workspaceMode == newValue)));
+        applyTooltip(button, workspaceMode == WorkspaceMode.TWO_D
+                ? "Zeigt die 2D-Zeichenfläche im großen Mittelbereich an."
+                : "Zeigt die 3D-Ansicht im großen Mittelbereich an und spart Platz gegenüber der Parallelansicht.");
+        return button;
+    }
+
+    private String workspaceModeButtonStyle(boolean active) {
+        return active
+                ? "-fx-background-color: #4b6a88; -fx-text-fill: white; -fx-background-radius: 999; -fx-padding: 8 16 8 16;"
+                : "-fx-background-radius: 999; -fx-padding: 8 16 8 16;";
     }
 
     private void settingsBarStyling() {
@@ -487,6 +536,14 @@ public final class CadWorkbench extends BorderPane {
         stairPresetSelector.setPrefWidth(190);
     }
 
+    private void updateWorkspaceMode() {
+        boolean showTwoD = activeWorkspaceMode.get() == WorkspaceMode.TWO_D;
+        drawingArea.setVisible(showTwoD);
+        drawingArea.setManaged(showTwoD);
+        threeDViewport.setVisible(!showTwoD);
+        threeDViewport.setManaged(!showTwoD);
+    }
+
     private MenuBar buildMenuBar() {
         Menu dateiMenu = new Menu("Datei");
         dateiMenu.getItems().addAll(
@@ -510,6 +567,11 @@ public final class CadWorkbench extends BorderPane {
         );
 
         Menu ansichtMenu = new Menu("Ansicht");
+        ansichtMenu.getItems().addAll(
+                menuItem("2D-Arbeitsbereich", () -> activeWorkspaceMode.set(WorkspaceMode.TWO_D), null),
+                menuItem("3D-Arbeitsbereich", () -> activeWorkspaceMode.set(WorkspaceMode.THREE_D), null),
+                new SeparatorMenuItem()
+        );
         for (ViewOrientation viewOrientation : ViewOrientation.values()) {
             ansichtMenu.getItems().add(menuItem(
                     "Zu " + viewOrientation.label(),
@@ -2044,7 +2106,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void updateStatus() {
-        viewLabel.setText("Aktive Ansicht: " + activeView.get().label() + " | Etage: " + activeLevel.get().name());
+        viewLabel.setText("Arbeitsbereich: " + activeWorkspaceMode.get().label() + " | 2D-Ansicht: " + activeView.get().label() + " | Etage: " + activeLevel.get().name());
         zoomLabel.setText(String.format(Locale.GERMAN, "Zoom: %.2f x", zoom));
         cursorLabel.setText(String.format(Locale.GERMAN, "Cursor: %.2f m / %.2f m", lastCursor.xMillimeters() / 1000.0, lastCursor.yMillimeters() / 1000.0));
         if (previewSegment == null) {

@@ -168,6 +168,7 @@ public final class ThreeDViewport extends BorderPane {
                 defaultPose.elevationDegrees(),
                 defaultPose.distance(),
                 0.0,
+                0.0,
                 0.0
         );
         fitToSceneRequested = true;
@@ -464,9 +465,9 @@ public final class ThreeDViewport extends BorderPane {
             parallelCamera.getTransforms().setAll(cameraTransforms());
             subScene.setCamera(parallelCamera);
         }
-        modelRoot.setTranslateX(baseTranslateX + cameraPose.panX());
-        modelRoot.setTranslateY(baseTranslateY + cameraPose.panZ());
-        modelRoot.setTranslateZ(baseTranslateZ);
+        modelRoot.setTranslateX(baseTranslateX + cameraPose.panX() * WORLD_SCALE);
+        modelRoot.setTranslateY(baseTranslateY + cameraPose.panY() * WORLD_SCALE);
+        modelRoot.setTranslateZ(baseTranslateZ + cameraPose.panZ() * WORLD_SCALE);
         cameraStatusLabel.setText(String.format(
                 "3D Kamera: %s | Azimut %.1f° | Elevation %.1f° | Abstand %.1f m | Szene %.0f mm",
                 cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC ? "orthografisch" : "perspektivisch",
@@ -492,6 +493,7 @@ public final class ThreeDViewport extends BorderPane {
                 cameraPose.azimuthDegrees(),
                 cameraPose.elevationDegrees(),
                 Math.max(6_000.0, sceneSpan * 1.8),
+                0.0,
                 0.0,
                 0.0
         );

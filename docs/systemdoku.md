@@ -31,7 +31,7 @@ Für macOS gibt es zusätzlich Gradle-Aufgaben auf Basis von `jpackage`:
 * `de.andreas.cadas`
   Einstiegspunkte der Anwendung.
 * `de.andreas.cadas.ui`
-  JavaFX-Workbench, Ansichten und Interaktion mit der Zeichenfläche.
+  JavaFX-Workbench, Umschaltung zwischen 2D- und 3D-Arbeitsbereich sowie Interaktion mit der Zeichenfläche.
 * `de.andreas.cadas.ui.AutomationBridgeServer`
   Lokaler HTTP-Zugriff für direkte Tests gegen eine laufende JavaFX-Anwendung.
 * `de.andreas.cadas.application.history`
@@ -68,7 +68,8 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * Live-Anzeige von Länge und Winkel
 * ein- und ausblendbare Bemaßung für Wände
 * Werkzeugmodus für Wände, Räume, Türen, Fenster und Bearbeitung
-* parallele 3D-Ansicht mit Orbit, Zoom, Pan und Auswahlrückkopplung
+* umschaltbarer Mittelbereich für 2D-Zeichenfläche oder 3D-Ansicht
+* 3D-Ansicht mit Orbit, Zoom, Pan und Auswahlrückkopplung
 * Mehrfachauswahl mit Eigenschaftenübernahme auf mehrere passende Bauteile
 * Kontextmenü für Auswahlaktionen und 90°-Drehung rotierbarer Bauteile
 * Rückgängig und Wiederherstellen für fachliche Bearbeitungsschritte
