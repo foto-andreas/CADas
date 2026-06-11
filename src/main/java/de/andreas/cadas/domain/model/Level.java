@@ -126,6 +126,18 @@ public final class Level {
         surfaceLayerStacks.add(Objects.requireNonNull(stack, "stack darf nicht null sein."));
     }
 
+    public void removeSurfaceLayerStack(UUID stackId) {
+        surfaceLayerStacks.removeIf(stack -> stack.id().equals(stackId));
+    }
+
+    public SurfaceLayerStack findSurfaceLayerStack(SurfaceType surfaceType, String targetKey) {
+        return surfaceLayerStacks.stream()
+                .filter(stack -> stack.surfaceType() == surfaceType)
+                .filter(stack -> stack.targetKey().equals(targetKey))
+                .findFirst()
+                .orElse(null);
+    }
+
     public Wall findWall(UUID wallId) {
         return walls.stream()
                 .filter(wall -> wall.id().equals(wallId))

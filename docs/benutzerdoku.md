@@ -90,6 +90,7 @@ Links befindet sich eine dauerhaft sichtbare vertikale Liste mit Properties. Dor
 
 * allgemeine Zeichenwerte wie Rasterweite, Länge, Winkel und Nordwinkel
 * fachliche Eigenschaften für Wand, Raum, Tür, Fenster und Treppe
+* Ebenen- und Belagswerte für Innenwand, Außenwand, Boden, Decke und Dachflächen
 * eine Auswahlzusammenfassung
 * eine Übersicht registrierter externer CAD-Bibliotheken
 
@@ -137,8 +138,9 @@ Praktisch heißt das für Anwender:
 
 Wichtig:
 
-* Aktuell basiert die automatische Raumkontur auf der reinen Wandstärke.
-* Spätere Innenbeläge auf Wänden sind dafür fachlich vorgesehen, verschieben die Raumkante aber in der aktuellen Version noch nicht zusätzlich.
+* Ohne zusätzliche Innenlagen basiert die automatische Raumkontur auf der reinen Wandstärke.
+* Sichtbare Innenbeläge auf Wänden verschieben die Raumkante zusätzlich nach innen.
+* Dadurch ändern sich Raumkontur, Fläche und Volumen unmittelbar mit.
 
 ## Empfohlener Zeichenablauf pro Etage
 
@@ -242,7 +244,6 @@ Dieser Modus ist als einfacher Fallback noch vorhanden. Für echte Dachgeschoss-
 
 Derzeit gilt:
 
-* Die Raum-Innenkante wird noch aus der nackten Wandstärke und noch nicht aus späteren Innenbelägen abgeleitet.
 * Die automatische Deckenform entsteht aus Wand-Endpunkten und interpoliert dazwischen. Komplexe Dachdetails wie Dachgauben oder mehrfach geknickte Dachflächen sind noch nicht als eigene Dachobjekte modelliert.
 * Der ältere Rechteck-Fallback für `Dachschräge` bleibt bestehen, sollte aber nur für einfache Räume verwendet werden.
 
@@ -261,10 +262,11 @@ Derzeit gilt:
 * Mit gedrückter rechter Maustaste verschiebst du den Modellbezug seitlich.
 * Mit dem Mausrad zoomst du in der 3D-Ansicht.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
+* Über `Iso`, `Oben`, `Vorne` und `Rechts` wechselst du auf schnelle 3D-Kamerapresets.
 * Über die Geschoss-Checkboxen blendest du einzelne Etagen in der 3D-Ansicht ein oder aus.
 * Die Option `3D Ebenen` blendet zusätzliche Oberflächen-Schichten ein oder aus.
 * `Modell einpassen` richtet Abstand und Mittelpunkt auf das aktuell sichtbare Modell aus.
-* `Ansicht zentrieren` setzt die Kamera auf die Standardlage der aktuellen Blickrichtung zurück.
+* `Ansicht zentrieren` setzt die Kamera auf die räumliche Standardperspektive zurück.
 
 ### Auswahl, Mehrfachauswahl und Kontextmenü
 
@@ -317,6 +319,7 @@ Die sechs orthogonalen Ansichten werden oberhalb der Zeichenfläche über Pfeilt
 * `⤓ Unten`
 
 Die Umschaltung wirkt auf die 3D-Kamera und auf die Kompassdarstellung. Besonders bei `Oben` ist der Nordwinkel relevant.
+Die 3D-Kamera bleibt davon bewusst unabhängig und wird über die 3D-Bedienelemente gesteuert.
 
 ## Werkzeuge
 
@@ -337,6 +340,25 @@ Mit dem Werkzeug `Raum` zeichnest du keinen separaten Rechteckraum mehr.
 * Mit dem Werkzeug `Raum` klickst du in einen automatisch erkannten Raum, um ihn gezielt auszuwählen.
 * Raumname, Raumhöhe, Bodenstärke, Deckenstärke und Dachschräge kommen aus den aktuellen Eingaben und können dann auf die Auswahl angewendet werden.
 * Wenn du eine gemeinsame Wandecke verschiebst, wird die Raumkontur automatisch nachgeführt und darf dabei auch schräg oder polygonal werden.
+
+### Ebenen auf Flächen
+
+Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepflegt.
+
+* Wähle im Werkzeug `Bearbeiten` zuerst eine Wand oder einen Raum aus.
+* Öffne links den Bereich `Ebenen`.
+* Wähle den Flächentyp, zum Beispiel `WALL_INTERIOR`, `WALL_EXTERIOR`, `FLOOR` oder `CEILING`.
+* Wähle optional ein Preset wie `Fliese`, `Dämmplatte`, `Rigipsplatte`, `OSB-Platte`, `Tapete` oder eine registrierte `DWG-Referenz`.
+* Lege Name, Dicke, Platten- oder Fliesenmaß, Verlegeart, Mindestversatz und Mindestbreite fest.
+* `Ebene hinzufügen` legt den Belag auf der gewählten Fläche an.
+* `Ebene aktualisieren`, `ausblenden`, `nach oben` und `nach unten` ändern Bestand und Reihenfolge.
+
+Für Anwender wichtig:
+
+* Sichtbare Innenlagen auf Wänden verkleinern den Raum entlang der Innenkante.
+* Sichtbare Boden- und Deckenlagen verändern die lichte Raumhöhe und damit das Volumen.
+* Die 3D-Ansicht zeigt diese Ebenen auf Wunsch als gestapelte Schichten an.
+* Registrierte `DWG`-Bibliotheken erscheinen zusätzlich als auswählbare Referenz-Presets für Ebenen.
 
 ### Treppe
 

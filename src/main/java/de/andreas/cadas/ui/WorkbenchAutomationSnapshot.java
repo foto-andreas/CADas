@@ -12,6 +12,9 @@ public record WorkbenchAutomationSnapshot(
         int stairCount,
         int selectionCount,
         int registeredCadLibraries,
+        int threeDBodyCount,
+        boolean threeDHasContent,
+        String threeDCameraStatus,
         String statusText
 ) {
 }

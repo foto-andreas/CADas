@@ -7,11 +7,17 @@ import de.andreas.cadas.application.history.UndoRedoStack;
 import de.andreas.cadas.application.drawing.OpeningPlacementService;
 import de.andreas.cadas.application.drawing.QuarterTurnRotationService;
 import de.andreas.cadas.application.drawing.SelectionQueryService;
+import de.andreas.cadas.application.drawing.SelectionTranslationService;
 import de.andreas.cadas.application.drawing.SnapService;
 import de.andreas.cadas.application.drawing.WallEditingService;
 import de.andreas.cadas.application.drawing.WallEndpointSelection;
 import de.andreas.cadas.application.exchange.LevelExchangeService;
 import de.andreas.cadas.application.exchange.ProjectExchangeService;
+import de.andreas.cadas.application.layers.SurfaceCoveringPreset;
+import de.andreas.cadas.application.layers.SurfaceCoveringPresetService;
+import de.andreas.cadas.application.layers.SurfaceLayerEffectService;
+import de.andreas.cadas.application.layers.TileLayoutRequest;
+import de.andreas.cadas.application.layers.TileLayoutService;
 import de.andreas.cadas.application.parts.DoorPreset;
 import de.andreas.cadas.application.parts.PartLibraryImportService;
 import de.andreas.cadas.application.parts.StairPreset;
@@ -31,6 +37,10 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SurfaceLayer;
+import de.andreas.cadas.domain.model.SurfaceLayerStack;
+import de.andreas.cadas.domain.model.SurfaceLayoutMode;
+import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
 import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
@@ -41,6 +51,7 @@ import de.andreas.cadas.infrastructure.dxf.DxfLevelExchangeService;
 import de.andreas.cadas.infrastructure.dxf.DxfProjectExchangeService;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -70,6 +81,7 @@ import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
@@ -128,8 +140,11 @@ public final class CadWorkbench extends BorderPane {
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     private final WallEditingService wallEditingService = new WallEditingService();
     private final QuarterTurnRotationService quarterTurnRotationService = new QuarterTurnRotationService();
+    private final SelectionTranslationService selectionTranslationService = new SelectionTranslationService();
     private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
     private final ProjectExchangeService projectExchangeService = new DxfProjectExchangeService();
+    private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
+    private final TileLayoutService tileLayoutService = new TileLayoutService();
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
 
     private final ObjectProperty<Level> activeLevel = new SimpleObjectProperty<>(project.primaryLevel());
@@ -189,11 +204,31 @@ public final class CadWorkbench extends BorderPane {
     private final TextField stairHeightField = new TextField("2,80");
     private final ComboBox<LengthUnit> stairHeightUnit = new ComboBox<>();
     private final TextField stairStepsField = new TextField("16");
+    private final ComboBox<SurfaceType> surfaceTypeSelector = new ComboBox<>();
+    private final ComboBox<SurfaceCoveringPreset> surfacePresetSelector = new ComboBox<>();
+    private final ListView<String> surfaceLayerList = new ListView<>();
+    private final TextField surfaceLayerNameField = new TextField("Belag");
+    private final TextField surfaceLayerThicknessField = new TextField("1,2");
+    private final ComboBox<LengthUnit> surfaceLayerThicknessUnit = new ComboBox<>();
+    private final TextField surfaceTileWidthField = new TextField("60");
+    private final ComboBox<LengthUnit> surfaceTileWidthUnit = new ComboBox<>();
+    private final TextField surfaceTileHeightField = new TextField("30");
+    private final ComboBox<LengthUnit> surfaceTileHeightUnit = new ComboBox<>();
+    private final ComboBox<SurfaceLayoutMode> surfaceLayoutModeSelector = new ComboBox<>();
+    private final TextField surfaceLayoutOffsetField = new TextField("0");
+    private final ComboBox<LengthUnit> surfaceLayoutOffsetUnit = new ComboBox<>();
+    private final TextField surfaceMinimumOffsetField = new TextField("10");
+    private final ComboBox<LengthUnit> surfaceMinimumOffsetUnit = new ComboBox<>();
+    private final TextField surfaceMinimumEdgeWidthField = new TextField("8");
+    private final ComboBox<LengthUnit> surfaceMinimumEdgeWidthUnit = new ComboBox<>();
+    private final Label surfaceLayerTargetLabel = new Label("Keine Fläche ausgewählt.");
+    private final Label surfaceLayerCoverageLabel = new Label("Keine Ebenen ausgewählt.");
     private final ComboBox<Level> levelSelector = new ComboBox<>();
     private final ComboBox<DrawingTool> toolSelector = new ComboBox<>();
     private final ObservableList<DoorPreset> availableDoorPresets = FXCollections.observableArrayList();
     private final ObservableList<WindowPreset> availableWindowPresets = FXCollections.observableArrayList();
     private final ObservableList<StairPreset> availableStairPresets = FXCollections.observableArrayList();
+    private final ObservableList<SurfaceCoveringPreset> availableSurfacePresets = FXCollections.observableArrayList();
     private final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection);
     private final ViewProjectionService projectionService = new ViewProjectionService();
     private final ProjectedModelBoundsService projectedBoundsService = new ProjectedModelBoundsService();
@@ -206,6 +241,12 @@ public final class CadWorkbench extends BorderPane {
     private final Button clearSelectionButton = new Button("Auswahl aufheben");
     private final Button applySelectionPropertiesButton = new Button("Werte auf Auswahl anwenden");
     private final Button applyEndpointHeightButton = new Button("Eckhöhe anwenden");
+    private final Button addSurfaceLayerButton = new Button("Ebene hinzufügen");
+    private final Button updateSurfaceLayerButton = new Button("Ebene aktualisieren");
+    private final Button removeSurfaceLayerButton = new Button("Ebene entfernen");
+    private final Button toggleSurfaceLayerVisibilityButton = new Button("Sichtbarkeit umschalten");
+    private final Button moveSurfaceLayerUpButton = new Button("Nach oben");
+    private final Button moveSurfaceLayerDownButton = new Button("Nach unten");
     private final ContextMenu selectionContextMenu = new ContextMenu();
     private final Label cadLibrarySummaryLabel = new Label("Keine externen CAD-Bibliotheken registriert.");
 
@@ -235,6 +276,9 @@ public final class CadWorkbench extends BorderPane {
     private double pendingGuideWorldMillimeters;
     private boolean threeDDirty = true;
     private boolean historyCapturedForDrag;
+    private PlanPoint selectionDragAnchor;
+    private List<Wall> selectionDragBaseWalls = List.of();
+    private List<Staircase> selectionDragBaseStaircases = List.of();
 
     public CadWorkbench() {
         setPadding(new Insets(12));
@@ -244,7 +288,6 @@ public final class CadWorkbench extends BorderPane {
         configureLayout();
         configureCanvas();
         threeDViewport.syncLevels(availableLevels, activeLevel.get().name());
-        threeDViewport.applyViewOrientation(activeView.get());
         selectedSelection.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.setSelectedSelection(newValue);
             threeDViewport.setSelectedSelections(Set.copyOf(selectedSelections));
@@ -276,6 +319,7 @@ public final class CadWorkbench extends BorderPane {
         toolSelector.getItems().addAll(DrawingTool.values());
         toolSelector.setValue(DrawingTool.WALL);
         initializePresetSelectors();
+        initializeSurfaceLayerControls();
         levelSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
                 activateLevel(newValue);
@@ -292,7 +336,6 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(showAreaVolume);
         registerRenderListener(showGuides);
         activeView.addListener((ignored, oldValue, newValue) -> {
-            threeDViewport.applyViewOrientation(newValue);
             fitCurrentViewToContent();
             render();
         });
@@ -301,6 +344,7 @@ public final class CadWorkbench extends BorderPane {
             updateActionButtons();
         });
         configureActionButtons();
+        registerBundledDwgLibraries();
     }
 
     private void configureLayout() {
@@ -558,6 +602,25 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Stufen", stairStepsField)
                 ),
                 createPropertySection(
+                        "Ebenen",
+                        surfaceLayerTargetLabel,
+                        propertyRow("Fläche", surfaceTypeSelector),
+                        propertyRow("Preset", surfacePresetSelector),
+                        surfaceLayerList,
+                        surfaceLayerCoverageLabel,
+                        propertyRow("Name", surfaceLayerNameField),
+                        propertyRow("Dicke", surfaceLayerThicknessField, surfaceLayerThicknessUnit),
+                        propertyRow("Breite", surfaceTileWidthField, surfaceTileWidthUnit),
+                        propertyRow("Höhe", surfaceTileHeightField, surfaceTileHeightUnit),
+                        propertyRow("Versatzmodus", surfaceLayoutModeSelector),
+                        propertyRow("Versatz", surfaceLayoutOffsetField, surfaceLayoutOffsetUnit),
+                        propertyRow("Mindestversatz", surfaceMinimumOffsetField, surfaceMinimumOffsetUnit),
+                        propertyRow("Mindestbreite Rand", surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit),
+                        new HBox(6.0, addSurfaceLayerButton, updateSurfaceLayerButton),
+                        new HBox(6.0, removeSurfaceLayerButton, toggleSurfaceLayerVisibilityButton),
+                        new HBox(6.0, moveSurfaceLayerUpButton, moveSurfaceLayerDownButton)
+                ),
+                createPropertySection(
                         "CAD-Bibliotheken",
                         cadLibrarySummaryLabel
                 )
@@ -601,6 +664,12 @@ public final class CadWorkbench extends BorderPane {
         clearSelectionButton.setOnAction(event -> clearSelection());
         applySelectionPropertiesButton.setOnAction(event -> applyCurrentInputsToSelection());
         applyEndpointHeightButton.setOnAction(event -> applyEndpointHeightToSelection());
+        addSurfaceLayerButton.setOnAction(event -> addSurfaceLayer());
+        updateSurfaceLayerButton.setOnAction(event -> updateSurfaceLayer());
+        removeSurfaceLayerButton.setOnAction(event -> removeSurfaceLayer());
+        toggleSurfaceLayerVisibilityButton.setOnAction(event -> toggleSurfaceLayerVisibility());
+        moveSurfaceLayerUpButton.setOnAction(event -> moveSurfaceLayer(-1));
+        moveSurfaceLayerDownButton.setOnAction(event -> moveSurfaceLayer(1));
         rebuildSelectionContextMenu();
         applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
         applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
@@ -608,6 +677,12 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(clearSelectionButton, "Hebt die aktuelle Auswahl auf und entfernt die Hervorhebung in 2D und 3D.");
         applyTooltip(applySelectionPropertiesButton, "Übernimmt die aktuell sichtbaren Eingabewerte auf alle passenden, ausgewählten Bauteile.");
         applyTooltip(applyEndpointHeightButton, "Übernimmt die eingetragene Höhe auf den aktuell ausgewählten Wand-Endpunkt und aktualisiert daraus die angrenzenden Räume.");
+        applyTooltip(addSurfaceLayerButton, "Legt auf der aktuell ausgewählten Wand- oder Raumfläche eine neue Ebene mit den eingetragenen Maßen an.");
+        applyTooltip(updateSurfaceLayerButton, "Übernimmt die aktuellen Ebenenwerte auf den in der Liste markierten Belag.");
+        applyTooltip(removeSurfaceLayerButton, "Entfernt den in der Liste markierten Belag von der aktuell ausgewählten Fläche.");
+        applyTooltip(toggleSurfaceLayerVisibilityButton, "Schaltet die Sichtbarkeit des markierten Belags um und passt Raumwirkung sowie 3D-Darstellung direkt an.");
+        applyTooltip(moveSurfaceLayerUpButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach oben.");
+        applyTooltip(moveSurfaceLayerDownButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach unten.");
         applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf, die für spätere Teileverwendung vorgemerkt sind.");
     }
 
@@ -621,12 +696,14 @@ public final class CadWorkbench extends BorderPane {
                 case 4 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
                 case 5 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW);
                 case 6 -> shouldShowSection(DrawingTool.STAIR, RenderableKind.STAIR);
+                case 7 -> shouldShowLayerSection();
                 default -> true;
             };
             node.setVisible(visible);
             node.setManaged(visible);
         }
         selectionSummaryLabel.setText(selectionSummary());
+        refreshSurfaceLayerSection();
     }
 
     private boolean shouldShowSection(DrawingTool tool, RenderableKind... kinds) {
@@ -642,6 +719,16 @@ public final class CadWorkbench extends BorderPane {
             }
         }
         return false;
+    }
+
+    private boolean shouldShowLayerSection() {
+        if (selectedSelection.get() == null) {
+            return false;
+        }
+        return selectedSelection.get().kind() == RenderableKind.WALL
+                || selectedSelection.get().kind() == RenderableKind.ROOM_VOLUME
+                || selectedSelection.get().kind() == RenderableKind.ROOM_FLOOR
+                || selectedSelection.get().kind() == RenderableKind.ROOM_CEILING;
     }
 
     private String selectionSummary() {
@@ -676,6 +763,14 @@ public final class CadWorkbench extends BorderPane {
         clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
         applySelectionPropertiesButton.setDisable(!hasSelection);
         applyEndpointHeightButton.setDisable(selectedEndpointGroup == null);
+        boolean hasSurfaceTarget = currentSurfaceTargetKey().isPresent();
+        boolean hasSurfaceSelection = surfaceLayerList.getSelectionModel().getSelectedIndex() >= 0;
+        addSurfaceLayerButton.setDisable(!hasSurfaceTarget);
+        updateSurfaceLayerButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
+        removeSurfaceLayerButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
+        toggleSurfaceLayerVisibilityButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
+        moveSurfaceLayerUpButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection || surfaceLayerList.getSelectionModel().getSelectedIndex() <= 0);
+        moveSurfaceLayerDownButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection || surfaceLayerList.getSelectionModel().getSelectedIndex() >= surfaceLayerList.getItems().size() - 1);
     }
 
     private MenuItem menuItem(String label, Runnable action, KeyCombination accelerator) {
@@ -728,6 +823,12 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(windowHeightUnit, LengthUnit.METER);
         initializeUnitSelector(sillHeightUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(stairHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(surfaceLayerThicknessUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceTileWidthUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceTileHeightUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceLayoutOffsetUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceMinimumOffsetUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceMinimumEdgeWidthUnit, LengthUnit.CENTIMETER);
     }
 
     private void initializeUnitSelector(ComboBox<LengthUnit> selector, LengthUnit defaultUnit) {
@@ -758,6 +859,35 @@ public final class CadWorkbench extends BorderPane {
         doorPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyDoorPreset(newValue));
         windowPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyWindowPreset(newValue));
         stairPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyStairPreset(newValue));
+    }
+
+    private void initializeSurfaceLayerControls() {
+        availableSurfacePresets.setAll(new SurfaceCoveringPresetService().defaults());
+        surfaceTypeSelector.getItems().setAll(SurfaceType.values());
+        surfaceTypeSelector.setValue(SurfaceType.WALL_INTERIOR);
+        surfacePresetSelector.setItems(availableSurfacePresets);
+        if (!availableSurfacePresets.isEmpty()) {
+            surfacePresetSelector.setValue(availableSurfacePresets.getFirst());
+        }
+        surfaceLayoutModeSelector.getItems().setAll(SurfaceLayoutMode.values());
+        surfaceLayoutModeSelector.setValue(SurfaceLayoutMode.AUTOMATIC);
+        surfaceLayerList.setPrefHeight(120);
+        surfaceLayerList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> syncInputsFromSelectedSurfaceLayer());
+        surfaceTypeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> refreshSurfaceLayerSection());
+        surfacePresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applySurfacePreset(newValue));
+        applySurfacePreset(surfacePresetSelector.getValue());
+    }
+
+    private void registerBundledDwgLibraries() {
+        Path workspaceRoot = Path.of("").toAbsolutePath();
+        try {
+            Files.list(workspaceRoot)
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".dwg"))
+                    .sorted()
+                    .forEach(this::registerDwgLibrary);
+        } catch (IOException ignored) {
+            // Fallback: keine automatische DWG-Registrierung möglich.
+        }
     }
 
     private <T> void selectFirstIfAvailable(ComboBox<T> selector, ObservableList<T> values) {
@@ -809,6 +939,25 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(stairHeightField, "Legt die Gesamthöhe der nächsten Treppe fest.");
         applyTooltip(stairHeightUnit, "Bestimmt die Einheit für die Treppenhöhe.");
         applyTooltip(stairStepsField, "Legt die Stufenanzahl der nächsten Treppe fest.");
+        applyTooltip(surfaceTypeSelector, "Bestimmt, ob die Ebene auf einer Innenwand, Außenwand, dem Boden oder der Decke der aktuell ausgewählten Fläche liegt.");
+        applyTooltip(surfacePresetSelector, "Wählt einen Beispielbelag oder eine DWG-Referenz aus und übernimmt deren Standardwerte in die Ebenenfelder.");
+        applyTooltip(surfaceLayerList, "Zeigt die Ebenen der aktuell ausgewählten Fläche in ihrer Stapelreihenfolge an.");
+        applyTooltip(surfaceLayerNameField, "Legt den Namen der Ebene fest, etwa Fliese, Rigips, Dämmplatte oder eine DWG-Referenz.");
+        applyTooltip(surfaceLayerThicknessField, "Legt die Dicke der Ebene fest. Innenwand- und Deckenbeläge wirken direkt auf Raumgeometrie und Volumen.");
+        applyTooltip(surfaceLayerThicknessUnit, "Bestimmt die Einheit für die Dicke des ausgewählten Belags.");
+        applyTooltip(surfaceTileWidthField, "Legt die Breite einer Fliese oder Platte für die Belegungsbasis fest.");
+        applyTooltip(surfaceTileWidthUnit, "Bestimmt die Einheit für die Breite der Fliese oder Platte.");
+        applyTooltip(surfaceTileHeightField, "Legt die Höhe beziehungsweise Länge einer Fliese oder Platte für die Belegungsbasis fest.");
+        applyTooltip(surfaceTileHeightUnit, "Bestimmt die Einheit für die Höhe oder Länge des Belags.");
+        applyTooltip(surfaceLayoutModeSelector, "Bestimmt, ob ohne Versatz, mit automatischem Versatz oder mit festem Reihenversatz belegt wird.");
+        applyTooltip(surfaceLayoutOffsetField, "Legt bei festem Versatz den horizontalen Reihenversatz fest.");
+        applyTooltip(surfaceLayoutOffsetUnit, "Bestimmt die Einheit für den festen Reihenversatz.");
+        applyTooltip(surfaceMinimumOffsetField, "Legt den kleinsten zulässigen automatischen Versatz zwischen zwei Reihen fest.");
+        applyTooltip(surfaceMinimumOffsetUnit, "Bestimmt die Einheit für den Mindestversatz.");
+        applyTooltip(surfaceMinimumEdgeWidthField, "Legt die kleinste zulässige Restbreite an Anfang und Ende einer Reihe fest.");
+        applyTooltip(surfaceMinimumEdgeWidthUnit, "Bestimmt die Einheit für die Mindestbreite an den Rändern.");
+        applyTooltip(surfaceLayerTargetLabel, "Zeigt, auf welcher Wand- oder Raumfläche die aktuellen Ebenen bearbeitet werden.");
+        applyTooltip(surfaceLayerCoverageLabel, "Zeigt eine Kurzbewertung der aktuellen Platten- oder Fliesenbelegung der markierten Ebene.");
         applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
     }
 
@@ -900,6 +1049,9 @@ public final class CadWorkbench extends BorderPane {
             DraftingConstraints constraints = currentConstraints(false);
             PlanPoint editPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
             selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, SNAP_TOLERANCE).orElse(null);
+            selectionDragAnchor = null;
+            selectionDragBaseWalls = List.of();
+            selectionDragBaseStaircases = List.of();
             historyCapturedForDrag = false;
             if (selectedEndpointGroup != null) {
                 syncEndpointHeightInputFromSelection();
@@ -912,10 +1064,9 @@ public final class CadWorkbench extends BorderPane {
                         ));
                 draftLabel.setText("Wandecke ausgewählt. `Eckhöhe anwenden` setzt die Höhe auf alle verbundenen Wandenden.");
             } else {
-                updateSelection(
-                        selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null),
-                        event.isShortcutDown() || event.isShiftDown()
-                );
+                SelectionKey editSelection = selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null);
+                updateSelection(editSelection, event.isShortcutDown() || event.isShiftDown());
+                prepareSelectionDrag(editSelection, editPoint);
             }
             render();
             return;
@@ -972,6 +1123,16 @@ public final class CadWorkbench extends BorderPane {
                 markThreeDDirty();
                 render();
             }
+            if (selectionDragAnchor != null) {
+                if (!historyCapturedForDrag) {
+                    rememberStateForUndo();
+                    historyCapturedForDrag = true;
+                }
+                DraftingConstraints constraints = currentConstraints(false);
+                PlanPoint snappedPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
+                translateSelectedComponents(snappedPoint);
+                render();
+            }
             return;
         }
 
@@ -994,6 +1155,17 @@ public final class CadWorkbench extends BorderPane {
         }
 
         if (selectedEndpointGroup != null) {
+            historyCapturedForDrag = false;
+            updatePropertySectionVisibility();
+            updateActionButtons();
+            render();
+            return;
+        }
+
+        if (selectionDragAnchor != null) {
+            selectionDragAnchor = null;
+            selectionDragBaseWalls = List.of();
+            selectionDragBaseStaircases = List.of();
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -1164,7 +1336,7 @@ public final class CadWorkbench extends BorderPane {
         graphics.fillText(room.name(), toScreenProjectedX(center, 0.0) - 26, toScreenProjectedY(center, 0.0) - 6);
         graphics.setFont(Font.font("Menlo", 11));
         graphics.fillText(
-                String.format(Locale.GERMAN, "%.2f m² | %.2f m³", room.areaSquareMeters(), room.volumeCubicMeters()),
+                String.format(Locale.GERMAN, "%.2f m² | %.2f m³", room.areaSquareMeters(), surfaceLayerEffectService.effectiveVolumeCubicMeters(activeLevel.get(), room)),
                 toScreenProjectedX(center, 0.0) - 42,
                 toScreenProjectedY(center, 0.0) + 12
         );
@@ -1216,7 +1388,7 @@ public final class CadWorkbench extends BorderPane {
         graphics.fillText(
                 String.format(Locale.GERMAN, "Schräge %.2f m → %.2f m | %.1f°",
                         profile.kneeWallHeight().toMillimeters() / 1000.0,
-                        room.maximumCeilingHeightMillimeters() / 1000.0,
+                        surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(activeLevel.get(), room) / 1000.0,
                         room.slopeAngleDegrees()),
                 toScreenProjectedX(room.centerPoint(), 0.0) - 72,
                 toScreenProjectedY(room.centerPoint(), 0.0) + 28
@@ -1469,7 +1641,7 @@ public final class CadWorkbench extends BorderPane {
         double left = toScreenHorizontal(minProjectedX);
         double right = toScreenHorizontal(maxProjectedX);
         double floorY = toScreenVertical(0.0);
-        double topY = toScreenVertical(-room.maximumCeilingHeightMillimeters());
+        double topY = toScreenVertical(-surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(activeLevel.get(), room));
         if (isSlopeVisibleInCurrentElevation(room)) {
             drawSlopedRoomElevation(graphics, room, left, right, floorY, topY);
             return;
@@ -1494,7 +1666,7 @@ public final class CadWorkbench extends BorderPane {
             drawPolygonalRoomElevation(graphics, room, floorY);
             return;
         }
-        double lowY = toScreenVertical(-room.minimumCeilingHeightMillimeters());
+        double lowY = toScreenVertical(-surfaceLayerEffectService.effectiveMinimumCeilingHeightMillimeters(activeLevel.get(), room));
         boolean risesToRight = switch (activeView.get()) {
             case EAST -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.NORTH).orElse(false);
             case WEST -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.SOUTH).orElse(false);
@@ -1517,13 +1689,13 @@ public final class CadWorkbench extends BorderPane {
         java.util.TreeMap<Long, Double> topProfile = new java.util.TreeMap<>();
         for (int index = 0; index < room.outline().size(); index++) {
             PlanPoint point = room.outline().get(index);
-            addElevationSample(topProfile, point, room.ceilingVertexHeights().get(index).toMillimeters());
+            addElevationSample(topProfile, point, surfaceLayerEffectService.effectiveHeightAt(activeLevel.get(), room, point));
             PlanPoint next = room.outline().get((index + 1) % room.outline().size());
             PlanPoint midpoint = new PlanPoint(
                     (point.xMillimeters() + next.xMillimeters()) / 2.0,
                     (point.yMillimeters() + next.yMillimeters()) / 2.0
             );
-            addElevationSample(topProfile, midpoint, room.ceilingHeightAt(midpoint));
+            addElevationSample(topProfile, midpoint, surfaceLayerEffectService.effectiveHeightAt(activeLevel.get(), room, midpoint));
         }
         if (topProfile.size() < 2) {
             return;
@@ -2157,11 +2329,8 @@ public final class CadWorkbench extends BorderPane {
     private void importPartLibrary(Path sourceFile) {
         String fileName = sourceFile.getFileName().toString();
         if (fileName.toLowerCase(Locale.ROOT).endsWith(".dwg")) {
-            if (!cadLibraryReferences.contains(sourceFile)) {
-                cadLibraryReferences.add(sourceFile);
-            }
-            updateCadLibrarySummary();
-            draftLabel.setText("DWG-Bibliothek registriert: " + fileName);
+            registerDwgLibrary(sourceFile);
+            draftLabel.setText("DWG-Bibliothek geladen und für Ebenen verfügbar: " + fileName);
             return;
         }
         try {
@@ -2199,6 +2368,21 @@ public final class CadWorkbench extends BorderPane {
                 .orElse("Keine externen CAD-Bibliotheken registriert."));
     }
 
+    private void registerDwgLibrary(Path sourceFile) {
+        if (!cadLibraryReferences.contains(sourceFile)) {
+            cadLibraryReferences.add(sourceFile);
+        }
+        SurfaceCoveringPreset dwgPreset = new SurfaceCoveringPresetService().fromDwg(sourceFile);
+        boolean exists = availableSurfacePresets.stream().anyMatch(preset -> preset.coveringSource().equals(dwgPreset.coveringSource()));
+        if (!exists) {
+            availableSurfacePresets.add(dwgPreset);
+        }
+        updateCadLibrarySummary();
+        if (surfacePresetSelector.getValue() == null) {
+            surfacePresetSelector.setValue(dwgPreset);
+        }
+    }
+
     private void applyDoorPreset(DoorPreset preset) {
         if (preset == null) {
             return;
@@ -2223,6 +2407,295 @@ public final class CadWorkbench extends BorderPane {
         }
         stairHeightField.setText(preset.totalHeight().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
         stairStepsField.setText(Integer.toString(preset.stepCount()));
+    }
+
+    private void applySurfacePreset(SurfaceCoveringPreset preset) {
+        if (preset == null) {
+            return;
+        }
+        surfaceLayerNameField.setText(preset.name().replace("DWG-Referenz: ", ""));
+        surfaceLayerThicknessField.setText(formatValue(preset.thickness(), LengthUnit.CENTIMETER, 2));
+        surfaceTileWidthField.setText(formatValue(preset.tileWidth(), LengthUnit.CENTIMETER, 1));
+        surfaceTileHeightField.setText(formatValue(preset.tileHeight(), LengthUnit.CENTIMETER, 1));
+        surfaceLayoutModeSelector.setValue(preset.layoutMode());
+        surfaceLayoutOffsetField.setText(formatValue(preset.offset(), LengthUnit.CENTIMETER, 1));
+        surfaceMinimumOffsetField.setText(formatValue(preset.minimumOffset(), LengthUnit.CENTIMETER, 1));
+        surfaceMinimumEdgeWidthField.setText(formatValue(preset.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1));
+    }
+
+    private void refreshSurfaceLayerSection() {
+        Optional<String> targetKey = currentSurfaceTargetKey();
+        if (targetKey.isEmpty()) {
+            surfaceLayerTargetLabel.setText("Keine passende Wand- oder Raumfläche ausgewählt.");
+            surfaceLayerList.getItems().clear();
+            surfaceLayerCoverageLabel.setText("Keine Ebenen ausgewählt.");
+            updateActionButtons();
+            return;
+        }
+        surfaceLayerTargetLabel.setText("Fläche: " + currentSurfaceType().name() + " auf `" + targetKey.get() + "`");
+        SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(currentSurfaceType(), targetKey.get());
+        if (stack == null) {
+            surfaceLayerList.getItems().clear();
+            surfaceLayerCoverageLabel.setText("Noch keine Ebene auf dieser Fläche.");
+            updateActionButtons();
+            return;
+        }
+        surfaceLayerList.getItems().setAll(stack.layers().stream().map(this::describeSurfaceLayer).toList());
+        if (!surfaceLayerList.getItems().isEmpty() && surfaceLayerList.getSelectionModel().getSelectedIndex() < 0) {
+            surfaceLayerList.getSelectionModel().selectFirst();
+        }
+        syncInputsFromSelectedSurfaceLayer();
+        updateActionButtons();
+    }
+
+    private String describeSurfaceLayer(SurfaceLayer layer) {
+        String visibility = layer.visible() ? "sichtbar" : "aus";
+        int tileCount = estimatedTileCount(layer);
+        String sourceLabel = layer.coveringSource();
+        if (sourceLabel.endsWith(".dwg") || sourceLabel.endsWith(".DWG")) {
+            sourceLabel = Path.of(sourceLabel).getFileName().toString();
+        }
+        String source = sourceLabel.isBlank() ? "" : " | Quelle: " + sourceLabel;
+        return layer.name() + " | " + layer.thickness().format(LengthUnit.MILLIMETER, 1) + " | " + visibility + " | " + tileCount + " Elemente" + source;
+    }
+
+    private int estimatedTileCount(SurfaceLayer layer) {
+        Optional<Room> room = selectedRoom();
+        if (room.isEmpty() || currentSurfaceType() == SurfaceType.WALL_INTERIOR || currentSurfaceType() == SurfaceType.WALL_EXTERIOR) {
+            return 0;
+        }
+        TileLayoutRequest request = new TileLayoutRequest(
+                Length.ofMillimeters(room.get().widthMillimeters()),
+                Length.ofMillimeters(room.get().depthMillimeters()),
+                layer.tileWidth(),
+                layer.tileHeight(),
+                layer.layoutMode(),
+                layer.layoutOffset(),
+                layer.minimumOffset(),
+                layer.minimumEdgeWidth()
+        );
+        return tileLayoutService.fillSurface(request).size();
+    }
+
+    private void syncInputsFromSelectedSurfaceLayer() {
+        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
+        if (selectedLayer == null) {
+            updateActionButtons();
+            return;
+        }
+        surfaceLayerNameField.setText(selectedLayer.name());
+        surfaceLayerThicknessField.setText(formatValue(selectedLayer.thickness(), LengthUnit.CENTIMETER, 2));
+        surfaceTileWidthField.setText(formatValue(selectedLayer.tileWidth(), LengthUnit.CENTIMETER, 1));
+        surfaceTileHeightField.setText(formatValue(selectedLayer.tileHeight(), LengthUnit.CENTIMETER, 1));
+        surfaceLayoutModeSelector.setValue(selectedLayer.layoutMode());
+        surfaceLayoutOffsetField.setText(formatValue(selectedLayer.layoutOffset(), LengthUnit.CENTIMETER, 1));
+        surfaceMinimumOffsetField.setText(formatValue(selectedLayer.minimumOffset(), LengthUnit.CENTIMETER, 1));
+        surfaceMinimumEdgeWidthField.setText(formatValue(selectedLayer.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1));
+        surfaceLayerCoverageLabel.setText(describeSurfaceLayer(selectedLayer));
+        updateActionButtons();
+    }
+
+    private void addSurfaceLayer() {
+        Optional<String> targetKey = currentSurfaceTargetKey();
+        if (targetKey.isEmpty()) {
+            return;
+        }
+        rememberStateForUndo();
+        SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(currentSurfaceType(), targetKey.get());
+        if (stack == null) {
+            stack = new SurfaceLayerStack(currentSurfaceType(), targetKey.get());
+            activeLevel.get().addSurfaceLayerStack(stack);
+        }
+        stack.addLayer(buildSurfaceLayerFromInputs());
+        afterSurfaceLayerMutation("Ebene hinzugefügt.");
+    }
+
+    private void updateSurfaceLayer() {
+        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
+        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
+        if (stack == null || selectedLayer == null) {
+            return;
+        }
+        rememberStateForUndo();
+        replaceSurfaceLayer(stack, selectedLayer.id(), new SurfaceLayer(
+                selectedLayer.id(),
+                currentSurfaceLayerName(),
+                currentSurfaceLayerThickness(),
+                selectedLayer.visible(),
+                currentSurfaceTileWidth(),
+                currentSurfaceTileHeight(),
+                currentSurfaceLayoutMode(),
+                currentSurfaceLayoutOffset(),
+                currentSurfaceMinimumOffset(),
+                currentSurfaceMinimumEdgeWidth(),
+                currentSurfaceCoveringSource()
+        ));
+        afterSurfaceLayerMutation("Ebene aktualisiert.");
+    }
+
+    private void removeSurfaceLayer() {
+        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
+        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
+        if (stack == null || selectedLayer == null) {
+            return;
+        }
+        rememberStateForUndo();
+        stack.removeLayer(selectedLayer.id());
+        if (stack.layers().isEmpty()) {
+            activeLevel.get().removeSurfaceLayerStack(stack.id());
+        }
+        afterSurfaceLayerMutation("Ebene entfernt.");
+    }
+
+    private void toggleSurfaceLayerVisibility() {
+        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
+        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
+        if (stack == null || selectedLayer == null) {
+            return;
+        }
+        rememberStateForUndo();
+        stack.setVisibility(selectedLayer.id(), !selectedLayer.visible());
+        afterSurfaceLayerMutation("Ebenensichtbarkeit umgeschaltet.");
+    }
+
+    private void moveSurfaceLayer(int direction) {
+        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
+        int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
+        if (stack == null || selectedIndex < 0) {
+            return;
+        }
+        rememberStateForUndo();
+        SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
+        stack.moveLayer(selectedLayer.id(), selectedIndex + direction);
+        afterSurfaceLayerMutation("Ebenenreihenfolge geändert.");
+        int newIndex = Math.max(0, Math.min(selectedIndex + direction, stack.layers().size() - 1));
+        surfaceLayerList.getSelectionModel().select(newIndex);
+    }
+
+    private void afterSurfaceLayerMutation(String message) {
+        synchronizeRoomsFromWalls(activeLevel.get());
+        markThreeDDirty();
+        refreshSurfaceLayerSection();
+        draftLabel.setText(message);
+        render();
+    }
+
+    private SurfaceLayer buildSurfaceLayerFromInputs() {
+        return SurfaceLayer.create(
+                currentSurfaceLayerName(),
+                currentSurfaceLayerThickness(),
+                currentSurfaceTileWidth(),
+                currentSurfaceTileHeight(),
+                currentSurfaceLayoutMode(),
+                currentSurfaceLayoutOffset(),
+                currentSurfaceMinimumOffset(),
+                currentSurfaceMinimumEdgeWidth(),
+                currentSurfaceCoveringSource()
+        );
+    }
+
+    private String currentSurfaceLayerName() {
+        String name = surfaceLayerNameField.getText();
+        return name == null || name.isBlank() ? "Belag" : name.trim();
+    }
+
+    private Length currentSurfaceLayerThickness() {
+        return parseLength(surfaceLayerThicknessField, surfaceLayerThicknessUnit.getValue()).orElse(Length.of(1.2, LengthUnit.CENTIMETER));
+    }
+
+    private Length currentSurfaceTileWidth() {
+        return parseLength(surfaceTileWidthField, surfaceTileWidthUnit.getValue()).orElse(Length.of(60, LengthUnit.CENTIMETER));
+    }
+
+    private Length currentSurfaceTileHeight() {
+        return parseLength(surfaceTileHeightField, surfaceTileHeightUnit.getValue()).orElse(Length.of(30, LengthUnit.CENTIMETER));
+    }
+
+    private SurfaceLayoutMode currentSurfaceLayoutMode() {
+        return Optional.ofNullable(surfaceLayoutModeSelector.getValue()).orElse(SurfaceLayoutMode.AUTOMATIC);
+    }
+
+    private Length currentSurfaceLayoutOffset() {
+        return parseLength(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit.getValue()).orElse(Length.zero());
+    }
+
+    private Length currentSurfaceMinimumOffset() {
+        return parseLength(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit.getValue()).orElse(Length.zero());
+    }
+
+    private Length currentSurfaceMinimumEdgeWidth() {
+        return parseLength(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit.getValue()).orElse(Length.zero());
+    }
+
+    private String currentSurfaceCoveringSource() {
+        return Optional.ofNullable(surfacePresetSelector.getValue())
+                .map(SurfaceCoveringPreset::coveringSource)
+                .orElse("");
+    }
+
+    private Optional<SurfaceLayerStack> currentSurfaceLayerStack() {
+        return currentSurfaceTargetKey()
+                .map(targetKey -> activeLevel.get().findSurfaceLayerStack(currentSurfaceType(), targetKey));
+    }
+
+    private Optional<SurfaceLayer> selectedSurfaceLayer() {
+        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
+        int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
+        if (stack == null || selectedIndex < 0 || selectedIndex >= stack.layers().size()) {
+            return Optional.empty();
+        }
+        return Optional.of(stack.layers().get(selectedIndex));
+    }
+
+    private Optional<String> currentSurfaceTargetKey() {
+        if (selectedSelection.get() == null) {
+            return Optional.empty();
+        }
+        return switch (selectedSelection.get().kind()) {
+            case WALL -> Optional.of(selectedSelection.get().elementId());
+            case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> Optional.of(selectedSelection.get().elementId());
+            default -> Optional.empty();
+        };
+    }
+
+    private SurfaceType currentSurfaceType() {
+        SurfaceType selectedType = Optional.ofNullable(surfaceTypeSelector.getValue()).orElse(SurfaceType.WALL_INTERIOR);
+        if (selectedSelection.get() != null && selectedSelection.get().kind() == RenderableKind.WALL) {
+            if (selectedType != SurfaceType.WALL_INTERIOR && selectedType != SurfaceType.WALL_EXTERIOR) {
+                surfaceTypeSelector.setValue(SurfaceType.WALL_INTERIOR);
+                return SurfaceType.WALL_INTERIOR;
+            }
+            return selectedType;
+        }
+        if (selectedSelection.get() != null
+                && (selectedSelection.get().kind() == RenderableKind.ROOM_VOLUME
+                || selectedSelection.get().kind() == RenderableKind.ROOM_FLOOR
+                || selectedSelection.get().kind() == RenderableKind.ROOM_CEILING)) {
+            if (selectedType != SurfaceType.FLOOR && selectedType != SurfaceType.CEILING) {
+                surfaceTypeSelector.setValue(SurfaceType.FLOOR);
+                return SurfaceType.FLOOR;
+            }
+            return selectedType;
+        }
+        return selectedType;
+    }
+
+    private Optional<Room> selectedRoom() {
+        if (selectedSelection.get() == null) {
+            return Optional.empty();
+        }
+        if (selectedSelection.get().kind() != RenderableKind.ROOM_VOLUME
+                && selectedSelection.get().kind() != RenderableKind.ROOM_FLOOR
+                && selectedSelection.get().kind() != RenderableKind.ROOM_CEILING) {
+            return Optional.empty();
+        }
+        return activeLevel.get().rooms().stream()
+                .filter(room -> room.id().toString().equals(selectedSelection.get().elementId()))
+                .findFirst();
+    }
+
+    private void replaceSurfaceLayer(SurfaceLayerStack stack, UUID layerId, SurfaceLayer replacement) {
+        stack.replaceLayer(layerId, replacement);
     }
 
     private PlanPoint screenToWorld(double screenX, double screenY) {
@@ -2369,6 +2842,9 @@ public final class CadWorkbench extends BorderPane {
         availableLevels.setAll(project.levels());
         guideLines.setAll(snapshot.guideLines());
         selectedEndpointGroup = null;
+        selectionDragAnchor = null;
+        selectionDragBaseWalls = List.of();
+        selectionDragBaseStaircases = List.of();
         draftStart = null;
         previewSegment = null;
         pendingGuideOrientation = null;
@@ -2386,6 +2862,9 @@ public final class CadWorkbench extends BorderPane {
     private void clearSelection() {
         clearSelectionsInternal();
         selectedEndpointGroup = null;
+        selectionDragAnchor = null;
+        selectionDragBaseWalls = List.of();
+        selectionDragBaseStaircases = List.of();
         historyCapturedForDrag = false;
         updateActionButtons();
         render();
@@ -2695,6 +3174,35 @@ public final class CadWorkbench extends BorderPane {
         level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults()));
     }
 
+    private void prepareSelectionDrag(SelectionKey selectionKey, PlanPoint anchorPoint) {
+        if (selectionKey == null || !selectedSelections.contains(selectionKey)) {
+            return;
+        }
+        if (selectedSelections.stream().noneMatch(this::isTranslatableSelection)) {
+            return;
+        }
+        selectionDragAnchor = anchorPoint;
+        selectionDragBaseWalls = List.copyOf(activeLevel.get().walls());
+        selectionDragBaseStaircases = List.copyOf(activeLevel.get().staircases());
+        draftLabel.setText("Ausgewählte Wände oder Treppen können jetzt parallel verschoben werden.");
+    }
+
+    private void translateSelectedComponents(PlanPoint snappedPoint) {
+        double deltaX = snappedPoint.xMillimeters() - selectionDragAnchor.xMillimeters();
+        double deltaY = snappedPoint.yMillimeters() - selectionDragAnchor.yMillimeters();
+        Level dragLevel = new Level(activeLevel.get().name());
+        dragLevel.replaceWalls(selectionDragBaseWalls);
+        dragLevel.replaceStaircases(selectionDragBaseStaircases);
+        SelectionTranslationService.TranslationResult translationResult = selectionTranslationService.translate(dragLevel, Set.copyOf(selectedSelections), deltaX, deltaY);
+        if (!translationResult.changed()) {
+            return;
+        }
+        activeLevel.get().replaceWalls(translationResult.walls());
+        activeLevel.get().replaceStaircases(translationResult.staircases());
+        synchronizeRoomsFromWalls(activeLevel.get());
+        markThreeDDirty();
+    }
+
     private void refreshThreeDIfNeeded() {
         if (!threeDDirty) {
             return;
@@ -2726,6 +3234,9 @@ public final class CadWorkbench extends BorderPane {
                 activeLevel.get().staircases().size(),
                 selectedSelections.size(),
                 cadLibraryReferences.size(),
+                threeDViewport.renderedBodyCount(),
+                threeDViewport.hasVisibleSceneContent(),
+                threeDViewport.cameraStatusText(),
                 draftLabel.getText()
         );
     }
@@ -2827,6 +3338,12 @@ public final class CadWorkbench extends BorderPane {
             case "wallThickness" -> wallThicknessField;
             case "wallHeight" -> wallHeightField;
             case "endpointHeight" -> endpointHeightField;
+            case "surfaceLayerThickness" -> surfaceLayerThicknessField;
+            case "surfaceTileWidth" -> surfaceTileWidthField;
+            case "surfaceTileHeight" -> surfaceTileHeightField;
+            case "surfaceLayoutOffset" -> surfaceLayoutOffsetField;
+            case "surfaceMinimumOffset" -> surfaceMinimumOffsetField;
+            case "surfaceMinimumEdgeWidth" -> surfaceMinimumEdgeWidthField;
             case "roomName" -> roomNameField;
             case "roomHeight" -> roomHeightField;
             case "floorThickness" -> floorThicknessField;
@@ -2851,6 +3368,12 @@ public final class CadWorkbench extends BorderPane {
             case "wallThickness" -> wallThicknessUnit;
             case "wallHeight" -> wallHeightUnit;
             case "endpointHeight" -> endpointHeightUnit;
+            case "surfaceLayerThickness" -> surfaceLayerThicknessUnit;
+            case "surfaceTileWidth" -> surfaceTileWidthUnit;
+            case "surfaceTileHeight" -> surfaceTileHeightUnit;
+            case "surfaceLayoutOffset" -> surfaceLayoutOffsetUnit;
+            case "surfaceMinimumOffset" -> surfaceMinimumOffsetUnit;
+            case "surfaceMinimumEdgeWidth" -> surfaceMinimumEdgeWidthUnit;
             case "roomHeight" -> roomHeightUnit;
             case "floorThickness" -> floorThicknessUnit;
             case "ceilingThickness" -> ceilingThicknessUnit;
@@ -2873,6 +3396,11 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private boolean isRotatableSelection(SelectionKey selectionKey) {
+        return selectionKey.kind() == RenderableKind.WALL
+                || selectionKey.kind() == RenderableKind.STAIR;
+    }
+
+    private boolean isTranslatableSelection(SelectionKey selectionKey) {
         return selectionKey.kind() == RenderableKind.WALL
                 || selectionKey.kind() == RenderableKind.STAIR;
     }
