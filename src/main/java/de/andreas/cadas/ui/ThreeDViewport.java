@@ -76,8 +76,10 @@ public final class ThreeDViewport extends BorderPane {
     private Set<SelectionKey> selectedSelections = Set.of();
     private boolean fitToSceneRequested = true;
     private double sceneCenterX;
+    private double sceneCenterY;
     private double sceneCenterZ;
     private double sceneSpan;
+    private double modelTranslateY;
     private double dragStartX;
     private double dragStartY;
     private CameraPose dragStartPose;
@@ -144,6 +146,10 @@ public final class ThreeDViewport extends BorderPane {
                 viewOrientation.cameraElevationDegrees()
         );
         fitToSceneRequested = true;
+        if (currentProject != null) {
+            refresh(currentProject);
+            return;
+        }
         updateCamera();
     }
 
@@ -306,6 +312,8 @@ public final class ThreeDViewport extends BorderPane {
         Map<String, Group> groupedByLevel = new LinkedHashMap<>();
         double minX = Double.POSITIVE_INFINITY;
         double maxX = Double.NEGATIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
         double minZ = Double.POSITIVE_INFINITY;
         double maxZ = Double.NEGATIVE_INFINITY;
         for (RenderableBox renderableBox : sceneModel.boxes()) {
@@ -318,18 +326,23 @@ public final class ThreeDViewport extends BorderPane {
             levelGroup.getChildren().add(createNode(renderableBox));
             minX = Math.min(minX, renderableBox.centerX() - renderableBox.width() / 2.0);
             maxX = Math.max(maxX, renderableBox.centerX() + renderableBox.width() / 2.0);
+            minY = Math.min(minY, renderableBox.centerY() - renderableBox.height() / 2.0);
+            maxY = Math.max(maxY, renderableBox.centerY() + renderableBox.height() / 2.0);
             minZ = Math.min(minZ, renderableBox.centerZ() - renderableBox.depth() / 2.0);
             maxZ = Math.max(maxZ, renderableBox.centerZ() + renderableBox.depth() / 2.0);
         }
         modelRoot.getChildren().addAll(groupedByLevel.values());
         if (sceneModel.boxes().isEmpty()) {
             sceneCenterX = 0.0;
+            sceneCenterY = 0.0;
             sceneCenterZ = 0.0;
             sceneSpan = 8_000.0;
+            modelTranslateY = 0.0;
         } else {
             sceneCenterX = (minX + maxX) / 2.0;
+            sceneCenterY = (minY + maxY) / 2.0;
             sceneCenterZ = (minZ + maxZ) / 2.0;
-            sceneSpan = Math.max(4_000.0, Math.max(maxX - minX, maxZ - minZ));
+            sceneSpan = Math.max(4_000.0, Math.max(maxY - minY, Math.max(maxX - minX, maxZ - minZ)));
         }
     }
 
@@ -401,13 +414,15 @@ public final class ThreeDViewport extends BorderPane {
             subScene.setCamera(parallelCamera);
         }
         modelRoot.setTranslateX(cameraPose.panX());
+        modelRoot.setTranslateY(modelTranslateY);
         modelRoot.setTranslateZ(cameraPose.panZ());
         cameraStatusLabel.setText(String.format(
-                "3D Kamera: %s | Azimut %.1f° | Elevation %.1f° | Abstand %.1f m",
+                "3D Kamera: %s | Azimut %.1f° | Elevation %.1f° | Abstand %.1f m | Szene %.0f mm",
                 cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC ? "orthografisch" : "perspektivisch",
                 cameraPose.azimuthDegrees(),
                 cameraPose.elevationDegrees(),
-                cameraPose.distance() / 1000.0
+                cameraPose.distance() / 1000.0,
+                sceneSpan
         ));
     }
 
@@ -418,11 +433,12 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private void fitCameraToScene() {
+        modelTranslateY = sceneCenterY * WORLD_SCALE;
         cameraPose = new CameraPose(
                 projectionModeSelector.getValue(),
                 currentOrientation.cameraAzimuthDegrees(),
                 currentOrientation.cameraElevationDegrees(),
-                Math.max(8_000.0, sceneSpan * 1.9),
+                Math.max(8_000.0, sceneSpan * 2.2),
                 -sceneCenterX * WORLD_SCALE,
                 -sceneCenterZ * WORLD_SCALE
         );
@@ -434,7 +450,7 @@ public final class ThreeDViewport extends BorderPane {
         return new javafx.scene.transform.Transform[]{
                 new Rotate(-cameraPose.elevationDegrees(), Rotate.X_AXIS),
                 new Rotate(-cameraPose.azimuthDegrees(), Rotate.Y_AXIS),
-                new Translate(0, -2_500 * WORLD_SCALE, -cameraPose.distance() * WORLD_SCALE)
+                new Translate(0, 0, -cameraPose.distance() * WORLD_SCALE)
         };
     }
 
