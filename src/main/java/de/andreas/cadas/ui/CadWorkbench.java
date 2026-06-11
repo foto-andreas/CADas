@@ -18,6 +18,7 @@ import de.andreas.cadas.application.parts.StairPreset;
 import de.andreas.cadas.application.parts.StandardPartLibrary;
 import de.andreas.cadas.application.parts.StandardPartLibraryService;
 import de.andreas.cadas.application.parts.WindowPreset;
+import de.andreas.cadas.application.room.AutoRoomGenerationService;
 import de.andreas.cadas.application.view.RenderableKind;
 import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.domain.geometry.Angle;
@@ -117,6 +118,7 @@ public final class CadWorkbench extends BorderPane {
 
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
+    private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     private final DraftingService draftingService = new DraftingService();
     private final SnapService snapService = new SnapService();
     private final SelectionQueryService selectionQueryService = new SelectionQueryService();
@@ -641,7 +643,7 @@ public final class CadWorkbench extends BorderPane {
         }
         return "Ausgewählt: " + switch (selectedSelection.get().kind()) {
             case WALL -> "Wand";
-            case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> "Raum";
+            case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> "automatisch abgeleiteter Raum";
             case DOOR -> "Tür";
             case WINDOW -> "Fenster";
             case STAIR -> "Treppe";
@@ -653,7 +655,10 @@ public final class CadWorkbench extends BorderPane {
         undoButton.setDisable(!history.canUndo());
         redoButton.setDisable(!history.canRedo());
         boolean hasSelection = !selectedSelections.isEmpty();
-        deleteSelectionButton.setDisable(!hasSelection);
+        boolean hasDeletableSelection = selectedSelections.stream().anyMatch(selection -> selection.kind() != RenderableKind.ROOM_VOLUME
+                && selection.kind() != RenderableKind.ROOM_FLOOR
+                && selection.kind() != RenderableKind.ROOM_CEILING);
+        deleteSelectionButton.setDisable(!hasDeletableSelection);
         clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
         applySelectionPropertiesButton.setDisable(!hasSelection);
     }
@@ -746,7 +751,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void applyFormTooltips() {
-        applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Je nach Werkzeug werden Wände, Räume, Türen oder Fenster platziert.");
+        applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Räume werden aus geschlossenen Wandzügen automatisch abgeleitet und können hier fachlich ausgewählt sowie bearbeitet werden.");
         applyTooltip(gridField, "Legt die Rasterweite für die Zeichenfläche fest. Werte werden mit der gewählten Einheit interpretiert.");
         applyTooltip(gridUnit, "Bestimmt die Einheit für die Rasterweite, damit Eingaben in Millimeter, Zentimeter oder Meter erfolgen können.");
         applyTooltip(lengthField, "Optionaler Längenwert für die gerade gezeichnete Wand. Wenn ein Wert eingetragen ist, wird die Wand auf diese Länge gesetzt.");
@@ -757,12 +762,12 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
         applyTooltip(wallHeightField, "Legt die Raum- beziehungsweise Wandhöhe für neu gezeichnete Wände fest.");
         applyTooltip(wallHeightUnit, "Bestimmt die Einheit für die Wandhöhe.");
-        applyTooltip(roomNameField, "Legt den Namen für den nächsten anzulegenden Raum fest.");
-        applyTooltip(roomHeightField, "Legt die lichte Raumhöhe für den nächsten Raum fest.");
+        applyTooltip(roomNameField, "Legt den Namen für automatisch erkannte Räume oder für die aktuell ausgewählte Raumauswahl fest.");
+        applyTooltip(roomHeightField, "Legt die lichte Raumhöhe für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
         applyTooltip(roomHeightUnit, "Bestimmt die Einheit für die Raumhöhe.");
-        applyTooltip(floorThicknessField, "Legt die Boden- oder Fußbodenstärke des nächsten Raums fest.");
+        applyTooltip(floorThicknessField, "Legt die Boden- oder Fußbodenstärke für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
         applyTooltip(floorThicknessUnit, "Bestimmt die Einheit für die Bodenstärke.");
-        applyTooltip(ceilingThicknessField, "Legt die Deckenstärke des nächsten Raums fest.");
+        applyTooltip(ceilingThicknessField, "Legt die Deckenstärke für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
         applyTooltip(ceilingThicknessUnit, "Bestimmt die Einheit für die Deckenstärke.");
         applyTooltip(slopedCeilingModeSelector, "Aktiviert optional eine innere Dachschräge beziehungsweise schräge Decke für rechteckige Räume. Ohne Aktivierung bleibt die Decke waagerecht.");
         applyTooltip(slopedCeilingSideSelector, "Legt fest, an welcher Raumkante die niedrige Sockelhöhe liegt. Die Schräge steigt immer zur gegenüberliegenden Kante an.");
@@ -896,6 +901,21 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
 
+        if (currentTool() == DrawingTool.ROOM) {
+            PlanPoint roomPoint = screenToWorld(event.getX(), event.getY());
+            SelectionKey roomSelection = selectionQueryService.findSelection(activeLevel.get(), roomPoint, SNAP_TOLERANCE)
+                    .filter(selection -> selection.kind() == RenderableKind.ROOM_VOLUME
+                            || selection.kind() == RenderableKind.ROOM_FLOOR
+                            || selection.kind() == RenderableKind.ROOM_CEILING)
+                    .orElse(null);
+            updateSelection(roomSelection, event.isShortcutDown() || event.isShiftDown());
+            draftLabel.setText(roomSelection == null
+                    ? "Kein automatisch erkannter Raum an dieser Position. Zeichne zuerst einen geschlossenen Wandzug."
+                    : "Raum ausgewählt. Eigenschaften können jetzt in der linken Leiste angepasst werden.");
+            render();
+            return;
+        }
+
         DraftingConstraints constraints = currentConstraints(!event.isShiftDown());
         draftStart = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
         previewSegment = new PlanSegment(draftStart, draftStart);
@@ -928,6 +948,7 @@ public final class CadWorkbench extends BorderPane {
                 DraftingConstraints constraints = currentConstraints(false);
                 PlanPoint snappedPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
                 activeLevel.get().replaceWalls(wallEditingService.moveEndpointGroup(activeLevel.get().walls(), selectedEndpointGroup, snappedPoint));
+                synchronizeRoomsFromWalls(activeLevel.get());
                 markThreeDDirty();
                 render();
             }
@@ -969,20 +990,8 @@ public final class CadWorkbench extends BorderPane {
                 rememberStateForUndo();
                 Wall wall = Wall.create(previewSegment, currentWallThickness(), currentWallHeight());
                 activeLevel.get().addWall(wall);
+                synchronizeRoomsFromWalls(activeLevel.get());
                 selectSingle(new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()));
-            } else if (currentTool() == DrawingTool.ROOM) {
-                rememberStateForUndo();
-                Room room = Room.rectangular(
-                        currentRoomName(),
-                        previewSegment.start(),
-                        previewSegment.end(),
-                        currentRoomHeight(),
-                        currentFloorThickness(),
-                        currentCeilingThickness(),
-                        currentSlopedCeilingProfile()
-                );
-                activeLevel.get().addRoom(room);
-                selectSingle(new SelectionKey(RenderableKind.ROOM_VOLUME, activeLevel.get().name(), room.id().toString()));
             } else if (currentTool() == DrawingTool.STAIR) {
                 rememberStateForUndo();
                 Staircase staircase = Staircase.create(
@@ -1090,7 +1099,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void drawWalls(GraphicsContext graphics) {
         graphics.setFill(Color.web("#2f2a24"));
-        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.BUTT);
 
         for (Wall wall : activeLevel.get().walls()) {
             boolean selected = isSelected(RenderableKind.WALL, wall.id().toString());
@@ -1692,6 +1701,16 @@ public final class CadWorkbench extends BorderPane {
         return roomName.trim();
     }
 
+    private AutoRoomGenerationService.RoomDefaults currentRoomDefaults() {
+        return new AutoRoomGenerationService.RoomDefaults(
+                currentRoomName(),
+                currentRoomHeight(),
+                currentFloorThickness(),
+                currentCeilingThickness(),
+                currentSlopedCeilingProfile()
+        );
+    }
+
     private Length currentRoomHeight() {
         return parseLength(roomHeightField, roomHeightUnit.getValue()).orElse(DEFAULT_ROOM_HEIGHT);
     }
@@ -1991,6 +2010,7 @@ public final class CadWorkbench extends BorderPane {
             rememberStateForUndo();
             String levelName = uniqueLevelName(exchangeFileNameService.stripRepeatedExtension(sourceFile, ".dxf"));
             Level importedLevel = levelExchangeService.importLevel(sourceFile, levelName);
+            importedLevel.replaceRooms(autoRoomGenerationService.synchronize(importedLevel, currentRoomDefaults()));
             project.addLevel(importedLevel);
             availableLevels.add(importedLevel);
             activateLevel(importedLevel);
@@ -2014,6 +2034,7 @@ public final class CadWorkbench extends BorderPane {
         try {
             rememberStateForUndo();
             ProjectModel importedProject = projectExchangeService.importProject(sourceFile, project.name());
+            importedProject.levels().forEach(level -> level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults())));
             project.replaceWith(importedProject);
             availableLevels.setAll(project.levels());
             guideLines.clear();
@@ -2272,6 +2293,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void restoreSnapshot(WorkbenchSnapshot snapshot) {
         project.replaceWith(snapshot.project());
+        project.levels().forEach(level -> level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults())));
         availableLevels.setAll(project.levels());
         guideLines.setAll(snapshot.guideLines());
         selectedEndpointGroup = null;
@@ -2306,7 +2328,7 @@ public final class CadWorkbench extends BorderPane {
             UUID id = UUID.fromString(selectionKey.elementId());
             removed |= switch (selectionKey.kind()) {
                 case WALL -> activeLevel.get().removeWall(id);
-                case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> activeLevel.get().removeRoom(id);
+                case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> false;
                 case DOOR -> activeLevel.get().removeDoor(id);
                 case WINDOW -> activeLevel.get().removeWindow(id);
                 case STAIR -> activeLevel.get().removeStaircase(id);
@@ -2314,6 +2336,7 @@ public final class CadWorkbench extends BorderPane {
             };
         }
         if (removed) {
+            synchronizeRoomsFromWalls(activeLevel.get());
             clearSelectionsInternal();
             markThreeDDirty();
             draftLabel.setText("Ausgewählte Bauteile gelöscht.");
@@ -2372,9 +2395,13 @@ public final class CadWorkbench extends BorderPane {
     private void rebuildSelectionContextMenu() {
         selectionContextMenu.getItems().setAll(
                 menuItem("Eigenschaften auf Auswahl anwenden", this::applyCurrentInputsToSelection, null),
-                menuItem("Auswahl löschen", this::deleteSelection, null),
                 menuItem("Auswahl aufheben", this::clearSelection, null)
         );
+        if (selectedSelections.stream().anyMatch(selection -> selection.kind() != RenderableKind.ROOM_VOLUME
+                && selection.kind() != RenderableKind.ROOM_FLOOR
+                && selection.kind() != RenderableKind.ROOM_CEILING)) {
+            selectionContextMenu.getItems().add(menuItem("Auswahl löschen", this::deleteSelection, null));
+        }
         if (selectedSelections.stream().anyMatch(this::isRotatableSelection)) {
             selectionContextMenu.getItems().addAll(
                     menuItem("Bauteile 90° im Uhrzeigersinn drehen", this::rotateSelectedComponentsClockwise, null),
@@ -2474,6 +2501,7 @@ public final class CadWorkbench extends BorderPane {
             default -> {
             }
         }
+        synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
         draftLabel.setText("Eigenschaften auf Auswahl angewendet.");
         render();
@@ -2506,8 +2534,8 @@ public final class CadWorkbench extends BorderPane {
         rememberStateForUndo();
         QuarterTurnRotationService.RotationResult rotationResult = quarterTurnRotationService.rotate(activeLevel.get(), Set.copyOf(selectedSelections), clockwise);
         activeLevel.get().replaceWalls(rotationResult.walls());
-        activeLevel.get().replaceRooms(rotationResult.rooms());
         activeLevel.get().replaceStaircases(rotationResult.staircases());
+        synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
         draftLabel.setText("Ausgewählte Bauteile gedreht.");
         render();
@@ -2540,6 +2568,10 @@ public final class CadWorkbench extends BorderPane {
 
     private void markThreeDDirty() {
         threeDDirty = true;
+    }
+
+    private void synchronizeRoomsFromWalls(Level level) {
+        level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults()));
     }
 
     private void refreshThreeDIfNeeded() {
@@ -2718,9 +2750,6 @@ public final class CadWorkbench extends BorderPane {
 
     private boolean isRotatableSelection(SelectionKey selectionKey) {
         return selectionKey.kind() == RenderableKind.WALL
-                || selectionKey.kind() == RenderableKind.ROOM_VOLUME
-                || selectionKey.kind() == RenderableKind.ROOM_FLOOR
-                || selectionKey.kind() == RenderableKind.ROOM_CEILING
                 || selectionKey.kind() == RenderableKind.STAIR;
     }
 

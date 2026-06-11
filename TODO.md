@@ -18,6 +18,8 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Kernmodell für Projekt, Geschoss, Raum, Wand, Tür, Fenster, Boden und Decke aufbauen.
 - [x] Höhen- und Dickenangaben für Räume, Wände, Decken, Fenster und Türschwellen modellieren.
 - [x] Modellregeln für verbundene Linien-Enden und konsistente Topologie definieren.
+- [x] Räume aus geschlossenen orthogonalen Wandzügen automatisch als Innenkonturen der Wandkörper ableiten.
+- [x] Raumgeometrie bei Wandänderungen automatisch nachführen und polygonale Raumkonturen erlauben.
 
 ## Phase 2: 2D-Zeichenoberfläche als erstes MVP
 - [x] Unendlichen Canvas mit Pan und Zoom umsetzen.
@@ -71,6 +73,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Schichtstärken pro Ebene verarbeiten.
 - [x] Rechteckige Kachelbelegung mit Richtung, automatischem Versatz und Mindestversatz umsetzen.
 - [x] Konsistenzregeln für gleiche Ebenenfolgen in gleichen Bereichen definieren.
+- [ ] Raumkonturen zusätzlich um Wand-Innenbeläge und weitere wirksame Wandebenen verschieben, sobald diese auf Wänden fachlich geführt werden.
 
 ## Phase 6: Dateiformate und Teilebibliotheken
 - [x] DXF als erstes AutoCAD-kompatibles Austauschformat fest einplanen.

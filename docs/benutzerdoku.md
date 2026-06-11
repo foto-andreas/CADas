@@ -117,21 +117,28 @@ Unten zeigt die Anwendung:
 
 ## Fachliches Modell einer Etage
 
-Für das Verständnis der aktuellen Version ist ein Punkt zentral: `Wände` und `Räume` sind fachlich noch keine automatisch gekoppelten Objekte.
+Für das Verständnis der aktuellen Version ist jetzt ein anderer Punkt zentral: `Wände` sind die primäre bauliche Geometrie, `Räume` werden daraus automatisch abgeleitet.
 
-Das bedeutet im aktuellen MVP:
+Das bedeutet im aktuellen Stand:
 
-* Wände sind eigenständige lineare Bauteile mit Achse, Stärke und Höhe.
-* Türen und Fenster sind an genau eine Wand gebunden.
-* Räume sind eigenständige Flächenobjekte mit Name, Raumhöhe, Boden, Decke und optionaler Dachschräge.
-* Ein Raum entsteht aktuell nicht automatisch aus einem geschlossenen Wandring.
-* Eine Wand wird aktuell auch nicht automatisch aus einem Raumrand erzeugt.
+* Wände werden über ihre Achse, Stärke und Höhe gezeichnet.
+* Die Wandachse ist eine Konstruktionslinie, nicht die Raumkante.
+* Der Raum beginnt an der inneren sichtbaren Wandkante, also bei der Wandachse plus beziehungsweise minus halber Wandstärke.
+* Türen und Fenster sind weiter direkt an genau eine Wand gebunden.
+* Räume entstehen automatisch aus geschlossenen orthogonalen Wandzügen.
+* Wenn du Wände verschiebst, veränderst oder schließt, wird die Raumkontur automatisch nachgeführt.
+* Räume dürfen dadurch auch polygonal werden und müssen nicht rechteckig bleiben.
 
 Praktisch heißt das für Anwender:
 
-* Die Wände beschreiben die baulichen Begrenzungen.
-* Die Räume beschreiben die fachlichen Raumbereiche für Name, Fläche, Volumen und später weitere Ausbauten.
-* Beides sollte inhaltlich zusammenpassen, wird aber derzeit noch nicht automatisch gegeneinander validiert.
+* Zuerst werden die Wände gezeichnet.
+* Daraus entsteht die fachliche Innenfläche des Raums automatisch.
+* Namen, Raumhöhe, Boden, Decke und Dachschräge hängen dann am automatisch erkannten Raum.
+
+Wichtig:
+
+* Aktuell basiert die automatische Raumkontur auf der reinen Wandstärke.
+* Spätere Innenbeläge auf Wänden sind dafür fachlich vorgesehen, verschieben die Raumkante aber in der aktuellen Version noch nicht zusätzlich.
 
 ## Empfohlener Zeichenablauf pro Etage
 
@@ -140,14 +147,14 @@ Die aktuelle Version arbeitet am stabilsten mit der folgenden Reihenfolge:
 1. Etage anlegen oder auswählen.
 2. Mit dem Werkzeug `Wand` die baulichen Außen- und Innenwände zeichnen.
 3. Mit `Tür` und `Fenster` Öffnungen direkt auf die passenden Wände setzen.
-4. Mit dem Werkzeug `Raum` die fachlichen Räume als Rechtecke über die nutzbaren Raumflächen aufziehen.
+4. Prüfen, ob aus den geschlossenen Wandzügen die Räume automatisch erkannt wurden.
 5. Bei Bedarf Treppen platzieren.
 6. Danach Ansichten, Bemaßung, Flächen und 3D zur Kontrolle nutzen.
 
 Wichtig:
 
-* Für eine fachlich saubere Etage solltest du einen Raum nicht als Ersatz für Wände zeichnen.
-* Räume dienen aktuell nicht zum automatischen Wandaufbau, sondern für Rauminformationen und deren Auswertung.
+* Für eine fachlich saubere Etage musst du die Wände vollständig und geschlossen zeichnen.
+* Ein Raum entsteht nicht aus einer separaten Rechteckzeichnung, sondern aus der Innenfläche des Wandzugs.
 * Türen und Fenster benötigen immer zuerst eine vorhandene Wand.
 
 ## Was genau gehört in die Wände, was in den Raum?
@@ -156,7 +163,7 @@ Wichtig:
 
 Wände tragen aktuell:
 
-* Verlauf der Wand
+* Verlauf der Wandachse
 * Wandstärke
 * Wandhöhe
 * Türen und Fenster als wandgebundene Öffnungen
@@ -165,6 +172,7 @@ Wände tragen aktuell:
 
 Räume tragen aktuell:
 
+* automatisch abgeleitete Innenkontur
 * Raumname
 * Raumfläche
 * Raumvolumen
@@ -185,8 +193,8 @@ Das bedeutet:
 
 ### So gibst du eine Dachschräge aktuell ein
 
-1. Zeichne zuerst die Wände des Dachgeschosses ganz normal.
-2. Ziehe danach den Raum als Rechteck über die nutzbare Raumfläche auf.
+1. Zeichne zuerst die Wände des Dachgeschosses ganz normal und schließe den Raum vollständig.
+2. Warte, bis der Raum aus dem Wandzug automatisch erkannt wurde.
 3. Stelle in den Raum-Properties die `Raumhöhe` ein.
    Diese Höhe ist aktuell die hohe lichte Raumhöhe an der Oberkante der Schräge.
 4. Stelle `Dachschräge` auf `Mit Dachschräge`.
@@ -326,10 +334,11 @@ Mit dem Werkzeug `Wand` zeichnest du lineare Wände.
 
 ### Raum
 
-Mit dem Werkzeug `Raum` ziehst du aktuell einen rechteckigen Raum auf.
+Mit dem Werkzeug `Raum` zeichnest du keinen separaten Rechteckraum mehr.
 
-* Linke Maustaste drücken und diagonal ziehen.
-* Raumname, Raumhöhe, Bodenstärke und Deckenstärke kommen aus den aktuellen Eingaben.
+* Räume werden automatisch aus geschlossenen Wandzügen erzeugt.
+* Mit dem Werkzeug `Raum` klickst du in einen automatisch erkannten Raum, um ihn gezielt auszuwählen.
+* Raumname, Raumhöhe, Bodenstärke, Deckenstärke und Dachschräge kommen aus den aktuellen Eingaben und können dann auf die Auswahl angewendet werden.
 
 ### Treppe
 
@@ -663,7 +672,7 @@ Damit kann ein Testablauf beispielsweise so aussehen:
 2. Rasterweite festlegen.
 3. Werkzeug `Wand` wählen und Außenkontur zeichnen.
 4. Innenwände ergänzen.
-5. Werkzeug `Raum` wählen und Räume anlegen.
+5. Prüfen, ob die Räume automatisch aus dem geschlossenen Wandzug entstanden sind.
 6. Türen und Fenster mit Presets oder freien Werten setzen.
 7. Treppen platzieren und bei Bedarf drehen.
 8. Ergebnis in der 3D-Ansicht kontrollieren.
