@@ -2,6 +2,8 @@
 
 Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert werden. Also nichts entfernen, von dem du denkst, dass es aus Versehen reingekommen ist. Für erledigte Punkte `- [x]`, für offene Punkte `- [ ]` verwenden.
 
+Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechungen abzuarbeiten.
+
 ## Phase 0: Projektbasis und Leitplanken
 - [x] Gradle-Projekt mit Wrapper 9.5, JDK 25 und sauberer Modulstruktur anlegen.
 - [x] JavaFX-Projektgrundlage für das CAD-Programm anlegen und bootstrapen.
