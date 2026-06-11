@@ -16,5 +16,13 @@ class ThreeDViewPreparationTest {
         assertEquals(45.0, pose.azimuthDegrees());
         assertEquals(30.0, pose.elevationDegrees());
     }
-}
 
+    @Test
+    void kannGezielteKameraWinkelAlsAnsichtspresetAbleiten() {
+        CameraPose pose = preparation.poseForAngles(ProjectionMode.PERSPECTIVE, 90.0, 0.0);
+
+        assertEquals(ProjectionMode.PERSPECTIVE, pose.projectionMode());
+        assertEquals(90.0, pose.azimuthDegrees());
+        assertEquals(0.0, pose.elevationDegrees());
+    }
+}

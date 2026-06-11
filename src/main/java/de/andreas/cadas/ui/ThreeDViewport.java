@@ -33,6 +33,7 @@ import javafx.scene.AmbientLight;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
@@ -51,6 +52,7 @@ public final class ThreeDViewport extends BorderPane {
 
     private static final double WORLD_SCALE = 0.08;
 
+    private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
     private final ThreeDCameraController cameraController = new ThreeDCameraController();
     private final PerspectiveCamera perspectiveCamera = new PerspectiveCamera(true);
@@ -66,7 +68,8 @@ public final class ThreeDViewport extends BorderPane {
     private final Consumer<SelectionKey> selectionConsumer;
 
     private ProjectModel currentProject;
-    private CameraPose cameraPose = new ThreeDViewPreparation().defaultPose();
+    private CameraPose cameraPose = viewPreparation.defaultPose();
+    private ViewOrientation currentOrientation = ViewOrientation.TOP;
     private SelectionKey selectedSelection;
     private double dragStartX;
     private double dragStartY;
@@ -111,6 +114,20 @@ public final class ThreeDViewport extends BorderPane {
         if (currentProject != null) {
             refresh(currentProject);
         }
+    }
+
+    public void applyViewOrientation(ViewOrientation viewOrientation) {
+        currentOrientation = viewOrientation;
+        cameraPose = viewPreparation.poseForAngles(
+                projectionModeSelector.getValue(),
+                viewOrientation.cameraAzimuthDegrees(),
+                viewOrientation.cameraElevationDegrees()
+        );
+        updateCamera();
+    }
+
+    public void resetToCurrentOrientation() {
+        applyViewOrientation(currentOrientation);
     }
 
     private void configureScene() {
@@ -176,7 +193,12 @@ public final class ThreeDViewport extends BorderPane {
     private void configureLayout() {
         Label title = new Label("3D-Ansicht");
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        HBox header = new HBox(12.0, title, new Label("Projektion"), projectionModeSelector, surfaceLayersCheckBox);
+        Label projectionLabel = new Label("Projektion");
+        Button resetViewButton = new Button("Ansicht zentrieren");
+        resetViewButton.setOnAction(event -> resetToCurrentOrientation());
+        resetViewButton.setStyle("-fx-background-color: #4b6a88; -fx-text-fill: white; -fx-background-radius: 999;");
+        applyTooltip(resetViewButton, "Setzt die 3D-Kamera auf die Standardansicht zurück und richtet das Modell wieder übersichtlich aus.");
+        HBox header = new HBox(12.0, title, projectionLabel, projectionModeSelector, surfaceLayersCheckBox, resetViewButton);
         header.setAlignment(Pos.CENTER_LEFT);
 
         ScrollPane levelScrollPane = new ScrollPane(levelTogglePane);
@@ -319,4 +341,5 @@ public final class ThreeDViewport extends BorderPane {
         tooltip.setMaxWidth(320);
         Tooltip.install(node, tooltip);
     }
+
 }

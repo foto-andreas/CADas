@@ -2,6 +2,8 @@ package de.andreas.cadas.ui;
 
 import de.andreas.cadas.application.drawing.DraftingConstraints;
 import de.andreas.cadas.application.drawing.DraftingService;
+import de.andreas.cadas.application.exchange.ExchangeFileNameService;
+import de.andreas.cadas.application.history.UndoRedoStack;
 import de.andreas.cadas.application.drawing.OpeningPlacementService;
 import de.andreas.cadas.application.drawing.SelectionQueryService;
 import de.andreas.cadas.application.drawing.SnapService;
@@ -36,7 +38,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.beans.property.BooleanProperty;
@@ -50,16 +54,24 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
@@ -67,6 +79,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.Node;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.FileChooser;
@@ -95,6 +108,7 @@ public final class CadWorkbench extends BorderPane {
     private final DraftingService draftingService = new DraftingService();
     private final SnapService snapService = new SnapService();
     private final SelectionQueryService selectionQueryService = new SelectionQueryService();
+    private final ExchangeFileNameService exchangeFileNameService = new ExchangeFileNameService();
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     private final WallEditingService wallEditingService = new WallEditingService();
     private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
@@ -156,6 +170,13 @@ public final class CadWorkbench extends BorderPane {
     private final ObservableList<WindowPreset> availableWindowPresets = FXCollections.observableArrayList();
     private final ObservableList<StairPreset> availableStairPresets = FXCollections.observableArrayList();
     private final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection);
+    private final UndoRedoStack<WorkbenchSnapshot> history = new UndoRedoStack<>();
+    private final VBox propertySections = new VBox(12.0);
+    private final Label selectionSummaryLabel = new Label("Keine Auswahl");
+    private final Button undoButton = new Button("Rückgängig");
+    private final Button redoButton = new Button("Wiederherstellen");
+    private final Button deleteSelectionButton = new Button("Auswahl löschen");
+    private final Button clearSelectionButton = new Button("Auswahl aufheben");
 
     private final Label zoomLabel = new Label();
     private final Label cursorLabel = new Label();
@@ -180,6 +201,7 @@ public final class CadWorkbench extends BorderPane {
     private GuideOrientation pendingGuideOrientation;
     private double pendingGuideWorldMillimeters;
     private boolean threeDDirty = true;
+    private boolean historyCapturedForDrag;
 
     public CadWorkbench() {
         setPadding(new Insets(12));
@@ -189,10 +211,23 @@ public final class CadWorkbench extends BorderPane {
         configureLayout();
         configureCanvas();
         threeDViewport.syncLevels(availableLevels, activeLevel.get().name());
+        threeDViewport.applyViewOrientation(activeView.get());
         selectedSelection.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.setSelectedSelection(newValue);
+            updatePropertySectionVisibility();
+            updateActionButtons();
             render();
         });
+        sceneProperty().addListener((ignored, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.getAccelerators().put(
+                        new KeyCodeCombination(KeyCode.ESCAPE),
+                        this::clearSelection
+                );
+            }
+        });
+        updatePropertySectionVisibility();
+        updateActionButtons();
         updateStatus();
         render();
     }
@@ -219,13 +254,22 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(showDimensions);
         registerRenderListener(showAreaVolume);
         registerRenderListener(showGuides);
-        activeView.addListener((ignored, oldValue, newValue) -> render());
+        activeView.addListener((ignored, oldValue, newValue) -> {
+            threeDViewport.applyViewOrientation(newValue);
+            render();
+        });
+        toolSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
+            updatePropertySectionVisibility();
+            updateActionButtons();
+        });
+        configureActionButtons();
     }
 
     private void configureLayout() {
+        MenuBar menuBar = buildMenuBar();
         ToolBar settingsBar = buildSettingsBar();
         HBox viewBar = buildViewBar();
-        VBox topArea = new VBox(10.0, settingsBar, viewBar);
+        VBox topArea = new VBox(8.0, menuBar, settingsBar, viewBar);
         topArea.setPadding(new Insets(0, 0, 12, 0));
         setTop(topArea);
 
@@ -234,8 +278,8 @@ public final class CadWorkbench extends BorderPane {
         drawingArea.setLeft(verticalRuler);
         drawingArea.setCenter(new StackPane(drawingPane));
         drawingArea.setStyle("-fx-background-color: rgba(255,255,255,0.55); -fx-background-radius: 16;");
-        SplitPane splitPane = new SplitPane(drawingArea, threeDViewport);
-        splitPane.setDividerPositions(0.64);
+        SplitPane splitPane = new SplitPane(buildPropertyPane(), drawingArea, threeDViewport);
+        splitPane.setDividerPositions(0.19, 0.69);
         setCenter(splitPane);
 
         HBox statusBar = new HBox(18.0, viewLabel, zoomLabel, cursorLabel, draftLabel);
@@ -275,38 +319,17 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(guideBox, "Blendet gezogene Hilfslinien aus den Linealen ein oder aus.");
 
         Button resetViewButton = createActionButton(
-                "Ansicht zentrieren",
-                "-fx-background-color: #4b6a88; -fx-text-fill: white; -fx-background-radius: 999;",
+                "2D zentrieren",
+                null,
                 this::resetTwoDView,
                 "Setzt Zoom und Verschiebung der Zeichenfläche auf die Startansicht zurück."
         );
 
         Button addLevelButton = createActionButton(
                 "Etage hinzufügen",
-                "-fx-background-color: #7f5539; -fx-text-fill: white; -fx-background-radius: 999;",
+                null,
                 this::createLevel,
                 "Legt eine neue Etage für den aktuellen Grundriss an und wechselt direkt in diese Etage."
-        );
-
-        Button exportDxfButton = createActionButton(
-                "DXF exportieren",
-                "-fx-background-color: #3b7b58; -fx-text-fill: white; -fx-background-radius: 999;",
-                this::exportCurrentLevel,
-                "Exportiert die aktuell aktive Etage als DXF-Datei. Räume, Wände, Türen und Fenster werden einschließlich CADas-Metadaten geschrieben."
-        );
-
-        Button importDxfButton = createActionButton(
-                "DXF importieren",
-                "-fx-background-color: #5d648f; -fx-text-fill: white; -fx-background-radius: 999;",
-                this::importLevel,
-                "Importiert eine DXF-Datei als neue Etage. CADas-Metadaten werden bevorzugt ausgewertet, einfache Geometrien werden ersatzweise als Grundriss übernommen."
-        );
-
-        Button importLibraryButton = createActionButton(
-                "Teilebibliothek laden",
-                "-fx-background-color: #8a5f8f; -fx-text-fill: white; -fx-background-radius: 999;",
-                this::importPartLibrary,
-                "Importiert zusätzliche Tür-, Fenster- und Treppen-Presets aus einer externen `.cadasparts`-Datei und stellt sie direkt in den Auswahllisten bereit."
         );
 
         settingsBarStyling();
@@ -315,49 +338,10 @@ public final class CadWorkbench extends BorderPane {
                 new Separator(Orientation.VERTICAL),
                 labelledNode("Etage", levelSelector),
                 addLevelButton,
-                exportDxfButton,
-                importDxfButton,
-                importLibraryButton,
-                new Separator(Orientation.VERTICAL),
-                labelledNode("Rasterweite", gridField),
-                gridUnit,
-                new Separator(Orientation.VERTICAL),
-                labelledNode("Länge", lengthField),
-                lengthUnit,
-                labelledNode("Winkel", angleField),
-                labelledNode("Wandstärke", wallThicknessField),
-                wallThicknessUnit,
-                labelledNode("Wandhöhe", wallHeightField),
-                wallHeightUnit,
-                new Separator(Orientation.VERTICAL),
-                labelledNode("Raum", roomNameField),
-                labelledNode("Raumhöhe", roomHeightField),
-                roomHeightUnit,
-                labelledNode("Boden", floorThicknessField),
-                floorThicknessUnit,
-                labelledNode("Decke", ceilingThicknessField),
-                ceilingThicknessUnit,
-                new Separator(Orientation.VERTICAL),
-                labelledNode("Türbreite", doorWidthField),
-                doorWidthUnit,
-                labelledNode("Türhöhe", doorHeightField),
-                doorHeightUnit,
-                labelledNode("Schwelle", thresholdField),
-                thresholdUnit,
-                labelledNode("Tür-Preset", doorPresetSelector),
-                new Separator(Orientation.VERTICAL),
-                labelledNode("Fensterbreite", windowWidthField),
-                windowWidthUnit,
-                labelledNode("Fensterhöhe", windowHeightField),
-                windowHeightUnit,
-                labelledNode("Brüstung", sillHeightField),
-                sillHeightUnit,
-                labelledNode("Fenster-Preset", windowPresetSelector),
-                new Separator(Orientation.VERTICAL),
-                labelledNode("Treppen-Preset", stairPresetSelector),
-                labelledNode("Treppenhöhe", stairHeightField),
-                stairHeightUnit,
-                labelledNode("Stufen", stairStepsField),
+                undoButton,
+                redoButton,
+                deleteSelectionButton,
+                clearSelectionButton,
                 new Separator(Orientation.VERTICAL),
                 rasterBox,
                 snapRasterBox,
@@ -372,15 +356,11 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private HBox buildViewBar() {
-        ToggleGroup group = new ToggleGroup();
         HBox box = new HBox(8.0);
         box.setAlignment(Pos.CENTER_LEFT);
         box.getChildren().add(new Label("Ansichten:"));
         for (ViewOrientation viewOrientation : ViewOrientation.values()) {
-            ToggleButton button = new ToggleButton(viewOrientation.label());
-            button.setUserData(viewOrientation);
-            button.setToggleGroup(group);
-            button.setSelected(viewOrientation == ViewOrientation.TOP);
+            Button button = new Button(viewOrientation.buttonLabel());
             button.setOnAction(event -> activeView.set(viewOrientation));
             button.setStyle("-fx-background-radius: 999; -fx-padding: 8 14 8 14;");
             applyTooltip(button, "Schaltet die aktuelle orthogonale Ansicht auf " + viewOrientation.label() + " um.");
@@ -414,7 +394,234 @@ public final class CadWorkbench extends BorderPane {
         stairPresetSelector.setPrefWidth(190);
     }
 
-    private HBox labelledNode(String label, javafx.scene.Node node) {
+    private MenuBar buildMenuBar() {
+        Menu dateiMenu = new Menu("Datei");
+        dateiMenu.getItems().addAll(
+                menuItem("Etage hinzufügen", this::createLevel, shortcutKey(KeyCode.N)),
+                menuItem("Projekt leeren", this::clearProject, shortcutKey(KeyCode.L)),
+                menuItem("DXF exportieren", this::exportCurrentLevel, shortcutShiftKey(KeyCode.E)),
+                menuItem("DXF importieren", this::importLevel, shortcutShiftKey(KeyCode.I)),
+                menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
+                menuItem("Beenden", Platform::exit, shortcutKey(KeyCode.Q))
+        );
+
+        Menu bearbeitenMenu = new Menu("Bearbeiten");
+        bearbeitenMenu.getItems().addAll(
+                menuItem("Rückgängig", this::undo, shortcutKey(KeyCode.Z)),
+                menuItem("Wiederherstellen", this::redo, shortcutShiftKey(KeyCode.Z)),
+                menuItem("Auswahl löschen", this::deleteSelection, new KeyCodeCombination(KeyCode.DELETE)),
+                menuItem("Auswahl aufheben", this::clearSelection, new KeyCodeCombination(KeyCode.ESCAPE))
+        );
+
+        Menu ansichtMenu = new Menu("Ansicht");
+        for (ViewOrientation viewOrientation : ViewOrientation.values()) {
+            ansichtMenu.getItems().add(menuItem(
+                    "Zu " + viewOrientation.label(),
+                    () -> activeView.set(viewOrientation),
+                    null
+            ));
+        }
+        ansichtMenu.getItems().addAll(
+                menuItem("2D-Ansicht zentrieren", this::resetTwoDView, shortcutKey(KeyCode.DIGIT0)),
+                menuItem("3D-Ansicht zentrieren", threeDViewport::resetToCurrentOrientation, shortcutShiftKey(KeyCode.DIGIT0))
+        );
+
+        Menu werkzeugMenu = new Menu("Werkzeuge");
+        werkzeugMenu.getItems().addAll(
+                toolMenuItem(DrawingTool.EDIT, KeyCode.E),
+                toolMenuItem(DrawingTool.WALL, KeyCode.W),
+                toolMenuItem(DrawingTool.ROOM, KeyCode.R),
+                toolMenuItem(DrawingTool.STAIR, KeyCode.T),
+                toolMenuItem(DrawingTool.DOOR, KeyCode.D),
+                toolMenuItem(DrawingTool.WINDOW, KeyCode.F)
+        );
+
+        Menu optionenMenu = new Menu("Optionen");
+        optionenMenu.getItems().addAll(
+                checkMenuItem("Raster anzeigen", showGrid),
+                checkMenuItem("Auf Raster einrasten", snapToGrid),
+                checkMenuItem("Auf Punkte einrasten", snapToEndpoints),
+                checkMenuItem("Hilfslinien anzeigen", showGuides),
+                checkMenuItem("Bemaßung anzeigen", showDimensions),
+                checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
+                checkMenuItem("Nordpfeil anzeigen", showCompass)
+        );
+
+        MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu);
+        applyTooltip(menuBar, "Bietet Datei-, Bearbeitungs-, Ansichts- und Werkzeugfunktionen mit passenden Tastaturkürzeln an.");
+        return menuBar;
+    }
+
+    private ScrollPane buildPropertyPane() {
+        selectionSummaryLabel.setWrapText(true);
+        selectionSummaryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
+        propertySections.getChildren().setAll(
+                createPropertySection("Auswahl", selectionSummaryLabel),
+                createPropertySection(
+                        "Zeichnen",
+                        propertyRow("Rasterweite", gridField, gridUnit),
+                        propertyRow("Länge", lengthField, lengthUnit),
+                        propertyRow("Winkel", angleField)
+                ),
+                createPropertySection(
+                        "Wand",
+                        propertyRow("Wandstärke", wallThicknessField, wallThicknessUnit),
+                        propertyRow("Wandhöhe", wallHeightField, wallHeightUnit)
+                ),
+                createPropertySection(
+                        "Raum",
+                        propertyRow("Name", roomNameField),
+                        propertyRow("Raumhöhe", roomHeightField, roomHeightUnit),
+                        propertyRow("Boden", floorThicknessField, floorThicknessUnit),
+                        propertyRow("Decke", ceilingThicknessField, ceilingThicknessUnit)
+                ),
+                createPropertySection(
+                        "Tür",
+                        propertyRow("Preset", doorPresetSelector),
+                        propertyRow("Breite", doorWidthField, doorWidthUnit),
+                        propertyRow("Höhe", doorHeightField, doorHeightUnit),
+                        propertyRow("Schwelle", thresholdField, thresholdUnit)
+                ),
+                createPropertySection(
+                        "Fenster",
+                        propertyRow("Preset", windowPresetSelector),
+                        propertyRow("Breite", windowWidthField, windowWidthUnit),
+                        propertyRow("Höhe", windowHeightField, windowHeightUnit),
+                        propertyRow("Brüstung", sillHeightField, sillHeightUnit)
+                ),
+                createPropertySection(
+                        "Treppe",
+                        propertyRow("Preset", stairPresetSelector),
+                        propertyRow("Höhe", stairHeightField, stairHeightUnit),
+                        propertyRow("Stufen", stairStepsField)
+                )
+        );
+        propertySections.setPadding(new Insets(4, 0, 4, 0));
+
+        VBox container = new VBox(10.0, new Label("Properties"), propertySections);
+        container.setPadding(new Insets(12));
+        container.setStyle("-fx-background-color: rgba(255,255,255,0.62); -fx-background-radius: 16;");
+
+        ScrollPane scrollPane = new ScrollPane(container);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefWidth(290);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+        applyTooltip(scrollPane, "Zeigt alle für Werkzeug oder Auswahl passenden Eigenschaften in einer permanent sichtbaren, vertikalen Liste an.");
+        return scrollPane;
+    }
+
+    private VBox createPropertySection(String title, Node... nodes) {
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold;");
+        VBox section = new VBox(8.0, titleLabel);
+        section.getChildren().addAll(nodes);
+        section.setPadding(new Insets(10));
+        section.setStyle("-fx-background-color: rgba(242,236,226,0.92); -fx-background-radius: 12;");
+        return section;
+    }
+
+    private VBox propertyRow(String label, Node... controls) {
+        Label fieldLabel = new Label(label);
+        fieldLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4d4135;");
+        HBox controlRow = new HBox(6.0, controls);
+        controlRow.setAlignment(Pos.CENTER_LEFT);
+        return new VBox(4.0, fieldLabel, controlRow);
+    }
+
+    private void configureActionButtons() {
+        undoButton.setOnAction(event -> undo());
+        redoButton.setOnAction(event -> redo());
+        deleteSelectionButton.setOnAction(event -> deleteSelection());
+        clearSelectionButton.setOnAction(event -> clearSelection());
+        applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
+        applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
+        applyTooltip(deleteSelectionButton, "Löscht das aktuell ausgewählte Bauteil aus der aktiven Etage.");
+        applyTooltip(clearSelectionButton, "Hebt die aktuelle Auswahl auf und entfernt die Hervorhebung in 2D und 3D.");
+    }
+
+    private void updatePropertySectionVisibility() {
+        for (int index = 0; index < propertySections.getChildren().size(); index++) {
+            Node node = propertySections.getChildren().get(index);
+            boolean visible = switch (index) {
+                case 0, 1 -> true;
+                case 2 -> shouldShowSection(DrawingTool.WALL, RenderableKind.WALL);
+                case 3 -> shouldShowSection(DrawingTool.ROOM, RenderableKind.ROOM_VOLUME, RenderableKind.ROOM_FLOOR, RenderableKind.ROOM_CEILING);
+                case 4 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
+                case 5 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW);
+                case 6 -> shouldShowSection(DrawingTool.STAIR, RenderableKind.STAIR);
+                default -> true;
+            };
+            node.setVisible(visible);
+            node.setManaged(visible);
+        }
+        selectionSummaryLabel.setText(selectionSummary());
+    }
+
+    private boolean shouldShowSection(DrawingTool tool, RenderableKind... kinds) {
+        if (currentTool() == tool) {
+            return true;
+        }
+        if (selectedSelection.get() == null) {
+            return false;
+        }
+        for (RenderableKind kind : kinds) {
+            if (selectedSelection.get().kind() == kind) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String selectionSummary() {
+        if (selectedSelection.get() == null) {
+            return "Keine Auswahl. Wähle ein Bauteil im Werkzeug `Bearbeiten` aus oder nutze direkt die Werkzeuge in der Zeichenfläche.";
+        }
+        return "Ausgewählt: " + switch (selectedSelection.get().kind()) {
+            case WALL -> "Wand";
+            case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> "Raum";
+            case DOOR -> "Tür";
+            case WINDOW -> "Fenster";
+            case STAIR -> "Treppe";
+            default -> selectedSelection.get().kind().name();
+        } + " auf Etage `" + selectedSelection.get().levelName() + "`.";
+    }
+
+    private void updateActionButtons() {
+        undoButton.setDisable(!history.canUndo());
+        redoButton.setDisable(!history.canRedo());
+        boolean hasSelection = selectedSelection.get() != null;
+        deleteSelectionButton.setDisable(!hasSelection);
+        clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
+    }
+
+    private MenuItem menuItem(String label, Runnable action, KeyCombination accelerator) {
+        MenuItem menuItem = new MenuItem(label);
+        menuItem.setOnAction(event -> action.run());
+        if (accelerator != null) {
+            menuItem.setAccelerator(accelerator);
+        }
+        return menuItem;
+    }
+
+    private MenuItem toolMenuItem(DrawingTool tool, KeyCode keyCode) {
+        return menuItem(tool.label(), () -> toolSelector.setValue(tool), shortcutKey(keyCode));
+    }
+
+    private CheckMenuItem checkMenuItem(String label, BooleanProperty property) {
+        CheckMenuItem menuItem = new CheckMenuItem(label);
+        menuItem.selectedProperty().bindBidirectional(property);
+        return menuItem;
+    }
+
+    private KeyCombination shortcutKey(KeyCode keyCode) {
+        return new KeyCodeCombination(keyCode, KeyCombination.SHORTCUT_DOWN);
+    }
+
+    private KeyCombination shortcutShiftKey(KeyCode keyCode) {
+        return new KeyCodeCombination(keyCode, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
+    }
+
+    private HBox labelledNode(String label, Node node) {
         HBox box = new HBox(6.0, new Label(label), node);
         box.setAlignment(Pos.CENTER_LEFT);
         return box;
@@ -512,7 +719,9 @@ public final class CadWorkbench extends BorderPane {
     private Button createActionButton(String label, String style, Runnable action, String tooltipText) {
         Button button = new Button(label);
         button.setOnAction(event -> action.run());
-        button.setStyle(style);
+        if (style != null) {
+            button.setStyle(style);
+        }
         applyTooltip(button, tooltipText);
         return button;
     }
@@ -572,6 +781,7 @@ public final class CadWorkbench extends BorderPane {
             DraftingConstraints constraints = currentConstraints(false);
             PlanPoint editPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
             selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, SNAP_TOLERANCE).orElse(null);
+            historyCapturedForDrag = false;
             if (selectedEndpointGroup != null) {
                 activeLevel.get().walls().stream()
                         .filter(wall -> selectedEndpointGroup.startWallIds().contains(wall.id()) || selectedEndpointGroup.endWallIds().contains(wall.id()))
@@ -609,6 +819,10 @@ public final class CadWorkbench extends BorderPane {
 
         if (draftStart == null) {
             if (selectedEndpointGroup != null) {
+                if (!historyCapturedForDrag) {
+                    rememberStateForUndo();
+                    historyCapturedForDrag = true;
+                }
                 DraftingConstraints constraints = currentConstraints(false);
                 PlanPoint snappedPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
                 activeLevel.get().replaceWalls(wallEditingService.moveEndpointGroup(activeLevel.get().walls(), selectedEndpointGroup, snappedPoint));
@@ -638,6 +852,8 @@ public final class CadWorkbench extends BorderPane {
 
         if (selectedEndpointGroup != null) {
             selectedEndpointGroup = null;
+            historyCapturedForDrag = false;
+            updateActionButtons();
             render();
             return;
         }
@@ -648,10 +864,12 @@ public final class CadWorkbench extends BorderPane {
 
         if (previewSegment.length().toMillimeters() > 1.0) {
             if (currentTool() == DrawingTool.WALL) {
+                rememberStateForUndo();
                 Wall wall = Wall.create(previewSegment, currentWallThickness(), currentWallHeight());
                 activeLevel.get().addWall(wall);
                 selectedSelection.set(new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()));
             } else if (currentTool() == DrawingTool.ROOM) {
+                rememberStateForUndo();
                 Room room = Room.rectangular(
                         currentRoomName(),
                         previewSegment.start(),
@@ -663,6 +881,7 @@ public final class CadWorkbench extends BorderPane {
                 activeLevel.get().addRoom(room);
                 selectedSelection.set(new SelectionKey(RenderableKind.ROOM_VOLUME, activeLevel.get().name(), room.id().toString()));
             } else if (currentTool() == DrawingTool.STAIR) {
+                rememberStateForUndo();
                 Staircase staircase = Staircase.create(
                         currentStairType(),
                         previewSegment.start(),
@@ -1164,6 +1383,7 @@ public final class CadWorkbench extends BorderPane {
                 .map(String::trim)
                 .filter(name -> !name.isBlank())
                 .ifPresent(levelName -> {
+                    rememberStateForUndo();
                     Level level = project.createLevel(levelName);
                     availableLevels.add(level);
                     activateLevel(level);
@@ -1183,6 +1403,7 @@ public final class CadWorkbench extends BorderPane {
                 currentThresholdHeight(),
                 SNAP_TOLERANCE)
                 .ifPresent(door -> {
+                    rememberStateForUndo();
                     activeLevel.get().addDoor(door);
                     selectedSelection.set(new SelectionKey(RenderableKind.DOOR, activeLevel.get().name(), door.id().toString()));
                     markThreeDDirty();
@@ -1198,6 +1419,7 @@ public final class CadWorkbench extends BorderPane {
                 currentWindowHeight(),
                 SNAP_TOLERANCE)
                 .ifPresent(window -> {
+                    rememberStateForUndo();
                     activeLevel.get().addWindow(window);
                     selectedSelection.set(new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString()));
                     markThreeDDirty();
@@ -1205,6 +1427,9 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void startGuideDrag(GuideOrientation orientation, double worldMillimeters) {
+        if (pendingGuideOrientation == null) {
+            rememberStateForUndo();
+        }
         pendingGuideOrientation = orientation;
         pendingGuideWorldMillimeters = worldMillimeters;
         render();
@@ -1230,7 +1455,10 @@ public final class CadWorkbench extends BorderPane {
         guideLines.stream()
                 .filter(guideLine -> guideDistance(guideLine, clickPoint) <= SNAP_TOLERANCE.toMillimeters())
                 .findFirst()
-                .ifPresent(guideLines::remove);
+                .ifPresent(guideLine -> {
+                    rememberStateForUndo();
+                    guideLines.remove(guideLine);
+                });
         render();
     }
 
@@ -1250,8 +1478,9 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         try {
-            levelExchangeService.exportLevel(activeLevel.get(), file.toPath());
-            draftLabel.setText("DXF exportiert: " + file.getName());
+            Path exportPath = exchangeFileNameService.ensureSingleExtension(file.toPath(), ".dxf");
+            levelExchangeService.exportLevel(activeLevel.get(), exportPath);
+            draftLabel.setText("DXF exportiert: " + exportPath.getFileName());
         } catch (IOException exception) {
             draftLabel.setText("DXF-Export fehlgeschlagen: " + exception.getMessage());
         }
@@ -1265,7 +1494,8 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         try {
-            String levelName = uniqueLevelName(stripExtension(file.toPath()));
+            rememberStateForUndo();
+            String levelName = uniqueLevelName(exchangeFileNameService.stripRepeatedExtension(file.toPath(), ".dxf"));
             Level importedLevel = levelExchangeService.importLevel(file.toPath(), levelName);
             project.addLevel(importedLevel);
             availableLevels.add(importedLevel);
@@ -1281,15 +1511,6 @@ public final class CadWorkbench extends BorderPane {
         fileChooser.setTitle("DXF-Datei auswählen");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("DXF-Dateien", "*.dxf"));
         return fileChooser;
-    }
-
-    private String stripExtension(Path path) {
-        String filename = path.getFileName().toString();
-        int dotIndex = filename.lastIndexOf('.');
-        if (dotIndex <= 0) {
-            return filename;
-        }
-        return filename.substring(0, dotIndex);
     }
 
     private String uniqueLevelName(String baseName) {
@@ -1388,6 +1609,119 @@ public final class CadWorkbench extends BorderPane {
         render();
     }
 
+    private void clearProject() {
+        Alert alert = new Alert(
+                Alert.AlertType.CONFIRMATION,
+                "Alle Etagen, Bauteile, Hilfslinien und Dachinformationen des aktuellen Projekts werden entfernt. Dieser Schritt kann derzeit nicht rückgängig gemacht werden.",
+                ButtonType.OK,
+                ButtonType.CANCEL
+        );
+        alert.setTitle("Projekt leeren");
+        alert.setHeaderText("Projekt wirklich leeren?");
+        alert.getDialogPane().setPrefWidth(520);
+        Window window = getScene() != null ? getScene().getWindow() : null;
+        if (window != null) {
+            alert.initOwner(window);
+        }
+        alert.showAndWait()
+                .filter(ButtonType.OK::equals)
+                .ifPresent(ignored -> {
+                    rememberStateForUndo();
+                    Level level = project.resetToSingleLevel("Erdgeschoss");
+                    availableLevels.setAll(project.levels());
+                    guideLines.clear();
+                    selectedSelection.set(null);
+                    selectedEndpointGroup = null;
+                    draftStart = null;
+                    previewSegment = null;
+                    pendingGuideOrientation = null;
+                    activateLevel(level);
+                    draftLabel.setText("Projekt geleert.");
+                });
+    }
+
+    private void undo() {
+        history.undo(captureSnapshot())
+                .ifPresent(snapshot -> {
+                    restoreSnapshot(snapshot);
+                    draftLabel.setText("Letzte Änderung rückgängig gemacht.");
+                });
+        updateActionButtons();
+    }
+
+    private void redo() {
+        history.redo(captureSnapshot())
+                .ifPresent(snapshot -> {
+                    restoreSnapshot(snapshot);
+                    draftLabel.setText("Änderung wiederhergestellt.");
+                });
+        updateActionButtons();
+    }
+
+    private void rememberStateForUndo() {
+        history.remember(captureSnapshot());
+        updateActionButtons();
+    }
+
+    private WorkbenchSnapshot captureSnapshot() {
+        return new WorkbenchSnapshot(
+                project.copy(),
+                guideLines,
+                activeLevel.get().name(),
+                selectedSelection.get()
+        );
+    }
+
+    private void restoreSnapshot(WorkbenchSnapshot snapshot) {
+        project.replaceWith(snapshot.project());
+        availableLevels.setAll(project.levels());
+        guideLines.setAll(snapshot.guideLines());
+        selectedEndpointGroup = null;
+        draftStart = null;
+        previewSegment = null;
+        pendingGuideOrientation = null;
+        historyCapturedForDrag = false;
+        selectedSelection.set(snapshot.selectedSelection());
+        Level level = project.levels().stream()
+                .filter(candidate -> candidate.name().equals(snapshot.activeLevelName()))
+                .findFirst()
+                .orElse(project.primaryLevel());
+        activateLevel(level);
+    }
+
+    private void clearSelection() {
+        selectedSelection.set(null);
+        selectedEndpointGroup = null;
+        updateActionButtons();
+        render();
+    }
+
+    private void deleteSelection() {
+        if (selectedSelection.get() == null) {
+            return;
+        }
+        rememberStateForUndo();
+        SelectionKey selectionKey = selectedSelection.get();
+        UUID id = UUID.fromString(selectionKey.elementId());
+        boolean removed = switch (selectionKey.kind()) {
+            case WALL -> activeLevel.get().removeWall(id);
+            case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> activeLevel.get().removeRoom(id);
+            case DOOR -> activeLevel.get().removeDoor(id);
+            case WINDOW -> activeLevel.get().removeWindow(id);
+            case STAIR -> activeLevel.get().removeStaircase(id);
+            default -> false;
+        };
+        if (removed) {
+            selectedSelection.set(null);
+            markThreeDDirty();
+            draftLabel.setText("Ausgewähltes Bauteil gelöscht.");
+            render();
+            return;
+        }
+        draftLabel.setText("Auswahl konnte nicht gelöscht werden.");
+        updateActionButtons();
+    }
+
     private void activateLevel(Level level) {
         if (levelSelector.getValue() != level) {
             levelSelector.setValue(level);
@@ -1396,6 +1730,8 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.set(level);
         threeDViewport.syncLevels(availableLevels, level.name());
         markThreeDDirty();
+        updatePropertySectionVisibility();
+        updateActionButtons();
         render();
     }
 

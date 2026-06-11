@@ -31,6 +31,16 @@ public final class Level {
         walls.add(Objects.requireNonNull(wall, "wall darf nicht null sein."));
     }
 
+    public boolean removeWall(UUID wallId) {
+        Objects.requireNonNull(wallId, "wallId darf nicht null sein.");
+        boolean removed = walls.removeIf(wall -> wall.id().equals(wallId));
+        if (removed) {
+            doors.removeIf(door -> door.wallId().equals(wallId));
+            windows.removeIf(window -> window.wallId().equals(wallId));
+        }
+        return removed;
+    }
+
     public void replaceWalls(List<Wall> updatedWalls) {
         walls.clear();
         walls.addAll(Objects.requireNonNull(updatedWalls, "updatedWalls darf nicht null sein."));
@@ -42,6 +52,11 @@ public final class Level {
 
     public void addRoom(Room room) {
         rooms.add(Objects.requireNonNull(room, "room darf nicht null sein."));
+    }
+
+    public boolean removeRoom(UUID roomId) {
+        Objects.requireNonNull(roomId, "roomId darf nicht null sein.");
+        return rooms.removeIf(room -> room.id().equals(roomId));
     }
 
     public void replaceRooms(List<Room> updatedRooms) {
@@ -57,6 +72,11 @@ public final class Level {
         doors.add(Objects.requireNonNull(door, "door darf nicht null sein."));
     }
 
+    public boolean removeDoor(UUID doorId) {
+        Objects.requireNonNull(doorId, "doorId darf nicht null sein.");
+        return doors.removeIf(door -> door.id().equals(doorId));
+    }
+
     public void replaceDoors(List<Door> updatedDoors) {
         doors.clear();
         doors.addAll(Objects.requireNonNull(updatedDoors, "updatedDoors darf nicht null sein."));
@@ -70,6 +90,11 @@ public final class Level {
         windows.add(Objects.requireNonNull(window, "window darf nicht null sein."));
     }
 
+    public boolean removeWindow(UUID windowId) {
+        Objects.requireNonNull(windowId, "windowId darf nicht null sein.");
+        return windows.removeIf(window -> window.id().equals(windowId));
+    }
+
     public void replaceWindows(List<WindowElement> updatedWindows) {
         windows.clear();
         windows.addAll(Objects.requireNonNull(updatedWindows, "updatedWindows darf nicht null sein."));
@@ -81,6 +106,11 @@ public final class Level {
 
     public void addStaircase(Staircase staircase) {
         staircases.add(Objects.requireNonNull(staircase, "staircase darf nicht null sein."));
+    }
+
+    public boolean removeStaircase(UUID staircaseId) {
+        Objects.requireNonNull(staircaseId, "staircaseId darf nicht null sein.");
+        return staircases.removeIf(staircase -> staircase.id().equals(staircaseId));
     }
 
     public void replaceStaircases(List<Staircase> updatedStaircases) {
@@ -101,6 +131,19 @@ public final class Level {
                 .filter(wall -> wall.id().equals(wallId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Wand nicht gefunden: " + wallId));
+    }
+
+    public Level copy() {
+        Level copy = new Level(name);
+        copy.walls.addAll(walls);
+        copy.rooms.addAll(rooms);
+        copy.doors.addAll(doors);
+        copy.windows.addAll(windows);
+        copy.staircases.addAll(staircases);
+        surfaceLayerStacks.stream()
+                .map(SurfaceLayerStack::copy)
+                .forEach(copy.surfaceLayerStacks::add);
+        return copy;
     }
 
     @Override

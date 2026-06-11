@@ -16,12 +16,24 @@
 * `JUnit 5 Jupiter` für Unit-Tests
 * `JaCoCo` für Testreports
 
+### Start- und Paketierungsmodell
+
+Die Anwendung läuft inzwischen als modulare JavaFX-Anwendung mit `module-info.java`, `mainModule` und einem Launcher auf Modulpfad-Basis. Dadurch sind die generierten Startskripte stabiler und die bisherigen JavaFX-Warnungen zur nicht unterstützten Klassenpfad-Konfiguration entfallen.
+
+Für macOS gibt es zusätzlich Gradle-Aufgaben auf Basis von `jpackage`:
+
+* `installDist` für ein lokales Startverzeichnis
+* `packageMacOsAppImage` für ein App-Image
+* `packageMacOsDmg` für ein DMG-Installationspaket
+
 ### Paketstruktur
 
 * `de.andreas.cadas`
   Einstiegspunkte der Anwendung.
 * `de.andreas.cadas.ui`
   JavaFX-Workbench, Ansichten und Interaktion mit der Zeichenfläche.
+* `de.andreas.cadas.application.history`
+  Allgemeine Rückgängig-/Wiederherstellen-Verwaltung auf Snapshot-Basis.
 * `de.andreas.cadas.application.drawing`
   Anwendungslogik für orthogonales Zeichnen, manuelle Längen- und Winkeleingabe, Snap-Verhalten, Öffnungsplatzierung und Bearbeitung verbundener Wand-Endpunkte.
 * `de.andreas.cadas.application.exchange`
@@ -43,16 +55,19 @@
 
 Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
+* Menüleiste mit Datei-, Bearbeitungs-, Ansichts- und Werkzeugaktionen
+* kontextabhängige Eigenschaftenleiste als dauerhaft sichtbare vertikale Property-Spalte
 * pann- und zoombare Zeichenfläche
 * Rasterdarstellung
 * Hilfslinien aus Linealen
 * magnetisches Snap auf Raster und Endpunkte
-* sechs orthogonale Ansichtsumschalter
+* sechs orthogonale Ansichtsumschalter mit Pfeilbeschriftung
 * optionale Himmelsrichtung
 * Live-Anzeige von Länge und Winkel
 * ein- und ausblendbare Bemaßung für Wände
 * Werkzeugmodus für Wände, Räume, Türen, Fenster und Bearbeitung
 * parallele 3D-Ansicht mit Orbit, Zoom, Pan und Auswahlrückkopplung
+* Rückgängig und Wiederherstellen für fachliche Bearbeitungsschritte
 * DXF-Import und DXF-Export für die aktive Etage
 * Standardteil-Presets für Türen, Fenster und Treppen
 * erste Treppenplatzierung für gerade, 180°- und Wendeltreppen
@@ -61,6 +76,10 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 ### Anwendungslogik
 
 `DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam. `ThreeDSceneModelBuilder` leitet aus denselben Domänenobjekten einen renderbaren 3D-Szenengraphen ab, und `ThreeDCameraController` kapselt Orbit-, Pan-, Zoom- und Projektionswechsel der 3D-Kamera.
+
+`SelectionQueryService` kapselt die fachliche Auswahlauflösung unter dem Cursor. Dadurch liegt die Priorisierung von Öffnungen, Treppen, Wänden und Räumen nicht mehr direkt in der JavaFX-Workbench.
+
+`UndoRedoStack` kapselt den generischen Verlauf. In der Workbench werden darüber komplette Projektsnapshots einschließlich Hilfslinien, aktiver Etage und Auswahlzustand verwaltet.
 
 ### Domäne
 
@@ -112,10 +131,14 @@ Aktuell abgesichert sind unter anderem:
 * Verschieben verbundener Wand-Endpunkte
 * Flächen- und Volumenberechnung von Räumen
 * DXF-Roundtrip für die Grundobjekte des MVP
+* Dateinamennormalisierung für DXF-Import und -Export
 * Standardteil-Bibliothek für Türen, Fenster und Treppen
 * Dach- und Ebenendomäne für weitere Ausbaustufen
 * 3D-Geometrieableitung für Wände, Räume, Öffnungen, Treppen und Dach
 * Kameragrundverhalten für Orbit, Pan, Zoom und Projektionswechsel
+* Kamera-Presets für die sechs orthogonalen Ansichten
+* Auswahlpriorisierung für Türen, Fenster, Treppen, Wände und Räume
+* Rückgängig-/Wiederherstellen-Verhalten des generischen Verlaufs
 * Grundverhalten des Projektmodells
 
 Build und Tests laufen über:

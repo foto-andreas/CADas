@@ -1,7 +1,10 @@
 package de.andreas.cadas.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
+import de.andreas.cadas.domain.geometry.Angle;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
@@ -40,5 +43,38 @@ class ProjectModelTest {
 
         assertEquals(2, model.levels().size());
         assertEquals("Obergeschoss", level.name());
+    }
+
+    @Test
+    void projektKannAufEineLeereEinzelEtageZurueckgesetztWerden() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        model.createLevel("Obergeschoss");
+        model.defineRoof(new Roof(RoofType.SADDLE, Angle.ofDegrees(38), Length.of(40, LengthUnit.CENTIMETER), true));
+
+        Level resetLevel = model.resetToSingleLevel("Neustart");
+
+        assertEquals(1, model.levels().size());
+        assertEquals("Neustart", resetLevel.name());
+        assertFalse(model.roof().isPresent());
+    }
+
+    @Test
+    void projektKannAusEinerMomentaufnahmeWiederhergestelltWerden() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        model.primaryLevel().addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(2000, 0)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        ));
+
+        ProjectModel snapshot = model.copy();
+
+        model.createLevel("Obergeschoss");
+        model.primaryLevel().removeWall(model.primaryLevel().walls().getFirst().id());
+        model.replaceWith(snapshot);
+
+        assertEquals(1, model.levels().size());
+        assertEquals(1, model.primaryLevel().walls().size());
+        assertNotSame(snapshot.primaryLevel(), model.primaryLevel());
     }
 }

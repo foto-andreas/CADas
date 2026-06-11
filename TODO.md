@@ -93,21 +93,21 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 - [x] GitHub-README.md erstellen mit wichtichen Informationen
 
 ## Nächste Aktionen
-- [ ] Undo und Restore implementieren
-- [ ] Die Ansichten lassen sich noch nicht umschalten
+- [x] Undo und Restore implementieren
+- [x] Die Ansichten lassen sich noch nicht umschalten
 - [ ] Elemente auswählen, abwählen, mehrere selektieren und deren Einstellungen ändern
 - [ ] Treppe die ohne Absatz in einem rechteckigen Bereich untergebracht ist, am Anfang und am Ende in der gleichen Linie endet. Frag nach, wenn du nciht genau weißt, was gemeint ist.
 - [ ] Aufbau der normalen Treppe passt nicht, Podest muss von einem Teil der Treppe erreichbar sein und der andere Teil vom Podest wegführen. Aber die Stufenbereiche liegen nebeneinander.
 - [ ] 3D-Ansicht ist leer
 - [ ] DWG-Dateien könne nicht als Teilebibliothek ausgewählt werden
-- [ ] Projekt leeren, Nachfrage-Dialog davor
-- [ ] Menü ergänzen und sinnvoll füllen, Key-Shortcuts passend ergänzen und implementieren
-- [ ] Oben/Unten/Nord/Süd/Ost/West durch Pfeile nach oben, unten, links, rechts ersetzen und dann die Ansicht entsprechend damit kippen.
+- [x] Projekt leeren, Nachfrage-Dialog davor
+- [x] Menü ergänzen und sinnvoll füllen, Key-Shortcuts passend ergänzen und implementieren
+- [x] Oben/Unten/Nord/Süd/Ost/West durch Pfeile nach oben, unten, links, rechts ersetzen und dann die Ansicht entsprechend damit kippen.
 - [ ] Nord-Einstellung bei Ansicht von Oben konfigurierbar machen und dann den Kompass immer passend gedreht anzeigen. Damit soll angezeigt werden, in welcher Ausrichtung das Gebäude steht.
 - [ ] Beim Ziehen von Hilfslinien soll das jeweils andere Lineal als Basis genommen werden, die aktuelle Position als Länge angezeigt werden und snap genutzt werden können
-- [ ] DXF-Extension beim Export wird doppelt angehängt und beim Etagennamen mit angezeigt
+- [x] DXF-Extension beim Export wird doppelt angehängt und beim Etagennamen mit angezeigt
 - [ ] Baue ein Logo für die Anwendung ein, was in der Task-Leiste eingeblendet wird. Suche oder erstelle ein CAD-Logo
-- [ ] Bei der 3D-Ansicht einen "Ansicht zentrieren"-Button ergänzen
+- [x] Bei der 3D-Ansicht einen "Ansicht zentrieren"-Button ergänzen
 - [ ] Drehen der 3D-Ansicht ist unhandlich und unverständlich
 - [ ] Durchforste die AutoCAD-Doku und suche nach Dingen, die wichtig sind und hier fehlen. Einfaches einbauen, Konpliziertes in TODO für später ergänzen.
 - [ ] Drehen von Bauteilen in den 90°-Winkeln ergänzen
@@ -115,6 +115,7 @@ Die folgende Liste kann während der Agenten-Tätigkeit angepasst und erweitert 
 - [ ] Kannst du ermöglichen, dass du direkt auf eine zum Testen gestartete APP zugreifen kannst? Wenn es zu JavaFX nichts Passendes gibt: Ggf. einen MCP-Server in der App ergänzen, dem du Maus-Aktionen, Tastatur-Eingaben usw. in Feldern an die App schicken kannst oder das in der Event-Ebene realisierst. Ziel soll sein, dass du Dinge selber testen kannst, dann exportierst und in der Datei nachsehen kannst, ob neue Funktionen funktionieren oder nicht.
 - [ ] horizontales Lineal ist rechts nicht lang genug, da ist eine weiße Box.
 - [ ] offenbar werden aktuell nur DXFs für einzelne Etagen erstellt/geladen. Das ist eine Option, es soll aber auch das ganze Gebäude ex-/importiert werden. Und das soll der Standard sein.
-- [ ] Die bunten Buttons können im Menü untergebracht werden und unten entfallen.
-- [ ] Je nach Werkzeugauswahl/Element-Selektion sollen nur die passenden Properties angezeigt werden
-- [ ] Die passenden Properties sollen alle in einer immer sichtbaren vertikalen Liste angezeigt werden, nicht aufgeteilt oben und was nicht passt rechts.
+- [x] Die bunten Buttons können im Menü untergebracht werden und unten entfallen.
+- [x] Je nach Werkzeugauswahl/Element-Selektion sollen nur die passenden Properties angezeigt werden
+- [x] Die passenden Properties sollen alle in einer immer sichtbaren vertikalen Liste angezeigt werden, nicht aufgeteilt oben und was nicht passt rechts.
+- [x] Gradle-Task und Release-Build für ein macOS-Install-Paket ergänzen

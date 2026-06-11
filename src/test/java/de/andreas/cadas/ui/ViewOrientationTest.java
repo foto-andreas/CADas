@@ -11,6 +11,7 @@ class ViewOrientationTest {
     void liefertFuerJedeAnsichtEineAussagekraeftigeOverlayBeschreibung() {
         for (ViewOrientation orientation : ViewOrientation.values()) {
             assertFalse(orientation.label().isBlank());
+            assertFalse(orientation.buttonLabel().isBlank());
             assertFalse(orientation.overlayDescription().isBlank());
             assertTrue(orientation.overlayDescription().contains("orthogonaler Projektion"));
         }

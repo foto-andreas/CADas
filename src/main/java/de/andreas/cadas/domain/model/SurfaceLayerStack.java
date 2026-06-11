@@ -74,5 +74,10 @@ public final class SurfaceLayerStack {
         }
         throw new IllegalArgumentException("Ebene nicht gefunden: " + layerId);
     }
-}
 
+    public SurfaceLayerStack copy() {
+        SurfaceLayerStack copy = new SurfaceLayerStack(id, surfaceType, targetKey);
+        copy.layers.addAll(layers);
+        return copy;
+    }
+}
