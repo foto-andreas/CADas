@@ -89,10 +89,32 @@ class DxfLevelExchangeServiceTest {
     @Test
     void exportiertMetrischeHeaderUndModelSpaceKennung() throws Exception {
         Level level = new Level("Erdgeschoss");
-        level.addWall(Wall.create(
+        Wall wall = Wall.create(
                 new PlanSegment(new PlanPoint(0, 0), new PlanPoint(1000, 0)),
                 Length.of(17.5, LengthUnit.CENTIMETER),
                 Length.of(2.75, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        level.addDoor(Door.create(
+                wall.id(),
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.of(80, LengthUnit.CENTIMETER),
+                Length.of(2.01, LengthUnit.METER),
+                Length.zero()
+        ));
+        level.addWindow(WindowElement.create(
+                wall.id(),
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(1.20, LengthUnit.METER)
+        ));
+        level.addStaircase(Staircase.create(
+                StairType.STRAIGHT,
+                new PlanPoint(0, 0),
+                new PlanPoint(1000, 2000),
+                Length.of(2.75, LengthUnit.METER),
+                14
         ));
 
         Path file = tempDir.resolve("header.dxf");
@@ -102,6 +124,17 @@ class DxfLevelExchangeServiceTest {
         assertTrue(dxf.contains("$INSUNITS\n70\n4"));
         assertTrue(dxf.contains("$MEASUREMENT\n70\n1"));
         assertTrue(dxf.contains("\n67\n0\n410\nModel\n"));
+        assertTrue(dxf.contains("\n2\nTABLES\n"));
+        assertTrue(dxf.contains("\n2\nBLOCKS\n"));
+        assertTrue(dxf.contains("\n2\nOBJECTS\n"));
+        assertTrue(dxf.contains("\n2\nLAYER\n"));
+        assertTrue(dxf.contains("\n2\nBLOCK_RECORD\n"));
+        assertTrue(dxf.contains("\n0\nINSERT\n"));
+        assertTrue(dxf.contains("\n2\nCADAS_DOOR\n"));
+        assertTrue(dxf.contains("\n2\nCADAS_WINDOW\n"));
+        assertTrue(dxf.contains("\n2\nCADAS_STAIR\n"));
+        assertTrue(dxf.contains("\n0\nDICTIONARY\n"));
+        assertTrue(dxf.contains("\n0\nLAYOUT\n"));
     }
 
     @Test

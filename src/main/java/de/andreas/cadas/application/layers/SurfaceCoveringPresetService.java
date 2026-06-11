@@ -90,4 +90,22 @@ public final class SurfaceCoveringPresetService {
                 path.toAbsolutePath().toString()
         );
     }
+
+    public SurfaceCoveringPreset fromDwgBlock(Path path, String blockName) {
+        String normalizedBlockName = blockName.trim();
+        String fileName = path.getFileName().toString();
+        String baseName = fileName.endsWith(".dwg") ? fileName.substring(0, fileName.length() - 4) : fileName;
+        return new SurfaceCoveringPreset(
+                "dwg-" + baseName.toLowerCase().replace(' ', '-') + "-" + normalizedBlockName.toLowerCase().replace(' ', '-'),
+                "DWG-Block: " + normalizedBlockName,
+                Length.of(10, LengthUnit.MILLIMETER),
+                Length.of(100, LengthUnit.CENTIMETER),
+                Length.of(100, LengthUnit.CENTIMETER),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.zero(),
+                Length.of(10, LengthUnit.CENTIMETER),
+                path.toAbsolutePath() + "#" + normalizedBlockName
+        );
+    }
 }
