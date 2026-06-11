@@ -62,6 +62,10 @@ public final class AutomationBridgeServer {
             workbench.automationSelectLevel(required(query, "value"));
             return workbench.automationSnapshot();
         }));
+        server.createContext("/workspace", exchange -> handleMutation(exchange, query -> {
+            workbench.automationSetWorkspace(required(query, "value"));
+            return workbench.automationSnapshot();
+        }));
         server.createContext("/field", exchange -> handleMutation(exchange, query -> {
             workbench.automationSetField(required(query, "name"), required(query, "value"));
             return workbench.automationSnapshot();

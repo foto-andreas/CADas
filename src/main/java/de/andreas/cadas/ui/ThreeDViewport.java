@@ -11,14 +11,19 @@ import de.andreas.cadas.application.view.ThreeDSceneModelBuilder;
 import de.andreas.cadas.application.view.ThreeDViewPreparation;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.imageio.ImageIO;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
@@ -35,6 +40,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
@@ -411,6 +417,27 @@ public final class ThreeDViewport extends BorderPane {
         return cameraStatusLabel.getText();
     }
 
+    public void exportSnapshot(Path path) {
+        if (path == null) {
+            throw new IllegalArgumentException("Für den 3D-Snapshot wird ein Zielpfad benötigt.");
+        }
+        if (getWidth() <= 0 || getHeight() <= 0) {
+            throw new IllegalStateException("Die 3D-Ansicht hat noch keine nutzbare Größe.");
+        }
+        fitCameraToScene();
+        applyCss();
+        layout();
+        WritableImage image = snapshot(null, null);
+        try {
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
+            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", path.toFile());
+        } catch (IOException exception) {
+            throw new IllegalStateException("3D-Snapshot konnte nicht geschrieben werden.", exception);
+        }
+    }
+
     private Node createNode(RenderableBox renderableBox) {
         Box box = new Box(
                 Math.max(1.0, renderableBox.width()),
@@ -517,9 +544,9 @@ public final class ThreeDViewport extends BorderPane {
 
     private javafx.scene.transform.Transform[] cameraTransforms() {
         return new javafx.scene.transform.Transform[]{
+                new Translate(0, 0, -cameraPose.distance() * WORLD_SCALE),
                 new Rotate(-cameraPose.elevationDegrees(), Rotate.X_AXIS),
-                new Rotate(-cameraPose.azimuthDegrees(), Rotate.Y_AXIS),
-                new Translate(0, 0, -cameraPose.distance() * WORLD_SCALE)
+                new Rotate(-cameraPose.azimuthDegrees(), Rotate.Y_AXIS)
         };
     }
 
