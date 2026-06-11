@@ -21,6 +21,18 @@ Achtung: Wir sind in einem frühen Status der Programmierung. Nix ist fest, weni
 ./gradlew run
 ```
 
+## Distribution
+
+Lokale Installations- und Distributionsaufgaben:
+
+```bash
+./gradlew installDist
+./gradlew packageMacOsAppImage
+./gradlew packageMacOsDmg
+```
+
+Hinweis: Die beiden macOS-Paketierungsaufgaben laufen nur auf `macOS`, weil dafür `jpackage` des lokalen JDK genutzt wird.
+
 ## Tests
 
 ```bash
@@ -39,6 +51,9 @@ Der aktuelle Schwerpunkt liegt auf dem 2D-Grundrisskern:
 * Wände, Räume, Türen, Fenster und Treppen
 * Etagenverwaltung
 * Raster, Snap, Hilfslinien und Bearbeitung verbundener Wand-Endpunkte
+* Menü, Tastaturkürzel, Rückgängig/Wiederherstellen und kontextabhängige Properties-Leiste
+* modulare JavaFX-Startskripte ohne die bisherigen Startwarnungen
+* erste gekoppelte 3D-Ansicht mit Auswahlrückkopplung
 * DXF-Import und -Export
 * interne und externe Teilebibliotheken
 

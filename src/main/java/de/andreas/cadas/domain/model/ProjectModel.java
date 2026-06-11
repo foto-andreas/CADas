@@ -48,4 +48,33 @@ public final class ProjectModel {
     public void defineRoof(Roof roof) {
         this.roof = Objects.requireNonNull(roof, "roof darf nicht null sein.");
     }
+
+    public ProjectModel copy() {
+        ProjectModel copy = new ProjectModel(name, List.of());
+        levels.stream()
+                .map(Level::copy)
+                .forEach(copy.levels::add);
+        copy.roof = roof;
+        return copy;
+    }
+
+    public void replaceWith(ProjectModel snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot darf nicht null sein.");
+        if (!name.equals(snapshot.name)) {
+            throw new IllegalArgumentException("Projektname darf beim Wiederherstellen nicht geändert werden.");
+        }
+        levels.clear();
+        snapshot.levels.stream()
+                .map(Level::copy)
+                .forEach(levels::add);
+        roof = snapshot.roof;
+    }
+
+    public Level resetToSingleLevel(String levelName) {
+        levels.clear();
+        roof = null;
+        Level level = new Level(levelName);
+        levels.add(level);
+        return level;
+    }
 }

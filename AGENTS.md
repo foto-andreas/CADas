@@ -47,6 +47,10 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Der erste Dachumfang fokussiert das Satteldach als separates Domänenobjekt mit Winkel, Überstand und Dachrinne.
 * Externe Teilebibliotheken werden im ersten Schritt über das textbasierte Format `.cadasparts` importiert und in die bestehende Preset-Verwaltung integriert.
 * Die erste 3D-Visualisierung wird als JavaFX-`SubScene` mit gemeinsamem Auswahlmodell zwischen 2D und 3D sowie aus dem Fachmodell abgeleiteten Volumenkörpern umgesetzt.
+* Die JavaFX-Anwendung wird modular mit `module-info.java` und `mainModule` betrieben, damit Launcher, Distribution und zukünftige Paketierung sauber zusammenpassen.
+* Für macOS wird die erste Installationspaket-Erzeugung über `jpackage` aus dem Gradle-Build heraus bereitgestellt.
+* Datei-, Projekt- und Bearbeitungsaktionen werden primär über Menü und Tastaturkürzel angeboten; die Werkzeugleiste bleibt auf den schnellen Kernzugriff reduziert.
+* Eingabewerte und Bauteil-Properties werden in einer dauerhaft sichtbaren vertikalen Eigenschaftenleiste kontextabhängig nach Werkzeug oder Auswahl eingeblendet.
 
 ## Empfohlene Umsetzungsreihenfolge
 1. Technisches Grundgerüst, Architektur, Tests und Qualitätswerkzeuge.
