@@ -10,20 +10,14 @@ import java.util.Set;
 
 public final class OrthogonalPolygonDecompositionService {
 
+    private static final double GRID_STEP = 200.0;
+
     public List<CellRectangle> decompose(List<PlanPoint> outline) {
         if (outline.size() < 3) {
             return List.of();
         }
-        List<Double> xCoordinates = outline.stream()
-                .map(PlanPoint::xMillimeters)
-                .distinct()
-                .sorted()
-                .toList();
-        List<Double> yCoordinates = outline.stream()
-                .map(PlanPoint::yMillimeters)
-                .distinct()
-                .sorted()
-                .toList();
+        List<Double> xCoordinates = isOrthogonal(outline) ? orthogonalCoordinates(outline, true) : sampledCoordinates(outline, true);
+        List<Double> yCoordinates = isOrthogonal(outline) ? orthogonalCoordinates(outline, false) : sampledCoordinates(outline, false);
         List<CellRectangle> rectangles = new ArrayList<>();
         for (int xIndex = 0; xIndex < xCoordinates.size() - 1; xIndex++) {
             for (int yIndex = 0; yIndex < yCoordinates.size() - 1; yIndex++) {
@@ -38,6 +32,40 @@ public final class OrthogonalPolygonDecompositionService {
             }
         }
         return mergeHorizontally(rectangles);
+    }
+
+    private boolean isOrthogonal(List<PlanPoint> outline) {
+        for (int index = 0; index < outline.size(); index++) {
+            PlanPoint current = outline.get(index);
+            PlanPoint next = outline.get((index + 1) % outline.size());
+            if (Math.abs(current.xMillimeters() - next.xMillimeters()) >= 0.001
+                    && Math.abs(current.yMillimeters() - next.yMillimeters()) >= 0.001) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private List<Double> orthogonalCoordinates(List<PlanPoint> outline, boolean xAxis) {
+        return outline.stream()
+                .map(point -> xAxis ? point.xMillimeters() : point.yMillimeters())
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private List<Double> sampledCoordinates(List<PlanPoint> outline, boolean xAxis) {
+        double min = outline.stream().mapToDouble(point -> xAxis ? point.xMillimeters() : point.yMillimeters()).min().orElse(0.0);
+        double max = outline.stream().mapToDouble(point -> xAxis ? point.xMillimeters() : point.yMillimeters()).max().orElse(0.0);
+        List<Double> coordinates = new ArrayList<>();
+        coordinates.add(min);
+        double current = min;
+        while (current + GRID_STEP < max) {
+            current += GRID_STEP;
+            coordinates.add(current);
+        }
+        coordinates.add(max);
+        return coordinates.stream().distinct().sorted().toList();
     }
 
     private List<CellRectangle> mergeHorizontally(List<CellRectangle> rectangles) {

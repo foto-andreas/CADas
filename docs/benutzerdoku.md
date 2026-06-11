@@ -339,6 +339,7 @@ Mit dem Werkzeug `Raum` zeichnest du keinen separaten Rechteckraum mehr.
 * Räume werden automatisch aus geschlossenen Wandzügen erzeugt.
 * Mit dem Werkzeug `Raum` klickst du in einen automatisch erkannten Raum, um ihn gezielt auszuwählen.
 * Raumname, Raumhöhe, Bodenstärke, Deckenstärke und Dachschräge kommen aus den aktuellen Eingaben und können dann auf die Auswahl angewendet werden.
+* Wenn du eine gemeinsame Wandecke verschiebst, wird die Raumkontur automatisch nachgeführt und darf dabei auch schräg oder polygonal werden.
 
 ### Treppe
 

@@ -89,6 +89,31 @@ class AutoRoomGenerationServiceTest {
         assertEquals(SlopedCeilingSide.NORTH, updatedRooms.getFirst().slopedCeilingProfile().orElseThrow().lowSide());
     }
 
+    @Test
+    void passtRaumkonturBeiVerschobenerEckeMitSchraegenWaendenAn() {
+        Level level = new Level("Erdgeschoss");
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 0),
+                new PlanPoint(4000, 3000),
+                new PlanPoint(0, 3000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+
+        level.replaceWalls(List.of(
+                new Wall(level.walls().get(0).id(), new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4200, 200)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)),
+                new Wall(level.walls().get(1).id(), new PlanSegment(new PlanPoint(4200, 200), new PlanPoint(4000, 3000)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)),
+                level.walls().get(2),
+                level.walls().get(3)
+        ));
+
+        List<Room> rooms = service.synchronize(level, defaults());
+
+        assertEquals(1, rooms.size());
+        assertTrue(rooms.getFirst().outline().size() >= 4);
+        assertTrue(rooms.getFirst().maxXMillimeters() > 3900.0);
+        assertTrue(rooms.getFirst().minYMillimeters() > 0.0);
+    }
+
     private AutoRoomGenerationService.RoomDefaults defaults() {
         return new AutoRoomGenerationService.RoomDefaults(
                 "Dachraum",
