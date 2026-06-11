@@ -6,6 +6,7 @@ public record CameraPose(
         double elevationDegrees,
         double distance,
         double panX,
+        double panY,
         double panZ
 ) {
 }

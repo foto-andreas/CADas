@@ -56,8 +56,7 @@ Die Oberfläche besteht aktuell aus fünf Hauptbereichen:
 * Menüleiste
 * kompakte Werkzeugleiste
 * linke Eigenschaftenleiste
-* 2D-Zeichenfläche mit Linealen
-* rechte 3D-Ansicht
+* gemeinsamer Mittelbereich für 2D-Zeichenfläche oder 3D-Ansicht
 * untere Statusleiste
 
 ### Menüleiste
@@ -102,7 +101,7 @@ In der Mitte liegt die eigentliche Grundrissfläche. Dort werden Wände, Räume,
 
 ### 3D-Ansicht
 
-Rechts siehst du eine räumliche Ableitung des aktuellen Modells. Sie basiert direkt auf denselben Domänendaten wie die 2D-Ansicht. Auswahl, Sichtbarkeit und Hervorhebung sind mit der 2D-Ansicht gekoppelt.
+Im selben Mittelbereich kann statt der 2D-Zeichenfläche auch die 3D-Ansicht eingeblendet werden. Sie basiert direkt auf denselben Domänendaten wie die 2D-Ansicht. Auswahl, Sichtbarkeit und Hervorhebung sind mit der 2D-Ansicht gekoppelt.
 
 ### Statusleiste
 
@@ -261,6 +260,7 @@ Derzeit gilt:
 * Mit gedrückter linker Maustaste drehst du die Kamera um das Modell.
 * Mit gedrückter rechter Maustaste verschiebst du den Modellbezug seitlich.
 * Mit dem Mausrad zoomst du in der 3D-Ansicht.
+* Die 3D-Ansicht dreht jetzt um die Modellmitte; `Modell einpassen` und `Ansicht zentrieren` halten das Modell im Blick.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
 * Über `Iso`, `Oben`, `Vorne` und `Rechts` wechselst du auf schnelle 3D-Kamerapresets.
 * Über die Geschoss-Checkboxen blendest du einzelne Etagen in der 3D-Ansicht ein oder aus.
@@ -320,6 +320,14 @@ Die sechs orthogonalen Ansichten werden oberhalb der Zeichenfläche über Pfeilt
 
 Die Umschaltung wirkt auf die 3D-Kamera und auf die Kompassdarstellung. Besonders bei `Oben` ist der Nordwinkel relevant.
 Die 3D-Kamera bleibt davon bewusst unabhängig und wird über die 3D-Bedienelemente gesteuert.
+
+## Zwischen 2D und 3D umschalten
+
+Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D` und `3D`.
+
+* `2D` zeigt die Zeichenfläche mit Linealen und Grundrisswerkzeugen.
+* `3D` nutzt denselben Platz für die räumliche Modellansicht.
+* Dadurch bleibt mehr Platz für die aktive Arbeitsansicht, statt 2D und 3D ständig parallel einzublenden.
 
 ## Werkzeuge
 
