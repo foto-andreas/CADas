@@ -96,28 +96,33 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 
 ## Nächste Aktionen
 - [x] Undo und Restore implementieren
-- [ ] Das Umschalten der Ansichten ändert die Ansicht nicht
-- [ ] Elemente auswählen, abwählen, mehrere selektieren und deren Einstellungen ändern
-- [ ] Treppe die ohne Absatz in einem rechteckigen Bereich untergebracht ist, am Anfang und am Ende in der gleichen Linie endet. Frag nach, wenn du nciht genau weißt, was gemeint ist.
-- [ ] Aufbau der normalen Treppe passt nicht, Podest muss von einem Teil der Treppe erreichbar sein und der andere Teil vom Podest wegführen. Aber die Stufenbereiche liegen nebeneinander.
-- [ ] 3D-Ansicht ist leer
-- [ ] DWG-Dateien könne nicht als Teilebibliothek ausgewählt werden
+- [x] Das Umschalten der Ansichten ändert die Ansicht nicht
+- [x] Elemente auswählen, abwählen, mehrere selektieren und deren Einstellungen ändern
+- [x] Treppe die ohne Absatz in einem rechteckigen Bereich untergebracht ist, am Anfang und am Ende in der gleichen Linie endet. Frag nach, wenn du nciht genau weißt, was gemeint ist.
+- [x] Aufbau der normalen Treppe passt nicht, Podest muss von einem Teil der Treppe erreichbar sein und der andere Teil vom Podest wegführen. Aber die Stufenbereiche liegen nebeneinander.
+- [x] 3D-Ansicht ist leer
+- [x] DWG-Dateien könne nicht als Teilebibliothek ausgewählt werden
 - [x] Projekt leeren, Nachfrage-Dialog davor
 - [x] Menü ergänzen und sinnvoll füllen, Key-Shortcuts passend ergänzen und implementieren
-- [ ] Oben/Unten/Nord/Süd/Ost/West durch Pfeile nach oben, unten, links, rechts ersetzen und dann die Ansicht entsprechend damit kippen. Das klappt noch nicht. Bezeichnung der Himmelsrichtungen entfernen, denn das ist ja nicht die wirkliche Richtung.
-- [ ] Nord-Einstellung bei Ansicht von Oben konfigurierbar machen und dann den Kompass immer passend gedreht anzeigen. Damit soll angezeigt werden, in welcher Ausrichtung das Gebäude steht.
-- [ ] Beim Ziehen von Hilfslinien soll das jeweils andere Lineal als Basis genommen werden, die aktuelle Position als Länge angezeigt werden und snap genutzt werden können
+- [x] Oben/Unten/Nord/Süd/Ost/West durch Pfeile nach oben, unten, links, rechts ersetzen und dann die Ansicht entsprechend damit kippen. Das klappt noch nicht. Bezeichnung der Himmelsrichtungen entfernen, denn das ist ja nicht die wirkliche Richtung.
+- [x] Nord-Einstellung bei Ansicht von Oben konfigurierbar machen und dann den Kompass immer passend gedreht anzeigen. Damit soll angezeigt werden, in welcher Ausrichtung das Gebäude steht.
+- [x] Beim Ziehen von Hilfslinien soll das jeweils andere Lineal als Basis genommen werden, die aktuelle Position als Länge angezeigt werden und snap genutzt werden können
 - [x] DXF-Extension beim Export wird doppelt angehängt und beim Etagennamen mit angezeigt
-- [ ] Baue ein Logo für die Anwendung ein, was in der Task-Leiste eingeblendet wird. Suche oder erstelle ein CAD-Logo
+- [x] Baue ein Logo für die Anwendung ein, was in der Task-Leiste eingeblendet wird. Suche oder erstelle ein CAD-Logo
 - [x] Bei der 3D-Ansicht einen "Ansicht zentrieren"-Button ergänzen
-- [ ] Drehen der 3D-Ansicht ist unhandlich und unverständlich
-- [ ] Durchforste die AutoCAD-Doku und suche nach Dingen, die wichtig sind und hier fehlen. Einfaches einbauen, Konpliziertes in TODO für später ergänzen.
-- [ ] Drehen von Bauteilen in den 90°-Winkeln ergänzen
-- [ ] Kontextmenü bei Selektion von Bauteilen ergänzen und sinnvolle EInträge ergänzen
-- [ ] Kannst du ermöglichen, dass du direkt auf eine zum Testen gestartete APP zugreifen kannst? Wenn es zu JavaFX nichts Passendes gibt: Ggf. einen MCP-Server in der App ergänzen, dem du Maus-Aktionen, Tastatur-Eingaben usw. in Feldern an die App schicken kannst oder das in der Event-Ebene realisierst. Ziel soll sein, dass du Dinge selber testen kannst, dann exportierst und in der Datei nachsehen kannst, ob neue Funktionen funktionieren oder nicht.
-- [ ] horizontales Lineal ist rechts nicht lang genug, da ist eine weiße Box.
-- [ ] offenbar werden aktuell nur DXFs für einzelne Etagen erstellt/geladen. Das ist eine Option, es soll aber auch das ganze Gebäude ex-/importiert werden. Und das soll der Standard sein.
+- [x] Drehen der 3D-Ansicht ist unhandlich und unverständlich
+- [x] Durchforste die AutoCAD-Doku und suche nach Dingen, die wichtig sind und hier fehlen. Einfaches einbauen, Konpliziertes in TODO für später ergänzen.
+- [x] Drehen von Bauteilen in den 90°-Winkeln ergänzen
+- [x] Kontextmenü bei Selektion von Bauteilen ergänzen und sinnvolle EInträge ergänzen
+- [x] Kannst du ermöglichen, dass du direkt auf eine zum Testen gestartete APP zugreifen kannst? Wenn es zu JavaFX nichts Passendes gibt: Ggf. einen MCP-Server in der App ergänzen, dem du Maus-Aktionen, Tastatur-Eingaben usw. in Feldern an die App schicken kannst oder das in der Event-Ebene realisierst. Ziel soll sein, dass du Dinge selber testen kannst, dann exportierst und in der Datei nachsehen kannst, ob neue Funktionen funktionieren oder nicht.
+- [x] horizontales Lineal ist rechts nicht lang genug, da ist eine weiße Box.
+- [x] offenbar werden aktuell nur DXFs für einzelne Etagen erstellt/geladen. Das ist eine Option, es soll aber auch das ganze Gebäude ex-/importiert werden. Und das soll der Standard sein.
 - [x] Die bunten Buttons können im Menü untergebracht werden und unten entfallen.
 - [x] Je nach Werkzeugauswahl/Element-Selektion sollen nur die passenden Properties angezeigt werden
 - [x] Die passenden Properties sollen alle in einer immer sichtbaren vertikalen Liste angezeigt werden, nicht aufgeteilt oben und was nicht passt rechts.
 - [x] Gradle-Task und Release-Build für ein macOS-Install-Paket ergänzen
+
+## AutoCAD-Folgethemen
+- [ ] DXF-`TABLES`-Sektion mit Layer- und Linientypdefinitionen für robusteren Austausch ergänzen.
+- [ ] DXF-`BLOCKS`- und `INSERT`-Unterstützung für wiederverwendbare Bauteile und spätere DWG-Nutzung ergänzen.
+- [ ] DXF-Handles, `OBJECTS`-Sektion und weitergehende Layout-Metadaten für belastbareren AutoCAD-Roundtrip ergänzen.

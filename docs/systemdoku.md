@@ -32,6 +32,8 @@ Für macOS gibt es zusätzlich Gradle-Aufgaben auf Basis von `jpackage`:
   Einstiegspunkte der Anwendung.
 * `de.andreas.cadas.ui`
   JavaFX-Workbench, Ansichten und Interaktion mit der Zeichenfläche.
+* `de.andreas.cadas.ui.AutomationBridgeServer`
+  Lokaler HTTP-Zugriff für direkte Tests gegen eine laufende JavaFX-Anwendung.
 * `de.andreas.cadas.application.history`
   Allgemeine Rückgängig-/Wiederherstellen-Verwaltung auf Snapshot-Basis.
 * `de.andreas.cadas.application.drawing`
@@ -67,19 +69,23 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * ein- und ausblendbare Bemaßung für Wände
 * Werkzeugmodus für Wände, Räume, Türen, Fenster und Bearbeitung
 * parallele 3D-Ansicht mit Orbit, Zoom, Pan und Auswahlrückkopplung
+* Mehrfachauswahl mit Eigenschaftenübernahme auf mehrere passende Bauteile
+* Kontextmenü für Auswahlaktionen und 90°-Drehung rotierbarer Bauteile
 * Rückgängig und Wiederherstellen für fachliche Bearbeitungsschritte
-* DXF-Import und DXF-Export für die aktive Etage
+* Gebäude-DXF als Standard sowie Etagen-DXF als Zusatzfunktion
 * Standardteil-Presets für Türen, Fenster und Treppen
-* erste Treppenplatzierung für gerade, 180°- und Wendeltreppen
+* erste Treppenplatzierung für gerade, 180°-, gegenläufige und Wendeltreppen
 * Flächen- und Volumenanzeige für Räume
 
 ### Anwendungslogik
 
-`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam. `ThreeDSceneModelBuilder` leitet aus denselben Domänenobjekten einen renderbaren 3D-Szenengraphen ab, und `ThreeDCameraController` kapselt Orbit-, Pan-, Zoom- und Projektionswechsel der 3D-Kamera.
+`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam. `QuarterTurnRotationService` kapselt die 90°-Drehung rotierbarer Bauteile testbar außerhalb der UI. `ThreeDSceneModelBuilder` leitet aus denselben Domänenobjekten einen renderbaren 3D-Szenengraphen ab, und `ThreeDCameraController` kapselt Orbit-, Pan-, Zoom- und Projektionswechsel der 3D-Kamera.
 
 `SelectionQueryService` kapselt die fachliche Auswahlauflösung unter dem Cursor. Dadurch liegt die Priorisierung von Öffnungen, Treppen, Wänden und Räumen nicht mehr direkt in der JavaFX-Workbench.
 
 `UndoRedoStack` kapselt den generischen Verlauf. In der Workbench werden darüber komplette Projektsnapshots einschließlich Hilfslinien, aktiver Etage und Auswahlzustand verwaltet.
+
+`AutomationBridgeServer` bindet lokal auf `127.0.0.1:17845` und reicht Werkzeuge, Felder, Canvas-Aktionen sowie Import-/Export-Kommandos kontrolliert an die Workbench weiter. Dadurch lassen sich End-to-End-Tests der laufenden Desktop-Anwendung auch ohne manuelle Bedienung durchführen.
 
 ### Domäne
 
@@ -97,12 +103,15 @@ Diese Teile sind bewusst zunächst im Modell und in Tests abgesichert, bevor daf
 
 ## Dateiformatstrategie
 
-Der erste konkrete Austauschadapter ist `DxfLevelExchangeService`. Er kapselt den DXF-Import und -Export bewusst hinter `LevelExchangeService`, damit eine spätere `DWG`-Unterstützung als weiterer Infrastrukturadapter ergänzt werden kann.
+Die konkreten Austauschadapter sind `DxfProjectExchangeService` und `DxfLevelExchangeService`. Sie kapseln den DXF-Import und -Export bewusst hinter `ProjectExchangeService` und `LevelExchangeService`, damit eine spätere `DWG`-Unterstützung als weiterer Infrastrukturadapter ergänzt werden kann.
 
 Für den aktuellen Stand gilt:
 
-* Wände, Räume, Türen und Fenster werden sichtbar als DXF-Geometrie exportiert.
+* Gebäude-DXF ist die Standardfunktion für den Austausch kompletter Modelle mit mehreren Etagen.
+* Wände, Räume, Türen, Fenster und Treppen werden sichtbar als DXF-Geometrie exportiert.
 * Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
+* Der Export schreibt aktuell metrische Kopfvariablen über `$INSUNITS = 4` und `$MEASUREMENT = 1`.
+* Exportierte Entities werden explizit als Model-Space-Elemente gekennzeichnet.
 * Fällt diese Metadaten-Spur weg, importiert der Adapter zumindest einfache Wände und Räume aus der reinen Geometrie.
 
 ## Teilebibliotheken
@@ -131,6 +140,7 @@ Aktuell abgesichert sind unter anderem:
 * Verschieben verbundener Wand-Endpunkte
 * Flächen- und Volumenberechnung von Räumen
 * DXF-Roundtrip für die Grundobjekte des MVP
+* DXF-Header und Model-Space-Kennzeichnung für bessere AutoCAD-Kompatibilität
 * Dateinamennormalisierung für DXF-Import und -Export
 * Standardteil-Bibliothek für Türen, Fenster und Treppen
 * Dach- und Ebenendomäne für weitere Ausbaustufen
@@ -138,6 +148,7 @@ Aktuell abgesichert sind unter anderem:
 * Kameragrundverhalten für Orbit, Pan, Zoom und Projektionswechsel
 * Kamera-Presets für die sechs orthogonalen Ansichten
 * Auswahlpriorisierung für Türen, Fenster, Treppen, Wände und Räume
+* 90°-Drehung für Wände, Räume und Treppen
 * Rückgängig-/Wiederherstellen-Verhalten des generischen Verlaufs
 * Grundverhalten des Projektmodells
 
