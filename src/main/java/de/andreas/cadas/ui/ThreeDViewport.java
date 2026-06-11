@@ -41,6 +41,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
@@ -196,6 +197,7 @@ public final class ThreeDViewport extends BorderPane {
     private void configureControls() {
         projectionModeSelector.getItems().addAll(ProjectionMode.values());
         projectionModeSelector.setValue(cameraPose.projectionMode());
+        projectionModeSelector.setPrefWidth(160);
         projectionModeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
                 cameraPose = cameraController.switchProjection(cameraPose, newValue);
@@ -240,12 +242,30 @@ public final class ThreeDViewport extends BorderPane {
         applyTooltip(orbitDownButton, "Senkt die 3D-Kamera schrittweise ab.");
         applyTooltip(fitSceneButton, "Richtet Kameraabstand und Mittelpunkt so aus, dass das aktuelle Modell vollständig sichtbar wird.");
         applyTooltip(interactionHintLabel, "Erinnert an die direkte Maussteuerung der 3D-Ansicht: linke Maustaste dreht, rechte verschiebt und das Mausrad zoomt.");
-        HBox header = new HBox(12.0, title, projectionLabel, projectionModeSelector, orbitLeftButton, orbitRightButton, orbitUpButton, orbitDownButton, fitSceneButton, surfaceLayersCheckBox, resetViewButton, interactionHintLabel);
+        HBox titleRow = new HBox(10.0, title, interactionHintLabel);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        titleRow.setFillHeight(true);
+
+        FlowPane controlRow = new FlowPane(10.0, 10.0,
+                projectionLabel,
+                projectionModeSelector,
+                orbitLeftButton,
+                orbitRightButton,
+                orbitUpButton,
+                orbitDownButton,
+                fitSceneButton,
+                surfaceLayersCheckBox,
+                resetViewButton
+        );
+        controlRow.setAlignment(Pos.CENTER_LEFT);
+        controlRow.setPrefWrapLength(500);
+
+        VBox header = new VBox(8.0, titleRow, controlRow);
         header.setAlignment(Pos.CENTER_LEFT);
 
         ScrollPane levelScrollPane = new ScrollPane(levelTogglePane);
         levelScrollPane.setFitToWidth(true);
-        levelScrollPane.setPrefViewportHeight(88);
+        levelScrollPane.setPrefViewportHeight(72);
         levelScrollPane.setStyle("-fx-background-color: transparent;");
 
         sceneHintLabel.setWrapText(true);
@@ -257,7 +277,8 @@ public final class ThreeDViewport extends BorderPane {
         subScene.heightProperty().bind(scenePane.heightProperty());
 
         BorderPane.setMargin(scenePane, new Insets(10, 0, 10, 0));
-        setTop(new BorderPane(header, null, null, levelScrollPane, null));
+        VBox topArea = new VBox(10.0, header, levelScrollPane);
+        setTop(topArea);
         setCenter(scenePane);
         setBottom(cameraStatusLabel);
         setPadding(new Insets(0, 0, 0, 12));
