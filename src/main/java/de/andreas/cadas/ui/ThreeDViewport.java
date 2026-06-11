@@ -21,7 +21,6 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.CacheHint;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.ParallelCamera;
@@ -56,7 +55,7 @@ public final class ThreeDViewport extends BorderPane {
     private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
     private final ThreeDCameraController cameraController = new ThreeDCameraController();
-    private final PerspectiveCamera perspectiveCamera = new PerspectiveCamera(true);
+    private final PerspectiveCamera perspectiveCamera = new PerspectiveCamera(false);
     private final ParallelCamera parallelCamera = new ParallelCamera();
     private final Group worldRoot = new Group();
     private final Group modelRoot = new Group();
@@ -84,6 +83,7 @@ public final class ThreeDViewport extends BorderPane {
     private double dragStartY;
     private CameraPose dragStartPose;
     private MouseButton dragButton = MouseButton.NONE;
+    private boolean sceneWasEmpty = true;
 
     public ThreeDViewport(Consumer<SelectionKey> selectionConsumer) {
         this.selectionConsumer = selectionConsumer;
@@ -119,9 +119,10 @@ public final class ThreeDViewport extends BorderPane {
         rebuildScene(sceneModel);
         sceneHintLabel.setVisible(sceneModel.boxes().isEmpty());
         sceneHintLabel.setManaged(sceneModel.boxes().isEmpty());
-        if (!sceneModel.boxes().isEmpty() && fitToSceneRequested) {
+        if (!sceneModel.boxes().isEmpty() && (fitToSceneRequested || sceneWasEmpty)) {
             fitCameraToScene();
         }
+        sceneWasEmpty = sceneModel.boxes().isEmpty();
     }
 
     public void setSelectedSelection(SelectionKey selectedSelection) {
@@ -317,12 +318,7 @@ public final class ThreeDViewport extends BorderPane {
         double minZ = Double.POSITIVE_INFINITY;
         double maxZ = Double.NEGATIVE_INFINITY;
         for (RenderableBox renderableBox : sceneModel.boxes()) {
-            Group levelGroup = groupedByLevel.computeIfAbsent(renderableBox.levelName(), ignored -> {
-                Group group = new Group();
-                group.setCache(true);
-                group.setCacheHint(CacheHint.SPEED);
-                return group;
-            });
+            Group levelGroup = groupedByLevel.computeIfAbsent(renderableBox.levelName(), ignored -> new Group());
             levelGroup.getChildren().add(createNode(renderableBox));
             minX = Math.min(minX, renderableBox.centerX() - renderableBox.width() / 2.0);
             maxX = Math.max(maxX, renderableBox.centerX() + renderableBox.width() / 2.0);
@@ -438,7 +434,7 @@ public final class ThreeDViewport extends BorderPane {
                 projectionModeSelector.getValue(),
                 currentOrientation.cameraAzimuthDegrees(),
                 currentOrientation.cameraElevationDegrees(),
-                Math.max(8_000.0, sceneSpan * 2.2),
+                Math.max(6_000.0, sceneSpan * 1.8),
                 -sceneCenterX * WORLD_SCALE,
                 -sceneCenterZ * WORLD_SCALE
         );

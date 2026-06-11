@@ -10,6 +10,8 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SlopedCeilingProfile;
+import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
@@ -100,5 +102,26 @@ class DxfLevelExchangeServiceTest {
         assertTrue(dxf.contains("$INSUNITS\n70\n4"));
         assertTrue(dxf.contains("$MEASUREMENT\n70\n1"));
         assertTrue(dxf.contains("\n67\n0\n410\nModel\n"));
+    }
+
+    @Test
+    void exportiertUndImportiertRaeumeMitDachschraege() throws Exception {
+        Level level = new Level("Dachgeschoss");
+        level.addRoom(Room.rectangular(
+                "Studio",
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 3000),
+                Length.of(2.8, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                new SlopedCeilingProfile(SlopedCeilingSide.SOUTH, Length.of(1.1, LengthUnit.METER))
+        ));
+
+        Path file = tempDir.resolve("dachgeschoss.dxf");
+        exchangeService.exportLevel(level, file);
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertEquals(SlopedCeilingSide.SOUTH, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().lowSide());
+        assertEquals(1100.0, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().kneeWallHeight().toMillimeters(), 0.001);
     }
 }

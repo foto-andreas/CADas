@@ -11,6 +11,8 @@ import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.Roof;
 import de.andreas.cadas.domain.model.RoofType;
+import de.andreas.cadas.domain.model.SlopedCeilingProfile;
+import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
@@ -99,7 +101,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                             deserializePoints(parts[6]),
                             Length.ofMillimeters(parseDouble(parts[3])),
                             Length.ofMillimeters(parseDouble(parts[4])),
-                            Length.ofMillimeters(parseDouble(parts[5]))
+                            Length.ofMillimeters(parseDouble(parts[5])),
+                            parts.length >= 8 ? deserializeSlopedCeiling(parts[7]) : null
                     ));
                 }
                 case "DOOR" -> {
@@ -209,13 +212,14 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (Room room : level.rooms()) {
             appendMetadataText(dxf, room.centerPoint(), String.format(
                     Locale.US,
-                    "ROOM|%s|%s|%.3f|%.3f|%.3f|%s",
+                    "ROOM|%s|%s|%.3f|%.3f|%.3f|%s|%s",
                     sanitize(level.name()),
                     sanitize(room.name()),
                     room.roomHeight().toMillimeters(),
                     room.floorThickness().toMillimeters(),
                     room.ceilingThickness().toMillimeters(),
-                    serializePoints(room.outline())
+                    serializePoints(room.outline()),
+                    serializeSlopedCeiling(room)
             ));
         }
         for (Door door : level.doors()) {
@@ -346,6 +350,31 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
 
     private double parseDouble(String text) {
         return Double.parseDouble(text);
+    }
+
+    private String serializeSlopedCeiling(Room room) {
+        return room.slopedCeilingProfile()
+                .map(profile -> String.format(
+                        Locale.US,
+                        "SLOPE,%s,%.3f",
+                        profile.lowSide().name(),
+                        profile.kneeWallHeight().toMillimeters()
+                ))
+                .orElse("NONE");
+    }
+
+    private SlopedCeilingProfile deserializeSlopedCeiling(String value) {
+        if (value == null || value.isBlank() || value.equals("NONE")) {
+            return null;
+        }
+        String[] parts = value.split(",");
+        if (parts.length != 3 || !parts[0].equals("SLOPE")) {
+            return null;
+        }
+        return new SlopedCeilingProfile(
+                SlopedCeilingSide.valueOf(parts[1]),
+                Length.ofMillimeters(parseDouble(parts[2]))
+        );
     }
 
     private String sanitize(String value) {
