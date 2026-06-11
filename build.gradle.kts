@@ -1,3 +1,9 @@
+import org.gradle.api.DefaultTask
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+
 plugins {
     application
     jacoco
@@ -5,7 +11,7 @@ plugins {
 }
 
 group = "de.andreas"
-version = "0.1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -75,6 +81,63 @@ fun normalizedAppVersion(): String {
     return numericParts.joinToString(".")
 }
 
+fun artifactVersionSuffix(): String {
+    val rawVersion = version.toString()
+    return if (rawVersion.contains('-')) "-$rawVersion" else ""
+}
+
+abstract class RenamePackagedFileTask : DefaultTask() {
+
+    @get:OutputDirectory
+    abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
+
+    @get:Input
+    abstract val expectedExtension: Property<String>
+
+    @get:Input
+    abstract val targetFileName: Property<String>
+
+    @TaskAction
+    fun renamePackagedFile() {
+        val directory = outputDirectory.asFile.get()
+        val generatedArtifact = directory.listFiles()
+            ?.filter { file -> file.isFile && file.extension.equals(expectedExtension.get(), ignoreCase = true) }
+            ?.maxByOrNull(File::lastModified)
+            ?: return
+        val targetFile = directory.resolve(targetFileName.get())
+        if (generatedArtifact.name != targetFile.name) {
+            targetFile.delete()
+            generatedArtifact.renameTo(targetFile)
+        }
+    }
+}
+
+abstract class RenamePackagedDirectoryTask : DefaultTask() {
+
+    @get:OutputDirectory
+    abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
+
+    @get:Input
+    abstract val generatedDirectoryName: Property<String>
+
+    @get:Input
+    abstract val targetDirectoryName: Property<String>
+
+    @TaskAction
+    fun renamePackagedDirectory() {
+        val directory = outputDirectory.asFile.get()
+        val generatedDirectory = directory.resolve(generatedDirectoryName.get())
+        if (!generatedDirectory.exists()) {
+            return
+        }
+        val targetDirectory = directory.resolve(targetDirectoryName.get())
+        if (generatedDirectory.name != targetDirectory.name) {
+            targetDirectory.deleteRecursively()
+            generatedDirectory.renameTo(targetDirectory)
+        }
+    }
+}
+
 val commonJpackageArguments = listOf(
     "--name", "CADas",
     "--app-version", normalizedAppVersion(),
@@ -93,6 +156,18 @@ val cleanMacOsDmg by tasks.registering(Delete::class) {
     delete(dmgOutputDirectory)
 }
 
+val renameMacOsAppImage by tasks.registering(RenamePackagedDirectoryTask::class) {
+    outputDirectory.set(appImageOutputDirectory)
+    generatedDirectoryName.set("CADas.app")
+    targetDirectoryName.set("CADas${artifactVersionSuffix()}.app")
+}
+
+val renameMacOsDmg by tasks.registering(RenamePackagedFileTask::class) {
+    outputDirectory.set(dmgOutputDirectory)
+    expectedExtension.set("dmg")
+    targetFileName.set("CADas-${normalizedAppVersion()}${artifactVersionSuffix()}.dmg")
+}
+
 tasks.register<Exec>("packageMacOsAppImage") {
     group = "distribution"
     description = "Erstellt ein macOS-App-Image für CADas."
@@ -105,6 +180,7 @@ tasks.register<Exec>("packageMacOsAppImage") {
         "--type", "app-image",
         "--dest", appImageOutputDirectory.absolutePath
     ) + commonJpackageArguments
+    finalizedBy(renameMacOsAppImage)
 }
 
 tasks.register<Exec>("packageMacOsDmg") {
@@ -119,6 +195,7 @@ tasks.register<Exec>("packageMacOsDmg") {
         "--type", "dmg",
         "--dest", dmgOutputDirectory.absolutePath
     ) + commonJpackageArguments
+    finalizedBy(renameMacOsDmg)
 }
 
 tasks.register<Exec>("runMitAutomatisierung") {
