@@ -96,7 +96,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 
 ## Nächste Aktionen
 - [x] Undo und Restore implementieren
-- [x] Die Ansichten lassen sich noch nicht umschalten
+- [ ] Das Umschalten der Ansichten ändert die Ansicht nicht
 - [ ] Elemente auswählen, abwählen, mehrere selektieren und deren Einstellungen ändern
 - [ ] Treppe die ohne Absatz in einem rechteckigen Bereich untergebracht ist, am Anfang und am Ende in der gleichen Linie endet. Frag nach, wenn du nciht genau weißt, was gemeint ist.
 - [ ] Aufbau der normalen Treppe passt nicht, Podest muss von einem Teil der Treppe erreichbar sein und der andere Teil vom Podest wegführen. Aber die Stufenbereiche liegen nebeneinander.
@@ -104,7 +104,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [ ] DWG-Dateien könne nicht als Teilebibliothek ausgewählt werden
 - [x] Projekt leeren, Nachfrage-Dialog davor
 - [x] Menü ergänzen und sinnvoll füllen, Key-Shortcuts passend ergänzen und implementieren
-- [x] Oben/Unten/Nord/Süd/Ost/West durch Pfeile nach oben, unten, links, rechts ersetzen und dann die Ansicht entsprechend damit kippen.
+- [ ] Oben/Unten/Nord/Süd/Ost/West durch Pfeile nach oben, unten, links, rechts ersetzen und dann die Ansicht entsprechend damit kippen. Das klappt noch nicht. Bezeichnung der Himmelsrichtungen entfernen, denn das ist ja nicht die wirkliche Richtung.
 - [ ] Nord-Einstellung bei Ansicht von Oben konfigurierbar machen und dann den Kompass immer passend gedreht anzeigen. Damit soll angezeigt werden, in welcher Ausrichtung das Gebäude steht.
 - [ ] Beim Ziehen von Hilfslinien soll das jeweils andere Lineal als Basis genommen werden, die aktuelle Position als Länge angezeigt werden und snap genutzt werden können
 - [x] DXF-Extension beim Export wird doppelt angehängt und beim Etagennamen mit angezeigt
