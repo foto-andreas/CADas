@@ -2,6 +2,7 @@ package de.andreas.cadas.application.room;
 
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
+import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
@@ -9,8 +10,8 @@ import de.andreas.cadas.domain.model.Wall;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,13 +28,16 @@ public final class AutoRoomGenerationService {
 
     public List<Room> synchronize(Level level, RoomDefaults defaults) {
         List<WallRectangle> wallRectangles = wallRectangles(level.walls());
-        if (wallRectangles.isEmpty()) {
+        if (level.walls().isEmpty()) {
             return List.of();
         }
-        if (wallRectangles.size() != level.walls().size()) {
-            return level.rooms();
+        if (wallRectangles.size() == level.walls().size()) {
+            List<DetectedRoom> detectedRooms = detectRooms(wallRectangles);
+            if (!detectedRooms.isEmpty()) {
+                return matchWithExistingRooms(level.rooms(), detectedRooms, defaults);
+            }
         }
-        List<DetectedRoom> detectedRooms = detectRooms(wallRectangles);
+        List<DetectedRoom> detectedRooms = detectRoomsFromWallLoops(level.walls());
         if (detectedRooms.isEmpty()) {
             return List.of();
         }
@@ -110,6 +114,31 @@ public final class AutoRoomGenerationService {
                     rooms.add(new DetectedRoom(outline));
                 }
             }
+        }
+        return rooms;
+    }
+
+    private List<DetectedRoom> detectRoomsFromWallLoops(List<Wall> walls) {
+        Map<PointKey, List<WallConnection>> graph = buildGraph(walls);
+        Set<UUID> visitedWalls = new HashSet<>();
+        List<DetectedRoom> rooms = new ArrayList<>();
+        for (Wall wall : walls) {
+            if (visitedWalls.contains(wall.id())) {
+                continue;
+            }
+            Set<UUID> componentWallIds = collectComponent(wall, graph, walls);
+            visitedWalls.addAll(componentWallIds);
+            List<Wall> componentWalls = walls.stream()
+                    .filter(candidate -> componentWallIds.contains(candidate.id()))
+                    .toList();
+            if (componentWalls.size() < 3 || !formsSimpleLoop(componentWalls, graph)) {
+                continue;
+            }
+            orderedLoop(componentWalls, graph)
+                    .map(this::offsetLoopToInnerContour)
+                    .filter(outline -> outline.size() >= 3)
+                    .map(DetectedRoom::new)
+                    .ifPresent(rooms::add);
         }
         return rooms;
     }
@@ -221,6 +250,168 @@ public final class AutoRoomGenerationService {
                 && Math.abs(current.yMillimeters() - next.yMillimeters()) < EPSILON);
     }
 
+    private Map<PointKey, List<WallConnection>> buildGraph(List<Wall> walls) {
+        Map<PointKey, List<WallConnection>> graph = new LinkedHashMap<>();
+        for (Wall wall : walls) {
+            PointKey startKey = PointKey.of(wall.axis().start());
+            PointKey endKey = PointKey.of(wall.axis().end());
+            graph.computeIfAbsent(startKey, ignored -> new ArrayList<>())
+                    .add(new WallConnection(wall.id(), startKey, endKey));
+            graph.computeIfAbsent(endKey, ignored -> new ArrayList<>())
+                    .add(new WallConnection(wall.id(), endKey, startKey));
+        }
+        return graph;
+    }
+
+    private Set<UUID> collectComponent(Wall startWall, Map<PointKey, List<WallConnection>> graph, List<Wall> walls) {
+        Map<UUID, Wall> wallsById = new LinkedHashMap<>();
+        walls.forEach(wall -> wallsById.put(wall.id(), wall));
+        Set<UUID> component = new LinkedHashSet<>();
+        ArrayDeque<UUID> queue = new ArrayDeque<>();
+        queue.add(startWall.id());
+        while (!queue.isEmpty()) {
+            UUID wallId = queue.removeFirst();
+            if (!component.add(wallId)) {
+                continue;
+            }
+            Wall wall = wallsById.get(wallId);
+            if (wall == null) {
+                continue;
+            }
+            for (PointKey key : List.of(PointKey.of(wall.axis().start()), PointKey.of(wall.axis().end()))) {
+                for (WallConnection connection : graph.getOrDefault(key, List.of())) {
+                    if (!component.contains(connection.wallId())) {
+                        queue.addLast(connection.wallId());
+                    }
+                }
+            }
+        }
+        return component;
+    }
+
+    private boolean formsSimpleLoop(List<Wall> componentWalls, Map<PointKey, List<WallConnection>> graph) {
+        for (Wall wall : componentWalls) {
+            if (graph.getOrDefault(PointKey.of(wall.axis().start()), List.of()).size() != 2) {
+                return false;
+            }
+            if (graph.getOrDefault(PointKey.of(wall.axis().end()), List.of()).size() != 2) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Optional<List<LoopEdge>> orderedLoop(List<Wall> componentWalls, Map<PointKey, List<WallConnection>> graph) {
+        Map<UUID, Wall> wallsById = new LinkedHashMap<>();
+        componentWalls.forEach(wall -> wallsById.put(wall.id(), wall));
+        Wall startWall = componentWalls.getFirst();
+        PointKey startKey = PointKey.of(startWall.axis().start());
+        PointKey currentKey = PointKey.of(startWall.axis().end());
+        UUID previousWallId = startWall.id();
+        List<LoopEdge> orderedEdges = new ArrayList<>();
+        orderedEdges.add(new LoopEdge(startWall, startWall.axis().start(), startWall.axis().end()));
+        while (!currentKey.equals(startKey)) {
+            List<WallConnection> connections = graph.getOrDefault(currentKey, List.of());
+            WallConnection nextConnection = null;
+            for (WallConnection connection : connections) {
+                if (!connection.wallId().equals(previousWallId)) {
+                    nextConnection = connection;
+                    break;
+                }
+            }
+            if (nextConnection == null) {
+                return Optional.empty();
+            }
+            Wall nextWall = wallsById.get(nextConnection.wallId());
+            if (nextWall == null) {
+                return Optional.empty();
+            }
+            PlanPoint from = currentKey.toPoint();
+            PlanPoint to = nextConnection.otherEnd().toPoint();
+            orderedEdges.add(new LoopEdge(nextWall, from, to));
+            previousWallId = nextWall.id();
+            currentKey = nextConnection.otherEnd();
+            if (orderedEdges.size() > componentWalls.size() + 1) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(orderedEdges);
+    }
+
+    private List<PlanPoint> offsetLoopToInnerContour(List<LoopEdge> edges) {
+        List<PlanPoint> axisPoints = new ArrayList<>();
+        axisPoints.add(edges.getFirst().start());
+        edges.forEach(edge -> axisPoints.add(edge.end()));
+        if (samePoint(axisPoints.getFirst(), axisPoints.getLast())) {
+            axisPoints.removeLast();
+        }
+        double orientation = signedArea(axisPoints);
+        if (Math.abs(orientation) < EPSILON) {
+            return List.of();
+        }
+        List<PlanPoint> outline = new ArrayList<>();
+        for (int index = 0; index < edges.size(); index++) {
+            LoopEdge previous = edges.get((index - 1 + edges.size()) % edges.size());
+            LoopEdge current = edges.get(index);
+            OffsetLine previousLine = offsetLine(previous, orientation);
+            OffsetLine currentLine = offsetLine(current, orientation);
+            PlanPoint intersection = intersect(previousLine, currentLine)
+                    .orElse(current.start());
+            outline.add(intersection);
+        }
+        return simplify(outline);
+    }
+
+    private double signedArea(List<PlanPoint> points) {
+        double area = 0.0;
+        for (int index = 0; index < points.size(); index++) {
+            PlanPoint current = points.get(index);
+            PlanPoint next = points.get((index + 1) % points.size());
+            area += current.xMillimeters() * next.yMillimeters() - next.xMillimeters() * current.yMillimeters();
+        }
+        return area / 2.0;
+    }
+
+    private OffsetLine offsetLine(LoopEdge edge, double orientation) {
+        double dx = edge.end().xMillimeters() - edge.start().xMillimeters();
+        double dy = edge.end().yMillimeters() - edge.start().yMillimeters();
+        double length = Math.hypot(dx, dy);
+        if (length < EPSILON) {
+            return new OffsetLine(edge.start(), edge.end());
+        }
+        double normalX = -dy / length;
+        double normalY = dx / length;
+        if (orientation < 0.0) {
+            normalX = -normalX;
+            normalY = -normalY;
+        }
+        double offset = edge.wall().thickness().toMillimeters() / 2.0;
+        return new OffsetLine(
+                new PlanPoint(edge.start().xMillimeters() + normalX * offset, edge.start().yMillimeters() + normalY * offset),
+                new PlanPoint(edge.end().xMillimeters() + normalX * offset, edge.end().yMillimeters() + normalY * offset)
+        );
+    }
+
+    private Optional<PlanPoint> intersect(OffsetLine first, OffsetLine second) {
+        double x1 = first.start().xMillimeters();
+        double y1 = first.start().yMillimeters();
+        double x2 = first.end().xMillimeters();
+        double y2 = first.end().yMillimeters();
+        double x3 = second.start().xMillimeters();
+        double y3 = second.start().yMillimeters();
+        double x4 = second.end().xMillimeters();
+        double y4 = second.end().yMillimeters();
+        double denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if (Math.abs(denominator) < EPSILON) {
+            return Optional.empty();
+        }
+        double determinantFirst = x1 * y2 - y1 * x2;
+        double determinantSecond = x3 * y4 - y3 * x4;
+        double intersectionX = (determinantFirst * (x3 - x4) - (x1 - x2) * determinantSecond) / denominator;
+        double intersectionY = (determinantFirst * (y3 - y4) - (y1 - y2) * determinantSecond) / denominator;
+        return Optional.of(new PlanPoint(intersectionX, intersectionY));
+    }
+
     private List<Room> matchWithExistingRooms(List<Room> existingRooms, List<DetectedRoom> detectedRooms, RoomDefaults defaults) {
         List<Room> updatedRooms = new ArrayList<>();
         Set<UUID> matchedIds = new HashSet<>();
@@ -286,6 +477,9 @@ public final class AutoRoomGenerationService {
     private record CellIndex(int column, int row) {
     }
 
+    private record OffsetLine(PlanPoint start, PlanPoint end) {
+    }
+
     private record Vertex(double x, double y) {
 
         PlanPoint toPoint() {
@@ -298,6 +492,23 @@ public final class AutoRoomGenerationService {
         boolean contains(double x, double y) {
             return x > minX + EPSILON && x < maxX - EPSILON && y > minY + EPSILON && y < maxY - EPSILON;
         }
+    }
+
+    private record PointKey(long xMicrometers, long yMicrometers) {
+
+        static PointKey of(PlanPoint point) {
+            return new PointKey(Math.round(point.xMillimeters() * 1_000.0), Math.round(point.yMillimeters() * 1_000.0));
+        }
+
+        PlanPoint toPoint() {
+            return new PlanPoint(xMicrometers / 1_000.0, yMicrometers / 1_000.0);
+        }
+    }
+
+    private record WallConnection(UUID wallId, PointKey point, PointKey otherEnd) {
+    }
+
+    private record LoopEdge(Wall wall, PlanPoint start, PlanPoint end) {
     }
 
     private record DetectedRoom(List<PlanPoint> outline) {
