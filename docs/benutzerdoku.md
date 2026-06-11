@@ -115,6 +115,132 @@ Unten zeigt die Anwendung:
 
 ## Grundbedienung
 
+## Fachliches Modell einer Etage
+
+Für das Verständnis der aktuellen Version ist ein Punkt zentral: `Wände` und `Räume` sind fachlich noch keine automatisch gekoppelten Objekte.
+
+Das bedeutet im aktuellen MVP:
+
+* Wände sind eigenständige lineare Bauteile mit Achse, Stärke und Höhe.
+* Türen und Fenster sind an genau eine Wand gebunden.
+* Räume sind eigenständige Flächenobjekte mit Name, Raumhöhe, Boden, Decke und optionaler Dachschräge.
+* Ein Raum entsteht aktuell nicht automatisch aus einem geschlossenen Wandring.
+* Eine Wand wird aktuell auch nicht automatisch aus einem Raumrand erzeugt.
+
+Praktisch heißt das für Anwender:
+
+* Die Wände beschreiben die baulichen Begrenzungen.
+* Die Räume beschreiben die fachlichen Raumbereiche für Name, Fläche, Volumen und später weitere Ausbauten.
+* Beides sollte inhaltlich zusammenpassen, wird aber derzeit noch nicht automatisch gegeneinander validiert.
+
+## Empfohlener Zeichenablauf pro Etage
+
+Die aktuelle Version arbeitet am stabilsten mit der folgenden Reihenfolge:
+
+1. Etage anlegen oder auswählen.
+2. Mit dem Werkzeug `Wand` die baulichen Außen- und Innenwände zeichnen.
+3. Mit `Tür` und `Fenster` Öffnungen direkt auf die passenden Wände setzen.
+4. Mit dem Werkzeug `Raum` die fachlichen Räume als Rechtecke über die nutzbaren Raumflächen aufziehen.
+5. Bei Bedarf Treppen platzieren.
+6. Danach Ansichten, Bemaßung, Flächen und 3D zur Kontrolle nutzen.
+
+Wichtig:
+
+* Für eine fachlich saubere Etage solltest du einen Raum nicht als Ersatz für Wände zeichnen.
+* Räume dienen aktuell nicht zum automatischen Wandaufbau, sondern für Rauminformationen und deren Auswertung.
+* Türen und Fenster benötigen immer zuerst eine vorhandene Wand.
+
+## Was genau gehört in die Wände, was in den Raum?
+
+### Wände
+
+Wände tragen aktuell:
+
+* Verlauf der Wand
+* Wandstärke
+* Wandhöhe
+* Türen und Fenster als wandgebundene Öffnungen
+
+### Räume
+
+Räume tragen aktuell:
+
+* Raumname
+* Raumfläche
+* Raumvolumen
+* lichte Raumhöhe auf der hohen Seite
+* Bodenstärke
+* Deckenstärke
+* optional eine innere Dachschräge oder schräge Decke
+
+## Dachgeschoss und Dachschrägen
+
+Die aktuelle Lösung für Dachschrägen ist bewusst raumbasiert, nicht wandbasiert.
+
+Das bedeutet:
+
+* Die Dachschräge hängt aktuell am `Raum`.
+* Sie beschreibt die innere nutzbare Schräge der Decke.
+* Dadurch bleibt die Schräge fachlich direkt als Innenfläche verfügbar, was später für Deckenebenen, Platten oder ähnliche Ausbauten wichtig ist.
+
+### So gibst du eine Dachschräge aktuell ein
+
+1. Zeichne zuerst die Wände des Dachgeschosses ganz normal.
+2. Ziehe danach den Raum als Rechteck über die nutzbare Raumfläche auf.
+3. Stelle in den Raum-Properties die `Raumhöhe` ein.
+   Diese Höhe ist aktuell die hohe lichte Raumhöhe an der Oberkante der Schräge.
+4. Stelle `Dachschräge` auf `Mit Dachschräge`.
+5. Wähle bei `Niedrige Seite`, an welcher Raumkante die Schräge mit dem Kniestock beginnt.
+6. Gib bei `Sockelhöhe` die Höhe des Kniestocks beziehungsweise der niedrigen Wandseite ein.
+
+Aus diesen Werten ergibt sich aktuell:
+
+* die niedrige Innenkante der Schräge
+* die hohe Innenkante aus der Raumhöhe
+* der Schräge-Winkel
+* das angepasste Raumvolumen
+* die Darstellung in Draufsicht, Seitenansicht und 3D
+
+### Beispiel
+
+Ein Dachraum hat:
+
+* Raumrechteck `5,00 m x 4,00 m`
+* Raumhöhe `2,80 m`
+* Dachschräge `Mit Dachschräge`
+* Niedrige Seite `Nordkante`
+* Sockelhöhe `1,00 m`
+
+Dann gilt:
+
+* An der Nordkante beginnt die Decke auf `1,00 m`.
+* Zur gegenüberliegenden Raumkante steigt die Decke linear auf `2,80 m`.
+* Das Raumvolumen wird nicht mehr mit durchgehend `2,80 m` gerechnet, sondern mit der gemittelten Höhe der Schräge.
+
+### Was der Anwender in 2D und 3D sieht
+
+* In der Draufsicht wird die niedrige Seite der Schräge markiert.
+* In Seitenansichten erscheint die Decke schräg, wenn die Blickrichtung zur gewählten Schräge passt.
+* In 3D wird das Raumvolumen mit abgestufter Schräge dargestellt.
+
+## Aktuelle Grenzen der Dachschrägen
+
+Die aktuelle erste Version kann bewusst noch nicht alles.
+
+Derzeit gilt:
+
+* Pro Raum ist aktuell genau eine Dachschräge beziehungsweise schräge Decke vorgesehen.
+* Die Schräge funktioniert aktuell für rechteckige Räume.
+* Gegenüberliegende Doppel-Schrägen oder komplexe Dachkonturen sind noch nicht separat modelliert.
+* Die Schräge hängt aktuell am Raum und nicht direkt an einzelnen Wänden.
+* Eine automatisch aus Wänden abgeleitete Dachinnengeometrie gibt es noch nicht.
+
+Für das aktuelle MVP ist das fachlich absichtlich so geschnitten, damit:
+
+* die Bedienung einfach bleibt,
+* das Raumvolumen sinnvoll berechnet werden kann,
+* und die spätere Nutzung der schrägen Innenfläche für zusätzliche Ebenen vorbereitet ist.
+
 ### Navigation in 2D
 
 * Mit dem Mausrad zoomst du in die Zeichnung hinein oder heraus.
