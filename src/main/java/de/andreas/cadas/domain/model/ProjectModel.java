@@ -6,7 +6,7 @@ import java.util.Objects;
 
 public final class ProjectModel {
 
-    private final String name;
+    private String name;
     private final List<Level> levels = new ArrayList<>();
     private Roof roof;
 
@@ -60,9 +60,7 @@ public final class ProjectModel {
 
     public void replaceWith(ProjectModel snapshot) {
         Objects.requireNonNull(snapshot, "snapshot darf nicht null sein.");
-        if (!name.equals(snapshot.name)) {
-            throw new IllegalArgumentException("Projektname darf beim Wiederherstellen nicht geändert werden.");
-        }
+        name = snapshot.name;
         levels.clear();
         snapshot.levels.stream()
                 .map(Level::copy)

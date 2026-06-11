@@ -9,13 +9,16 @@ public record WorkbenchSnapshot(
         ProjectModel project,
         List<GuideLine> guideLines,
         String activeLevelName,
-        SelectionKey selectedSelection
+        List<SelectionKey> selectedSelections,
+        SelectionKey primarySelection
 ) {
 
     public WorkbenchSnapshot {
         Objects.requireNonNull(project, "project darf nicht null sein.");
         Objects.requireNonNull(guideLines, "guideLines darf nicht null sein.");
         Objects.requireNonNull(activeLevelName, "activeLevelName darf nicht null sein.");
+        Objects.requireNonNull(selectedSelections, "selectedSelections darf nicht null sein.");
         guideLines = List.copyOf(guideLines);
+        selectedSelections = List.copyOf(selectedSelections);
     }
 }

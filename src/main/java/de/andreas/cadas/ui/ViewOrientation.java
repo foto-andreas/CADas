@@ -3,10 +3,10 @@ package de.andreas.cadas.ui;
 public enum ViewOrientation {
     TOP("Oben", "⤒ Oben", "Grundriss in Draufsicht mit orthogonaler Projektion", 0.0, 90.0),
     BOTTOM("Unten", "⤓ Unten", "Grundriss in Untersicht mit orthogonaler Projektion", 0.0, -90.0),
-    NORTH("Nord", "↑ Nord", "Nordansicht mit orthogonaler Projektion", 0.0, 0.0),
-    SOUTH("Süd", "↓ Süd", "Südansicht mit orthogonaler Projektion", 180.0, 0.0),
-    EAST("Ost", "→ Ost", "Ostansicht mit orthogonaler Projektion", 90.0, 0.0),
-    WEST("West", "← West", "Westansicht mit orthogonaler Projektion", -90.0, 0.0);
+    NORTH("Vorne", "↑", "Frontansicht mit orthogonaler Projektion", 0.0, 0.0),
+    SOUTH("Hinten", "↓", "Rückansicht mit orthogonaler Projektion", 180.0, 0.0),
+    EAST("Rechts", "→", "Rechte Seitenansicht mit orthogonaler Projektion", 90.0, 0.0),
+    WEST("Links", "←", "Linke Seitenansicht mit orthogonaler Projektion", -90.0, 0.0);
 
     private final String label;
     private final String buttonLabel;

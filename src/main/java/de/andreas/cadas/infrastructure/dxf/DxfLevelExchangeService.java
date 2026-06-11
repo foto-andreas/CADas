@@ -7,6 +7,8 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.StairType;
+import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
 
@@ -41,13 +43,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             Files.createDirectories(parent);
         }
         StringBuilder dxf = new StringBuilder();
-        appendPair(dxf, 0, "SECTION");
-        appendPair(dxf, 2, "HEADER");
-        appendPair(dxf, 9, "$ACADVER");
-        appendPair(dxf, 1, "AC1015");
-        appendPair(dxf, 0, "ENDSEC");
-        appendPair(dxf, 0, "SECTION");
-        appendPair(dxf, 2, "ENTITIES");
+        DxfDocumentSupport.appendStandardHeader(dxf);
 
         for (Wall wall : level.walls()) {
             appendLineEntity(dxf, DxfLayer.WALLS, wall.axis().start(), wall.axis().end());
@@ -109,6 +105,28 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             ));
         }
 
+        for (Staircase staircase : level.staircases()) {
+            appendClosedPolyline(dxf, DxfLayer.STAIRS, List.of(
+                    staircase.pointAtLocalPosition(0, 0),
+                    staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0),
+                    staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()),
+                    staircase.pointAtLocalPosition(0, staircase.heightMillimeters())
+            ));
+            appendMetadataText(dxf, staircase.firstCorner(), String.format(
+                    Locale.US,
+                    "STAIR|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d",
+                    staircase.id(),
+                    staircase.stairType().name(),
+                    staircase.firstCorner().xMillimeters(),
+                    staircase.firstCorner().yMillimeters(),
+                    staircase.oppositeCorner().xMillimeters(),
+                    staircase.oppositeCorner().yMillimeters(),
+                    staircase.totalHeight().toMillimeters(),
+                    staircase.stepCount(),
+                    staircase.rotationQuarterTurns()
+            ));
+        }
+
         appendPair(dxf, 0, "ENDSEC");
         appendPair(dxf, 0, "EOF");
         Files.writeString(targetFile, dxf.toString());
@@ -140,6 +158,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         List<Room> importedRooms = new ArrayList<>();
         List<Door> pendingDoors = new ArrayList<>();
         List<WindowElement> pendingWindows = new ArrayList<>();
+        List<Staircase> importedStaircases = new ArrayList<>();
 
         for (String metadata : metadataEntries) {
             String[] parts = metadata.split("\\|");
@@ -179,12 +198,22 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                         Length.ofMillimeters(parseDouble(parts[4])),
                         Length.ofMillimeters(parseDouble(parts[5]))
                 ));
+                case "STAIR" -> importedStaircases.add(new Staircase(
+                        UUID.fromString(parts[1]),
+                        StairType.valueOf(parts[2]),
+                        new PlanPoint(parseDouble(parts[3]), parseDouble(parts[4])),
+                        new PlanPoint(parseDouble(parts[5]), parseDouble(parts[6])),
+                        Length.ofMillimeters(parseDouble(parts[7])),
+                        Integer.parseInt(parts[8]),
+                        Integer.parseInt(parts[9])
+                ));
                 default -> {
                 }
             }
         }
 
         level.replaceRooms(importedRooms);
+        level.replaceStaircases(importedStaircases);
         pendingDoors.stream()
                 .filter(door -> wallsById.containsKey(door.wallId()))
                 .forEach(level::addDoor);
@@ -246,7 +275,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
 
     private void appendLineEntity(StringBuilder dxf, DxfLayer layer, PlanPoint start, PlanPoint end) {
         appendPair(dxf, 0, "LINE");
-        appendPair(dxf, 8, layer.name());
+        DxfDocumentSupport.appendModelSpace(dxf, layer.name());
         appendPair(dxf, 10, start.xMillimeters());
         appendPair(dxf, 20, start.yMillimeters());
         appendPair(dxf, 11, end.xMillimeters());
@@ -255,7 +284,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
 
     private void appendClosedPolyline(StringBuilder dxf, DxfLayer layer, List<PlanPoint> points) {
         appendPair(dxf, 0, "LWPOLYLINE");
-        appendPair(dxf, 8, layer.name());
+        DxfDocumentSupport.appendModelSpace(dxf, layer.name());
         appendPair(dxf, 90, points.size());
         appendPair(dxf, 70, 1);
         for (PlanPoint point : points) {
@@ -266,7 +295,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
 
     private void appendMetadataText(StringBuilder dxf, PlanPoint anchor, String value) {
         appendPair(dxf, 0, "TEXT");
-        appendPair(dxf, 8, DxfLayer.CADAS_META.name());
+        DxfDocumentSupport.appendModelSpace(dxf, DxfLayer.CADAS_META.name());
         appendPair(dxf, 10, anchor.xMillimeters());
         appendPair(dxf, 20, anchor.yMillimeters());
         appendPair(dxf, 40, 100.0);

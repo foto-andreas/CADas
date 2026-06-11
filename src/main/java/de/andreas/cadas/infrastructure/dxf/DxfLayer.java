@@ -5,6 +5,6 @@ enum DxfLayer {
     ROOMS,
     DOORS,
     WINDOWS,
+    STAIRS,
     CADAS_META
 }
-

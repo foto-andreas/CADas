@@ -23,9 +23,9 @@ public final class StandardPartLibraryService {
                 List.of(
                         new StairPreset("stair-straight", "Gerade Treppe", StairType.STRAIGHT, Length.of(2.80, LengthUnit.METER), 16),
                         new StairPreset("stair-half-turn", "Altbau 180°-Treppe", StairType.HALF_TURN, Length.of(2.90, LengthUnit.METER), 18),
+                        new StairPreset("stair-switchback", "Gegenläufige Treppe ohne Podest", StairType.SWITCHBACK, Length.of(2.85, LengthUnit.METER), 18),
                         new StairPreset("stair-spiral", "Wendeltreppe", StairType.SPIRAL, Length.of(2.80, LengthUnit.METER), 15)
                 )
         );
     }
 }
-
