@@ -6,6 +6,9 @@ import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 
+import java.util.List;
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 
 class RoomTest {
@@ -44,5 +47,35 @@ class RoomTest {
         assertEquals(1000.0, room.minimumCeilingHeightMillimeters(), 0.001);
         assertEquals(2800.0, room.maximumCeilingHeightMillimeters(), 0.001);
         assertEquals(1900.0, room.ceilingHeightAt(new PlanPoint(2000, 2500)), 0.001);
+    }
+
+    @Test
+    void berechnetPolygonaleDeckenhoehenUndVolumenAusEckhoehen() {
+        Room room = new Room(
+                UUID.randomUUID(),
+                "Ausbau",
+                List.of(
+                        new PlanPoint(0, 0),
+                        new PlanPoint(4000, 0),
+                        new PlanPoint(4000, 3000),
+                        new PlanPoint(0, 3000)
+                ),
+                Length.of(3.1, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                null,
+                List.of(
+                        Length.of(2.4, LengthUnit.METER),
+                        Length.of(2.8, LengthUnit.METER),
+                        Length.of(3.1, LengthUnit.METER),
+                        Length.of(2.7, LengthUnit.METER)
+                )
+        );
+
+        assertEquals(12.0, room.areaSquareMeters(), 0.001);
+        assertEquals(33.0, room.volumeCubicMeters(), 0.001);
+        assertEquals(2400.0, room.minimumCeilingHeightMillimeters(), 0.001);
+        assertEquals(3100.0, room.maximumCeilingHeightMillimeters(), 0.001);
+        assertEquals(2750.0, room.ceilingHeightAt(room.centerPoint()), 0.001);
     }
 }

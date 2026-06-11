@@ -15,7 +15,8 @@ public record Room(
         Length roomHeight,
         Length floorThickness,
         Length ceilingThickness,
-        SlopedCeilingProfile slopedCeiling
+        SlopedCeilingProfile slopedCeiling,
+        List<Length> ceilingVertexHeights
 ) {
 
     public Room {
@@ -25,6 +26,9 @@ public record Room(
         Objects.requireNonNull(roomHeight, "roomHeight darf nicht null sein.");
         Objects.requireNonNull(floorThickness, "floorThickness darf nicht null sein.");
         Objects.requireNonNull(ceilingThickness, "ceilingThickness darf nicht null sein.");
+        if (ceilingVertexHeights != null && ceilingVertexHeights.size() != outline.size()) {
+            throw new IllegalArgumentException("Deckenhöhen müssen zu allen Raum-Eckpunkten passen.");
+        }
         if (slopedCeiling != null && slopedCeiling.kneeWallHeight().toMillimeters() > roomHeight.toMillimeters()) {
             throw new IllegalArgumentException("Die Sockelhöhe der Dachschräge darf die lichte Raumhöhe nicht überschreiten.");
         }
@@ -32,6 +36,19 @@ public record Room(
             throw new IllegalArgumentException("Ein Raum benötigt mindestens drei Eckpunkte.");
         }
         outline = List.copyOf(outline);
+        ceilingVertexHeights = ceilingVertexHeights == null ? null : List.copyOf(ceilingVertexHeights);
+    }
+
+    public Room(
+            UUID id,
+            String name,
+            List<PlanPoint> outline,
+            Length roomHeight,
+            Length floorThickness,
+            Length ceilingThickness,
+            SlopedCeilingProfile slopedCeiling
+    ) {
+        this(id, name, outline, roomHeight, floorThickness, ceilingThickness, slopedCeiling, null);
     }
 
     public static Room rectangular(
@@ -70,12 +87,17 @@ public record Room(
                 roomHeight,
                 floorThickness,
                 ceilingThickness,
-                slopedCeiling
+                slopedCeiling,
+                null
         );
     }
 
     public Optional<SlopedCeilingProfile> slopedCeilingProfile() {
         return Optional.ofNullable(slopedCeiling);
+    }
+
+    public Optional<List<Length>> ceilingVertexHeightsProfile() {
+        return Optional.ofNullable(ceilingVertexHeights);
     }
 
     public Length area() {
@@ -93,6 +115,18 @@ public record Room(
     }
 
     public double volumeCubicMeters() {
+        if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
+            double centerHeight = ceilingHeightAt(centerPoint());
+            double volumeMillimeters = 0.0;
+            for (int index = 0; index < outline.size(); index++) {
+                PlanPoint current = outline.get(index);
+                PlanPoint next = outline.get((index + 1) % outline.size());
+                double triangleArea = triangleArea(centerPoint(), current, next);
+                double averageHeight = (centerHeight + ceilingVertexHeights.get(index).toMillimeters() + ceilingVertexHeights.get((index + 1) % ceilingVertexHeights.size()).toMillimeters()) / 3.0;
+                volumeMillimeters += triangleArea * averageHeight;
+            }
+            return volumeMillimeters / 1_000_000_000.0;
+        }
         double averageHeight = slopedCeilingProfile()
                 .map(profile -> (profile.kneeWallHeight().toMillimeters() + roomHeight.toMillimeters()) / 2.0)
                 .orElse(roomHeight.toMillimeters());
@@ -134,6 +168,9 @@ public record Room(
     }
 
     public double ceilingHeightAt(PlanPoint point) {
+        if (ceilingVertexHeights != null && ceilingVertexHeights.size() == outline.size()) {
+            return interpolatedVertexHeight(point);
+        }
         if (slopedCeiling == null) {
             return roomHeight.toMillimeters();
         }
@@ -149,16 +186,25 @@ public record Room(
     }
 
     public double minimumCeilingHeightMillimeters() {
+        if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
+            return ceilingVertexHeights.stream().mapToDouble(Length::toMillimeters).min().orElse(roomHeight.toMillimeters());
+        }
         return slopedCeilingProfile()
                 .map(profile -> profile.kneeWallHeight().toMillimeters())
                 .orElse(roomHeight.toMillimeters());
     }
 
     public double maximumCeilingHeightMillimeters() {
+        if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
+            return ceilingVertexHeights.stream().mapToDouble(Length::toMillimeters).max().orElse(roomHeight.toMillimeters());
+        }
         return roomHeight.toMillimeters();
     }
 
     public double slopeAngleDegrees() {
+        if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
+            return 0.0;
+        }
         if (slopedCeiling == null) {
             return 0.0;
         }
@@ -171,13 +217,27 @@ public record Room(
     }
 
     public boolean slopeVisibleInEastWestView() {
+        if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
+            return hasVariableCeilingHeights();
+        }
         return slopedCeiling != null
                 && (slopedCeiling.lowSide() == SlopedCeilingSide.NORTH || slopedCeiling.lowSide() == SlopedCeilingSide.SOUTH);
     }
 
     public boolean slopeVisibleInNorthSouthView() {
+        if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
+            return hasVariableCeilingHeights();
+        }
         return slopedCeiling != null
                 && (slopedCeiling.lowSide() == SlopedCeilingSide.EAST || slopedCeiling.lowSide() == SlopedCeilingSide.WEST);
+    }
+
+    public boolean hasVariableCeilingHeights() {
+        if (ceilingVertexHeights != null && ceilingVertexHeights.size() > 1) {
+            double reference = ceilingVertexHeights.getFirst().toMillimeters();
+            return ceilingVertexHeights.stream().anyMatch(length -> Math.abs(length.toMillimeters() - reference) > 0.001);
+        }
+        return slopedCeiling != null;
     }
 
     private double runMillimeters(SlopedCeilingSide side) {
@@ -194,5 +254,62 @@ public record Room(
             case EAST -> maxXMillimeters() - point.xMillimeters();
             case WEST -> point.xMillimeters() - minXMillimeters();
         };
+    }
+
+    private double interpolatedVertexHeight(PlanPoint point) {
+        PlanPoint center = centerPoint();
+        double centerHeight = ceilingVertexHeights.stream().mapToDouble(Length::toMillimeters).average().orElse(roomHeight.toMillimeters());
+        for (int index = 0; index < outline.size(); index++) {
+            PlanPoint first = outline.get(index);
+            PlanPoint second = outline.get((index + 1) % outline.size());
+            if (pointInsideTriangle(point, center, first, second)) {
+                return barycentricHeight(
+                        point,
+                        center,
+                        first,
+                        second,
+                        centerHeight,
+                        ceilingVertexHeights.get(index).toMillimeters(),
+                        ceilingVertexHeights.get((index + 1) % ceilingVertexHeights.size()).toMillimeters()
+                );
+            }
+        }
+        return centerHeight;
+    }
+
+    private boolean pointInsideTriangle(PlanPoint point, PlanPoint a, PlanPoint b, PlanPoint c) {
+        double denominator = ((b.yMillimeters() - c.yMillimeters()) * (a.xMillimeters() - c.xMillimeters())
+                + (c.xMillimeters() - b.xMillimeters()) * (a.yMillimeters() - c.yMillimeters()));
+        if (Math.abs(denominator) < 0.001) {
+            return false;
+        }
+        double alpha = ((b.yMillimeters() - c.yMillimeters()) * (point.xMillimeters() - c.xMillimeters())
+                + (c.xMillimeters() - b.xMillimeters()) * (point.yMillimeters() - c.yMillimeters())) / denominator;
+        double beta = ((c.yMillimeters() - a.yMillimeters()) * (point.xMillimeters() - c.xMillimeters())
+                + (a.xMillimeters() - c.xMillimeters()) * (point.yMillimeters() - c.yMillimeters())) / denominator;
+        double gamma = 1.0 - alpha - beta;
+        return alpha >= -0.0001 && beta >= -0.0001 && gamma >= -0.0001;
+    }
+
+    private double barycentricHeight(PlanPoint point, PlanPoint a, PlanPoint b, PlanPoint c, double heightA, double heightB, double heightC) {
+        double denominator = ((b.yMillimeters() - c.yMillimeters()) * (a.xMillimeters() - c.xMillimeters())
+                + (c.xMillimeters() - b.xMillimeters()) * (a.yMillimeters() - c.yMillimeters()));
+        if (Math.abs(denominator) < 0.001) {
+            return heightA;
+        }
+        double alpha = ((b.yMillimeters() - c.yMillimeters()) * (point.xMillimeters() - c.xMillimeters())
+                + (c.xMillimeters() - b.xMillimeters()) * (point.yMillimeters() - c.yMillimeters())) / denominator;
+        double beta = ((c.yMillimeters() - a.yMillimeters()) * (point.xMillimeters() - c.xMillimeters())
+                + (a.xMillimeters() - c.xMillimeters()) * (point.yMillimeters() - c.yMillimeters())) / denominator;
+        double gamma = 1.0 - alpha - beta;
+        return alpha * heightA + beta * heightB + gamma * heightC;
+    }
+
+    private double triangleArea(PlanPoint a, PlanPoint b, PlanPoint c) {
+        return Math.abs(
+                a.xMillimeters() * (b.yMillimeters() - c.yMillimeters())
+                        + b.xMillimeters() * (c.yMillimeters() - a.yMillimeters())
+                        + c.xMillimeters() * (a.yMillimeters() - b.yMillimeters())
+        ) / 2.0;
     }
 }

@@ -42,9 +42,11 @@ import de.andreas.cadas.infrastructure.dxf.DxfProjectExchangeService;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -156,6 +158,8 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> wallThicknessUnit = new ComboBox<>();
     private final TextField wallHeightField = new TextField("2,75");
     private final ComboBox<LengthUnit> wallHeightUnit = new ComboBox<>();
+    private final TextField endpointHeightField = new TextField("2,75");
+    private final ComboBox<LengthUnit> endpointHeightUnit = new ComboBox<>();
     private final TextField roomNameField = new TextField("Raum");
     private final TextField roomHeightField = new TextField("2,60");
     private final ComboBox<LengthUnit> roomHeightUnit = new ComboBox<>();
@@ -201,6 +205,7 @@ public final class CadWorkbench extends BorderPane {
     private final Button deleteSelectionButton = new Button("Auswahl löschen");
     private final Button clearSelectionButton = new Button("Auswahl aufheben");
     private final Button applySelectionPropertiesButton = new Button("Werte auf Auswahl anwenden");
+    private final Button applyEndpointHeightButton = new Button("Eckhöhe anwenden");
     private final ContextMenu selectionContextMenu = new ContextMenu();
     private final Label cadLibrarySummaryLabel = new Label("Keine externen CAD-Bibliotheken registriert.");
 
@@ -419,6 +424,7 @@ public final class CadWorkbench extends BorderPane {
         roomHeightField.setPrefColumnCount(5);
         floorThicknessField.setPrefColumnCount(4);
         ceilingThicknessField.setPrefColumnCount(4);
+        endpointHeightField.setPrefColumnCount(5);
         slopedCeilingModeSelector.setPrefWidth(160);
         slopedCeilingSideSelector.setPrefWidth(160);
         kneeWallHeightField.setPrefColumnCount(4);
@@ -517,7 +523,9 @@ public final class CadWorkbench extends BorderPane {
                 createPropertySection(
                         "Wand",
                         propertyRow("Wandstärke", wallThicknessField, wallThicknessUnit),
-                        propertyRow("Wandhöhe", wallHeightField, wallHeightUnit)
+                        propertyRow("Wandhöhe", wallHeightField, wallHeightUnit),
+                        propertyRow("Eckhöhe", endpointHeightField, endpointHeightUnit),
+                        applyEndpointHeightButton
                 ),
                 createPropertySection(
                         "Raum",
@@ -592,12 +600,14 @@ public final class CadWorkbench extends BorderPane {
         deleteSelectionButton.setOnAction(event -> deleteSelection());
         clearSelectionButton.setOnAction(event -> clearSelection());
         applySelectionPropertiesButton.setOnAction(event -> applyCurrentInputsToSelection());
+        applyEndpointHeightButton.setOnAction(event -> applyEndpointHeightToSelection());
         rebuildSelectionContextMenu();
         applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
         applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
         applyTooltip(deleteSelectionButton, "Löscht das aktuell ausgewählte Bauteil aus der aktiven Etage.");
         applyTooltip(clearSelectionButton, "Hebt die aktuelle Auswahl auf und entfernt die Hervorhebung in 2D und 3D.");
         applyTooltip(applySelectionPropertiesButton, "Übernimmt die aktuell sichtbaren Eingabewerte auf alle passenden, ausgewählten Bauteile.");
+        applyTooltip(applyEndpointHeightButton, "Übernimmt die eingetragene Höhe auf den aktuell ausgewählten Wand-Endpunkt und aktualisiert daraus die angrenzenden Räume.");
         applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf, die für spätere Teileverwendung vorgemerkt sind.");
     }
 
@@ -635,6 +645,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private String selectionSummary() {
+        if (selectedEndpointGroup != null) {
+            return "Ausgewählt: gemeinsame Wandecke auf Etage `" + activeLevel.get().name()
+                    + "`. Die Eckhöhe wirkt auf alle verbundenen Wandenden und leitet daraus die Raumdecke neu ab.";
+        }
         if (selectedSelections.isEmpty()) {
             return "Keine Auswahl. Wähle ein Bauteil im Werkzeug `Bearbeiten` aus oder nutze direkt die Werkzeuge in der Zeichenfläche.";
         }
@@ -661,6 +675,7 @@ public final class CadWorkbench extends BorderPane {
         deleteSelectionButton.setDisable(!hasDeletableSelection);
         clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
         applySelectionPropertiesButton.setDisable(!hasSelection);
+        applyEndpointHeightButton.setDisable(selectedEndpointGroup == null);
     }
 
     private MenuItem menuItem(String label, Runnable action, KeyCombination accelerator) {
@@ -701,6 +716,7 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(lengthUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(wallThicknessUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(wallHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(endpointHeightUnit, LengthUnit.METER);
         initializeUnitSelector(roomHeightUnit, LengthUnit.METER);
         initializeUnitSelector(floorThicknessUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(ceilingThicknessUnit, LengthUnit.CENTIMETER);
@@ -762,6 +778,8 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
         applyTooltip(wallHeightField, "Legt die Raum- beziehungsweise Wandhöhe für neu gezeichnete Wände fest.");
         applyTooltip(wallHeightUnit, "Bestimmt die Einheit für die Wandhöhe.");
+        applyTooltip(endpointHeightField, "Legt die Höhe für den aktuell ausgewählten gemeinsamen Wand-Endpunkt fest. Daraus wird bei geschlossenen Wandzügen eine schräge Decke des betroffenen Raums abgeleitet.");
+        applyTooltip(endpointHeightUnit, "Bestimmt die Einheit für die Endpunkthöhe einer ausgewählten Wandecke.");
         applyTooltip(roomNameField, "Legt den Namen für automatisch erkannte Räume oder für die aktuell ausgewählte Raumauswahl fest.");
         applyTooltip(roomHeightField, "Legt die lichte Raumhöhe für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
         applyTooltip(roomHeightUnit, "Bestimmt die Einheit für die Raumhöhe.");
@@ -884,6 +902,7 @@ public final class CadWorkbench extends BorderPane {
             selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, SNAP_TOLERANCE).orElse(null);
             historyCapturedForDrag = false;
             if (selectedEndpointGroup != null) {
+                syncEndpointHeightInputFromSelection();
                 activeLevel.get().walls().stream()
                         .filter(wall -> selectedEndpointGroup.startWallIds().contains(wall.id()) || selectedEndpointGroup.endWallIds().contains(wall.id()))
                         .findFirst()
@@ -891,6 +910,7 @@ public final class CadWorkbench extends BorderPane {
                                 new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()),
                                 event.isShortcutDown() || event.isShiftDown()
                         ));
+                draftLabel.setText("Wandecke ausgewählt. `Eckhöhe anwenden` setzt die Höhe auf alle verbundenen Wandenden.");
             } else {
                 updateSelection(
                         selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null),
@@ -974,8 +994,8 @@ public final class CadWorkbench extends BorderPane {
         }
 
         if (selectedEndpointGroup != null) {
-            selectedEndpointGroup = null;
             historyCapturedForDrag = false;
+            updatePropertySectionVisibility();
             updateActionButtons();
             render();
             return;
@@ -1151,7 +1171,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawRoomSlopeMarker(GraphicsContext graphics, Room room) {
-        if (!projectionService.isPlanView(activeView.get()) || room.slopedCeilingProfile().isEmpty()) {
+        if (!projectionService.isPlanView(activeView.get()) || room.slopedCeilingProfile().isEmpty() || room.ceilingVertexHeightsProfile().isPresent()) {
             return;
         }
         SlopedCeilingProfile profile = room.slopedCeilingProfile().orElseThrow();
@@ -1426,16 +1446,15 @@ public final class CadWorkbench extends BorderPane {
         double startX = toScreenProjectedX(wall.axis().start(), 0.0);
         double endX = toScreenProjectedX(wall.axis().end(), 0.0);
         double floorY = toScreenProjectedY(wall.axis().start(), 0.0);
-        double topY = toScreenProjectedY(wall.axis().start(), wall.height().toMillimeters());
-        double left = Math.min(startX, endX);
-        double width = Math.max(Math.abs(endX - startX), 3.0);
-        double top = Math.min(floorY, topY);
-        double height = Math.max(Math.abs(floorY - topY), 3.0);
+        double startTopY = toScreenProjectedY(wall.axis().start(), wall.heightAtStart());
+        double endTopY = toScreenProjectedY(wall.axis().end(), wall.heightAtEnd());
+        double[] xPoints = {startX, endX, endX, startX};
+        double[] yPoints = {floorY, floorY, endTopY, startTopY};
         graphics.setFill(selected ? Color.color(0.85, 0.57, 0.22, 0.24) : Color.color(0.23, 0.39, 0.54, 0.18));
-        graphics.fillRect(left, top, width, height);
+        graphics.fillPolygon(xPoints, yPoints, xPoints.length);
         graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#274c77"));
         graphics.setLineWidth(selected ? 2.8 : 2.0);
-        graphics.strokeRect(left, top, width, height);
+        graphics.strokePolygon(xPoints, yPoints, xPoints.length);
     }
 
     private void drawRoomElevation(GraphicsContext graphics, Room room) {
@@ -1471,6 +1490,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawSlopedRoomElevation(GraphicsContext graphics, Room room, double left, double right, double floorY, double topY) {
+        if (room.ceilingVertexHeightsProfile().isPresent()) {
+            drawPolygonalRoomElevation(graphics, room, floorY);
+            return;
+        }
         double lowY = toScreenVertical(-room.minimumCeilingHeightMillimeters());
         boolean risesToRight = switch (activeView.get()) {
             case EAST -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.NORTH).orElse(false);
@@ -1488,6 +1511,47 @@ public final class CadWorkbench extends BorderPane {
         graphics.setStroke(Color.color(0.55, 0.43, 0.25, 0.72));
         graphics.setLineWidth(1.8);
         graphics.strokePolygon(xPoints, yPoints, xPoints.length);
+    }
+
+    private void drawPolygonalRoomElevation(GraphicsContext graphics, Room room, double floorY) {
+        java.util.TreeMap<Long, Double> topProfile = new java.util.TreeMap<>();
+        for (int index = 0; index < room.outline().size(); index++) {
+            PlanPoint point = room.outline().get(index);
+            addElevationSample(topProfile, point, room.ceilingVertexHeights().get(index).toMillimeters());
+            PlanPoint next = room.outline().get((index + 1) % room.outline().size());
+            PlanPoint midpoint = new PlanPoint(
+                    (point.xMillimeters() + next.xMillimeters()) / 2.0,
+                    (point.yMillimeters() + next.yMillimeters()) / 2.0
+            );
+            addElevationSample(topProfile, midpoint, room.ceilingHeightAt(midpoint));
+        }
+        if (topProfile.size() < 2) {
+            return;
+        }
+        double[] xPoints = new double[topProfile.size() * 2];
+        double[] yPoints = new double[topProfile.size() * 2];
+        int pointIndex = 0;
+        for (Map.Entry<Long, Double> entry : topProfile.entrySet()) {
+            xPoints[pointIndex] = toScreenHorizontal(entry.getKey());
+            yPoints[pointIndex] = toScreenVertical(-entry.getValue());
+            pointIndex++;
+        }
+        List<Map.Entry<Long, Double>> entries = new ArrayList<>(topProfile.entrySet());
+        for (int reverseIndex = entries.size() - 1; reverseIndex >= 0; reverseIndex--) {
+            xPoints[pointIndex] = toScreenHorizontal(entries.get(reverseIndex).getKey());
+            yPoints[pointIndex] = floorY;
+            pointIndex++;
+        }
+        graphics.setFill(Color.color(0.77, 0.64, 0.45, 0.16));
+        graphics.fillPolygon(xPoints, yPoints, xPoints.length);
+        graphics.setStroke(Color.color(0.55, 0.43, 0.25, 0.72));
+        graphics.setLineWidth(1.8);
+        graphics.strokePolygon(xPoints, yPoints, xPoints.length);
+    }
+
+    private void addElevationSample(java.util.TreeMap<Long, Double> topProfile, PlanPoint point, double ceilingHeightMillimeters) {
+        long horizontal = Math.round(projectHorizontal(point, 0.0));
+        topProfile.merge(horizontal, ceilingHeightMillimeters, Math::max);
     }
 
     private void drawStairElevation(GraphicsContext graphics, Staircase staircase) {
@@ -1693,6 +1757,10 @@ public final class CadWorkbench extends BorderPane {
         return parseLength(wallHeightField, wallHeightUnit.getValue()).orElse(DEFAULT_WALL_HEIGHT);
     }
 
+    private Length currentEndpointHeight() {
+        return parseLength(endpointHeightField, endpointHeightUnit.getValue()).orElse(currentWallHeight());
+    }
+
     private String currentRoomName() {
         String roomName = roomNameField.getText();
         if (roomName == null || roomName.isBlank()) {
@@ -1808,7 +1876,11 @@ public final class CadWorkbench extends BorderPane {
         zoomLabel.setText(String.format(Locale.GERMAN, "Zoom: %.2f x", zoom));
         cursorLabel.setText(String.format(Locale.GERMAN, "Cursor: %.2f m / %.2f m", lastCursor.xMillimeters() / 1000.0, lastCursor.yMillimeters() / 1000.0));
         if (previewSegment == null) {
-            draftLabel.setText("Werkzeug: " + currentTool().label() + " | Linke Maustaste platziert, rechte Maustaste verschiebt, Alt+Rechtsklick entfernt Hilfslinien.");
+            if (selectedEndpointGroup != null) {
+                draftLabel.setText("Werkzeug: " + currentTool().label() + " | Wandecke ausgewählt: Ziehen verschiebt sie gemeinsam, `Eckhöhe anwenden` setzt ihre Höhe.");
+            } else {
+                draftLabel.setText("Werkzeug: " + currentTool().label() + " | Linke Maustaste platziert, rechte Maustaste verschiebt, Alt+Rechtsklick entfernt Hilfslinien.");
+            }
         } else {
             draftLabel.setText("Zeichnen: " + previewSegment.length().format(LengthUnit.METER, 2) + " | " + previewSegment.angle().format());
         }
@@ -2314,6 +2386,7 @@ public final class CadWorkbench extends BorderPane {
     private void clearSelection() {
         clearSelectionsInternal();
         selectedEndpointGroup = null;
+        historyCapturedForDrag = false;
         updateActionButtons();
         render();
     }
@@ -2475,12 +2548,19 @@ public final class CadWorkbench extends BorderPane {
         switch (selectedSelection.get().kind()) {
             case WALL -> activeLevel.get().replaceWalls(activeLevel.get().walls().stream()
                     .map(wall -> selectedIds().contains(wall.id().toString())
-                            ? new Wall(wall.id(), wall.axis(), currentWallThickness(), currentWallHeight())
+                            ? new Wall(
+                            wall.id(),
+                            wall.axis(),
+                            currentWallThickness(),
+                            currentWallHeight(),
+                            currentWallHeight(),
+                            currentWallHeight()
+                    )
                             : wall)
                     .toList());
             case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> activeLevel.get().replaceRooms(activeLevel.get().rooms().stream()
                     .map(room -> selectedIds().contains(room.id().toString())
-                            ? new Room(room.id(), currentRoomName(), room.outline(), currentRoomHeight(), currentFloorThickness(), currentCeilingThickness(), currentSlopedCeilingProfile())
+                            ? new Room(room.id(), currentRoomName(), room.outline(), currentRoomHeight(), currentFloorThickness(), currentCeilingThickness(), currentSlopedCeilingProfile(), room.ceilingVertexHeights())
                             : room)
                     .toList());
             case DOOR -> activeLevel.get().replaceDoors(activeLevel.get().doors().stream()
@@ -2505,6 +2585,47 @@ public final class CadWorkbench extends BorderPane {
         markThreeDDirty();
         draftLabel.setText("Eigenschaften auf Auswahl angewendet.");
         render();
+    }
+
+    private void applyEndpointHeightToSelection() {
+        if (selectedEndpointGroup == null) {
+            return;
+        }
+        Length newHeight = currentEndpointHeight();
+        rememberStateForUndo();
+        activeLevel.get().replaceWalls(activeLevel.get().walls().stream()
+                .map(wall -> {
+                    boolean isStart = selectedEndpointGroup.startWallIds().contains(wall.id());
+                    boolean isEnd = selectedEndpointGroup.endWallIds().contains(wall.id());
+                    if (!isStart && !isEnd) {
+                        return wall;
+                    }
+                    return wall.withEndpointHeights(
+                            isStart ? newHeight : wall.startHeight(),
+                            isEnd ? newHeight : wall.endHeight()
+                    );
+                })
+                .toList());
+        synchronizeRoomsFromWalls(activeLevel.get());
+        syncEndpointHeightInputFromSelection();
+        markThreeDDirty();
+        updatePropertySectionVisibility();
+        draftLabel.setText("Eckhöhe übernommen und Raumgeometrie aktualisiert.");
+        render();
+    }
+
+    private void syncEndpointHeightInputFromSelection() {
+        selectedEndpointHeight().ifPresent(height -> endpointHeightField.setText(formatValue(height, LengthUnit.METER, 2)));
+    }
+
+    private Optional<Length> selectedEndpointHeight() {
+        if (selectedEndpointGroup == null) {
+            return Optional.empty();
+        }
+        return activeLevel.get().walls().stream()
+                .filter(wall -> selectedEndpointGroup.startWallIds().contains(wall.id()) || selectedEndpointGroup.endWallIds().contains(wall.id()))
+                .findFirst()
+                .map(wall -> selectedEndpointGroup.startWallIds().contains(wall.id()) ? wall.startHeight() : wall.endHeight());
     }
 
     private Set<String> selectedIds() {
@@ -2659,6 +2780,7 @@ public final class CadWorkbench extends BorderPane {
             case "clearSelection" -> clearSelection();
             case "deleteSelection" -> deleteSelection();
             case "applySelectionProperties" -> applyCurrentInputsToSelection();
+            case "applyEndpointHeight" -> applyEndpointHeightToSelection();
             case "rotateSelectedComponentsClockwise", "rotateSelectedStairsClockwise" -> rotateSelectedComponentsClockwise();
             case "rotateSelectedComponentsCounterClockwise", "rotateSelectedStairsCounterClockwise" -> rotateSelectedComponentsCounterClockwise();
             case "exportProjectDxf" -> exportProjectAsDxf(requirePath(path, actionName));
@@ -2704,6 +2826,7 @@ public final class CadWorkbench extends BorderPane {
             case "northAngle" -> northAngleField;
             case "wallThickness" -> wallThicknessField;
             case "wallHeight" -> wallHeightField;
+            case "endpointHeight" -> endpointHeightField;
             case "roomName" -> roomNameField;
             case "roomHeight" -> roomHeightField;
             case "floorThickness" -> floorThicknessField;
@@ -2727,6 +2850,7 @@ public final class CadWorkbench extends BorderPane {
             case "length" -> lengthUnit;
             case "wallThickness" -> wallThicknessUnit;
             case "wallHeight" -> wallHeightUnit;
+            case "endpointHeight" -> endpointHeightUnit;
             case "roomHeight" -> roomHeightUnit;
             case "floorThickness" -> floorThicknessUnit;
             case "ceilingThickness" -> ceilingThicknessUnit;

@@ -83,14 +83,19 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 case "LEVEL" -> levels.computeIfAbsent(desanitize(parts[1]), Level::new);
                 case "WALL" -> {
                     Level level = levels.computeIfAbsent(desanitize(parts[1]), Level::new);
+                    double startHeight = parts.length >= 11 ? parseDouble(parts[5]) : parseDouble(parts[4]);
+                    double endHeight = parts.length >= 11 ? parseDouble(parts[6]) : parseDouble(parts[4]);
+                    int pointOffset = parts.length >= 11 ? 2 : 0;
                     level.addWall(new Wall(
                             UUID.fromString(parts[2]),
                             new PlanSegment(
-                                    new PlanPoint(parseDouble(parts[5]), parseDouble(parts[6])),
-                                    new PlanPoint(parseDouble(parts[7]), parseDouble(parts[8]))
+                                    new PlanPoint(parseDouble(parts[5 + pointOffset]), parseDouble(parts[6 + pointOffset])),
+                                    new PlanPoint(parseDouble(parts[7 + pointOffset]), parseDouble(parts[8 + pointOffset]))
                             ),
                             Length.ofMillimeters(parseDouble(parts[3])),
-                            Length.ofMillimeters(parseDouble(parts[4]))
+                            Length.ofMillimeters(parseDouble(parts[4])),
+                            Length.ofMillimeters(startHeight),
+                            Length.ofMillimeters(endHeight)
                     ));
                 }
                 case "ROOM" -> {
@@ -102,7 +107,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                             Length.ofMillimeters(parseDouble(parts[3])),
                             Length.ofMillimeters(parseDouble(parts[4])),
                             Length.ofMillimeters(parseDouble(parts[5])),
-                            parts.length >= 8 ? deserializeSlopedCeiling(parts[7]) : null
+                            parts.length >= 8 ? deserializeSlopedCeiling(parts[7]) : null,
+                            parts.length >= 9 ? deserializeCeilingVertexHeights(parts[8]) : null
                     ));
                 }
                 case "DOOR" -> {
@@ -198,11 +204,13 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (Wall wall : level.walls()) {
             appendMetadataText(dxf, wall.axis().start(), String.format(
                     Locale.US,
-                    "WALL|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
+                    "WALL|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
                     sanitize(level.name()),
                     wall.id(),
                     wall.thickness().toMillimeters(),
                     wall.height().toMillimeters(),
+                    wall.startHeight().toMillimeters(),
+                    wall.endHeight().toMillimeters(),
                     wall.axis().start().xMillimeters(),
                     wall.axis().start().yMillimeters(),
                     wall.axis().end().xMillimeters(),
@@ -212,14 +220,15 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (Room room : level.rooms()) {
             appendMetadataText(dxf, room.centerPoint(), String.format(
                     Locale.US,
-                    "ROOM|%s|%s|%.3f|%.3f|%.3f|%s|%s",
+                    "ROOM|%s|%s|%.3f|%.3f|%.3f|%s|%s|%s",
                     sanitize(level.name()),
                     sanitize(room.name()),
                     room.roomHeight().toMillimeters(),
                     room.floorThickness().toMillimeters(),
                     room.ceilingThickness().toMillimeters(),
                     serializePoints(room.outline()),
-                    serializeSlopedCeiling(room)
+                    serializeSlopedCeiling(room),
+                    serializeCeilingVertexHeights(room)
             ));
         }
         for (Door door : level.doors()) {
@@ -363,6 +372,15 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 .orElse("NONE");
     }
 
+    private String serializeCeilingVertexHeights(Room room) {
+        return room.ceilingVertexHeightsProfile()
+                .map(heights -> heights.stream()
+                        .map(height -> String.format(Locale.US, "%.3f", height.toMillimeters()))
+                        .reduce((left, right) -> left + ";" + right)
+                        .orElse("NONE"))
+                .orElse("NONE");
+    }
+
     private SlopedCeilingProfile deserializeSlopedCeiling(String value) {
         if (value == null || value.isBlank() || value.equals("NONE")) {
             return null;
@@ -375,6 +393,17 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 SlopedCeilingSide.valueOf(parts[1]),
                 Length.ofMillimeters(parseDouble(parts[2]))
         );
+    }
+
+    private List<Length> deserializeCeilingVertexHeights(String value) {
+        if (value == null || value.isBlank() || value.equals("NONE")) {
+            return null;
+        }
+        List<Length> heights = new ArrayList<>();
+        for (String part : value.split(";")) {
+            heights.add(Length.ofMillimeters(parseDouble(part)));
+        }
+        return List.copyOf(heights);
     }
 
     private String sanitize(String value) {

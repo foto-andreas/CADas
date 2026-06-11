@@ -183,71 +183,68 @@ Räume tragen aktuell:
 
 ## Dachgeschoss und Dachschrägen
 
-Die aktuelle Lösung für Dachschrägen ist bewusst raumbasiert, nicht wandbasiert.
+Die aktuelle Lösung für Dachschrägen ist jetzt primär wand- und eckbasiert.
 
 Das bedeutet:
 
-* Die Dachschräge hängt aktuell am `Raum`.
-* Sie beschreibt die innere nutzbare Schräge der Decke.
-* Dadurch bleibt die Schräge fachlich direkt als Innenfläche verfügbar, was später für Deckenebenen, Platten oder ähnliche Ausbauten wichtig ist.
+* Die Höhe der Decke entsteht aus den Höhen der verbundenen Wand-Endpunkte.
+* Ein gemeinsamer Wand-Endpunkt ist fachlich ein Höhenknoten.
+* Aus diesen Eckhöhen werden die obere Wandkante, die polygonale Raumdecke und das Raumvolumen automatisch neu berechnet.
+* Die schräge Innenfläche bleibt dadurch direkt als fachliche Deckenfläche erhalten und kann später mit Ebenen, Platten oder anderen Belägen weiter genutzt werden.
 
-### So gibst du eine Dachschräge aktuell ein
+### So gibst du eine schräge Decke im Dachgeschoss ein
 
 1. Zeichne zuerst die Wände des Dachgeschosses ganz normal und schließe den Raum vollständig.
 2. Warte, bis der Raum aus dem Wandzug automatisch erkannt wurde.
-3. Stelle in den Raum-Properties die `Raumhöhe` ein.
-   Diese Höhe ist aktuell die hohe lichte Raumhöhe an der Oberkante der Schräge.
-4. Stelle `Dachschräge` auf `Mit Dachschräge`.
-5. Wähle bei `Niedrige Seite`, an welcher Raumkante die Schräge mit dem Kniestock beginnt.
-6. Gib bei `Sockelhöhe` die Höhe des Kniestocks beziehungsweise der niedrigen Wandseite ein.
+3. Wechsle in das Werkzeug `Bearbeiten`.
+4. Klicke die gemeinsame Wandecke an, an der die Decke niedriger oder höher werden soll.
+5. Trage links bei `Eckhöhe` die gewünschte lichte Höhe dieser Ecke ein.
+6. Klicke auf `Eckhöhe anwenden`.
+7. Wiederhole das für weitere Ecken, bis die gewünschte Dach- oder Deckenform entstanden ist.
 
-Aus diesen Werten ergibt sich aktuell:
+Aus diesen Werten ergibt sich automatisch:
 
-* die niedrige Innenkante der Schräge
-* die hohe Innenkante aus der Raumhöhe
-* der Schräge-Winkel
+* die obere Schräge der betroffenen Wände
+* die polygonale Raumdecke
 * das angepasste Raumvolumen
-* die Darstellung in Draufsicht, Seitenansicht und 3D
+* die Darstellung in Seitenansichten und 3D
 
-### Beispiel
+### Typischer Anwendungsfall im Dachgeschoss
 
-Ein Dachraum hat:
+Ein Raum hat entlang einer Traufseite einen Kniestock und steigt zur Firstseite an.
 
-* Raumrechteck `5,00 m x 4,00 m`
-* Raumhöhe `2,80 m`
-* Dachschräge `Mit Dachschräge`
-* Niedrige Seite `Nordkante`
-* Sockelhöhe `1,00 m`
+Dann gehst du typischerweise so vor:
 
-Dann gilt:
+1. Zeichne den geschlossenen Wandzug des Raums.
+2. Wähle die beiden Ecken an der niedrigen Traufseite nacheinander aus.
+3. Setze dort jeweils zum Beispiel `1,00 m` oder `1,20 m` als `Eckhöhe`.
+4. Lasse die gegenüberliegenden hohen Ecken auf der normalen Raumhöhe, zum Beispiel `2,80 m` oder `3,10 m`.
 
-* An der Nordkante beginnt die Decke auf `1,00 m`.
-* Zur gegenüberliegenden Raumkante steigt die Decke linear auf `2,80 m`.
-* Das Raumvolumen wird nicht mehr mit durchgehend `2,80 m` gerechnet, sondern mit der gemittelten Höhe der Schräge.
+Damit entsteht keine symbolische Schräge mehr, sondern eine fachlich wirksame Innenfläche mit echter Volumenänderung.
 
-### Was der Anwender in 2D und 3D sieht
+### Was du in 2D und 3D siehst
 
-* In der Draufsicht wird die niedrige Seite der Schräge markiert.
-* In Seitenansichten erscheint die Decke schräg, wenn die Blickrichtung zur gewählten Schräge passt.
-* In 3D wird das Raumvolumen mit abgestufter Schräge dargestellt.
+* In Seitenansichten werden Wände mit schräger Oberkante dargestellt.
+* Räume erscheinen dort nicht nur rechteckig, sondern mit polygonaler Deckenkontur.
+* In 3D werden die Raumvolumina und Wandkörper aus diesen Eckhöhen abgeleitet.
+
+### Einfacher Fallback für Rechteckräume
+
+Für einfache Rechteckräume gibt es weiterhin die ältere raumgebundene Eingabe:
+
+* `Dachschräge = Mit Dachschräge`
+* `Niedrige Seite`
+* `Sockelhöhe`
+
+Dieser Modus ist als einfacher Fallback noch vorhanden. Für echte Dachgeschoss-Geometrien mit konkreten Wand- und Eckhöhen ist aber die Bearbeitung über `Eckhöhe` der fachlich führende Weg.
 
 ## Aktuelle Grenzen der Dachschrägen
 
-Die aktuelle erste Version kann bewusst noch nicht alles.
-
 Derzeit gilt:
 
-* Pro Raum ist aktuell genau eine Dachschräge beziehungsweise schräge Decke vorgesehen.
-* Die Schräge funktioniert aktuell für rechteckige Räume.
-* Gegenüberliegende Doppel-Schrägen oder komplexe Dachkonturen sind noch nicht separat modelliert.
-* Die Schräge hängt aktuell am Raum und nicht direkt an einzelnen Wänden.
-* Eine automatisch aus Wänden abgeleitete Dachinnengeometrie gibt es noch nicht.
-
-Für das aktuelle MVP ist das fachlich absichtlich so geschnitten, damit:
-
-* die Bedienung einfach bleibt,
-* das Raumvolumen sinnvoll berechnet werden kann,
-* und die spätere Nutzung der schrägen Innenfläche für zusätzliche Ebenen vorbereitet ist.
+* Die Raum-Innenkante wird noch aus der nackten Wandstärke und noch nicht aus späteren Innenbelägen abgeleitet.
+* Die automatische Deckenform entsteht aus Wand-Endpunkten und interpoliert dazwischen. Komplexe Dachdetails wie Dachgauben oder mehrfach geknickte Dachflächen sind noch nicht als eigene Dachobjekte modelliert.
+* Der ältere Rechteck-Fallback für `Dachschräge` bleibt bestehen, sollte aber nur für einfache Räume verwendet werden.
 
 ### Navigation in 2D
 

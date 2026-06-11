@@ -68,7 +68,7 @@ public final class ThreeDSceneModelBuilder {
     }
 
     private double estimateLevelHeight(Level level) {
-        double wallHeight = level.walls().stream().mapToDouble(wall -> wall.height().toMillimeters()).max().orElse(2750.0);
+        double wallHeight = level.walls().stream().mapToDouble(Wall::maximumHeightMillimeters).max().orElse(2750.0);
         double roomHeight = level.rooms().stream()
                 .mapToDouble(room -> room.maximumCeilingHeightMillimeters() + room.floorThickness().toMillimeters() + room.ceilingThickness().toMillimeters())
                 .max()
@@ -82,7 +82,7 @@ public final class ThreeDSceneModelBuilder {
         for (Room room : level.rooms()) {
             List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles = roomRectangles(room);
             boxes.addAll(buildRoomFloor(level, room, baseHeight, rectangles));
-            if (room.slopedCeilingProfile().isPresent()) {
+            if (room.hasVariableCeilingHeights()) {
                 boxes.addAll(buildSlopedRoomVolume(level, room, baseHeight, rectangles));
                 boxes.addAll(buildSlopedCeiling(level, room, baseHeight, rectangles));
             } else {
@@ -216,7 +216,7 @@ public final class ThreeDSceneModelBuilder {
                 offsetFromCeiling += layer.thickness().toMillimeters();
                 continue;
             }
-            if (room.slopedCeilingProfile().isPresent()) {
+            if (room.hasVariableCeilingHeights()) {
                 boxes.addAll(buildSlopedRoomSlices(
                         level.name(),
                         room,
@@ -306,12 +306,12 @@ public final class ThreeDSceneModelBuilder {
             String materialKey,
             double opacity,
             SelectionKey selectionKey
-    ) {
+        ) {
         List<RenderableBox> boxes = new ArrayList<>();
         boolean variesAlongDepth = room.slopedCeilingProfile()
                 .map(profile -> profile.lowSide() == de.andreas.cadas.domain.model.SlopedCeilingSide.NORTH
                         || profile.lowSide() == de.andreas.cadas.domain.model.SlopedCeilingSide.SOUTH)
-                .orElse(false);
+                .orElse(room.depthMillimeters() >= room.widthMillimeters());
         for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
             for (int index = 0; index < SLOPE_SEGMENTS; index++) {
                 double startRatio = (double) index / SLOPE_SEGMENTS;
@@ -364,27 +364,27 @@ public final class ThreeDSceneModelBuilder {
             double cursor = 0.0;
             for (OpeningRange opening : openings) {
                 if (opening.startMillimeters() > cursor) {
-                    boxes.add(segmentToBox(level.name(), wall, cursor, opening.startMillimeters(), baseHeight, 0.0, wall.height().toMillimeters(), "wall"));
+                    boxes.addAll(segmentToBoxes(level.name(), wall, cursor, opening.startMillimeters(), baseHeight, 0.0, "wall"));
                 }
                 if (opening.kind() == RenderableKind.DOOR) {
-                    double upperHeight = Math.max(0.0, wall.height().toMillimeters() - opening.upperHeightMillimeters());
-                    if (upperHeight > 0.0) {
-                        boxes.add(segmentToBox(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), baseHeight + opening.upperHeightMillimeters(), 0.0, upperHeight, "wall"));
+                    double upperHeight = Math.max(0.0, wall.minimumHeightMillimeters() - opening.upperHeightMillimeters());
+                    if (upperHeight > 0.0 || wall.hasVariableTopHeight()) {
+                        boxes.addAll(segmentToBoxes(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), baseHeight + opening.upperHeightMillimeters(), opening.upperHeightMillimeters(), "wall"));
                     }
                 } else if (opening.kind() == RenderableKind.WINDOW) {
                     if (opening.lowerHeightMillimeters() > 0.0) {
-                        boxes.add(segmentToBox(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), baseHeight, 0.0, opening.lowerHeightMillimeters(), "wall"));
+                        boxes.add(segmentToUniformBox(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), baseHeight, opening.lowerHeightMillimeters(), "wall"));
                     }
                     double upperBase = baseHeight + opening.upperHeightMillimeters();
-                    double upperHeight = Math.max(0.0, wall.height().toMillimeters() - opening.upperHeightMillimeters());
-                    if (upperHeight > 0.0) {
-                        boxes.add(segmentToBox(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), upperBase, 0.0, upperHeight, "wall"));
+                    double upperHeight = Math.max(0.0, wall.minimumHeightMillimeters() - opening.upperHeightMillimeters());
+                    if (upperHeight > 0.0 || wall.hasVariableTopHeight()) {
+                        boxes.addAll(segmentToBoxes(level.name(), wall, opening.startMillimeters(), opening.endMillimeters(), upperBase, opening.upperHeightMillimeters(), "wall"));
                     }
                 }
                 cursor = Math.max(cursor, opening.endMillimeters());
             }
             if (cursor < wall.axis().length().toMillimeters()) {
-                boxes.add(segmentToBox(level.name(), wall, cursor, wall.axis().length().toMillimeters(), baseHeight, 0.0, wall.height().toMillimeters(), "wall"));
+                boxes.addAll(segmentToBoxes(level.name(), wall, cursor, wall.axis().length().toMillimeters(), baseHeight, 0.0, "wall"));
             }
         }
         return boxes;
@@ -420,13 +420,43 @@ public final class ThreeDSceneModelBuilder {
         return openings;
     }
 
-    private RenderableBox segmentToBox(
+    private List<RenderableBox> segmentToBoxes(
             String levelName,
             Wall wall,
             double startMillimeters,
             double endMillimeters,
             double baseHeight,
-            double verticalOffset,
+            double subtractBottomMillimeters,
+            String materialKey
+    ) {
+        if (!wall.hasVariableTopHeight()) {
+            double heightMillimeters = Math.max(0.0, wall.heightAt((startMillimeters + endMillimeters) / 2.0) - subtractBottomMillimeters);
+            if (heightMillimeters <= 0.0) {
+                return List.of();
+            }
+            return List.of(segmentToUniformBox(levelName, wall, startMillimeters, endMillimeters, baseHeight, heightMillimeters, materialKey));
+        }
+        List<RenderableBox> boxes = new ArrayList<>();
+        double segmentLength = Math.max(1.0, endMillimeters - startMillimeters);
+        int slices = Math.max(2, (int) Math.ceil(segmentLength / 400.0));
+        for (int index = 0; index < slices; index++) {
+            double sliceStart = startMillimeters + segmentLength * index / slices;
+            double sliceEnd = startMillimeters + segmentLength * (index + 1) / slices;
+            double heightMillimeters = Math.max(0.0, wall.heightAt((sliceStart + sliceEnd) / 2.0) - subtractBottomMillimeters);
+            if (heightMillimeters <= 0.0) {
+                continue;
+            }
+            boxes.add(segmentToUniformBox(levelName, wall, sliceStart, sliceEnd, baseHeight, heightMillimeters, materialKey));
+        }
+        return boxes;
+    }
+
+    private RenderableBox segmentToUniformBox(
+            String levelName,
+            Wall wall,
+            double startMillimeters,
+            double endMillimeters,
+            double baseHeight,
             double heightMillimeters,
             String materialKey
     ) {
@@ -440,7 +470,7 @@ public final class ThreeDSceneModelBuilder {
                 levelName,
                 RenderableKind.WALL,
                 (start.xMillimeters() + end.xMillimeters()) / 2.0,
-                baseHeight + verticalOffset + heightMillimeters / 2.0,
+                baseHeight + heightMillimeters / 2.0,
                 (start.yMillimeters() + end.yMillimeters()) / 2.0,
                 segmentLength,
                 heightMillimeters,

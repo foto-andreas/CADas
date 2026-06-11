@@ -51,7 +51,9 @@ public final class QuarterTurnRotationService {
                         rotatePoint(wall.axis().end(), center, clockwise)
                 ),
                 wall.thickness(),
-                wall.height()
+                wall.height(),
+                wall.startHeight(),
+                wall.endHeight()
         );
     }
 
@@ -68,7 +70,8 @@ public final class QuarterTurnRotationService {
                 room.ceilingThickness(),
                 room.slopedCeilingProfile()
                         .map(profile -> clockwise ? profile.rotateClockwise() : profile.rotateCounterClockwise())
-                        .orElse(null)
+                        .orElse(null),
+                room.ceilingVertexHeights()
         );
     }
 
