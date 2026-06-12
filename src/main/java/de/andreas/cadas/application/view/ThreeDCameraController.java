@@ -3,11 +3,10 @@ package de.andreas.cadas.application.view;
 public final class ThreeDCameraController {
 
     public CameraPose orbit(CameraPose pose, double deltaAzimuthDegrees, double deltaElevationDegrees) {
-        double elevation = Math.max(-89.0, Math.min(89.0, pose.elevationDegrees() + deltaElevationDegrees));
         return new CameraPose(
                 pose.projectionMode(),
                 pose.azimuthDegrees() + deltaAzimuthDegrees,
-                elevation,
+                pose.elevationDegrees() + deltaElevationDegrees,
                 pose.distance(),
                 pose.panX(),
                 pose.panY(),

@@ -67,6 +67,16 @@ public record Room(
             PlanPoint firstCorner,
             PlanPoint oppositeCorner,
             Length roomHeight,
+            Length floorThickness
+    ) {
+        return rectangular(name, firstCorner, oppositeCorner, roomHeight, floorThickness, Length.ofMillimeters(0.1), null);
+    }
+
+    public static Room rectangular(
+            String name,
+            PlanPoint firstCorner,
+            PlanPoint oppositeCorner,
+            Length roomHeight,
             Length floorThickness,
             Length ceilingThickness,
             SlopedCeilingProfile slopedCeiling

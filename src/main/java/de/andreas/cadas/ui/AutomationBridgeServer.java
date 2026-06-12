@@ -103,11 +103,11 @@ public final class AutomationBridgeServer {
             return workbench.automationSnapshot();
         }));
         server.createContext("/invoke", exchange -> handleMutation(exchange, query -> {
-            workbench.automationInvoke(
+            WorkbenchAutomationSnapshot direct = workbench.automationInvoke(
                     required(query, "action"),
                     Optional.ofNullable(query.get("path")).map(Path::of).orElse(null)
             );
-            return workbench.automationSnapshot();
+            return direct != null ? direct : workbench.automationSnapshot();
         }));
     }
 

@@ -3486,7 +3486,8 @@ public final class CadWorkbench extends BorderPane {
         drawingCanvas.fireEvent(mouseEvent(MouseEvent.MOUSE_RELEASED, toX, toY, button, shiftDown, shortcutDown, altDown, false));
     }
 
-    public void automationInvoke(String actionName, Path path) {
+    public WorkbenchAutomationSnapshot automationInvoke(String actionName, Path path) {
+        WorkbenchAutomationSnapshot result = null;
         switch (actionName) {
             case "undo" -> undo();
             case "redo" -> redo();
@@ -3507,9 +3508,105 @@ public final class CadWorkbench extends BorderPane {
                 refreshThreeDIfNeeded();
                 threeDViewport.exportSnapshot(requirePath(path, actionName));
             }
+            case "exportSubSceneSnapshot" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.exportSubSceneSnapshot(requirePath(path, actionName));
+            }
+            case "threeDOrbitLeft" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationOrbit(-15.0, 0.0);
+            }
+            case "threeDOrbitRight" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationOrbit(15.0, 0.0);
+            }
+            case "threeDOrbitUp" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationOrbit(0.0, 8.0);
+            }
+            case "threeDOrbitDown" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationOrbit(0.0, -8.0);
+            }
+            case "threeDPanRight" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationPan(90.0, 0.0);
+            }
+            case "threeDPanLeft" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationPan(-90.0, 0.0);
+            }
+            case "threeDPanUp" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationPan(0.0, -60.0);
+            }
+            case "threeDPanDown" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationPan(0.0, 60.0);
+            }
+            case "threeDZoomIn" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationZoom(0.92);
+            }
+            case "threeDZoomOut" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationZoom(1.08);
+            }
+            case "threeDFit" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.automationFitToScene();
+            }
+            case "threeDReset" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.resetToCurrentOrientation();
+            }
+            case "diagnose3D" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                result = automationSnapshot();
+                // Diagnose wird in die cameraStatus-Info-Zeile geschrieben, damit sie
+                // vom Automation-Snapshot zurückgegeben werden kann, ohne neue Felder anzulegen.
+                String diagnose = threeDViewport.diagnoseRenderState();
+                draftLabel.setText("DIAGNOSE: " + diagnose);
+            }
+            case "setProjection3D" -> {
+                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                String mode = path != null ? path.toString() : "ORTHOGRAPHIC";
+                threeDViewport.setProjectionMode(de.andreas.cadas.application.view.ProjectionMode.valueOf(mode));
+            }
             case "clearProject" -> clearProjectWithoutDialog();
             default -> throw new IllegalArgumentException("Automatisierungsaktion `" + actionName + "` ist unbekannt.");
         }
+        return result;
     }
 
     public void automationSetStatusText(String text) {

@@ -257,10 +257,10 @@ Derzeit gilt:
 
 ### Navigation in 3D
 
-* Mit gedrückter linker Maustaste drehst du die Kamera um das Modell.
-* Mit gedrückter rechter Maustaste verschiebst du den Modellbezug seitlich.
+* Mit gedrückter linker Maustaste drehst du das Modell um seine Mitte.
+* Mit gedrückter rechter Maustaste verschiebst du die 3D-Ansicht entlang der Bildschirmachsen.
 * Mit dem Mausrad zoomst du in der 3D-Ansicht.
-* Die 3D-Ansicht dreht jetzt um die Modellmitte; `Modell einpassen` und `Ansicht zentrieren` halten das Modell im Blick.
+* Die 3D-Ansicht nutzt dafür eine feste Kamera mit Modell-Orbit; `Modell einpassen` und `Ansicht zentrieren` halten das Modell im Blick.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
 * `Oberflächenrendering` blendet die transparenten Raumvolumina aus und zeigt stattdessen die sichtbaren Flächen, Beläge und Öffnungen als baunähere Ansicht.
 * Über `Iso`, `Oben`, `Vorne` und `Rechts` wechselst du auf schnelle 3D-Kamerapresets.
