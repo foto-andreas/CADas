@@ -1,7 +1,18 @@
 package de.andreas.cadas.application.view;
 
 public enum ProjectionMode {
-    ORTHOGRAPHIC,
-    PERSPECTIVE
+    ORTHOGRAPHIC("Orthografisch"),
+    PERSPECTIVE("Perspektivisch");
+
+    private final String displayName;
+
+    ProjectionMode(String displayName) {
+        this.displayName = displayName;
+    }
+
+    @Override
+    public String toString() {
+        return displayName;
+    }
 }
 

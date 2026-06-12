@@ -27,7 +27,6 @@ import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.AmbientLight;
-import javafx.scene.Camera;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.PerspectiveCamera;
@@ -64,7 +63,9 @@ public final class ThreeDViewport extends BorderPane {
     private static final double MIN_CAMERA_DISTANCE_UNITS = 10.0;
     private static final double MAX_CAMERA_DISTANCE_UNITS = 50_000.0;
     private static final double DEFAULT_PERSPECTIVE_FOV_DEGREES = 38.0;
-    private static final double FIT_PADDING_FACTOR = 1.4;
+    private static final double PERSPECTIVE_FIT_PADDING = 1.8;
+    private static final double ORTHO_FOV_DEGREES = 15.0;
+    private static final double ORTHO_FIT_PADDING = 1.4;
 
     private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
@@ -302,6 +303,7 @@ public final class ThreeDViewport extends BorderPane {
         projectionModeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
                 cameraPose = cameraController.switchProjection(cameraPose, newValue);
+                fitToSceneRequested = true;
                 updateCamera();
             }
         });
@@ -694,11 +696,13 @@ public final class ThreeDViewport extends BorderPane {
         sceneGroup.getTransforms().setAll(new Translate(panXScene, panYScene, 0.0));
 
         double cameraOffset = Math.max(MIN_CAMERA_DISTANCE_UNITS, cameraPose.distance());
-        perspectiveCamera.setNearClip(0.5);
-        perspectiveCamera.setFarClip(MAX_CAMERA_DISTANCE_UNITS * 4.0);
+
+        if (cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC) {
+            perspectiveCamera.setFieldOfView(ORTHO_FOV_DEGREES);
+        } else {
+            perspectiveCamera.setFieldOfView(DEFAULT_PERSPECTIVE_FOV_DEGREES);
+        }
         perspectiveCamera.getTransforms().setAll(new Translate(0.0, 0.0, -cameraOffset));
-        boolean isOrthographic = cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC;
-        perspectiveCamera.setFieldOfView(isOrthographic ? 5.0 : DEFAULT_PERSPECTIVE_FOV_DEGREES);
         subScene.setCamera(perspectiveCamera);
 
         if (fitToSceneRequested) {
@@ -708,9 +712,11 @@ public final class ThreeDViewport extends BorderPane {
         }
 
         applyLightPositions(cameraPose.distance());
+        String projName = cameraPose.projectionMode() == ProjectionMode.PERSPECTIVE
+                ? "perspektivisch" : "orthografisch";
         cameraStatusLabel.setText(String.format(
                 "3D Ansicht: %s | Azimut %.1f° | Elevation %.1f° | Abstand %.1f m | Versatz %.0f/%.0f mm | Szene %.0f mm",
-                isOrthographic ? "orthografisch" : "perspektivisch",
+                projName,
                 cameraPose.azimuthDegrees(),
                 cameraPose.elevationDegrees(),
                 cameraPose.distance() / 1000.0,
@@ -730,26 +736,26 @@ public final class ThreeDViewport extends BorderPane {
         if (sceneSpanHorizontal <= 0.0) {
             return;
         }
-        // FOV setzen, BEVOR die Distanz berechnet wird. Dadurch arbeiten wir immer mit dem
-        // korrekten FOV für den aktuellen Projektionsmodus, egal von wo fitCameraToScene
-        // aufgerufen wird.
-        boolean isOrthographic = cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC;
-        double activeFovDegrees = isOrthographic ? 5.0 : DEFAULT_PERSPECTIVE_FOV_DEGREES;
-        perspectiveCamera.setFieldOfView(activeFovDegrees);
-        double halbeBildHoehe = Math.tan(Math.toRadians(activeFovDegrees / 2.0));
-        double halbeBildBreite = halbeBildHoehe;
-        double minHalbeBild = Math.min(halbeBildHoehe, halbeBildBreite);
+
+        double fov = cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC
+                ? ORTHO_FOV_DEGREES : DEFAULT_PERSPECTIVE_FOV_DEGREES;
+        double padding = cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC
+                ? ORTHO_FIT_PADDING : PERSPECTIVE_FIT_PADDING;
+
+        perspectiveCamera.setFieldOfView(fov);
+        double halbeBildHoehe = Math.tan(Math.toRadians(fov / 2.0));
         double elevation = Math.abs(cameraPose.elevationDegrees());
         boolean isTopDownView = elevation > 80.0;
         double modelHalfHorizontalUnits = sceneSpanHorizontal / 2.0;
-        double horizontalAbstand = (modelHalfHorizontalUnits * FIT_PADDING_FACTOR) / minHalbeBild;
+        double horizontalAbstand = (modelHalfHorizontalUnits * padding) / halbeBildHoehe;
         double modelHeightUnits = isTopDownView ? sceneSpanHorizontal : sceneHeightMax;
-        double heightAbstand = (modelHeightUnits * FIT_PADDING_FACTOR) / (2.0 * halbeBildHoehe);
+        double heightAbstand = (modelHeightUnits * padding) / (2.0 * halbeBildHoehe);
         double benoetigterAbstandUnits = Math.max(horizontalAbstand, heightAbstand) + 20.0;
         double clamped = Math.max(MIN_CAMERA_DISTANCE_UNITS,
                 Math.min(MAX_CAMERA_DISTANCE_UNITS, benoetigterAbstandUnits));
+
         cameraPose = new CameraPose(
-                projectionModeSelector.getValue(),
+                cameraPose.projectionMode(),
                 cameraPose.azimuthDegrees(),
                 cameraPose.elevationDegrees(),
                 clamped,
