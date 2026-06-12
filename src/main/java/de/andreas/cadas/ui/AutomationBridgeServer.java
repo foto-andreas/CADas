@@ -202,7 +202,10 @@ public final class AutomationBridgeServer {
                 + "\"threeDBodyCount\":" + snapshot.threeDBodyCount() + ","
                 + "\"threeDHasContent\":" + snapshot.threeDHasContent() + ","
                 + "\"threeDCameraStatus\":\"" + escape(snapshot.threeDCameraStatus()) + "\","
-                + "\"statusText\":\"" + escape(snapshot.statusText()) + "\""
+                + "\"statusText\":\"" + escape(snapshot.statusText()) + "\","
+                + "\"zoom\":" + snapshot.zoom() + ","
+                + "\"offsetX\":" + snapshot.offsetX() + ","
+                + "\"offsetY\":" + snapshot.offsetY()
                 + "}";
     }
 

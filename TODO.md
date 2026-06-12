@@ -152,6 +152,6 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Modell: Die Decken müssen innerhalb des Raums liegen. Der Raum soll um die Deckendicke in seiner Höhe vermindert werden. Die Decken sollen innerhalb des Polygons liegen, den die oberen Wandinnenkanten bilden.
 - [x] bei den Decken gibt es noch das Problem, dass diese bei Innenecken in die Wand hineinragen, und zwar bis zur Wandmitte genau in der Innenecke. Außenecken sehen ok aus.
 - [x] Modell/UI: Die Standard-Deckendicke soll 1mm betragen
-- [ ] Aktuell gibt es Fundamente unter den Wänden, der Boden ist leer und mit etwas Abstand unter dem Haus ist eine Ebene, die wie Fußboden aussieht.
-- [ ] "Rückgängig" (ggf. auch "Wiederherstellen") ändert ungewollt Zoom und Position
-- [ ] Ich glaube, der Raum-Eintrag in der Werkzeug-Combobox ist überflüssig. Eigentlich haben wir doch Räume nur als "Nebenprodukt" und nur zur Anzeige/Bemaßung. Erstellen durch Automatik wie jetzt und Anzeige ist ok. Aber man wird vermutlich keinen Raum direkt zeichnen wollen
+- [x] Aktuell gibt es Fundamente unter den Wänden, der Boden ist leer und mit etwas Abstand unter dem Haus ist eine Ebene, die wie Fußboden aussieht.
+- [x] "Rückgängig" (ggf. auch "Wiederherstellen") ändert ungewollt Zoom und Position
+- [x] Ich glaube, der Raum-Eintrag in der Werkzeug-Combobox ist überflüssig. Eigentlich haben wir doch Räume nur als "Nebenprodukt" und nur zur Anzeige/Bemaßung. Erstellen durch Automatik wie jetzt und Anzeige ist ok. Aber man wird vermutlich keinen Raum direkt zeichnen wollen
