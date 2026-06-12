@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -49,11 +50,12 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 collectProjectLayers(project),
                 Set.of(DxfDocumentSupport.BLOCK_DOOR, DxfDocumentSupport.BLOCK_WINDOW, DxfDocumentSupport.BLOCK_STAIR)
         );
-        appendMetadataText(dxf, context, new PlanPoint(0, 0), "PROJECT|" + sanitize(project.name()));
+        appendMetadataText(dxf, context, new PlanPoint(0, 0), DxfMetadataCodec.CURRENT_MARKER);
+        appendMetadataText(dxf, context, new PlanPoint(0, 0), "PROJECT|" + DxfMetadataCodec.encode(project.name()));
 
         for (Level level : project.levels()) {
             String layerPrefix = sanitizeLayerName(level.name());
-            appendMetadataText(dxf, context, new PlanPoint(0, 0), "LEVEL|" + sanitize(level.name()));
+            appendMetadataText(dxf, context, new PlanPoint(0, 0), "LEVEL|" + DxfMetadataCodec.encode(level.name()));
             exportLevelGeometry(dxf, context, level, layerPrefix);
             exportLevelMetadata(dxf, context, level);
         }
@@ -86,127 +88,136 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         Map<String, SurfaceLayerStack> lastStackByLevel = new LinkedHashMap<>();
         String importedProjectName = projectName;
         Roof importedRoof = null;
+        boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadata);
         for (String entry : metadata) {
-            String[] parts = entry.split("\\|");
-            switch (parts[0]) {
-                case "PROJECT" -> importedProjectName = stripDxfExtension(desanitize(parts[1]));
-                case "LEVEL" -> levels.computeIfAbsent(desanitize(parts[1]), Level::new);
-                case "WALL" -> {
-                    Level level = levels.computeIfAbsent(desanitize(parts[1]), Level::new);
-                    double startHeight = parts.length >= 11 ? parseDouble(parts[5]) : parseDouble(parts[4]);
-                    double endHeight = parts.length >= 11 ? parseDouble(parts[6]) : parseDouble(parts[4]);
-                    int pointOffset = parts.length >= 11 ? 2 : 0;
-                    level.addWall(new Wall(
-                            UUID.fromString(parts[2]),
-                            new PlanSegment(
-                                    new PlanPoint(parseDouble(parts[5 + pointOffset]), parseDouble(parts[6 + pointOffset])),
-                                    new PlanPoint(parseDouble(parts[7 + pointOffset]), parseDouble(parts[8 + pointOffset]))
-                            ),
-                            Length.ofMillimeters(parseDouble(parts[3])),
-                            Length.ofMillimeters(parseDouble(parts[4])),
-                            Length.ofMillimeters(startHeight),
-                            Length.ofMillimeters(endHeight)
-                    ));
-                }
-                case "ROOM" -> {
-                    Level level = levels.computeIfAbsent(desanitize(parts[1]), Level::new);
-                    if (isUuid(parts[2])) {
-                        level.addRoom(new Room(
+            String[] parts = DxfMetadataCodec.split(entry);
+            if (DxfMetadataCodec.isMarker(parts)) {
+                continue;
+            }
+            try {
+                switch (parts[0]) {
+                    case "PROJECT" -> importedProjectName = stripDxfExtension(DxfMetadataCodec.decode(parts[1], encodedFields));
+                    case "LEVEL" -> levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                    case "WALL" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        double startHeight = parts.length >= 11 ? parseDouble(parts[5]) : parseDouble(parts[4]);
+                        double endHeight = parts.length >= 11 ? parseDouble(parts[6]) : parseDouble(parts[4]);
+                        int pointOffset = parts.length >= 11 ? 2 : 0;
+                        level.addWall(new Wall(
                                 UUID.fromString(parts[2]),
-                                desanitize(parts[3]),
-                                deserializePoints(parts[7]),
+                                new PlanSegment(
+                                        new PlanPoint(parseDouble(parts[5 + pointOffset]), parseDouble(parts[6 + pointOffset])),
+                                        new PlanPoint(parseDouble(parts[7 + pointOffset]), parseDouble(parts[8 + pointOffset]))
+                                ),
+                                Length.ofMillimeters(parseDouble(parts[3])),
                                 Length.ofMillimeters(parseDouble(parts[4])),
-                                Length.ofMillimeters(parseDouble(parts[5])),
-                                Length.ofMillimeters(parseDouble(parts[6])),
-                                parts.length >= 9 ? deserializeSlopedCeiling(parts[8]) : null,
-                                parts.length >= 10 ? deserializeCeilingVertexHeights(parts[9]) : null
+                                Length.ofMillimeters(startHeight),
+                                Length.ofMillimeters(endHeight)
                         ));
-                    } else {
-                        level.addRoom(new Room(
+                    }
+                    case "ROOM" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        if (isUuid(parts[2])) {
+                            level.addRoom(new Room(
+                                    UUID.fromString(parts[2]),
+                                    DxfMetadataCodec.decode(parts[3], encodedFields),
+                                    deserializePoints(parts[7]),
+                                    Length.ofMillimeters(parseDouble(parts[4])),
+                                    Length.ofMillimeters(parseDouble(parts[5])),
+                                    Length.ofMillimeters(parseDouble(parts[6])),
+                                    parts.length >= 9 ? deserializeSlopedCeiling(parts[8]) : null,
+                                    parts.length >= 10 ? deserializeCeilingVertexHeights(parts[9]) : null
+                            ));
+                        } else {
+                            level.addRoom(new Room(
+                                    UUID.randomUUID(),
+                                    DxfMetadataCodec.decode(parts[2], encodedFields),
+                                    deserializePoints(parts[6]),
+                                    Length.ofMillimeters(parseDouble(parts[3])),
+                                    Length.ofMillimeters(parseDouble(parts[4])),
+                                    Length.ofMillimeters(parseDouble(parts[5])),
+                                    parts.length >= 8 ? deserializeSlopedCeiling(parts[7]) : null,
+                                    parts.length >= 9 ? deserializeCeilingVertexHeights(parts[8]) : null
+                            ));
+                        }
+                    }
+                    case "DOOR" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        level.addDoor(new Door(
                                 UUID.randomUUID(),
-                                desanitize(parts[2]),
-                                deserializePoints(parts[6]),
+                                UUID.fromString(parts[2]),
                                 Length.ofMillimeters(parseDouble(parts[3])),
                                 Length.ofMillimeters(parseDouble(parts[4])),
                                 Length.ofMillimeters(parseDouble(parts[5])),
-                                parts.length >= 8 ? deserializeSlopedCeiling(parts[7]) : null,
-                                parts.length >= 9 ? deserializeCeilingVertexHeights(parts[8]) : null
+                                Length.ofMillimeters(parseDouble(parts[6]))
                         ));
                     }
-                }
-                case "DOOR" -> {
-                    Level level = levels.computeIfAbsent(desanitize(parts[1]), Level::new);
-                    level.addDoor(new Door(
-                            UUID.randomUUID(),
-                            UUID.fromString(parts[2]),
-                            Length.ofMillimeters(parseDouble(parts[3])),
-                            Length.ofMillimeters(parseDouble(parts[4])),
-                            Length.ofMillimeters(parseDouble(parts[5])),
-                            Length.ofMillimeters(parseDouble(parts[6]))
-                    ));
-                }
-                case "WINDOW" -> {
-                    Level level = levels.computeIfAbsent(desanitize(parts[1]), Level::new);
-                    level.addWindow(new WindowElement(
-                            UUID.randomUUID(),
-                            UUID.fromString(parts[2]),
-                            Length.ofMillimeters(parseDouble(parts[3])),
-                            Length.ofMillimeters(parseDouble(parts[4])),
-                            Length.ofMillimeters(parseDouble(parts[5])),
-                            Length.ofMillimeters(parseDouble(parts[6]))
-                    ));
-                }
-                case "STAIR" -> {
-                    Level level = levels.computeIfAbsent(desanitize(parts[1]), Level::new);
-                    level.addStaircase(new Staircase(
-                            UUID.fromString(parts[2]),
-                            StairType.valueOf(parts[3]),
-                            new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
-                            new PlanPoint(parseDouble(parts[6]), parseDouble(parts[7])),
-                            Length.ofMillimeters(parseDouble(parts[8])),
-                            Integer.parseInt(parts[9]),
-                            Integer.parseInt(parts[10])
-                    ));
-                }
-                case "ROOF" -> importedRoof = new Roof(
-                        RoofType.valueOf(parts[1]),
-                        Angle.ofDegrees(parseDouble(parts[2])),
-                        Length.ofMillimeters(parseDouble(parts[3])),
-                        Boolean.parseBoolean(parts[4])
-                );
-                case "SLS" -> {
-                    Level level = levels.computeIfAbsent(desanitize(parts[1]), Level::new);
-                    SurfaceLayerStack stack = new SurfaceLayerStack(
-                            UUID.fromString(parts[2]),
-                            SurfaceType.valueOf(parts[3]),
-                            desanitize(parts[4])
-                    );
-                    level.addSurfaceLayerStack(stack);
-                    lastStackByLevel.put(desanitize(parts[1]), stack);
-                }
-                case "SLL" -> {
-                    SurfaceLayerStack stack = lastStackByLevel.get(desanitize(parts[1]));
-                    if (stack != null) {
-                        SurfaceLayer layer = new SurfaceLayer(
+                    case "WINDOW" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        level.addWindow(new WindowElement(
+                                UUID.randomUUID(),
                                 UUID.fromString(parts[2]),
-                                desanitize(parts[3]),
+                                Length.ofMillimeters(parseDouble(parts[3])),
                                 Length.ofMillimeters(parseDouble(parts[4])),
-                                Boolean.parseBoolean(parts[5]),
-                                Length.ofMillimeters(parseDouble(parts[6])),
-                                Length.ofMillimeters(parseDouble(parts[7])),
-                                SurfaceLayoutMode.valueOf(parts[8]),
-                                Length.ofMillimeters(parseDouble(parts[9])),
-                                Length.ofMillimeters(parseDouble(parts[10])),
-                                Length.ofMillimeters(parseDouble(parts[11])),
-                                Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[12]) : parseDouble(parts[11])),
-                                Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[13]) : parseDouble(parts[12])),
-                                desanitize(parts.length >= 15 ? parts[14] : parts[13])
+                                Length.ofMillimeters(parseDouble(parts[5])),
+                                Length.ofMillimeters(parseDouble(parts[6]))
+                        ));
+                    }
+                    case "STAIR" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        level.addStaircase(new Staircase(
+                                UUID.fromString(parts[2]),
+                                StairType.valueOf(parts[3]),
+                                new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
+                                new PlanPoint(parseDouble(parts[6]), parseDouble(parts[7])),
+                                Length.ofMillimeters(parseDouble(parts[8])),
+                                Integer.parseInt(parts[9]),
+                                Integer.parseInt(parts[10])
+                        ));
+                    }
+                    case "ROOF" -> importedRoof = new Roof(
+                            RoofType.valueOf(parts[1]),
+                            Angle.ofDegrees(parseDouble(parts[2])),
+                            Length.ofMillimeters(parseDouble(parts[3])),
+                            Boolean.parseBoolean(parts[4])
+                    );
+                    case "SLS" -> {
+                        String levelName = DxfMetadataCodec.decode(parts[1], encodedFields);
+                        Level level = levels.computeIfAbsent(levelName, Level::new);
+                        SurfaceLayerStack stack = new SurfaceLayerStack(
+                                UUID.fromString(parts[2]),
+                                SurfaceType.valueOf(parts[3]),
+                                DxfMetadataCodec.decode(parts[4], encodedFields)
                         );
-                        stack.addLayer(layer);
+                        level.addSurfaceLayerStack(stack);
+                        lastStackByLevel.put(levelName, stack);
+                    }
+                    case "SLL" -> {
+                        SurfaceLayerStack stack = lastStackByLevel.get(DxfMetadataCodec.decode(parts[1], encodedFields));
+                        if (stack != null) {
+                            SurfaceLayer layer = new SurfaceLayer(
+                                    UUID.fromString(parts[2]),
+                                    DxfMetadataCodec.decode(parts[3], encodedFields),
+                                    Length.ofMillimeters(parseDouble(parts[4])),
+                                    Boolean.parseBoolean(parts[5]),
+                                    Length.ofMillimeters(parseDouble(parts[6])),
+                                    Length.ofMillimeters(parseDouble(parts[7])),
+                                    SurfaceLayoutMode.valueOf(parts[8]),
+                                    Length.ofMillimeters(parseDouble(parts[9])),
+                                    Length.ofMillimeters(parseDouble(parts[10])),
+                                    Length.ofMillimeters(parseDouble(parts[11])),
+                                    Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[12]) : parseDouble(parts[11])),
+                                    Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[13]) : parseDouble(parts[12])),
+                                    DxfMetadataCodec.decode(parts.length >= 15 ? parts[14] : parts[13], encodedFields)
+                            );
+                            stack.addLayer(layer);
+                        }
+                    }
+                    default -> {
                     }
                 }
-                default -> {
-                }
+            } catch (IllegalArgumentException | IndexOutOfBoundsException ignored) {
+                // Fremde oder beschädigte Metadaten sollen den Geometrieimport nicht blockieren.
             }
         }
 
@@ -303,7 +314,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             appendMetadataText(dxf, context, wall.axis().start(), String.format(
                     Locale.US,
                     "WALL|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
-                    sanitize(level.name()),
+                    DxfMetadataCodec.encode(level.name()),
                     wall.id(),
                     wall.thickness().toMillimeters(),
                     wall.height().toMillimeters(),
@@ -319,9 +330,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             appendMetadataText(dxf, context, room.centerPoint(), String.format(
                     Locale.US,
                     "ROOM|%s|%s|%s|%.3f|%.3f|%.3f|%s|%s|%s",
-                    sanitize(level.name()),
+                    DxfMetadataCodec.encode(level.name()),
                     room.id(),
-                    sanitize(room.name()),
+                    DxfMetadataCodec.encode(room.name()),
                     room.roomHeight().toMillimeters(),
                     room.floorThickness().toMillimeters(),
                     room.ceilingThickness().toMillimeters(),
@@ -334,7 +345,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
                     "DOOR|%s|%s|%.3f|%.3f|%.3f|%.3f",
-                    sanitize(level.name()),
+                    DxfMetadataCodec.encode(level.name()),
                     door.wallId(),
                     door.offsetFromStart().toMillimeters(),
                     door.width().toMillimeters(),
@@ -346,7 +357,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
                     "WINDOW|%s|%s|%.3f|%.3f|%.3f|%.3f",
-                    sanitize(level.name()),
+                    DxfMetadataCodec.encode(level.name()),
                     window.wallId(),
                     window.offsetFromStart().toMillimeters(),
                     window.width().toMillimeters(),
@@ -358,7 +369,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             appendMetadataText(dxf, context, staircase.firstCorner(), String.format(
                     Locale.US,
                     "STAIR|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d",
-                    sanitize(level.name()),
+                    DxfMetadataCodec.encode(level.name()),
                     staircase.id(),
                     staircase.stairType().name(),
                     staircase.firstCorner().xMillimeters(),
@@ -374,18 +385,18 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
                     "SLS|%s|%s|%s|%s",
-                    sanitize(level.name()),
+                    DxfMetadataCodec.encode(level.name()),
                     sls.id(),
                     sls.surfaceType().name(),
-                    sanitize(sls.targetKey())
+                    DxfMetadataCodec.encode(sls.targetKey())
             ));
             for (SurfaceLayer layer : sls.layers()) {
                 appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                         Locale.US,
                         "SLL|%s|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s",
-                        sanitize(level.name()),
+                        DxfMetadataCodec.encode(level.name()),
                         layer.id(),
-                        sanitize(layer.name()),
+                        DxfMetadataCodec.encode(layer.name()),
                         layer.thickness().toMillimeters(),
                         layer.visible(),
                         layer.tileWidth().toMillimeters(),
@@ -396,7 +407,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                         layer.minimumEdgeWidth().toMillimeters(),
                         layer.minimumStartEndMargin().toMillimeters(),
                         layer.jointWidth().toMillimeters(),
-                        sanitize(layer.coveringSource())
+                        DxfMetadataCodec.encode(layer.coveringSource())
                 ));
             }
         }
@@ -417,7 +428,10 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 }
                 builder = new DxfEntityBuilder(value);
             } else if (builder != null) {
-                builder.add(Integer.parseInt(code), value);
+                Optional<Integer> groupCode = parseGroupCode(code);
+                if (groupCode.isPresent()) {
+                    builder.add(groupCode.get(), value);
+                }
             }
         }
         if (builder != null) {
@@ -542,14 +556,6 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         return List.copyOf(heights);
     }
 
-    private String sanitize(String value) {
-        return value.replace("|", "/").replace("\n", " ").trim();
-    }
-
-    private String desanitize(String value) {
-        return value.replace('/', '|');
-    }
-
     private static boolean isUuid(String text) {
         if (text == null || text.length() != 36) return false;
         try {
@@ -570,6 +576,14 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
 
     private String sanitizeLayerName(String value) {
         return value.replaceAll("[^A-Za-z0-9_\\-]", "_");
+    }
+
+    private Optional<Integer> parseGroupCode(String value) {
+        try {
+            return Optional.of(Integer.parseInt(value));
+        } catch (NumberFormatException exception) {
+            return Optional.empty();
+        }
     }
 
     private record DxfEntity(String type, Map<Integer, List<String>> values) {
