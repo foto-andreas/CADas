@@ -3,7 +3,6 @@ package de.andreas.cadas.ui;
 public enum DrawingTool {
     EDIT("Bearbeiten", true),
     WALL("Wand", false),
-    ROOM("Raum", false),
     STAIR("Treppe", false),
     DOOR("Tür", true),
     WINDOW("Fenster", true);

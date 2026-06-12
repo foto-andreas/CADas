@@ -15,6 +15,9 @@ public record WorkbenchAutomationSnapshot(
         int threeDBodyCount,
         boolean threeDHasContent,
         String threeDCameraStatus,
-        String statusText
+        String statusText,
+        double zoom,
+        double offsetX,
+        double offsetY
 ) {
 }

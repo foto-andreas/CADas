@@ -64,7 +64,6 @@ public final class ThreeDSceneModelBuilder {
                     .orElse(0.0);
             double wallBaseHeight = baseHeight + floorOffset;
             buildRoomFloor(level, baseHeight);
-            boxes.addAll(buildWallFoundations(level, baseHeight));
             boxes.addAll(buildRoomInteriors(level, baseHeight, renderSurfaceLayers, surfaceRenderingMode));
             boxes.addAll(buildWalls(level, wallBaseHeight, surfaceRenderingMode));
             if (renderSurfaceLayers) {
@@ -121,42 +120,6 @@ public final class ThreeDSceneModelBuilder {
                     1.0
             );
         }
-    }
-
-    private List<RenderableBox> buildWallFoundations(Level level, double baseHeight) {
-        List<RenderableBox> boxes = new ArrayList<>();
-        double floorThickness = level.rooms().stream()
-                .mapToDouble(room -> room.floorThickness().toMillimeters())
-                .max()
-                .orElse(0.0);
-        if (floorThickness <= 0.0) return boxes;
-        double centerY = baseHeight + floorThickness / 2.0;
-        for (Wall wall : level.walls()) {
-            double wallLength = wall.axis().length().toMillimeters();
-            double halfThickness = wall.thickness().toMillimeters() / 2.0;
-            double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
-            double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
-            double ux = wallLength > 0.0 ? dx / wallLength : 0.0;
-            double uy = wallLength > 0.0 ? dy / wallLength : 0.0;
-            double midX = (wall.axis().start().xMillimeters() + wall.axis().end().xMillimeters()) / 2.0;
-            double midZ = (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0;
-            boxes.add(new RenderableBox(
-                    new SelectionKey(RenderableKind.ROOM_FLOOR, level.name(), "foundation-" + wall.id().toString()),
-                    level.name(),
-                    RenderableKind.ROOM_FLOOR,
-                    midX + ux * halfThickness / 2.0,
-                    centerY,
-                    midZ + uy * halfThickness / 2.0,
-                    wallLength + halfThickness,
-                    floorThickness,
-                    wall.thickness().toMillimeters(),
-                    RotationAxis.Y,
-                    wall.axis().angle().degrees(),
-                    "room-floor",
-                    1.0
-            ));
-        }
-        return boxes;
     }
 
     private List<RenderableBox> buildRoomInteriors(Level level, double baseHeight, boolean renderSurfaceLayers, boolean surfaceRenderingMode) {

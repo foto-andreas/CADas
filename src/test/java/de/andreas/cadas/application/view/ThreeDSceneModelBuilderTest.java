@@ -194,6 +194,31 @@ class ThreeDSceneModelBuilderTest {
     }
 
     @Test
+    void rendertKeineFundamentBoxenMehrUnterWaenden() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(5000, 0),
+                new PlanPoint(5000, 4000),
+                new PlanPoint(0, 4000)
+        ));
+        level.addRoom(Room.rectangular(
+                "Wohnen",
+                new PlanPoint(100, 100),
+                new PlanPoint(4900, 3900),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        ));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+
+        assertTrue(sceneModel.meshes().stream().anyMatch(mesh -> mesh.kind() == RenderableKind.ROOM_FLOOR));
+        assertFalse(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_FLOOR));
+    }
+
+    @Test
     void flacheDeckenmeshBleibtBeiLRaeumenAusDerInneneckeHeraus() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         var level = project.primaryLevel();

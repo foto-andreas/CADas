@@ -655,7 +655,6 @@ public final class CadWorkbench extends BorderPane {
         werkzeugMenu.getItems().addAll(
                 toolMenuItem(DrawingTool.EDIT, KeyCode.E),
                 toolMenuItem(DrawingTool.WALL, KeyCode.W),
-                toolMenuItem(DrawingTool.ROOM, KeyCode.R),
                 toolMenuItem(DrawingTool.STAIR, KeyCode.T),
                 toolMenuItem(DrawingTool.DOOR, KeyCode.D),
                 toolMenuItem(DrawingTool.WINDOW, KeyCode.F),
@@ -826,7 +825,7 @@ public final class CadWorkbench extends BorderPane {
             boolean visible = switch (index) {
                 case 0, 1 -> true;
                 case 2 -> shouldShowSection(DrawingTool.WALL, RenderableKind.WALL);
-                case 3 -> shouldShowSection(DrawingTool.ROOM, RenderableKind.ROOM_VOLUME, RenderableKind.ROOM_FLOOR, RenderableKind.ROOM_CEILING);
+                case 3 -> shouldShowRoomSection();
                 case 4 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
                 case 5 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW);
                 case 6 -> shouldShowSection(DrawingTool.STAIR, RenderableKind.STAIR);
@@ -853,6 +852,18 @@ public final class CadWorkbench extends BorderPane {
             }
         }
         return false;
+    }
+
+    private boolean shouldShowRoomSection() {
+        if (currentTool() == DrawingTool.WALL) {
+            return true;
+        }
+        if (selectedSelection.get() == null) {
+            return false;
+        }
+        return selectedSelection.get().kind() == RenderableKind.ROOM_VOLUME
+                || selectedSelection.get().kind() == RenderableKind.ROOM_FLOOR
+                || selectedSelection.get().kind() == RenderableKind.ROOM_CEILING;
     }
 
     private boolean shouldShowLayerSection() {
@@ -1032,7 +1043,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void applyFormTooltips() {
-        applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Räume werden aus geschlossenen Wandzügen automatisch abgeleitet und können hier fachlich ausgewählt sowie bearbeitet werden.");
+        applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Räume werden aus geschlossenen Wandzügen automatisch abgeleitet, im Werkzeug `Bearbeiten` ausgewählt und beim Zeichnen von Wänden über die sichtbaren Standardwerte links mitgesteuert.");
         applyTooltip(gridField, "Legt die Rasterweite für die Zeichenfläche fest. Werte werden mit der gewählten Einheit interpretiert.");
         applyTooltip(gridUnit, "Bestimmt die Einheit für die Rasterweite, damit Eingaben in Millimeter, Zentimeter oder Meter erfolgen können.");
         applyTooltip(lengthField, "Optionaler Längenwert für die gerade gezeichnete Wand. Wenn ein Wert eingetragen ist, wird die Wand auf diese Länge gesetzt.");
@@ -1238,21 +1249,6 @@ public final class CadWorkbench extends BorderPane {
                     }
                 }
             }
-            render();
-            return;
-        }
-
-        if (currentTool() == DrawingTool.ROOM) {
-            PlanPoint roomPoint = screenToWorld(event.getX(), event.getY());
-            SelectionKey roomSelection = selectionQueryService.findSelection(activeLevel.get(), roomPoint, SNAP_TOLERANCE)
-                    .filter(selection -> selection.kind() == RenderableKind.ROOM_VOLUME
-                            || selection.kind() == RenderableKind.ROOM_FLOOR
-                            || selection.kind() == RenderableKind.ROOM_CEILING)
-                    .orElse(null);
-            updateSelection(roomSelection, event.isShortcutDown() || event.isShiftDown());
-            draftLabel.setText(roomSelection == null
-                    ? "Kein automatisch erkannter Raum an dieser Position. Zeichne zuerst einen geschlossenen Wandzug."
-                    : "Raum ausgewählt. Eigenschaften können jetzt in der linken Leiste angepasst werden.");
             render();
             return;
         }
@@ -2046,23 +2042,7 @@ public final class CadWorkbench extends BorderPane {
         double startY = Math.min(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
         double endX = Math.max(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
         double endY = Math.max(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
-        if (currentTool() == DrawingTool.ROOM) {
-            graphics.setFill(Color.color(0.76, 0.49, 0.27, 0.18));
-            graphics.fillRect(
-                    toScreenProjectedX(new PlanPoint(startX, startY), 0.0),
-                    toScreenProjectedY(new PlanPoint(startX, startY), 0.0),
-                    (endX - startX) * scale(),
-                    (endY - startY) * scale()
-            );
-            graphics.setStroke(Color.web("#c26d32"));
-            graphics.setLineWidth(2.0);
-            graphics.strokeRect(
-                    toScreenProjectedX(new PlanPoint(startX, startY), 0.0),
-                    toScreenProjectedY(new PlanPoint(startX, startY), 0.0),
-                    (endX - startX) * scale(),
-                    (endY - startY) * scale()
-            );
-        } else if (currentTool() == DrawingTool.STAIR) {
+        if (currentTool() == DrawingTool.STAIR) {
             graphics.setFill(Color.color(0.45, 0.37, 0.29, 0.18));
             graphics.setStroke(Color.web("#7f6a55"));
             graphics.setLineWidth(2.0);
@@ -3225,7 +3205,10 @@ public final class CadWorkbench extends BorderPane {
                 guideLines,
                 activeLevel.get().name(),
                 List.copyOf(selectedSelections),
-                selectedSelection.get()
+                selectedSelection.get(),
+                zoom,
+                offsetX,
+                offsetY
         );
     }
 
@@ -3254,7 +3237,11 @@ public final class CadWorkbench extends BorderPane {
                 .findFirst()
                 .orElse(project.primaryLevel());
         activateLevel(level);
-        fitCurrentViewToContent();
+        zoom = snapshot.zoom();
+        offsetX = snapshot.offsetX();
+        offsetY = snapshot.offsetY();
+        updateStatus();
+        render();
     }
 
     private void clearSelection() {
@@ -3641,12 +3628,32 @@ public final class CadWorkbench extends BorderPane {
                 threeDViewport.renderedBodyCount(),
                 threeDViewport.hasVisibleSceneContent(),
                 threeDViewport.cameraStatusText(),
-                draftLabel.getText()
+                draftLabel.getText(),
+                zoom,
+                offsetX,
+                offsetY
         );
     }
 
+    public void automationSetViewport(double zoomFactor, double newOffsetX, double newOffsetY) {
+        zoom = clamp(zoomFactor, 0.25, 8.0);
+        offsetX = newOffsetX;
+        offsetY = newOffsetY;
+        updateStatus();
+        render();
+    }
+
+    public void automationRememberUndoState() {
+        rememberStateForUndo();
+    }
+
     public void automationSetTool(String toolName) {
-        toolSelector.setValue(DrawingTool.valueOf(toolName.trim().toUpperCase(Locale.ROOT)));
+        String normalizedToolName = toolName.trim().toUpperCase(Locale.ROOT);
+        if ("ROOM".equals(normalizedToolName)) {
+            toolSelector.setValue(DrawingTool.EDIT);
+            return;
+        }
+        toolSelector.setValue(DrawingTool.valueOf(normalizedToolName));
     }
 
     public void automationSelectLevel(String levelName) {

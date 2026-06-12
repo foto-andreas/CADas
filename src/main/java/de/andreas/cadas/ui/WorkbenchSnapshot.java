@@ -10,7 +10,10 @@ public record WorkbenchSnapshot(
         List<GuideLine> guideLines,
         String activeLevelName,
         List<SelectionKey> selectedSelections,
-        SelectionKey primarySelection
+        SelectionKey primarySelection,
+        double zoom,
+        double offsetX,
+        double offsetY
 ) {
 
     public WorkbenchSnapshot {
