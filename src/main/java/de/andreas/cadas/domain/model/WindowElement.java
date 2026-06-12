@@ -32,5 +32,9 @@ public record WindowElement(
     ) {
         return new WindowElement(UUID.randomUUID(), wallId, offsetFromStart, width, sillHeight, windowHeight);
     }
+
+    public WindowElement withOffset(Length offset) {
+        return new WindowElement(id, wallId, offset, width, sillHeight, windowHeight);
+    }
 }
 
