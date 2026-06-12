@@ -311,7 +311,7 @@ public final class ThreeDViewport extends BorderPane {
                 refresh(currentProject);
             }
         });
-        surfaceRenderingCheckBox.setSelected(false);
+        surfaceRenderingCheckBox.setSelected(true);
         surfaceRenderingCheckBox.selectedProperty().addListener((ignored, oldValue, newValue) -> {
             if (currentProject != null) {
                 refresh(currentProject);

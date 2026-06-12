@@ -1335,6 +1335,8 @@ public final class CadWorkbench extends BorderPane {
         graphics.setFill(Color.web("#fcfaf5"));
         graphics.fillRect(0, 0, drawingCanvas.getWidth(), drawingCanvas.getHeight());
 
+        drawLowerLevel(graphics);
+
         if (showGrid.get()) {
             drawGrid(graphics);
         }
@@ -1404,6 +1406,29 @@ public final class CadWorkbench extends BorderPane {
         for (double y = startY; y <= drawingCanvas.getHeight(); y += spacingPixels) {
             graphics.strokeLine(0, y, drawingCanvas.getWidth(), y);
         }
+    }
+
+    private void drawLowerLevel(GraphicsContext graphics) {
+        if (!projectionService.isPlanView(activeView.get())) return;
+        int index = availableLevels.indexOf(activeLevel.get());
+        if (index <= 0) return;
+        Level lowerLevel = availableLevels.get(index - 1);
+        graphics.setGlobalAlpha(0.2);
+        Color gray = Color.gray(0.2);
+        for (Room room : lowerLevel.rooms()) {
+            double[] xPoints = room.outline().stream().mapToDouble(p -> toScreenProjectedX(p, 0.0)).toArray();
+            double[] yPoints = room.outline().stream().mapToDouble(p -> toScreenProjectedY(p, 0.0)).toArray();
+            graphics.setFill(gray);
+            graphics.fillPolygon(xPoints, yPoints, xPoints.length);
+            graphics.setStroke(gray);
+            graphics.setLineWidth(2.0);
+            graphics.strokePolygon(xPoints, yPoints, xPoints.length);
+        }
+        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.SQUARE);
+        for (Wall wall : lowerLevel.walls()) {
+            drawWall(graphics, wall.axis(), wall.thickness(), gray, 1.0);
+        }
+        graphics.setGlobalAlpha(1.0);
     }
 
     private void drawWalls(GraphicsContext graphics) {
