@@ -329,9 +329,9 @@ public final class ThreeDViewport extends BorderPane {
         Button isometricViewButton = new Button("Iso");
         isometricViewButton.setOnAction(event -> resetToCurrentOrientation());
         Button topViewButton = new Button("Oben");
-        topViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.TOP));
+        topViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.BOTTOM));
         Button bottomViewButton = new Button("Unten");
-        bottomViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.BOTTOM));
+        bottomViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.TOP));
         Button frontViewButton = new Button("Vorne");
         frontViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.NORTH));
         Button backViewButton = new Button("Hinten");
@@ -340,9 +340,9 @@ public final class ThreeDViewport extends BorderPane {
         rightViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.EAST));
         Button leftViewButton = new Button("Links");
         leftViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.WEST));
-        Button orbitLeftButton = new Button("⟲");
+        Button orbitLeftButton = new Button("←");
         orbitLeftButton.setOnAction(event -> nudgeOrbit(-15.0, 0.0));
-        Button orbitRightButton = new Button("⟳");
+        Button orbitRightButton = new Button("→");
         orbitRightButton.setOnAction(event -> nudgeOrbit(15.0, 0.0));
         Button orbitUpButton = new Button("↑");
         orbitUpButton.setOnAction(event -> nudgeOrbit(0.0, 8.0));
@@ -350,8 +350,6 @@ public final class ThreeDViewport extends BorderPane {
         orbitDownButton.setOnAction(event -> nudgeOrbit(0.0, -8.0));
         Button fitSceneButton = new Button("Modell einpassen");
         fitSceneButton.setOnAction(event -> fitCameraToScene());
-        Button elevationZeroButton = new Button("Seite");
-        elevationZeroButton.setOnAction(event -> resetElevationToZero());
         applyTooltip(isometricViewButton, "Setzt auf die Standardansicht zurück (Azimut 45°, Elevation 0°, Abstand 9 m) – Höhe, Tiefe und Breite gleichzeitig sichtbar.");
         applyTooltip(topViewButton, "Wechselt die 3D-Kamera auf eine Draufsicht.");
         applyTooltip(bottomViewButton, "Wechselt die 3D-Kamera auf eine Untersicht.");
@@ -364,7 +362,6 @@ public final class ThreeDViewport extends BorderPane {
         applyTooltip(orbitUpButton, "Hebt die 3D-Kamera schrittweise an.");
         applyTooltip(orbitDownButton, "Senkt die 3D-Kamera schrittweise ab.");
         applyTooltip(fitSceneButton, "Richtet Kameraabstand und Mittelpunkt so aus, dass das aktuelle Modell vollständig sichtbar wird.");
-        applyTooltip(elevationZeroButton, "Setzt die Elevation auf 0° (waagerechte Ansicht), behält den aktuellen Azimut bei.");
         applyTooltip(surfaceLayersCheckBox, "Blendet zusätzliche Flächen-Ebenen als gestapelte 3D-Schichten ein oder aus.");
         applyTooltip(surfaceRenderingCheckBox, "Schaltet von der transparenten Modellansicht auf eine flächenbetonte Oberflächenansicht um.");
 
@@ -374,8 +371,8 @@ public final class ThreeDViewport extends BorderPane {
         FlowPane controlRow = new FlowPane(6.0, 6.0,
                 isometricViewButton, topViewButton, bottomViewButton,
                 frontViewButton, backViewButton, leftViewButton, rightViewButton,
-                orbitLeftButton, orbitRightButton, orbitUpButton, orbitDownButton,
-                elevationZeroButton, fitSceneButton,
+                orbitUpButton, orbitDownButton, orbitLeftButton, orbitRightButton,
+                fitSceneButton,
                 surfaceLayersCheckBox, surfaceRenderingCheckBox
         );
         controlRow.setAlignment(Pos.CENTER_LEFT);
@@ -402,7 +399,7 @@ public final class ThreeDViewport extends BorderPane {
         setCenter(sceneHolder);
         VBox footer = new VBox(4.0, sceneStatsLabel, cameraStatusLabel);
         setBottom(footer);
-        setPadding(new Insets(0, 0, 0, 12));
+        setPadding(new Insets(12, 0, 0, 12));
         setStyle("-fx-background-color: rgba(255,255,255,0.28); -fx-background-radius: 16;");
     }
 
