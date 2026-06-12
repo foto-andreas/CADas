@@ -130,6 +130,11 @@ public final class Level {
         surfaceLayerStacks.removeIf(stack -> stack.id().equals(stackId));
     }
 
+    public void replaceSurfaceLayerStacks(List<SurfaceLayerStack> updatedStacks) {
+        surfaceLayerStacks.clear();
+        surfaceLayerStacks.addAll(Objects.requireNonNull(updatedStacks, "updatedStacks darf nicht null sein."));
+    }
+
     public SurfaceLayerStack findSurfaceLayerStack(SurfaceType surfaceType, String targetKey) {
         return surfaceLayerStacks.stream()
                 .filter(stack -> stack.surfaceType() == surfaceType)

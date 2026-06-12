@@ -11,6 +11,10 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
+import de.andreas.cadas.domain.model.SurfaceLayer;
+import de.andreas.cadas.domain.model.SurfaceLayerStack;
+import de.andreas.cadas.domain.model.SurfaceLayoutMode;
+import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
@@ -84,6 +88,96 @@ class DxfLevelExchangeServiceTest {
         assertEquals(14.0, imported.rooms().getFirst().areaSquareMeters(), 0.001);
         assertEquals(StairType.SWITCHBACK, imported.staircases().getFirst().stairType());
         assertEquals(1, imported.staircases().getFirst().rotationQuarterTurns());
+    }
+
+    @Test
+    void exportiertUndImportiertOberflaechenStapel() throws Exception {
+        Level level = new Level("Erdgeschoss");
+        level.addRoom(Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(5000, 4000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        ));
+        var room = level.rooms().getFirst();
+        SurfaceLayerStack floorStack = new SurfaceLayerStack(
+                java.util.UUID.randomUUID(), SurfaceType.FLOOR, room.id().toString()
+        );
+        floorStack.addLayer(new SurfaceLayer(
+                java.util.UUID.randomUUID(),
+                "Fliese",
+                Length.of(10, LengthUnit.MILLIMETER),
+                true,
+                Length.of(600, LengthUnit.MILLIMETER),
+                Length.of(600, LengthUnit.MILLIMETER),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.of(10, LengthUnit.MILLIMETER),
+                Length.of(20, LengthUnit.MILLIMETER),
+                Length.of(2, LengthUnit.MILLIMETER),
+                "Kacheln"
+        ));
+        floorStack.addLayer(new SurfaceLayer(
+                java.util.UUID.randomUUID(),
+                "Daemmung",
+                Length.of(5, LengthUnit.MILLIMETER),
+                true,
+                Length.of(1200, LengthUnit.MILLIMETER),
+                Length.of(600, LengthUnit.MILLIMETER),
+                SurfaceLayoutMode.FIXED,
+                Length.of(100, LengthUnit.MILLIMETER),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                "Trittschalldaemmung"
+        ));
+        level.addSurfaceLayerStack(floorStack);
+
+        SurfaceLayerStack ceilingStack = new SurfaceLayerStack(
+                java.util.UUID.randomUUID(), SurfaceType.CEILING, room.id().toString()
+        );
+        ceilingStack.addLayer(new SurfaceLayer(
+                java.util.UUID.randomUUID(),
+                "PutZ",
+                Length.of(15, LengthUnit.MILLIMETER),
+                true,
+                Length.of(1000, LengthUnit.MILLIMETER),
+                Length.of(1000, LengthUnit.MILLIMETER),
+                SurfaceLayoutMode.FIXED,
+                Length.of(500, LengthUnit.MILLIMETER),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                "Gipsputz"
+        ));
+        level.addSurfaceLayerStack(ceilingStack);
+
+        Path file = tempDir.resolve("oberflaechen.dxf");
+        exchangeService.exportLevel(level, file);
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertEquals(2, imported.surfaceLayerStacks().size());
+        var importedFloor = imported.surfaceLayerStacks().stream()
+                .filter(s -> s.surfaceType() == SurfaceType.FLOOR)
+                .findFirst().orElseThrow();
+        assertEquals(2, importedFloor.layers().size());
+        assertEquals("Fliese", importedFloor.layers().getFirst().name());
+        assertEquals(600.0, importedFloor.layers().getFirst().tileWidth().toMillimeters(), 0.001);
+        assertEquals(2.0, importedFloor.layers().getFirst().jointWidth().toMillimeters(), 0.001);
+        assertTrue(importedFloor.layers().getFirst().visible());
+        assertEquals("Daemmung", importedFloor.layers().get(1).name());
+        assertEquals(SurfaceLayoutMode.FIXED, importedFloor.layers().get(1).layoutMode());
+        assertEquals(100.0, importedFloor.layers().get(1).layoutOffset().toMillimeters(), 0.001);
+
+        var importedCeiling = imported.surfaceLayerStacks().stream()
+                .filter(s -> s.surfaceType() == SurfaceType.CEILING)
+                .findFirst().orElseThrow();
+        assertEquals(1, importedCeiling.layers().size());
+        assertEquals("PutZ", importedCeiling.layers().getFirst().name());
+        assertEquals(SurfaceLayoutMode.FIXED, importedCeiling.layers().getFirst().layoutMode());
+        assertEquals(500.0, importedCeiling.layers().getFirst().layoutOffset().toMillimeters(), 0.001);
     }
 
     @Test

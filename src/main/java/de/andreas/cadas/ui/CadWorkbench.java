@@ -2506,7 +2506,7 @@ public final class CadWorkbench extends BorderPane {
             Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".dxf");
             levelExchangeService.exportLevel(activeLevel.get(), exportPath);
             draftLabel.setText("DXF exportiert: " + exportPath.getFileName());
-        } catch (IOException exception) {
+        } catch (Exception exception) {
             draftLabel.setText("DXF-Export fehlgeschlagen: " + exception.getMessage());
         }
     }
@@ -2527,7 +2527,7 @@ public final class CadWorkbench extends BorderPane {
             Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".dxf");
             projectExchangeService.exportProject(project, exportPath);
             draftLabel.setText("Gebäude-DXF exportiert: " + exportPath.getFileName());
-        } catch (IOException exception) {
+        } catch (Exception exception) {
             draftLabel.setText("Gebäude-DXF-Export fehlgeschlagen: " + exception.getMessage());
         }
     }
@@ -2553,7 +2553,7 @@ public final class CadWorkbench extends BorderPane {
             activateLevel(importedLevel);
             fitCurrentViewToContent();
             draftLabel.setText("DXF importiert: " + sourceFile.getFileName());
-        } catch (IOException exception) {
+        } catch (Exception exception) {
             draftLabel.setText("DXF-Import fehlgeschlagen: " + exception.getMessage());
         }
     }
@@ -2581,7 +2581,7 @@ public final class CadWorkbench extends BorderPane {
             activateLevel(project.primaryLevel());
             fitCurrentViewToContent();
             draftLabel.setText("Gebäude-DXF importiert: " + sourceFile.getFileName());
-        } catch (IOException exception) {
+        } catch (Exception exception) {
             draftLabel.setText("Gebäude-DXF-Import fehlgeschlagen: " + exception.getMessage());
         }
     }
@@ -2656,7 +2656,7 @@ public final class CadWorkbench extends BorderPane {
                 stairPresetSelector.setValue(importedLibrary.stairPresets().getFirst());
             }
             draftLabel.setText("Teilebibliothek geladen: " + fileName);
-        } catch (IOException exception) {
+        } catch (Exception exception) {
             draftLabel.setText("Teilebibliothek fehlgeschlagen: " + exception.getMessage());
         }
     }
