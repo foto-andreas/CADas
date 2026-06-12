@@ -623,6 +623,9 @@ public final class ThreeDViewport extends BorderPane {
         double widthUnits = Math.max(1.0, renderableBox.width() * WORLD_SCALE);
         double heightUnits = Math.max(1.0, renderableBox.height() * WORLD_SCALE);
         double depthUnits = Math.max(1.0, renderableBox.depth() * WORLD_SCALE);
+        if ("joint".equals(renderableBox.materialKey())) {
+            heightUnits = Math.max(heightUnits, 2.0);
+        }
         Box box = new Box(widthUnits, heightUnits, depthUnits);
         box.setTranslateX(renderableBox.centerX() * WORLD_SCALE);
         box.setTranslateY(-renderableBox.centerY() * WORLD_SCALE);
@@ -630,6 +633,7 @@ public final class ThreeDViewport extends BorderPane {
         box.setMaterial(material(renderableBox));
         box.setDrawMode(surfaceRenderingMode ? DrawMode.FILL : DrawMode.LINE);
         box.setCullFace(CullFace.NONE);
+        box.setOpacity(renderableBox.opacity());
         box.getTransforms().add(rotation(renderableBox.rotationAxis(), renderableBox.rotationDegrees()));
         box.setUserData(renderableBox.selectionKey());
         box.setOnMouseClicked(event -> {
@@ -650,6 +654,9 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private PhongMaterial material(RenderableBox renderableBox) {
+        boolean isJoint = "joint".equals(renderableBox.materialKey());
+        boolean isSelected = (selectedSelection != null && selectedSelection.equals(renderableBox.selectionKey()))
+                || selectedSelections.contains(renderableBox.selectionKey());
         Color color = switch (renderableBox.materialKey()) {
             case "wall" -> Color.web("#5b738a");
             case "door" -> Color.web("#c88349", 0.3);
@@ -660,15 +667,22 @@ public final class ThreeDViewport extends BorderPane {
             case "stair" -> Color.web("#7a6d60");
             case "roof" -> Color.web("#8e5f54");
             case "surface-layer" -> Color.web("#8e7b5e");
-            case "joint" -> Color.web("#443e35");
+            case "joint" -> Color.web("#1a1510");
             default -> Color.web("#8c877f");
         };
-        if ((selectedSelection != null && selectedSelection.equals(renderableBox.selectionKey()))
-                || selectedSelections.contains(renderableBox.selectionKey())) {
+        if (isSelected) {
             color = color.deriveColor(0, 1.0, 1.2, 1.0);
         }
         PhongMaterial material = new PhongMaterial(color);
-        material.setSpecularColor(color.brighter());
+        if (isJoint) {
+            Color baseJointColor = isSelected
+                    ? Color.web("#1a1510").deriveColor(0, 1.0, 1.5, 1.0)
+                    : Color.web("#1a1510");
+            material.setDiffuseColor(baseJointColor);
+            material.setSpecularColor(Color.web("#222222"));
+        } else {
+            material.setSpecularColor(color.brighter());
+        }
         return material;
     }
 

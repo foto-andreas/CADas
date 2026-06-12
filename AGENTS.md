@@ -4,6 +4,7 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * JDK 25
 * Gradle 9.5 über den Wrapper
 * JavaFX als UI-Technologie
+* Fass dich extrem kurz bei deinen Antworten und internen Erklärungen und dem Auflisten deines Denkens im Chat.
 
 ## Nicht verhandelbar
 * Anforderungen immer mit minimalen, sauberen Änderungen umsetzen.

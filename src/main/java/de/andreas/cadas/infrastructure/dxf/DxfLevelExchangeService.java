@@ -7,6 +7,10 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SurfaceLayer;
+import de.andreas.cadas.domain.model.SurfaceLayerStack;
+import de.andreas.cadas.domain.model.SurfaceLayoutMode;
+import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
 import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
@@ -74,8 +78,9 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             appendClosedPolyline(dxf, context, DxfLayer.ROOMS, room.outline());
             appendMetadataText(dxf, context, room.centerPoint(), String.format(
                     Locale.US,
-                    "ROOM|%s|%.3f|%.3f|%.3f|%s|%s|%s",
+                    "ROOM|%s|%s|%.3f|%.3f|%.3f|%s|%s|%s",
                     sanitize(room.name()),
+                    room.id(),
                     room.roomHeight().toMillimeters(),
                     room.floorThickness().toMillimeters(),
                     room.ceilingThickness().toMillimeters(),
@@ -169,6 +174,34 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             ));
         }
 
+        for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
+            appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
+                    Locale.US,
+                    "SLS|%s|%s|%s",
+                    sls.id(),
+                    sls.surfaceType().name(),
+                    sanitize(sls.targetKey())
+            ));
+            for (SurfaceLayer layer : sls.layers()) {
+                appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
+                        Locale.US,
+                        "SLL|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%s",
+                        layer.id(),
+                        sanitize(layer.name()),
+                        layer.thickness().toMillimeters(),
+                        layer.visible(),
+                        layer.tileWidth().toMillimeters(),
+                        layer.tileHeight().toMillimeters(),
+                        layer.layoutMode().name(),
+                        layer.layoutOffset().toMillimeters(),
+                        layer.minimumOffset().toMillimeters(),
+                        layer.minimumEdgeWidth().toMillimeters(),
+                        layer.jointWidth().toMillimeters(),
+                        sanitize(layer.coveringSource())
+                ));
+            }
+        }
+
         DxfDocumentSupport.finishDocument(context);
         Files.writeString(targetFile, dxf.toString());
     }
@@ -200,6 +233,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         List<Door> pendingDoors = new ArrayList<>();
         List<WindowElement> pendingWindows = new ArrayList<>();
         List<Staircase> importedStaircases = new ArrayList<>();
+        List<SurfaceLayerStack> importedStacks = new ArrayList<>();
 
         for (String metadata : metadataEntries) {
             String[] parts = metadata.split("\\|");
@@ -222,16 +256,31 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     level.addWall(wall);
                     wallsById.put(wall.id(), wall);
                 }
-                case "ROOM" -> importedRooms.add(new Room(
-                        UUID.randomUUID(),
-                        desanitize(parts[1]),
-                        deserializePoints(parts[5]),
-                        Length.ofMillimeters(parseDouble(parts[2])),
-                        Length.ofMillimeters(parseDouble(parts[3])),
-                        Length.ofMillimeters(parseDouble(parts[4])),
-                        parts.length >= 7 ? deserializeSlopedCeiling(parts[6]) : null,
-                        parts.length >= 8 ? deserializeCeilingVertexHeights(parts[7]) : null
-                ));
+                case "ROOM" -> {
+                    if (isUuid(parts[2])) {
+                        importedRooms.add(new Room(
+                                UUID.fromString(parts[2]),
+                                desanitize(parts[1]),
+                                deserializePoints(parts[6]),
+                                Length.ofMillimeters(parseDouble(parts[3])),
+                                Length.ofMillimeters(parseDouble(parts[4])),
+                                Length.ofMillimeters(parseDouble(parts[5])),
+                                parts.length >= 8 ? deserializeSlopedCeiling(parts[7]) : null,
+                                parts.length >= 9 ? deserializeCeilingVertexHeights(parts[8]) : null
+                        ));
+                    } else {
+                        importedRooms.add(new Room(
+                                UUID.randomUUID(),
+                                desanitize(parts[1]),
+                                deserializePoints(parts[5]),
+                                Length.ofMillimeters(parseDouble(parts[2])),
+                                Length.ofMillimeters(parseDouble(parts[3])),
+                                Length.ofMillimeters(parseDouble(parts[4])),
+                                parts.length >= 7 ? deserializeSlopedCeiling(parts[6]) : null,
+                                parts.length >= 8 ? deserializeCeilingVertexHeights(parts[7]) : null
+                        ));
+                    }
+                }
                 case "DOOR" -> pendingDoors.add(Door.create(
                         UUID.fromString(parts[1]),
                         Length.ofMillimeters(parseDouble(parts[2])),
@@ -255,6 +304,34 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                         Integer.parseInt(parts[8]),
                         Integer.parseInt(parts[9])
                 ));
+                case "SLS" -> {
+                    SurfaceLayerStack stack = new SurfaceLayerStack(
+                            UUID.fromString(parts[1]),
+                            SurfaceType.valueOf(parts[2]),
+                            desanitize(parts[3])
+                    );
+                    importedStacks.add(stack);
+                }
+                case "SLL" -> {
+                    if (!importedStacks.isEmpty()) {
+                        SurfaceLayerStack stack = importedStacks.getLast();
+                        SurfaceLayer layer = new SurfaceLayer(
+                                UUID.fromString(parts[1]),
+                                desanitize(parts[2]),
+                                Length.ofMillimeters(parseDouble(parts[3])),
+                                Boolean.parseBoolean(parts[4]),
+                                Length.ofMillimeters(parseDouble(parts[5])),
+                                Length.ofMillimeters(parseDouble(parts[6])),
+                                SurfaceLayoutMode.valueOf(parts[7]),
+                                Length.ofMillimeters(parseDouble(parts[8])),
+                                Length.ofMillimeters(parseDouble(parts[9])),
+                                Length.ofMillimeters(parseDouble(parts[10])),
+                                Length.ofMillimeters(parseDouble(parts[11])),
+                                desanitize(parts[12])
+                        );
+                        stack.addLayer(layer);
+                    }
+                }
                 default -> {
                 }
             }
@@ -262,6 +339,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
 
         level.replaceRooms(importedRooms);
         level.replaceStaircases(importedStaircases);
+        level.replaceSurfaceLayerStacks(importedStacks);
         pendingDoors.stream()
                 .filter(door -> wallsById.containsKey(door.wallId()))
                 .forEach(level::addDoor);
@@ -365,6 +443,16 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
 
     private static String desanitize(String value) {
         return value.replace("/", "|");
+    }
+
+    private static boolean isUuid(String text) {
+        if (text == null || text.length() != 36) return false;
+        try {
+            UUID.fromString(text);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private static String serializePoints(List<PlanPoint> points) {
