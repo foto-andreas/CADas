@@ -140,3 +140,10 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Angefangenes fertig machen: Ziehe den einfacheren und robusteren Schnitt: nicht mehr die Kamera um das Modell herumtricksen, sondern das Modell in einer Orbit-Gruppe drehen und die Kamera nur noch für Abstand und Projektion nutzen. Das ist für so eine CAD-Kontrollansicht deutlich stabiler.
 
 - [x] 3D-Ansicht vollständig überarbeiten. Modell einpassen und zentrieren funktioniert. Drehung im Modellmittelpunkt, Kamera fest mit Abstand, sichtbare SubScene-Fläche als Zentrierebene. JavaFX 25 zeigte im Test-Snapshot weiterhin nur den Hintergrund; die Render-Pipeline der SubScene in einer tiefen BorderPane-Verschachtelung muss in einer separaten Iteration mit echter Stage validiert werden.
+
+- 3D: "Oben" und "Unten" werden nicht korrekt zentriert
+- Modell: Die Decken müssen innerhalb des Raums liegen. Eigentlich soll der Raum dann um die Deckendicke in seiner Höhe vermindert werden. Die Decken sollen innerhalb des Polygons liegen, den die Wandinnenflächen bilden.
+- Modell/UI: Die Standard-Deckendicke soll 1mm betragen
+- "Rückgängig" ändert ungewollt Zoom und Position (das erfolgt seltsamerweise etwas verzögert)
+- Ich glaube, die Raum-Auswahl in der Werkzeug-Kombobox ist überflüssig. Eigentlich haben wir doch Räume nur als "Nebenprodukt" und nur zur Anzeige/Bemaßung. Erstellen durch Automatik wie jetzt und Anzeige ist ok. Aber man wird vermutlich keinen Raum direkt zeichnen wollen
+- 

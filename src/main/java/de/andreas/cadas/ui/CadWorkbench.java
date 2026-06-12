@@ -417,11 +417,11 @@ public final class CadWorkbench extends BorderPane {
         rasterBox.selectedProperty().bindBidirectional(showGrid);
         applyTooltip(rasterBox, "Blendet das maßstäbliche Raster der Zeichenfläche ein oder aus.");
 
-        CheckBox snapRasterBox = new CheckBox("Snap Raster");
+        CheckBox snapRasterBox = new CheckBox("Am Raster einrasten");
         snapRasterBox.selectedProperty().bindBidirectional(snapToGrid);
         applyTooltip(snapRasterBox, "Aktiviert das magnetische Einrasten auf das konfigurierte Raster.");
 
-        CheckBox snapPointsBox = new CheckBox("Snap Punkte");
+        CheckBox snapPointsBox = new CheckBox("An Punkten einrasten");
         snapPointsBox.selectedProperty().bindBidirectional(snapToEndpoints);
         applyTooltip(snapPointsBox, "Aktiviert das magnetische Einrasten auf vorhandene Linien-Endpunkte.");
 
@@ -747,7 +747,7 @@ public final class CadWorkbench extends BorderPane {
         );
         propertySections.setPadding(new Insets(4, 0, 4, 0));
 
-        VBox container = new VBox(10.0, new Label("Properties"), propertySections);
+        VBox container = new VBox(10.0, new Label("Eigenschaften"), propertySections);
         container.setPadding(new Insets(12));
         container.setStyle("-fx-background-color: rgba(255,255,255,0.62); -fx-background-radius: 16;");
 
@@ -2688,7 +2688,7 @@ public final class CadWorkbench extends BorderPane {
             updateActionButtons();
             return;
         }
-        surfaceLayerTargetLabel.setText("Fläche: " + currentSurfaceType().name() + " auf `" + targetKey.get() + "`");
+        surfaceLayerTargetLabel.setText("Fläche: " + currentSurfaceType().toString() + " auf `" + targetKey.get() + "`");
         SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(currentSurfaceType(), targetKey.get());
         if (stack == null) {
             surfaceLayerList.getItems().clear();

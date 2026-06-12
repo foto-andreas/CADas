@@ -22,5 +22,10 @@ public enum LengthUnit {
     public BigDecimal millimeterFactor() {
         return millimeterFactor;
     }
+
+    @Override
+    public String toString() {
+        return symbol;
+    }
 }
 
