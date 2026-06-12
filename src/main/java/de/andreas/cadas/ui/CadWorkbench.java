@@ -1194,7 +1194,9 @@ public final class CadWorkbench extends BorderPane {
                 openingDragWallAxis = null;
                 openingDragWidth = 0;
                 openingDragOffsetDelta = 0;
-                if (editSelection != null && (editSelection.kind() == RenderableKind.DOOR || editSelection.kind() == RenderableKind.WINDOW)) {
+                boolean onlyDoorOrWindow = selectedSelections.stream().allMatch(
+                        s -> s.kind() == RenderableKind.DOOR || s.kind() == RenderableKind.WINDOW);
+                if (onlyDoorOrWindow && editSelection != null && (editSelection.kind() == RenderableKind.DOOR || editSelection.kind() == RenderableKind.WINDOW)) {
                     UUID elementId = UUID.fromString(editSelection.elementId());
                     if (editSelection.kind() == RenderableKind.DOOR) {
                         activeLevel.get().doors().stream()
