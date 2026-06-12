@@ -19,6 +19,7 @@ import de.andreas.cadas.application.layers.DwgBlockCatalogService;
 import de.andreas.cadas.application.layers.SurfaceLayerEffectService;
 import de.andreas.cadas.application.layers.TileLayoutRequest;
 import de.andreas.cadas.application.layers.TileLayoutService;
+import de.andreas.cadas.application.layers.TilePlacement;
 import de.andreas.cadas.application.parts.DoorPreset;
 import de.andreas.cadas.application.parts.PartLibraryImportService;
 import de.andreas.cadas.application.parts.StairPreset;
@@ -111,6 +112,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
@@ -562,28 +564,34 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void settingsBarStyling() {
-        gridField.setPrefColumnCount(5);
+        gridField.setPrefColumnCount(6);
         lengthField.setPrefColumnCount(6);
-        angleField.setPrefColumnCount(5);
-        northAngleField.setPrefColumnCount(5);
-        wallThicknessField.setPrefColumnCount(5);
-        wallHeightField.setPrefColumnCount(5);
+        angleField.setPrefColumnCount(6);
+        northAngleField.setPrefColumnCount(6);
+        wallThicknessField.setPrefColumnCount(6);
+        wallHeightField.setPrefColumnCount(6);
         roomNameField.setPrefColumnCount(8);
-        roomHeightField.setPrefColumnCount(5);
-        floorThicknessField.setPrefColumnCount(4);
-        ceilingThicknessField.setPrefColumnCount(4);
-        endpointHeightField.setPrefColumnCount(5);
+        roomHeightField.setPrefColumnCount(6);
+        floorThicknessField.setPrefColumnCount(6);
+        ceilingThicknessField.setPrefColumnCount(6);
+        endpointHeightField.setPrefColumnCount(6);
         slopedCeilingModeSelector.setPrefWidth(160);
         slopedCeilingSideSelector.setPrefWidth(160);
-        kneeWallHeightField.setPrefColumnCount(4);
-        doorWidthField.setPrefColumnCount(5);
-        doorHeightField.setPrefColumnCount(5);
-        thresholdField.setPrefColumnCount(4);
-        windowWidthField.setPrefColumnCount(5);
-        windowHeightField.setPrefColumnCount(5);
-        sillHeightField.setPrefColumnCount(4);
-        stairHeightField.setPrefColumnCount(5);
-        stairStepsField.setPrefColumnCount(3);
+        kneeWallHeightField.setPrefColumnCount(6);
+        doorWidthField.setPrefColumnCount(6);
+        doorHeightField.setPrefColumnCount(6);
+        thresholdField.setPrefColumnCount(6);
+        windowWidthField.setPrefColumnCount(6);
+        windowHeightField.setPrefColumnCount(6);
+        sillHeightField.setPrefColumnCount(6);
+        stairHeightField.setPrefColumnCount(6);
+        stairStepsField.setPrefColumnCount(6);
+        surfaceLayerThicknessField.setPrefColumnCount(6);
+        surfaceTileWidthField.setPrefColumnCount(6);
+        surfaceTileHeightField.setPrefColumnCount(6);
+        surfaceLayoutOffsetField.setPrefColumnCount(6);
+        surfaceMinimumOffsetField.setPrefColumnCount(6);
+        surfaceMinimumEdgeWidthField.setPrefColumnCount(6);
         levelSelector.setPrefWidth(180);
         toolSelector.setPrefWidth(140);
         doorPresetSelector.setPrefWidth(190);
@@ -1541,7 +1549,57 @@ public final class CadWorkbench extends BorderPane {
                 drawRoomLabel(graphics, room, center);
             }
             drawRoomSlopeMarker(graphics, room);
+            drawRoomTileGrid(graphics, room);
         }
+    }
+
+    private void drawRoomTileGrid(GraphicsContext graphics, Room room) {
+        if (!projectionService.isPlanView(activeView.get())) {
+            return;
+        }
+        SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        if (stack == null || stack.layers().isEmpty()) {
+            return;
+        }
+        SurfaceLayer layer = stack.layers().getFirst();
+        if (!layer.visible()) {
+            return;
+        }
+        TileLayoutRequest request = new TileLayoutRequest(
+                Length.ofMillimeters(room.widthMillimeters()),
+                Length.ofMillimeters(room.depthMillimeters()),
+                layer.tileWidth(),
+                layer.tileHeight(),
+                layer.layoutMode(),
+                layer.layoutOffset(),
+                layer.minimumOffset(),
+                layer.minimumEdgeWidth()
+        );
+        List<TilePlacement> tiles = tileLayoutService.fillSurface(request);
+        if (tiles.isEmpty()) {
+            return;
+        }
+        double roomMinX = room.minXMillimeters();
+        double roomMinY = room.minYMillimeters();
+        graphics.save();
+        graphics.beginPath();
+        PlanPoint[] outline = room.outline().toArray(new PlanPoint[0]);
+        graphics.moveTo(toScreenX(outline[0].xMillimeters()), toScreenY(outline[0].yMillimeters()));
+        for (int i = 1; i < outline.length; i++) {
+            graphics.lineTo(toScreenX(outline[i].xMillimeters()), toScreenY(outline[i].yMillimeters()));
+        }
+        graphics.closePath();
+        graphics.clip();
+        graphics.setStroke(Color.color(0.35, 0.25, 0.12, 0.55));
+        graphics.setLineWidth(0.6);
+        for (TilePlacement tile : tiles) {
+            double sx = toScreenX(roomMinX + tile.xOffset().toMillimeters());
+            double sy = toScreenY(roomMinY + tile.yOffset().toMillimeters());
+            double sw = (tile.width().toMillimeters()) * scale();
+            double sh = (tile.height().toMillimeters()) * scale();
+            graphics.strokeRect(sx, sy, sw, sh);
+        }
+        graphics.restore();
     }
 
     private void drawRoomLabel(GraphicsContext graphics, Room room, PlanPoint center) {
@@ -2026,13 +2084,25 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawViewOverlay(GraphicsContext graphics) {
+        Font titleFont = Font.font("Menlo", 15);
+        Font descFont = Font.font("Menlo", 11);
+        String titleText = "Ansicht: " + activeView.get().label();
+        String descText = activeView.get().overlayDescription();
+        javafx.scene.text.Text titleMeasure = new javafx.scene.text.Text(titleText);
+        titleMeasure.setFont(titleFont);
+        javafx.scene.text.Text descMeasure = new javafx.scene.text.Text(descText);
+        descMeasure.setFont(descFont);
+        double titleWidth = titleMeasure.getLayoutBounds().getWidth();
+        double descWidth = descMeasure.getLayoutBounds().getWidth();
+        double maxWidth = Math.max(titleWidth, descWidth) + 32.0;
+        double height = 52.0;
         graphics.setFill(Color.color(0.18, 0.16, 0.13, 0.78));
-        graphics.fillRoundRect(16, 16, 230, 62, 18, 18);
+        graphics.fillRoundRect(16, 16, maxWidth, height, 18, 18);
         graphics.setFill(Color.WHITE);
-        graphics.setFont(Font.font("Menlo", 15));
-        graphics.fillText("Ansicht: " + activeView.get().label(), 28, 40);
-        graphics.setFont(Font.font("Menlo", 11));
-        graphics.fillText(activeView.get().overlayDescription(), 28, 62);
+        graphics.setFont(titleFont);
+        graphics.fillText(titleText, 28, 40);
+        graphics.setFont(descFont);
+        graphics.fillText(descText, 28, 58);
     }
 
     private void drawCompass(GraphicsContext graphics) {

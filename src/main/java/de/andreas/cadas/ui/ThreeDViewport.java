@@ -385,7 +385,7 @@ public final class ThreeDViewport extends BorderPane {
 
         ScrollPane levelScrollPane = new ScrollPane(levelTogglePane);
         levelScrollPane.setFitToWidth(true);
-        levelScrollPane.setPrefViewportHeight(56);
+        levelScrollPane.setPrefViewportHeight(40);
         levelScrollPane.setStyle("-fx-background-color: transparent;");
 
         sceneHintLabel.setWrapText(true);
