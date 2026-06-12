@@ -24,6 +24,7 @@ import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
+import de.andreas.cadas.application.room.AutoRoomGenerationService;
 
 import java.util.List;
 import java.util.Set;
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.Test;
 class ThreeDSceneModelBuilderTest {
 
     private final ThreeDSceneModelBuilder builder = new ThreeDSceneModelBuilder();
+    private final AutoRoomGenerationService roomGenerationService = new AutoRoomGenerationService();
 
     @Test
     void leitetVolumenkoerperFuerMvpObjekteAb() {
@@ -189,6 +191,89 @@ class ThreeDSceneModelBuilderTest {
                 .orElseThrow();
         assertEquals(2765.0, roomVolume.height(), 0.001);
         assertEquals(1582.5, roomVolume.centerY(), 0.001);
+    }
+
+    @Test
+    void flacheDeckenmeshBleibtBeiLRaeumenAusDerInneneckeHeraus() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        level.addRoom(new Room(
+                UUID.randomUUID(),
+                "L-Raum",
+                List.of(
+                        new PlanPoint(100, 100),
+                        new PlanPoint(4900, 100),
+                        new PlanPoint(4900, 1400),
+                        new PlanPoint(2900, 1400),
+                        new PlanPoint(2900, 3900),
+                        new PlanPoint(100, 3900)
+                ),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                null
+        ));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+
+        RenderableMesh ceilingMesh = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.ROOM_CEILING)
+                .findFirst()
+                .orElseThrow();
+        float[] points = ceilingMesh.points();
+        for (int index = 0; index < points.length; index += 3) {
+            double x = points[index];
+            double z = points[index + 2];
+            assertFalse(x > 2900.0 && z > 1400.0,
+                    "Deckenpunkt liegt unzulässig im ausgesparten Inneneck: " + x + "/" + z);
+        }
+    }
+
+    @Test
+    void flacheDeckenmeshBleibtAuchBeiAutomatischAbgeleitetemLRaumAusDerInneneckeHeraus() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(5000, 0),
+                new PlanPoint(5000, 1500),
+                new PlanPoint(3000, 1500),
+                new PlanPoint(3000, 4000),
+                new PlanPoint(0, 4000)
+        ));
+        level.replaceRooms(roomGenerationService.synchronize(level, defaults()));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+
+        RenderableMesh ceilingMesh = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.ROOM_CEILING)
+                .findFirst()
+                .orElseThrow();
+        float[] points = ceilingMesh.points();
+        for (int index = 0; index < points.length; index += 3) {
+            double x = points[index];
+            double z = points[index + 2];
+            assertFalse(x > 2900.0 && z > 1400.0,
+                    "Automatisch abgeleiteter Deckenpunkt liegt im ausgesparten Inneneck: " + x + "/" + z);
+        }
+    }
+
+    private AutoRoomGenerationService.RoomDefaults defaults() {
+        return new AutoRoomGenerationService.RoomDefaults(
+                "Raum",
+                Length.of(2.8, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                null
+        );
+    }
+
+    private void addLoop(de.andreas.cadas.domain.model.Level level, List<PlanPoint> points) {
+        for (int index = 0; index < points.size(); index++) {
+            PlanPoint start = points.get(index);
+            PlanPoint end = points.get((index + 1) % points.size());
+            level.addWall(Wall.create(new PlanSegment(start, end), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        }
     }
 
     @Test

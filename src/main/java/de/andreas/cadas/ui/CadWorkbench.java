@@ -140,7 +140,7 @@ public final class CadWorkbench extends BorderPane {
     private static final Length DEFAULT_WALL_HEIGHT = Length.of(2.75, LengthUnit.METER);
     private static final Length DEFAULT_ROOM_HEIGHT = Length.of(2.60, LengthUnit.METER);
     private static final Length DEFAULT_FLOOR_THICKNESS = Length.of(18, LengthUnit.CENTIMETER);
-    private static final Length DEFAULT_CEILING_THICKNESS = Length.of(20, LengthUnit.CENTIMETER);
+    private static final Length DEFAULT_CEILING_THICKNESS = Length.of(1, LengthUnit.MILLIMETER);
     private static final Length DEFAULT_DOOR_WIDTH = Length.of(1.01, LengthUnit.METER);
     private static final Length DEFAULT_DOOR_HEIGHT = Length.of(2.01, LengthUnit.METER);
     private static final Length DEFAULT_WINDOW_WIDTH = Length.of(1.20, LengthUnit.METER);
@@ -203,7 +203,7 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> roomHeightUnit = new ComboBox<>();
     private final TextField floorThicknessField = new TextField("18");
     private final ComboBox<LengthUnit> floorThicknessUnit = new ComboBox<>();
-    private final TextField ceilingThicknessField = new TextField("20");
+    private final TextField ceilingThicknessField = new TextField("1");
     private final ComboBox<LengthUnit> ceilingThicknessUnit = new ComboBox<>();
     private final ComboBox<String> slopedCeilingModeSelector = new ComboBox<>();
     private final ComboBox<SlopedCeilingSide> slopedCeilingSideSelector = new ComboBox<>();
@@ -948,7 +948,7 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(endpointHeightUnit, LengthUnit.METER);
         initializeUnitSelector(roomHeightUnit, LengthUnit.METER);
         initializeUnitSelector(floorThicknessUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(ceilingThicknessUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(ceilingThicknessUnit, LengthUnit.MILLIMETER);
         initializeUnitSelector(kneeWallHeightUnit, LengthUnit.METER);
         initializeUnitSelector(doorWidthUnit, LengthUnit.METER);
         initializeUnitSelector(doorHeightUnit, LengthUnit.METER);
@@ -3383,7 +3383,7 @@ public final class CadWorkbench extends BorderPane {
                         roomNameField.setText(room.name());
                         roomHeightField.setText(formatValue(room.roomHeight(), LengthUnit.METER, 2));
                         floorThicknessField.setText(formatValue(room.floorThickness(), LengthUnit.CENTIMETER, 1));
-                        ceilingThicknessField.setText(formatValue(room.ceilingThickness(), LengthUnit.CENTIMETER, 1));
+                        ceilingThicknessField.setText(formatValue(room.ceilingThickness(), LengthUnit.MILLIMETER, 1));
                         if (room.slopedCeilingProfile().isPresent()) {
                             SlopedCeilingProfile profile = room.slopedCeilingProfile().orElseThrow();
                             slopedCeilingModeSelector.setValue("Mit Dachschräge");
