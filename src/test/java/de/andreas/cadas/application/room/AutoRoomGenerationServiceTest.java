@@ -187,6 +187,32 @@ class AutoRoomGenerationServiceTest {
         assertEquals(3880.0, rooms.getFirst().maxXMillimeters(), 0.001);
     }
 
+    @Test
+    void summiertMehrereSichtbareWandlagenIterativUndIgnoriertVersteckte() {
+        Level level = new Level("Erdgeschoss");
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 0),
+                new PlanPoint(4000, 3000),
+                new PlanPoint(0, 3000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+        for (Wall wall : level.walls()) {
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, wall.id().toString());
+            stack.addLayer(SurfaceLayer.create("Rigips", Length.of(2, LengthUnit.CENTIMETER), Length.of(125, LengthUnit.CENTIMETER), Length.of(200, LengthUnit.CENTIMETER), Length.zero()));
+            stack.addLayer(SurfaceLayer.create("Ausgleich", Length.of(1, LengthUnit.CENTIMETER), Length.of(125, LengthUnit.CENTIMETER), Length.of(200, LengthUnit.CENTIMETER), Length.zero()));
+            stack.addLayer(SurfaceLayer.create("Verdeckt", Length.of(0.5, LengthUnit.CENTIMETER), Length.of(125, LengthUnit.CENTIMETER), Length.of(200, LengthUnit.CENTIMETER), Length.zero()).withVisibility(false));
+            level.addSurfaceLayerStack(stack);
+        }
+
+        List<Room> rooms = service.synchronize(level, defaults());
+
+        assertEquals(1, rooms.size());
+        assertEquals(130.0, rooms.getFirst().minXMillimeters(), 0.001);
+        assertEquals(3870.0, rooms.getFirst().maxXMillimeters(), 0.001);
+        assertEquals(130.0, rooms.getFirst().minYMillimeters(), 0.001);
+        assertEquals(2870.0, rooms.getFirst().maxYMillimeters(), 0.001);
+    }
+
     private AutoRoomGenerationService.RoomDefaults defaults() {
         return new AutoRoomGenerationService.RoomDefaults(
                 "Dachraum",

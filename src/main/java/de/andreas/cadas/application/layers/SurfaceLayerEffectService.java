@@ -88,21 +88,26 @@ public final class SurfaceLayerEffectService {
         double averageHeight = room.slopedCeilingProfile().isPresent()
                 ? (effectiveMinimumCeilingHeightMillimeters(level, room) + effectiveMaximumCeilingHeightMillimeters(level, room)) / 2.0
                 : effectiveMaximumCeilingHeightMillimeters(level, room);
-        return room.areaSquareMeters() * averageHeight / 1000.0;
+        return effectiveAreaSquareMeters(level, room) * averageHeight / 1000.0;
     }
 
     public Length effectiveFloorThickness(Level level, Room room) {
         return Length.ofMillimeters(room.floorThickness().toMillimeters() + floorLayerThicknessMillimeters(level, room));
     }
 
+    public double effectiveAreaSquareMeters(Level level, Room room) {
+        return room.areaSquareMeters();
+    }
+
     public double effectiveAverageHeightMillimeters(Level level, Room room) {
-        if (room.areaSquareMeters() <= 0.0) {
+        double effectiveAreaSquareMeters = effectiveAreaSquareMeters(level, room);
+        if (effectiveAreaSquareMeters <= 0.0) {
             return 0.0;
         }
         if (!room.hasVariableCeilingHeights()) {
             return effectiveMaximumCeilingHeightMillimeters(level, room);
         }
-        double areaSquareMillimeters = room.areaSquareMeters() * 1_000_000.0;
+        double areaSquareMillimeters = effectiveAreaSquareMeters * 1_000_000.0;
         if (areaSquareMillimeters <= 0.0) {
             return 0.0;
         }

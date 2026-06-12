@@ -1,5 +1,6 @@
 package de.andreas.cadas.application.view;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -122,7 +123,9 @@ class ThreeDSceneModelBuilderTest {
         ThreeDSceneModel mitEbenen = builder.build(project, Set.of("Erdgeschoss"), true);
 
         assertFalse(nurObergeschoss.boxes().stream().anyMatch(box -> "Erdgeschoss".equals(box.levelName())));
-        assertTrue(mitEbenen.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.SURFACE_LAYER));
+        assertFalse(nurObergeschoss.meshes().stream().anyMatch(mesh -> "Erdgeschoss".equals(mesh.levelName())));
+        assertTrue(mitEbenen.meshes().stream().anyMatch(mesh -> mesh.kind() == RenderableKind.ROOM_FLOOR));
+        assertTrue(mitEbenen.meshes().stream().anyMatch(mesh -> mesh.kind() == RenderableKind.SURFACE_LAYER));
     }
 
     @Test
@@ -154,6 +157,38 @@ class ThreeDSceneModelBuilderTest {
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_VOLUME));
         assertTrue(sceneModel.boxes().stream().filter(box -> box.kind() == RenderableKind.ROOM_VOLUME).count() > 1);
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.SURFACE_LAYER));
+    }
+
+    @Test
+    void reduziertRaumvolumenIn3dUmSichtbareBodenUndDeckenlagen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Room room = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 3000),
+                Length.of(2.8, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+
+        SurfaceLayerStack floor = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        floor.addLayer(SurfaceLayer.create("Parkett", Length.of(1.2, LengthUnit.CENTIMETER), Length.of(120, LengthUnit.CENTIMETER), Length.of(20, LengthUnit.CENTIMETER), Length.zero()));
+        floor.addLayer(SurfaceLayer.create("Ausgleich", Length.of(0.8, LengthUnit.CENTIMETER), Length.of(120, LengthUnit.CENTIMETER), Length.of(20, LengthUnit.CENTIMETER), Length.zero()));
+        SurfaceLayerStack ceiling = new SurfaceLayerStack(SurfaceType.CEILING, room.id().toString());
+        ceiling.addLayer(SurfaceLayer.create("Paneel", Length.of(1.5, LengthUnit.CENTIMETER), Length.of(120, LengthUnit.CENTIMETER), Length.of(20, LengthUnit.CENTIMETER), Length.zero()));
+        level.addSurfaceLayerStack(floor);
+        level.addSurfaceLayerStack(ceiling);
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+
+        RenderableBox roomVolume = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.ROOM_VOLUME)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(2765.0, roomVolume.height(), 0.001);
+        assertEquals(1582.5, roomVolume.centerY(), 0.001);
     }
 
     @Test

@@ -648,7 +648,7 @@ public final class CadWorkbench extends BorderPane {
         }
         ansichtMenu.getItems().addAll(
                 menuItem("2D-Ansicht zentrieren", this::resetTwoDView, shortcutKey(KeyCode.DIGIT0)),
-                menuItem("3D-Ansicht zentrieren", threeDViewport::resetToCurrentOrientation, shortcutShiftKey(KeyCode.DIGIT0))
+                menuItem("3D-Ansicht zentrieren", threeDViewport::centerCurrentView, shortcutShiftKey(KeyCode.DIGIT0))
         );
 
         Menu werkzeugMenu = new Menu("Werkzeuge");
@@ -1616,7 +1616,12 @@ public final class CadWorkbench extends BorderPane {
         graphics.fillText(room.name(), toScreenProjectedX(center, 0.0) - 26, toScreenProjectedY(center, 0.0) - 6);
         graphics.setFont(Font.font("Menlo", 11));
         graphics.fillText(
-                String.format(Locale.GERMAN, "%.2f m² | %.2f m³", room.areaSquareMeters(), surfaceLayerEffectService.effectiveVolumeCubicMeters(activeLevel.get(), room)),
+                String.format(
+                        Locale.GERMAN,
+                        "%.2f m² | %.2f m³",
+                        surfaceLayerEffectService.effectiveAreaSquareMeters(activeLevel.get(), room),
+                        surfaceLayerEffectService.effectiveVolumeCubicMeters(activeLevel.get(), room)
+                ),
                 toScreenProjectedX(center, 0.0) - 42,
                 toScreenProjectedY(center, 0.0) + 12
         );
@@ -3787,7 +3792,7 @@ public final class CadWorkbench extends BorderPane {
                 activeWorkspaceMode.set(WorkspaceMode.THREE_D);
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
-                threeDViewport.resetToCurrentOrientation();
+                threeDViewport.resetToDefaultView();
             }
             case "diagnose3D" -> {
                 activeWorkspaceMode.set(WorkspaceMode.THREE_D);
