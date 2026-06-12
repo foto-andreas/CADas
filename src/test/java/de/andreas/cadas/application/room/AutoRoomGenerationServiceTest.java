@@ -15,6 +15,7 @@ import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
+import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -211,6 +212,36 @@ class AutoRoomGenerationServiceTest {
         assertEquals(3870.0, rooms.getFirst().maxXMillimeters(), 0.001);
         assertEquals(130.0, rooms.getFirst().minYMillimeters(), 0.001);
         assertEquals(2870.0, rooms.getFirst().maxYMillimeters(), 0.001);
+    }
+
+    @Test
+    void beruecksichtigtRaumbezogeneInnenwandlagenBeimSichtbarkeitswechsel() {
+        Level level = new Level("Erdgeschoss");
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 0),
+                new PlanPoint(4000, 3000),
+                new PlanPoint(0, 3000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+        List<Room> initialRooms = service.synchronize(level, defaults());
+        level.replaceRooms(initialRooms);
+        Room room = level.rooms().getFirst();
+
+        for (Wall wall : level.walls()) {
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, WallSurfaceTargetKey.interior(wall.id(), room.id()));
+            stack.addLayer(SurfaceLayer.create("Dämmplatte", Length.of(4, LengthUnit.CENTIMETER), Length.of(120, LengthUnit.CENTIMETER), Length.of(60, LengthUnit.CENTIMETER), Length.zero()));
+            level.addSurfaceLayerStack(stack);
+        }
+
+        List<Room> visibleRooms = service.synchronize(level, defaults());
+        assertEquals(140.0, visibleRooms.getFirst().minXMillimeters(), 0.001);
+        assertEquals(3860.0, visibleRooms.getFirst().maxXMillimeters(), 0.001);
+
+        level.replaceRooms(visibleRooms);
+        level.surfaceLayerStacks().forEach(stack -> stack.setVisibility(stack.layers().getFirst().id(), false));
+        List<Room> hiddenRooms = service.synchronize(level, defaults());
+        assertEquals(100.0, hiddenRooms.getFirst().minXMillimeters(), 0.001);
+        assertEquals(3900.0, hiddenRooms.getFirst().maxXMillimeters(), 0.001);
     }
 
     @Test

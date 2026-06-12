@@ -78,6 +78,10 @@ public final class AutomationBridgeServer {
             );
             return workbench.automationSnapshot();
         }));
+        server.createContext("/surfaceLayer", exchange -> handleMutation(exchange, query -> {
+            workbench.automationSelectSurfaceLayer(Integer.parseInt(query.getOrDefault("index", "0")));
+            return workbench.automationSnapshot();
+        }));
         server.createContext("/field", exchange -> handleMutation(exchange, query -> {
             workbench.automationSetField(required(query, "name"), required(query, "value"));
             return workbench.automationSnapshot();
@@ -219,6 +223,7 @@ public final class AutomationBridgeServer {
                 + "\"surfaceTargetLabel\":\"" + escape(snapshot.surfaceTargetLabel()) + "\","
                 + "\"surfaceSelectionHint\":\"" + escape(snapshot.surfaceSelectionHint()) + "\","
                 + "\"surfaceCoverageLabel\":\"" + escape(snapshot.surfaceCoverageLabel()) + "\","
+                + "\"selectedRoomMetrics\":\"" + escape(snapshot.selectedRoomMetrics()) + "\","
                 + "\"statusText\":\"" + escape(snapshot.statusText()) + "\","
                 + "\"zoom\":" + snapshot.zoom() + ","
                 + "\"offsetX\":" + snapshot.offsetX() + ","

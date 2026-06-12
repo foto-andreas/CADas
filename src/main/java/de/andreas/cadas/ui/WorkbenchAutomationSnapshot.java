@@ -20,6 +20,7 @@ public record WorkbenchAutomationSnapshot(
         String surfaceTargetLabel,
         String surfaceSelectionHint,
         String surfaceCoverageLabel,
+        String selectedRoomMetrics,
         String statusText,
         double zoom,
         double offsetX,
