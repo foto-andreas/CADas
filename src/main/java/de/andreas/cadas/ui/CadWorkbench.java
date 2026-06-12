@@ -393,6 +393,7 @@ public final class CadWorkbench extends BorderPane {
         toolSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             updatePropertySectionVisibility();
             updateActionButtons();
+            updateStatus();
         });
         configureActionButtons();
         registerBundledDwgLibraries();
@@ -433,29 +434,17 @@ public final class CadWorkbench extends BorderPane {
         rasterBox.selectedProperty().bindBidirectional(showGrid);
         applyTooltip(rasterBox, "Blendet das maßstäbliche Raster der Zeichenfläche ein oder aus.");
 
-        CheckBox snapRasterBox = new CheckBox("Am Raster einrasten");
+        CheckBox snapRasterBox = new CheckBox("Raster-Snap");
         snapRasterBox.selectedProperty().bindBidirectional(snapToGrid);
         applyTooltip(snapRasterBox, "Aktiviert das magnetische Einrasten auf das konfigurierte Raster.");
 
-        CheckBox snapPointsBox = new CheckBox("An Punkten einrasten");
+        CheckBox snapPointsBox = new CheckBox("Punkt-Snap");
         snapPointsBox.selectedProperty().bindBidirectional(snapToEndpoints);
         applyTooltip(snapPointsBox, "Aktiviert das magnetische Einrasten auf vorhandene Linien-Endpunkte.");
-
-        CheckBox compassBox = new CheckBox("Nordpfeil");
-        compassBox.selectedProperty().bindBidirectional(showCompass);
-        applyTooltip(compassBox, "Blendet einen Nordpfeil in der Zeichenfläche ein oder aus.");
 
         CheckBox dimensionsBox = new CheckBox("Bemaßung");
         dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
         applyTooltip(dimensionsBox, "Blendet die Längenbeschriftung der gezeichneten Wände ein oder aus.");
-
-        CheckBox areaVolumeBox = new CheckBox("Fläche & Volumen");
-        areaVolumeBox.selectedProperty().bindBidirectional(showAreaVolume);
-        applyTooltip(areaVolumeBox, "Blendet Flächen- und Volumenwerte der Räume ein oder aus.");
-
-        CheckBox guideBox = new CheckBox("Hilfslinien");
-        guideBox.selectedProperty().bindBidirectional(showGuides);
-        applyTooltip(guideBox, "Blendet gezogene Hilfslinien aus den Linealen ein oder aus.");
 
         Button resetViewButton = createActionButton(
                 "2D zentrieren",
@@ -488,10 +477,6 @@ public final class CadWorkbench extends BorderPane {
                 snapPointsBox,
                 new Separator(Orientation.VERTICAL),
                 dimensionsBox,
-                areaVolumeBox,
-                guideBox,
-                compassBox,
-                new Separator(Orientation.VERTICAL),
                 resetViewButton
         );
     }
@@ -2372,11 +2357,21 @@ public final class CadWorkbench extends BorderPane {
             if (selectedEndpointGroup != null) {
                 draftLabel.setText("Werkzeug: " + currentTool().label() + " | Wandecke ausgewählt: Ziehen verschiebt sie gemeinsam, `Eckhöhe anwenden` setzt ihre Höhe.");
             } else {
-                draftLabel.setText("Werkzeug: " + currentTool().label() + " | Linke Maustaste platziert, rechte Maustaste verschiebt, Alt+Rechtsklick entfernt Hilfslinien.");
+                draftLabel.setText(statusHintForCurrentTool());
             }
         } else {
             draftLabel.setText("Zeichnen: " + previewSegment.length().format(LengthUnit.METER, 2) + " | " + previewSegment.angle().format());
         }
+    }
+
+    private String statusHintForCurrentTool() {
+        return switch (currentTool()) {
+            case EDIT -> "Werkzeug: Bearbeiten | Linksklick wählt aus, Rechtsziehen verschiebt die Ansicht, Alt+Rechtsklick entfernt Hilfslinien.";
+            case WALL -> "Werkzeug: Wand | Linksklick startet und beendet Wände, Shift erlaubt freie Winkel.";
+            case DOOR -> "Werkzeug: Tür | Linksklick auf eine Wand platziert die Tür mit den aktuellen Maßen.";
+            case WINDOW -> "Werkzeug: Fenster | Linksklick auf eine Wand platziert das Fenster mit den aktuellen Maßen.";
+            case STAIR -> "Werkzeug: Treppe | Rechteck aufziehen platziert die Treppe mit dem gewählten Preset.";
+        };
     }
 
     private void applyTooltip(javafx.scene.Node node, String text) {
