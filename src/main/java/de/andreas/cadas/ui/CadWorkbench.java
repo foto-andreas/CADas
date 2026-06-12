@@ -461,6 +461,7 @@ public final class CadWorkbench extends BorderPane {
                 new Separator(Orientation.VERTICAL),
                 labelledNode("Etage", levelSelector),
                 addLevelButton,
+                new Separator(Orientation.VERTICAL),
                 undoButton,
                 redoButton,
                 deleteSelectionButton,
@@ -469,6 +470,7 @@ public final class CadWorkbench extends BorderPane {
                 rasterBox,
                 snapRasterBox,
                 snapPointsBox,
+                new Separator(Orientation.VERTICAL),
                 dimensionsBox,
                 areaVolumeBox,
                 guideBox,
@@ -490,8 +492,8 @@ public final class CadWorkbench extends BorderPane {
         box.getChildren().add(viewButton("⤓ Unten", () -> activeView.set(ViewOrientation.BOTTOM), "Schaltet auf die feste Untersicht um."));
         box.getChildren().add(viewButton("↑", this::rotateViewUp, "Dreht das Modell aus der aktuellen 2D-Ansicht nach oben."));
         box.getChildren().add(viewButton("↓", this::rotateViewDown, "Dreht das Modell aus der aktuellen 2D-Ansicht nach unten."));
-        box.getChildren().add(viewButton("→", this::rotateViewRight, "Dreht das Modell aus der aktuellen 2D-Ansicht nach rechts."));
         box.getChildren().add(viewButton("←", this::rotateViewLeft, "Dreht das Modell aus der aktuellen 2D-Ansicht nach links."));
+        box.getChildren().add(viewButton("→", this::rotateViewRight, "Dreht das Modell aus der aktuellen 2D-Ansicht nach rechts."));
         return box;
     }
 
@@ -2289,6 +2291,7 @@ public final class CadWorkbench extends BorderPane {
                     Level level = project.createLevel(levelName);
                     availableLevels.add(level);
                     activateLevel(level);
+                    fitCurrentViewToContent();
                 });
     }
 
@@ -2468,6 +2471,7 @@ public final class CadWorkbench extends BorderPane {
             project.addLevel(importedLevel);
             availableLevels.add(importedLevel);
             activateLevel(importedLevel);
+            fitCurrentViewToContent();
             draftLabel.setText("DXF importiert: " + sourceFile.getFileName());
         } catch (IOException exception) {
             draftLabel.setText("DXF-Import fehlgeschlagen: " + exception.getMessage());
@@ -2494,6 +2498,7 @@ public final class CadWorkbench extends BorderPane {
             guideLines.clear();
             clearSelectionsInternal();
             activateLevel(project.primaryLevel());
+            fitCurrentViewToContent();
             draftLabel.setText("Gebäude-DXF importiert: " + sourceFile.getFileName());
         } catch (IOException exception) {
             draftLabel.setText("Gebäude-DXF-Import fehlgeschlagen: " + exception.getMessage());
@@ -3092,6 +3097,7 @@ public final class CadWorkbench extends BorderPane {
                     previewSegment = null;
                     pendingGuideOrientation = null;
                     activateLevel(level);
+                    fitCurrentViewToContent();
                     draftLabel.setText("Projekt geleert.");
                 });
     }
@@ -3154,6 +3160,7 @@ public final class CadWorkbench extends BorderPane {
                 .findFirst()
                 .orElse(project.primaryLevel());
         activateLevel(level);
+        fitCurrentViewToContent();
     }
 
     private void clearSelection() {
@@ -3450,7 +3457,6 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.set(level);
         threeDViewport.syncLevels(availableLevels, level.name());
         markThreeDDirty();
-        fitCurrentViewToContent();
         updatePropertySectionVisibility();
         updateActionButtons();
         render();
@@ -3463,7 +3469,10 @@ public final class CadWorkbench extends BorderPane {
         availableLevels.stream()
                 .filter(level -> level.name().equals(selectionKey.levelName()))
                 .findFirst()
-                .ifPresent(this::activateLevel);
+                .ifPresent(level -> {
+                    activateLevel(level);
+                    fitCurrentViewToContent();
+                });
         selectSingle(selectionKey);
     }
 
@@ -3729,6 +3738,7 @@ public final class CadWorkbench extends BorderPane {
         previewSegment = null;
         pendingGuideOrientation = null;
         activateLevel(level);
+        fitCurrentViewToContent();
         draftLabel.setText("Projekt geleert.");
     }
 
