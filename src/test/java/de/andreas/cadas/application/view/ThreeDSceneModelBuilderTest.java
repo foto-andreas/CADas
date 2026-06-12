@@ -194,7 +194,7 @@ class ThreeDSceneModelBuilderTest {
     }
 
     @Test
-    void rendertKeineFundamentBoxenMehrUnterWaenden() {
+    void rendertBodenkoerperInnenUndTragschichtUnterWaenden() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         var level = project.primaryLevel();
         addLoop(level, List.of(
@@ -215,7 +215,54 @@ class ThreeDSceneModelBuilderTest {
         ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
 
         assertTrue(sceneModel.meshes().stream().anyMatch(mesh -> mesh.kind() == RenderableKind.ROOM_FLOOR));
-        assertFalse(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_FLOOR));
+        List<RenderableBox> floorBoxes = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.ROOM_FLOOR)
+                .toList();
+        assertFalse(floorBoxes.isEmpty());
+        assertTrue(floorBoxes.stream().anyMatch(box -> box.selectionKey().elementId().equals(level.rooms().getFirst().id().toString())));
+        assertTrue(floorBoxes.stream().anyMatch(box -> box.selectionKey().elementId().startsWith("wall-support-")));
+        floorBoxes.forEach(box -> assertEquals(180.0, box.centerY() + box.height() / 2.0, 0.001));
+    }
+
+    @Test
+    void legtFugenVonBodenbelaegenSichtbarUeberDieBelagsoberflaeche() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Room room = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 3000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+        SurfaceLayerStack floor = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        floor.addLayer(SurfaceLayer.create(
+                "Fliese",
+                Length.of(12, LengthUnit.MILLIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(30, LengthUnit.CENTIMETER),
+                Length.of(2, LengthUnit.MILLIMETER)
+        ));
+        level.addSurfaceLayerStack(floor);
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), true);
+
+        List<RenderableBox> joints = sceneModel.boxes().stream()
+                .filter(box -> "joint".equals(box.materialKey()))
+                .toList();
+        assertFalse(joints.isEmpty());
+        joints.forEach(box -> assertTrue(box.centerY() - box.height() / 2.0 > 192.0));
+        assertTrue(sceneModel.boxes().stream().anyMatch(box ->
+                box.kind() == RenderableKind.SURFACE_LAYER
+                        && "surface-layer".equals(box.materialKey())
+                        && Math.abs(box.height() - 12.0) < 0.001
+        ));
+        long horizontaleFugenSegmente = joints.stream()
+                .filter(box -> box.width() > box.depth())
+                .count();
+        assertTrue(horizontaleFugenSegmente > 1, "Horizontale Fugen dürfen nicht auf ein Segment pro Reihe kollabieren.");
     }
 
     @Test

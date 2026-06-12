@@ -651,7 +651,7 @@ public final class ThreeDViewport extends BorderPane {
         box.setTranslateY(-renderableBox.centerY() * WORLD_SCALE);
         box.setTranslateZ(renderableBox.centerZ() * WORLD_SCALE);
         box.setMaterial(material(renderableBox));
-        box.setDrawMode(surfaceRenderingMode ? DrawMode.FILL : DrawMode.LINE);
+        box.setDrawMode(shouldRenderFilled(renderableBox) ? DrawMode.FILL : DrawMode.LINE);
         box.setCullFace(CullFace.NONE);
         box.setOpacity(renderableBox.opacity());
         box.getTransforms().add(rotation(renderableBox.rotationAxis(), renderableBox.rotationDegrees()));
@@ -663,6 +663,14 @@ public final class ThreeDViewport extends BorderPane {
             }
         });
         return box;
+    }
+
+    private boolean shouldRenderFilled(RenderableBox renderableBox) {
+        if (surfaceRenderingMode) {
+            return true;
+        }
+        return "room-floor".equals(renderableBox.materialKey())
+                || "joint".equals(renderableBox.materialKey());
     }
 
     private Rotate rotation(RotationAxis axis, double degrees) {
@@ -715,7 +723,11 @@ public final class ThreeDViewport extends BorderPane {
         ObservableIntegerArray smoothingGroups = mesh.getFaceSmoothingGroups();
         float[] src = rm.points();
         for (int i = 0; i < src.length; i += 3) {
-            meshPoints.addAll(src[i] * (float) WORLD_SCALE, src[i + 1] * (float) WORLD_SCALE, src[i + 2] * (float) WORLD_SCALE);
+            meshPoints.addAll(
+                    src[i] * (float) WORLD_SCALE,
+                    -src[i + 1] * (float) WORLD_SCALE,
+                    src[i + 2] * (float) WORLD_SCALE
+            );
         }
         int vertexCount = src.length / 3;
         for (int i = 0; i < vertexCount; i++) {

@@ -13,9 +13,26 @@ public record SurfaceCoveringPreset(
         Length offset,
         Length minimumOffset,
         Length minimumEdgeWidth,
+        Length minimumStartEndMargin,
         Length jointWidth,
         String coveringSource
 ) {
+
+    public SurfaceCoveringPreset(
+            String id,
+            String name,
+            Length thickness,
+            Length tileWidth,
+            Length tileHeight,
+            SurfaceLayoutMode layoutMode,
+            Length offset,
+            Length minimumOffset,
+            Length minimumEdgeWidth,
+            Length jointWidth,
+            String coveringSource
+    ) {
+        this(id, name, thickness, tileWidth, tileHeight, layoutMode, offset, minimumOffset, minimumEdgeWidth, minimumEdgeWidth, jointWidth, coveringSource);
+    }
 
     @Override
     public String toString() {

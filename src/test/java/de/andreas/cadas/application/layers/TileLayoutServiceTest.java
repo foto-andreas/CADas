@@ -31,7 +31,7 @@ class TileLayoutServiceTest {
     }
 
     @Test
-    void fixerVersatzErhoehtSichJeReiheModuloTileBreite() {
+    void fixerVersatzErhoehtSichAbDerZweitenReiheKonsequentJeReiheModuloTileBreite() {
         double tileWidthMm = 600.0;
         List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
                 Length.of(3, LengthUnit.METER),
@@ -51,9 +51,9 @@ class TileLayoutServiceTest {
         double offsetRow0 = tileWidthMm - firstRow0.width().toMillimeters();
         double offsetRow1 = tileWidthMm - firstRow1.width().toMillimeters();
         double offsetRow2 = tileWidthMm - firstRow2.width().toMillimeters();
-        assertEquals(100.0, offsetRow0, 0.01);
-        assertEquals(200.0, offsetRow1, 0.01);
-        assertEquals(300.0, offsetRow2, 0.01);
+        assertEquals(0.0, offsetRow0, 0.01);
+        assertEquals(100.0, offsetRow1, 0.01);
+        assertEquals(200.0, offsetRow2, 0.01);
         assertTrue(offsetRow1 > offsetRow0);
         assertTrue(offsetRow2 > offsetRow1);
     }
@@ -77,8 +77,8 @@ class TileLayoutServiceTest {
         TilePlacement firstRow1 = placements.stream().filter(t -> t.row() == 1).findFirst().orElseThrow();
         double offsetRow0 = tileWidthMm - firstRow0.width().toMillimeters();
         double offsetRow1 = tileWidthMm - firstRow1.width().toMillimeters();
-        assertEquals(500.0, offsetRow0, 0.01);
-        assertEquals(400.0, offsetRow1, 0.01);
+        assertEquals(0.0, offsetRow0, 0.01);
+        assertEquals(500.0, offsetRow1, 0.01);
     }
 
     @Test
@@ -143,9 +143,51 @@ class TileLayoutServiceTest {
         ));
 
         assertFalse(placements.isEmpty());
-        TilePlacement firstRow0 = placements.stream().filter(t -> t.row() == 0).findFirst().orElseThrow();
-        double offsetRow0 = tileWidthMm - firstRow0.width().toMillimeters();
-        assertTrue(offsetRow0 >= minimumEdgeWidth,
-                "Effektiver Versatz (" + offsetRow0 + " mm) sollte >= minimumEdgeWidth (" + minimumEdgeWidth + " mm) sein");
+        TilePlacement firstShiftedRow = placements.stream().filter(t -> t.row() == 1).findFirst().orElseThrow();
+        double offsetRow1 = tileWidthMm - firstShiftedRow.width().toMillimeters();
+        assertTrue(offsetRow1 >= minimumEdgeWidth,
+                "Effektiver Versatz (" + offsetRow1 + " mm) sollte >= minimumEdgeWidth (" + minimumEdgeWidth + " mm) sein");
+    }
+
+    @Test
+    void mindestrandAnAnfangUndEndeBeschneidetDieErsteReiheWennNoetig() {
+        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+                Length.ofMillimeters(3000),
+                Length.ofMillimeters(650),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(300),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.ofMillimeters(100)
+        ));
+
+        assertFalse(placements.isEmpty());
+        double ersteReihenHoehe = placements.stream()
+                .filter(tile -> tile.row() == 0)
+                .mapToDouble(tile -> tile.height().toMillimeters())
+                .max()
+                .orElseThrow();
+        int letzteReihe = placements.stream().mapToInt(TilePlacement::row).max().orElseThrow();
+        double letzteReihenHoehe = placements.stream()
+                .filter(tile -> tile.row() == letzteReihe)
+                .mapToDouble(tile -> tile.height().toMillimeters())
+                .max()
+                .orElseThrow();
+        double ersterReihenStart = placements.stream()
+                .filter(tile -> tile.row() == 0)
+                .mapToDouble(tile -> tile.yOffset().toMillimeters())
+                .min()
+                .orElseThrow();
+        double zweiteReihenStart = placements.stream()
+                .filter(tile -> tile.row() == 1)
+                .mapToDouble(tile -> tile.yOffset().toMillimeters())
+                .min()
+                .orElseThrow();
+        assertEquals(0.0, ersterReihenStart, 0.01);
+        assertEquals(250.0, ersteReihenHoehe, 0.01);
+        assertEquals(100.0, letzteReihenHoehe, 0.01);
+        assertEquals(ersteReihenHoehe, zweiteReihenStart, 0.01);
     }
 }

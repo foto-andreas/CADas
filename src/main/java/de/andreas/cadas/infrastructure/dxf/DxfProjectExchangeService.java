@@ -198,8 +198,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 Length.ofMillimeters(parseDouble(parts[9])),
                                 Length.ofMillimeters(parseDouble(parts[10])),
                                 Length.ofMillimeters(parseDouble(parts[11])),
-                                Length.ofMillimeters(parseDouble(parts[12])),
-                                desanitize(parts[13])
+                                Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[12]) : parseDouble(parts[11])),
+                                Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[13]) : parseDouble(parts[12])),
+                                desanitize(parts.length >= 15 ? parts[14] : parts[13])
                         );
                         stack.addLayer(layer);
                     }
@@ -381,7 +382,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             for (SurfaceLayer layer : sls.layers()) {
                 appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                         Locale.US,
-                        "SLL|%s|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%s",
+                        "SLL|%s|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s",
                         sanitize(level.name()),
                         layer.id(),
                         sanitize(layer.name()),
@@ -393,6 +394,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                         layer.layoutOffset().toMillimeters(),
                         layer.minimumOffset().toMillimeters(),
                         layer.minimumEdgeWidth().toMillimeters(),
+                        layer.minimumStartEndMargin().toMillimeters(),
                         layer.jointWidth().toMillimeters(),
                         sanitize(layer.coveringSource())
                 ));
