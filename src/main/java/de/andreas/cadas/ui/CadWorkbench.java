@@ -3878,6 +3878,7 @@ public final class CadWorkbench extends BorderPane {
                 surfaceLayerTargetLabel.getText(),
                 surfaceLayerSelectionHintLabel.getText(),
                 surfaceLayerCoverageLabel.getText(),
+                automationSelectedRoomMetrics(),
                 draftLabel.getText(),
                 zoom,
                 offsetX,
@@ -3964,6 +3965,15 @@ public final class CadWorkbench extends BorderPane {
         render();
     }
 
+    public void automationSelectSurfaceLayer(int index) {
+        if (index < 0 || index >= surfaceLayerList.getItems().size()) {
+            throw new IllegalArgumentException("Belagindex `" + index + "` ist ungültig.");
+        }
+        surfaceLayerList.getSelectionModel().select(index);
+        syncInputsFromSelectedSurfaceLayer();
+        render();
+    }
+
     public void automationSetField(String fieldName, String value) {
         textFieldByName(fieldName).setText(value);
         updatePropertySectionVisibility();
@@ -4003,6 +4013,7 @@ public final class CadWorkbench extends BorderPane {
             case "deleteSelection" -> deleteSelection();
             case "applySelectionProperties" -> applyCurrentInputsToSelection();
             case "applyEndpointHeight" -> applyEndpointHeightToSelection();
+            case "toggleSurfaceLayerVisibility" -> toggleSurfaceLayerVisibility();
             case "rotateSelectedComponentsClockwise", "rotateSelectedStairsClockwise" -> rotateSelectedComponentsClockwise();
             case "rotateSelectedComponentsCounterClockwise", "rotateSelectedStairsCounterClockwise" -> rotateSelectedComponentsCounterClockwise();
             case "exportProjectDxf" -> exportProjectAsDxf(requirePath(path, actionName));
@@ -4131,6 +4142,17 @@ public final class CadWorkbench extends BorderPane {
         } catch (IOException exception) {
             throw new IllegalStateException("Workbench-Snapshot konnte nicht geschrieben werden.", exception);
         }
+    }
+
+    private String automationSelectedRoomMetrics() {
+        return selectedSurfaceRoom()
+                .map(room -> String.format(
+                        Locale.GERMAN,
+                        "%.2f m² | %.2f m³",
+                        surfaceLayerEffectService.effectiveAreaSquareMeters(activeLevel.get(), room),
+                        surfaceLayerEffectService.effectiveVolumeCubicMeters(activeLevel.get(), room)
+                ))
+                .orElse("");
     }
 
     public void automationSetStatusText(String text) {

@@ -11,6 +11,7 @@ import de.andreas.cadas.domain.model.Wall;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public final class SurfaceLayerEffectService {
 
@@ -28,7 +29,37 @@ public final class SurfaceLayerEffectService {
     }
 
     public double wallInteriorThicknessMillimeters(Level level, Wall wall) {
+        return maximumWallInteriorThicknessMillimeters(level, wall);
+    }
+
+    public double wallInteriorThicknessMillimeters(Level level, Wall wall, Room room) {
+        Objects.requireNonNull(room, "room darf nicht null sein.");
+        double roomSpecificThickness = level.surfaceLayerStacks().stream()
+                .filter(stack -> stack.surfaceType() == SurfaceType.WALL_INTERIOR)
+                .filter(stack -> WallSurfaceTargetKey.matchesWall(stack.targetKey(), wall.id()))
+                .filter(stack -> WallSurfaceTargetKey.roomId(stack.targetKey()).map(room.id()::equals).orElse(false))
+                .flatMap(stack -> stack.layers().stream())
+                .filter(SurfaceLayer::visible)
+                .mapToDouble(layer -> layer.thickness().toMillimeters())
+                .sum();
+        if (roomSpecificThickness > 0.0) {
+            return roomSpecificThickness;
+        }
         return visibleThicknessMillimeters(level, SurfaceType.WALL_INTERIOR, wall.id().toString());
+    }
+
+    public double maximumWallInteriorThicknessMillimeters(Level level, Wall wall) {
+        double legacyThickness = visibleThicknessMillimeters(level, SurfaceType.WALL_INTERIOR, wall.id().toString());
+        double roomSpecificMaximum = level.surfaceLayerStacks().stream()
+                .filter(stack -> stack.surfaceType() == SurfaceType.WALL_INTERIOR)
+                .filter(stack -> WallSurfaceTargetKey.matchesWall(stack.targetKey(), wall.id()))
+                .mapToDouble(stack -> stack.layers().stream()
+                        .filter(SurfaceLayer::visible)
+                        .mapToDouble(layer -> layer.thickness().toMillimeters())
+                        .sum())
+                .max()
+                .orElse(0.0);
+        return Math.max(legacyThickness, roomSpecificMaximum);
     }
 
     public double wallExteriorThicknessMillimeters(Level level, Wall wall) {

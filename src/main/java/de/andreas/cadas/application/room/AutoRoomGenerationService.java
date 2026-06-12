@@ -51,7 +51,7 @@ public final class AutoRoomGenerationService {
         for (Wall wall : level.walls()) {
             double deltaX = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
             double deltaY = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
-            double halfThickness = wall.thickness().toMillimeters() / 2.0 + surfaceLayerEffectService.wallInteriorThicknessMillimeters(level, wall);
+            double halfThickness = wall.thickness().toMillimeters() / 2.0 + surfaceLayerEffectService.maximumWallInteriorThicknessMillimeters(level, wall);
             if (Math.abs(deltaY) < EPSILON) {
                 rectangles.add(new WallRectangle(
                         Math.min(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()),
@@ -387,11 +387,30 @@ public final class AutoRoomGenerationService {
             normalX = -normalX;
             normalY = -normalY;
         }
-        double offset = edge.wall().thickness().toMillimeters() / 2.0 + surfaceLayerEffectService.wallInteriorThicknessMillimeters(level, edge.wall());
+        Room adjacentRoom = findRoomAtInnerWallSide(level, edge, normalX, normalY).orElse(null);
+        double offset = edge.wall().thickness().toMillimeters() / 2.0
+                + (adjacentRoom == null
+                ? surfaceLayerEffectService.maximumWallInteriorThicknessMillimeters(level, edge.wall())
+                : surfaceLayerEffectService.wallInteriorThicknessMillimeters(level, edge.wall(), adjacentRoom));
         return new OffsetLine(
                 new PlanPoint(edge.start().xMillimeters() + normalX * offset, edge.start().yMillimeters() + normalY * offset),
                 new PlanPoint(edge.end().xMillimeters() + normalX * offset, edge.end().yMillimeters() + normalY * offset)
         );
+    }
+
+    private Optional<Room> findRoomAtInnerWallSide(Level level, LoopEdge edge, double normalX, double normalY) {
+        double probeDistance = edge.wall().thickness().toMillimeters() / 2.0 + 5.0;
+        PlanPoint midpoint = new PlanPoint(
+                (edge.start().xMillimeters() + edge.end().xMillimeters()) / 2.0,
+                (edge.start().yMillimeters() + edge.end().yMillimeters()) / 2.0
+        );
+        PlanPoint probe = new PlanPoint(
+                midpoint.xMillimeters() + normalX * probeDistance,
+                midpoint.yMillimeters() + normalY * probeDistance
+        );
+        return level.rooms().stream()
+                .filter(room -> containsPoint(room.outline(), probe))
+                .findFirst();
     }
 
     private Optional<PlanPoint> intersect(OffsetLine first, OffsetLine second) {

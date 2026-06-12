@@ -11,6 +11,8 @@ import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceType;
+import de.andreas.cadas.domain.model.Wall;
+import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
 
 import org.junit.jupiter.api.Test;
 
@@ -70,5 +72,45 @@ class SurfaceLayerEffectServiceTest {
         assertEquals(2757.5, effectService.effectiveMaximumCeilingHeightMillimeters(level, room), 0.001);
         assertEquals(33.09, effectService.effectiveVolumeCubicMeters(level, room), 0.001);
         assertEquals(room.areaSquareMeters(), effectService.effectiveAreaSquareMeters(level, room), 0.001);
+    }
+
+    @Test
+    void liefertRaumbezogeneInnenwandstaerkeProWandseite() {
+        Level level = new Level("Erdgeschoss");
+        Room leftRoom = Room.rectangular(
+                "Links",
+                new PlanPoint(0, 0),
+                new PlanPoint(1900, 3000),
+                Length.of(2.8, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        Room rightRoom = Room.rectangular(
+                "Rechts",
+                new PlanPoint(2100, 0),
+                new PlanPoint(4000, 3000),
+                Length.of(2.8, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(leftRoom);
+        level.addRoom(rightRoom);
+        Wall wall = Wall.create(
+                new de.andreas.cadas.domain.geometry.PlanSegment(new PlanPoint(2000, 0), new PlanPoint(2000, 3000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(wall);
+
+        SurfaceLayerStack leftStack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, WallSurfaceTargetKey.interior(wall.id(), leftRoom.id()));
+        leftStack.addLayer(SurfaceLayer.create("Dämmplatte", Length.of(4, LengthUnit.CENTIMETER), Length.of(120, LengthUnit.CENTIMETER), Length.of(60, LengthUnit.CENTIMETER), Length.zero()));
+        SurfaceLayerStack rightStack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, WallSurfaceTargetKey.interior(wall.id(), rightRoom.id()));
+        rightStack.addLayer(SurfaceLayer.create("Rigips", Length.of(1.25, LengthUnit.CENTIMETER), Length.of(200, LengthUnit.CENTIMETER), Length.of(125, LengthUnit.CENTIMETER), Length.zero()));
+        level.addSurfaceLayerStack(leftStack);
+        level.addSurfaceLayerStack(rightStack);
+
+        assertEquals(40.0, effectService.wallInteriorThicknessMillimeters(level, wall, leftRoom), 0.001);
+        assertEquals(12.5, effectService.wallInteriorThicknessMillimeters(level, wall, rightRoom), 0.001);
+        assertEquals(40.0, effectService.maximumWallInteriorThicknessMillimeters(level, wall), 0.001);
     }
 }
