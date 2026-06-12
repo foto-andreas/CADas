@@ -21,6 +21,7 @@ public final class SurfaceLayerConsistencyService {
                         + ":" + layer.layoutOffset().toMillimeters()
                         + ":" + layer.minimumOffset().toMillimeters()
                         + ":" + layer.minimumEdgeWidth().toMillimeters()
+                        + ":" + layer.minimumStartEndMargin().toMillimeters()
                         + ":" + layer.coveringSource())
                 .reduce((left, right) -> left + "|" + right)
                 .orElse("");

@@ -21,6 +21,7 @@ public final class SurfaceCoveringPresetService {
                         Length.zero(),
                         Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(8, LengthUnit.CENTIMETER),
+                        Length.of(8, LengthUnit.CENTIMETER),
                         Length.of(2, LengthUnit.MILLIMETER),
                         "Standard: Fliese"
                 ),
@@ -33,6 +34,7 @@ public final class SurfaceCoveringPresetService {
                         SurfaceLayoutMode.FIXED,
                         Length.of(30, LengthUnit.CENTIMETER),
                         Length.of(12, LengthUnit.CENTIMETER),
+                        Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(2, LengthUnit.MILLIMETER),
                         "Standard: Dämmplatte"
@@ -47,6 +49,7 @@ public final class SurfaceCoveringPresetService {
                         Length.zero(),
                         Length.zero(),
                         Length.of(15, LengthUnit.CENTIMETER),
+                        Length.of(15, LengthUnit.CENTIMETER),
                         Length.of(1, LengthUnit.MILLIMETER),
                         "Standard: Rigips"
                 ),
@@ -58,6 +61,7 @@ public final class SurfaceCoveringPresetService {
                         Length.of(67.5, LengthUnit.CENTIMETER),
                         SurfaceLayoutMode.FIXED,
                         Length.of(33.75, LengthUnit.CENTIMETER),
+                        Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(3, LengthUnit.MILLIMETER),
@@ -72,6 +76,7 @@ public final class SurfaceCoveringPresetService {
                         SurfaceLayoutMode.NONE,
                         Length.zero(),
                         Length.zero(),
+                        Length.of(5, LengthUnit.CENTIMETER),
                         Length.of(5, LengthUnit.CENTIMETER),
                         Length.zero(),
                         "Standard: Tapete"
@@ -92,6 +97,7 @@ public final class SurfaceCoveringPresetService {
                 Length.zero(),
                 Length.zero(),
                 Length.of(10, LengthUnit.CENTIMETER),
+                Length.of(10, LengthUnit.CENTIMETER),
                 Length.zero(),
                 path.toAbsolutePath().toString()
         );
@@ -110,6 +116,7 @@ public final class SurfaceCoveringPresetService {
                 SurfaceLayoutMode.NONE,
                 Length.zero(),
                 Length.zero(),
+                Length.of(10, LengthUnit.CENTIMETER),
                 Length.of(10, LengthUnit.CENTIMETER),
                 Length.zero(),
                 path.toAbsolutePath() + "#" + normalizedBlockName

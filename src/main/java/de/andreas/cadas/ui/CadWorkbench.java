@@ -244,6 +244,8 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> surfaceMinimumOffsetUnit = new ComboBox<>();
     private final TextField surfaceMinimumEdgeWidthField = new TextField("8");
     private final ComboBox<LengthUnit> surfaceMinimumEdgeWidthUnit = new ComboBox<>();
+    private final TextField surfaceMinimumStartEndMarginField = new TextField("8");
+    private final ComboBox<LengthUnit> surfaceMinimumStartEndMarginUnit = new ComboBox<>();
     private final TextField surfaceJointWidthField = new TextField("2");
     private final ComboBox<LengthUnit> surfaceJointWidthUnit = new ComboBox<>();
     private final TextField dwgBlockNameField = new TextField();
@@ -594,6 +596,7 @@ public final class CadWorkbench extends BorderPane {
         surfaceLayoutOffsetField.setPrefColumnCount(6);
         surfaceMinimumOffsetField.setPrefColumnCount(6);
         surfaceMinimumEdgeWidthField.setPrefColumnCount(6);
+        surfaceMinimumStartEndMarginField.setPrefColumnCount(6);
         surfaceJointWidthField.setPrefColumnCount(6);
         levelSelector.setPrefWidth(180);
         toolSelector.setPrefWidth(140);
@@ -744,6 +747,7 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Versatz", surfaceLayoutOffsetField, surfaceLayoutOffsetUnit),
                         propertyRow("Mindestversatz", surfaceMinimumOffsetField, surfaceMinimumOffsetUnit),
                         propertyRow("Mindestbreite Rand", surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit),
+                        propertyRow("Mindestbreite Anfang/Ende", surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit),
                         propertyRow("Fugenbreite", surfaceJointWidthField, surfaceJointWidthUnit),
                         propertyRow("DWG-Block", dwgBlockNameField),
                         new HBox(6.0, addSurfaceLayerButton, updateSurfaceLayerButton),
@@ -974,6 +978,7 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(surfaceLayoutOffsetUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceMinimumOffsetUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceMinimumEdgeWidthUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceMinimumStartEndMarginUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceJointWidthUnit, LengthUnit.MILLIMETER);
     }
 
@@ -1100,8 +1105,10 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(surfaceLayoutOffsetUnit, "Bestimmt die Einheit für den festen Reihenversatz.");
         applyTooltip(surfaceMinimumOffsetField, "Legt den kleinsten zulässigen automatischen Versatz zwischen zwei Reihen fest.");
         applyTooltip(surfaceMinimumOffsetUnit, "Bestimmt die Einheit für den Mindestversatz.");
-        applyTooltip(surfaceMinimumEdgeWidthField, "Legt die kleinste zulässige Restbreite an Anfang und Ende einer Reihe fest.");
-        applyTooltip(surfaceMinimumEdgeWidthUnit, "Bestimmt die Einheit für die Mindestbreite an den Rändern.");
+        applyTooltip(surfaceMinimumEdgeWidthField, "Legt die kleinste zulässige Restbreite links und rechts innerhalb einer Reihe fest.");
+        applyTooltip(surfaceMinimumEdgeWidthUnit, "Bestimmt die Einheit für die seitliche Mindestbreite an den Rändern.");
+        applyTooltip(surfaceMinimumStartEndMarginField, "Legt die kleinste zulässige Breite der Anfangs- und Endreihe in Verlegerichtung fest. Wenn die Endreihe zu schmal würde, wird die Anfangsreihe entsprechend beschnitten, bleibt aber direkt an der Wand.");
+        applyTooltip(surfaceMinimumStartEndMarginUnit, "Bestimmt die Einheit für die Mindestbreite der Anfangs- und Endreihe.");
         applyTooltip(surfaceJointWidthField, "Legt die Breite der Fugen zwischen den Fliesen oder Platten fest.");
         applyTooltip(surfaceJointWidthUnit, "Bestimmt die Einheit für die Fugenbreite.");
         applyTooltip(dwgBlockNameField, "Erfasst einen konkreten Blocknamen aus einer geladenen DWG-Bibliothek, damit daraus ein auswählbares Oberflächen-Preset wird.");
@@ -1576,7 +1583,8 @@ public final class CadWorkbench extends BorderPane {
                 layer.layoutMode(),
                 layer.layoutOffset(),
                 layer.minimumOffset(),
-                layer.minimumEdgeWidth()
+                layer.minimumEdgeWidth(),
+                layer.minimumStartEndMargin()
         );
         List<TilePlacement> tiles = tileLayoutService.fillSurface(request);
         if (tiles.isEmpty()) {
@@ -1584,7 +1592,7 @@ public final class CadWorkbench extends BorderPane {
         }
         double roomMinX = room.minXMillimeters();
         double roomMinY = room.minYMillimeters();
-        double jointPx = layer.jointWidth().toMillimeters() * scale();
+        double jointPx = Math.max(0.4, layer.jointWidth().toMillimeters() * scale());
         graphics.save();
         graphics.beginPath();
         PlanPoint[] outline = room.outline().toArray(new PlanPoint[0]);
@@ -1594,14 +1602,26 @@ public final class CadWorkbench extends BorderPane {
         }
         graphics.closePath();
         graphics.clip();
-        graphics.setStroke(Color.color(0.35, 0.25, 0.12, 0.55));
-        graphics.setLineWidth(Math.min(2.0, Math.max(0.4, jointPx)));
+        graphics.setFill(Color.color(0.35, 0.25, 0.12, 0.55));
+        var horizontalKeys = new java.util.HashSet<String>();
+        var verticalKeys = new java.util.HashSet<String>();
         for (TilePlacement tile : tiles) {
-            double sx = toScreenX(roomMinX + tile.xOffset().toMillimeters());
-            double sy = toScreenY(roomMinY + tile.yOffset().toMillimeters());
-            double sw = (tile.width().toMillimeters()) * scale();
-            double sh = (tile.height().toMillimeters()) * scale();
-            graphics.strokeRect(sx, sy, sw, sh);
+            double tx = roomMinX + tile.xOffset().toMillimeters();
+            double ty = roomMinY + tile.yOffset().toMillimeters();
+            double tw = tile.width().toMillimeters();
+            double th = tile.height().toMillimeters();
+            String hKey = String.format(Locale.US, "h:%.3f:%.3f:%.3f", ty + th, tx, tx + tw);
+            if (horizontalKeys.add(hKey)) {
+                double screenX = toScreenX(tx);
+                double screenY = toScreenY(ty + th - layer.jointWidth().toMillimeters() / 2.0);
+                graphics.fillRect(screenX, screenY, tw * scale(), jointPx);
+            }
+            String vKey = String.format(Locale.US, "v:%.3f:%.3f:%.3f", tx + tw, ty, ty + th);
+            if (verticalKeys.add(vKey)) {
+                double screenX = toScreenX(tx + tw - layer.jointWidth().toMillimeters() / 2.0);
+                double screenY = toScreenY(ty);
+                graphics.fillRect(screenX, screenY, jointPx, th * scale());
+            }
         }
         graphics.restore();
     }
@@ -2740,6 +2760,7 @@ public final class CadWorkbench extends BorderPane {
         surfaceLayoutOffsetField.setText(formatValue(preset.offset(), LengthUnit.CENTIMETER, 1));
         surfaceMinimumOffsetField.setText(formatValue(preset.minimumOffset(), LengthUnit.CENTIMETER, 1));
         surfaceMinimumEdgeWidthField.setText(formatValue(preset.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1));
+        surfaceMinimumStartEndMarginField.setText(formatValue(preset.minimumStartEndMargin(), LengthUnit.CENTIMETER, 1));
         surfaceJointWidthField.setText(formatValue(preset.jointWidth(), LengthUnit.MILLIMETER, 0));
         dwgBlockNameField.setText(extractDwgBlockName(preset.coveringSource()).orElse(""));
     }
@@ -2790,7 +2811,8 @@ public final class CadWorkbench extends BorderPane {
                 layer.layoutMode(),
                 layer.layoutOffset(),
                 layer.minimumOffset(),
-                layer.minimumEdgeWidth()
+                layer.minimumEdgeWidth(),
+                layer.minimumStartEndMargin()
         );
         return tileLayoutService.fillSurface(request).size();
     }
@@ -2809,6 +2831,7 @@ public final class CadWorkbench extends BorderPane {
         surfaceLayoutOffsetField.setText(formatValue(selectedLayer.layoutOffset(), LengthUnit.CENTIMETER, 1));
         surfaceMinimumOffsetField.setText(formatValue(selectedLayer.minimumOffset(), LengthUnit.CENTIMETER, 1));
         surfaceMinimumEdgeWidthField.setText(formatValue(selectedLayer.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1));
+        surfaceMinimumStartEndMarginField.setText(formatValue(selectedLayer.minimumStartEndMargin(), LengthUnit.CENTIMETER, 1));
         surfaceJointWidthField.setText(formatValue(selectedLayer.jointWidth(), LengthUnit.MILLIMETER, 0));
         surfaceLayerCoverageLabel.setText(describeSurfaceLayer(selectedLayer));
         updateActionButtons();
@@ -2847,6 +2870,7 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceLayoutOffset(),
                 currentSurfaceMinimumOffset(),
                 currentSurfaceMinimumEdgeWidth(),
+                currentSurfaceMinimumStartEndMargin(),
                 currentSurfaceJointWidth(),
                 currentSurfaceCoveringSource()
         ));
@@ -2910,6 +2934,7 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceLayoutOffset(),
                 currentSurfaceMinimumOffset(),
                 currentSurfaceMinimumEdgeWidth(),
+                currentSurfaceMinimumStartEndMargin(),
                 currentSurfaceJointWidth(),
                 currentSurfaceCoveringSource()
         );
@@ -2946,6 +2971,10 @@ public final class CadWorkbench extends BorderPane {
 
     private Length currentSurfaceMinimumEdgeWidth() {
         return parseLength(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit.getValue()).orElse(Length.zero());
+    }
+
+    private Length currentSurfaceMinimumStartEndMargin() {
+        return parseLength(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit.getValue()).orElse(Length.zero());
     }
 
     private Length currentSurfaceJointWidth() {
@@ -3865,6 +3894,7 @@ public final class CadWorkbench extends BorderPane {
             case "surfaceLayoutOffset" -> surfaceLayoutOffsetField;
             case "surfaceMinimumOffset" -> surfaceMinimumOffsetField;
             case "surfaceMinimumEdgeWidth" -> surfaceMinimumEdgeWidthField;
+            case "surfaceMinimumStartEndMargin" -> surfaceMinimumStartEndMarginField;
             case "surfaceJointWidth" -> surfaceJointWidthField;
             case "roomName" -> roomNameField;
             case "roomHeight" -> roomHeightField;
@@ -3896,6 +3926,7 @@ public final class CadWorkbench extends BorderPane {
             case "surfaceLayoutOffset" -> surfaceLayoutOffsetUnit;
             case "surfaceMinimumOffset" -> surfaceMinimumOffsetUnit;
             case "surfaceMinimumEdgeWidth" -> surfaceMinimumEdgeWidthUnit;
+            case "surfaceMinimumStartEndMargin" -> surfaceMinimumStartEndMarginUnit;
             case "surfaceJointWidth" -> surfaceJointWidthUnit;
             case "roomHeight" -> roomHeightUnit;
             case "floorThickness" -> floorThicknessUnit;

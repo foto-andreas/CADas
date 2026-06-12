@@ -185,7 +185,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             for (SurfaceLayer layer : sls.layers()) {
                 appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                         Locale.US,
-                        "SLL|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%s",
+                        "SLL|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s",
                         layer.id(),
                         sanitize(layer.name()),
                         layer.thickness().toMillimeters(),
@@ -196,6 +196,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                         layer.layoutOffset().toMillimeters(),
                         layer.minimumOffset().toMillimeters(),
                         layer.minimumEdgeWidth().toMillimeters(),
+                        layer.minimumStartEndMargin().toMillimeters(),
                         layer.jointWidth().toMillimeters(),
                         sanitize(layer.coveringSource())
                 ));
@@ -326,8 +327,9 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                                 Length.ofMillimeters(parseDouble(parts[8])),
                                 Length.ofMillimeters(parseDouble(parts[9])),
                                 Length.ofMillimeters(parseDouble(parts[10])),
-                                Length.ofMillimeters(parseDouble(parts[11])),
-                                desanitize(parts[12])
+                                Length.ofMillimeters(parts.length >= 14 ? parseDouble(parts[11]) : parseDouble(parts[10])),
+                                Length.ofMillimeters(parts.length >= 14 ? parseDouble(parts[12]) : parseDouble(parts[11])),
+                                desanitize(parts.length >= 14 ? parts[13] : parts[12])
                         );
                         stack.addLayer(layer);
                     }

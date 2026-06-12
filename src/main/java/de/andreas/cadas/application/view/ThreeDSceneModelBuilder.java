@@ -39,6 +39,8 @@ public final class ThreeDSceneModelBuilder {
     private static final double WINDOW_GLASS_DEPTH = 35.0;
     private static final double LEVEL_GAP = 0.0;
     private static final int MIN_SLOPE_SEGMENTS = 24;
+    private static final double JOINT_HEIGHT = 2.5;
+    private static final double JOINT_SURFACE_OFFSET = 2.0;
     private final OrthogonalPolygonDecompositionService decompositionService = new OrthogonalPolygonDecompositionService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
@@ -58,12 +60,11 @@ public final class ThreeDSceneModelBuilder {
                 continue;
             }
             double baseHeight = levelBaseHeights.getOrDefault(level.name(), 0.0);
-            double floorOffset = level.rooms().stream()
-                    .mapToDouble(room -> room.floorThickness().toMillimeters())
-                    .max()
-                    .orElse(0.0);
+            double floorOffset = maximumFloorThickness(level);
             double wallBaseHeight = baseHeight + floorOffset;
             buildRoomFloor(level, baseHeight);
+            boxes.addAll(buildRoomFloorBodies(level, baseHeight));
+            boxes.addAll(buildWallFloorSupports(level, baseHeight, floorOffset));
             boxes.addAll(buildRoomInteriors(level, baseHeight, renderSurfaceLayers, surfaceRenderingMode));
             boxes.addAll(buildWalls(level, wallBaseHeight, surfaceRenderingMode));
             if (renderSurfaceLayers) {
@@ -102,6 +103,13 @@ public final class ThreeDSceneModelBuilder {
         return Math.max(wallHeight, Math.max(roomHeight, stairHeight));
     }
 
+    private double maximumFloorThickness(Level level) {
+        return level.rooms().stream()
+                .mapToDouble(room -> room.floorThickness().toMillimeters())
+                .max()
+                .orElse(0.0);
+    }
+
     private void buildRoomFloor(Level level, double baseHeight) {
         for (Room room : level.rooms()) {
             double floorThickness = room.floorThickness().toMillimeters();
@@ -120,6 +128,63 @@ public final class ThreeDSceneModelBuilder {
                     1.0
             );
         }
+    }
+
+    private List<RenderableBox> buildRoomFloorBodies(Level level, double baseHeight) {
+        List<RenderableBox> boxes = new ArrayList<>();
+        for (Room room : level.rooms()) {
+            double floorThickness = room.floorThickness().toMillimeters();
+            if (floorThickness <= 0.0) {
+                continue;
+            }
+            for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : roomRectangles(room)) {
+                boxes.add(new RenderableBox(
+                        new SelectionKey(RenderableKind.ROOM_FLOOR, level.name(), room.id().toString()),
+                        level.name(),
+                        RenderableKind.ROOM_FLOOR,
+                        rectangle.centerX(),
+                        baseHeight + floorThickness / 2.0,
+                        rectangle.centerY(),
+                        rectangle.width(),
+                        floorThickness,
+                        rectangle.height(),
+                        RotationAxis.Y,
+                        0.0,
+                        "room-floor",
+                        1.0
+                ));
+            }
+        }
+        return boxes;
+    }
+
+    private List<RenderableBox> buildWallFloorSupports(Level level, double baseHeight, double supportHeight) {
+        List<RenderableBox> boxes = new ArrayList<>();
+        if (supportHeight <= 0.0) {
+            return boxes;
+        }
+        for (Wall wall : level.walls()) {
+            double wallLength = wall.axis().length().toMillimeters();
+            if (wallLength <= 0.0) {
+                continue;
+            }
+            boxes.add(new RenderableBox(
+                    new SelectionKey(RenderableKind.ROOM_FLOOR, level.name(), "wall-support-" + wall.id()),
+                    level.name(),
+                    RenderableKind.ROOM_FLOOR,
+                    (wall.axis().start().xMillimeters() + wall.axis().end().xMillimeters()) / 2.0,
+                    baseHeight + supportHeight / 2.0,
+                    (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0,
+                    wallLength + wall.thickness().toMillimeters(),
+                    supportHeight,
+                    wall.thickness().toMillimeters(),
+                    RotationAxis.Y,
+                    wall.axis().angle().degrees(),
+                    "room-floor",
+                    1.0
+            ));
+        }
+        return boxes;
     }
 
     private List<RenderableBox> buildRoomInteriors(Level level, double baseHeight, boolean renderSurfaceLayers, boolean surfaceRenderingMode) {
@@ -208,6 +273,13 @@ public final class ThreeDSceneModelBuilder {
                 currentHeight += layer.thickness().toMillimeters();
                 continue;
             }
+            boxes.addAll(buildFlatSurfaceLayerBodies(
+                    level.name(),
+                    layer.id().toString(),
+                    rectangles,
+                    currentHeight,
+                    layer.thickness().toMillimeters()
+            ));
             double layerTopHeight = currentHeight + layer.thickness().toMillimeters();
             addFlatSurfaceMesh(
                     new SelectionKey(RenderableKind.SURFACE_LAYER, level.name(), layer.id().toString()),
@@ -220,18 +292,49 @@ public final class ThreeDSceneModelBuilder {
                     "surface-layer",
                     SURFACE_LAYER_OPACITY
             );
-            boxes.addAll(buildJoints(room, layer, rectangles, layerTopHeight));
+            boxes.addAll(buildJoints(level.name(), room, layer, rectangles, layerTopHeight));
             currentHeight = layerTopHeight;
         }
         return boxes;
     }
 
-    private List<RenderableBox> buildJoints(Room room, SurfaceLayer layer, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles, double surfaceY) {
+    private List<RenderableBox> buildFlatSurfaceLayerBodies(
+            String levelName,
+            String elementId,
+            List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles,
+            double baseHeight,
+            double thickness
+    ) {
+        List<RenderableBox> boxes = new ArrayList<>();
+        if (thickness <= 0.0) {
+            return boxes;
+        }
+        for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
+            boxes.add(new RenderableBox(
+                    new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, elementId),
+                    levelName,
+                    RenderableKind.SURFACE_LAYER,
+                    rectangle.centerX(),
+                    baseHeight + thickness / 2.0,
+                    rectangle.centerY(),
+                    rectangle.width(),
+                    thickness,
+                    rectangle.height(),
+                    RotationAxis.Y,
+                    0.0,
+                    "surface-layer",
+                    SURFACE_LAYER_OPACITY
+            ));
+        }
+        return boxes;
+    }
+
+    private List<RenderableBox> buildJoints(String levelName, Room room, SurfaceLayer layer, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles, double surfaceY) {
         List<RenderableBox> joints = new ArrayList<>();
         double jointWidthMm = layer.jointWidth().toMillimeters();
         if (jointWidthMm < 0.001) return joints;
-        double jointHeight = 0.2;
-        double jointCenterY = surfaceY;
+        double jointHeight = JOINT_HEIGHT;
+        double jointCenterY = surfaceY + JOINT_SURFACE_OFFSET + jointHeight / 2.0;
         TileLayoutRequest request = new TileLayoutRequest(
                 Length.ofMillimeters(room.widthMillimeters()),
                 Length.ofMillimeters(room.depthMillimeters()),
@@ -240,7 +343,8 @@ public final class ThreeDSceneModelBuilder {
                 layer.layoutMode(),
                 layer.layoutOffset(),
                 layer.minimumOffset(),
-                layer.minimumEdgeWidth()
+                layer.minimumEdgeWidth(),
+                layer.minimumStartEndMargin()
         );
         List<TilePlacement> tiles = tileLayoutService.fillSurface(request);
         if (tiles.isEmpty()) return joints;
@@ -253,64 +357,54 @@ public final class ThreeDSceneModelBuilder {
             double ty = roomMinY + tile.yOffset().toMillimeters();
             double tw = tile.width().toMillimeters();
             double th = tile.height().toMillimeters();
-            String hKey = String.format(java.util.Locale.US, "h:%.3f", ty + th);
-            if (horizontalKeys.add(hKey)) {
-                for (OrthogonalPolygonDecompositionService.CellRectangle rect : rectangles) {
-                    double rx = rect.centerX() - rect.width() / 2.0;
-                    double rz = rect.centerY() - rect.height() / 2.0;
-                    double rxe = rx + rect.width();
-                    double rze = rz + rect.height();
-                    double jointX = Math.max(rx, tx);
-                    double jointXe = Math.min(rxe, tx + tw);
-                    double jointZ = ty + th - jointWidthMm / 2.0;
-                    double jointZe = jointZ + jointWidthMm;
-                    if (jointX < jointXe && jointZ < jointZe && jointZ >= rz && jointZe <= rze) {
-                        joints.add(new RenderableBox(
-                                new SelectionKey(RenderableKind.SURFACE_LAYER, "", layer.id().toString()),
-                                "",
-                                RenderableKind.SURFACE_LAYER,
-                                (jointX + jointXe) / 2.0,
-                                jointCenterY,
-                                (jointZ + jointZe) / 2.0,
-                                jointXe - jointX,
-                                jointHeight,
-                                jointZe - jointZ,
-                                RotationAxis.Y,
-                                0.0,
-                                "joint",
-                                1.0
-                        ));
-                    }
+            for (OrthogonalPolygonDecompositionService.CellRectangle rect : rectangles) {
+                double rx = rect.centerX() - rect.width() / 2.0;
+                double rz = rect.centerY() - rect.height() / 2.0;
+                double rxe = rx + rect.width();
+                double rze = rz + rect.height();
+                double jointX = Math.max(rx, tx);
+                double jointXe = Math.min(rxe, tx + tw);
+                double jointZ = ty + th - jointWidthMm / 2.0;
+                double jointZe = jointZ + jointWidthMm;
+                String hKey = String.format(java.util.Locale.US, "h:%.3f:%.3f:%.3f", jointZ, jointX, jointXe);
+                if (jointX < jointXe && jointZ < jointZe && jointZ >= rz && jointZe <= rze && horizontalKeys.add(hKey)) {
+                    joints.add(new RenderableBox(
+                            new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
+                            levelName,
+                            RenderableKind.SURFACE_LAYER,
+                            (jointX + jointXe) / 2.0,
+                            jointCenterY,
+                            (jointZ + jointZe) / 2.0,
+                            jointXe - jointX,
+                            jointHeight,
+                            jointZe - jointZ,
+                            RotationAxis.Y,
+                            0.0,
+                            "joint",
+                            1.0
+                    ));
                 }
-            }
-            String vKey = String.format(java.util.Locale.US, "v:%.3f:%.3f", tx + tw, ty);
-            if (verticalKeys.add(vKey)) {
-                for (OrthogonalPolygonDecompositionService.CellRectangle rect : rectangles) {
-                    double rx = rect.centerX() - rect.width() / 2.0;
-                    double rz = rect.centerY() - rect.height() / 2.0;
-                    double rxe = rx + rect.width();
-                    double rze = rz + rect.height();
-                    double jointX = tx + tw - jointWidthMm / 2.0;
-                    double jointXe = jointX + jointWidthMm;
-                    double jointZ = Math.max(rz, ty);
-                    double jointZe = Math.min(rze, ty + th);
-                    if (jointX >= rx && jointXe <= rxe && jointZ < jointZe) {
-                        joints.add(new RenderableBox(
-                                new SelectionKey(RenderableKind.SURFACE_LAYER, "", layer.id().toString()),
-                                "",
-                                RenderableKind.SURFACE_LAYER,
-                                (jointX + jointXe) / 2.0,
-                                jointCenterY,
-                                (jointZ + jointZe) / 2.0,
-                                jointXe - jointX,
-                                jointHeight,
-                                jointZe - jointZ,
-                                RotationAxis.Y,
-                                0.0,
-                                "joint",
-                                1.0
-                        ));
-                    }
+                double verticalJointX = tx + tw - jointWidthMm / 2.0;
+                double verticalJointXe = verticalJointX + jointWidthMm;
+                double verticalJointZ = Math.max(rz, ty);
+                double verticalJointZe = Math.min(rze, ty + th);
+                String vKey = String.format(java.util.Locale.US, "v:%.3f:%.3f:%.3f", verticalJointX, verticalJointZ, verticalJointZe);
+                if (verticalJointX >= rx && verticalJointXe <= rxe && verticalJointZ < verticalJointZe && verticalKeys.add(vKey)) {
+                    joints.add(new RenderableBox(
+                            new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
+                            levelName,
+                            RenderableKind.SURFACE_LAYER,
+                            (verticalJointX + verticalJointXe) / 2.0,
+                            jointCenterY,
+                            (verticalJointZ + verticalJointZe) / 2.0,
+                            verticalJointXe - verticalJointX,
+                            jointHeight,
+                            verticalJointZe - verticalJointZ,
+                            RotationAxis.Y,
+                            0.0,
+                            "joint",
+                            1.0
+                    ));
                 }
             }
         }
@@ -350,7 +444,7 @@ public final class ThreeDSceneModelBuilder {
                         "surface-layer",
                         SURFACE_LAYER_OPACITY
                 );
-                boxes.addAll(buildJoints(room, layer, rectangles, layerBottomHeight - layer.thickness().toMillimeters()));
+                boxes.addAll(buildJoints(level.name(), room, layer, rectangles, layerBottomHeight - layer.thickness().toMillimeters()));
             }
             offsetFromCeiling += layer.thickness().toMillimeters();
         }

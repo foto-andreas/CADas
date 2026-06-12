@@ -11,8 +11,22 @@ public record TileLayoutRequest(
         SurfaceLayoutMode layoutMode,
         Length layoutOffset,
         Length minimumOffset,
-        Length minimumEdgeWidth
+        Length minimumEdgeWidth,
+        Length minimumStartEndMargin
 ) {
+
+    public TileLayoutRequest(
+            Length surfaceWidth,
+            Length surfaceHeight,
+            Length tileWidth,
+            Length tileHeight,
+            SurfaceLayoutMode layoutMode,
+            Length layoutOffset,
+            Length minimumOffset,
+            Length minimumEdgeWidth
+    ) {
+        this(surfaceWidth, surfaceHeight, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumEdgeWidth);
+    }
 
     public TileLayoutRequest(
             Length surfaceWidth,
@@ -21,6 +35,6 @@ public record TileLayoutRequest(
             Length tileHeight,
             Length minimumOffset
     ) {
-        this(surfaceWidth, surfaceHeight, tileWidth, tileHeight, SurfaceLayoutMode.AUTOMATIC, Length.zero(), minimumOffset, Length.zero());
+        this(surfaceWidth, surfaceHeight, tileWidth, tileHeight, SurfaceLayoutMode.AUTOMATIC, Length.zero(), minimumOffset, Length.zero(), Length.zero());
     }
 }
