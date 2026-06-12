@@ -213,6 +213,31 @@ class AutoRoomGenerationServiceTest {
         assertEquals(2870.0, rooms.getFirst().maxYMillimeters(), 0.001);
     }
 
+    @Test
+    void leitetInneneckenOhneTreppenstufeZurWandmitteAb() {
+        Level level = new Level("Erdgeschoss");
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(5000, 0),
+                new PlanPoint(5000, 1500),
+                new PlanPoint(3000, 1500),
+                new PlanPoint(3000, 4000),
+                new PlanPoint(0, 4000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+
+        List<Room> rooms = service.synchronize(level, defaults());
+
+        assertEquals(1, rooms.size());
+        assertEquals(List.of(
+                new PlanPoint(100.0, 100.0),
+                new PlanPoint(4900.0, 100.0),
+                new PlanPoint(4900.0, 1400.0),
+                new PlanPoint(2900.0, 1400.0),
+                new PlanPoint(2900.0, 3900.0),
+                new PlanPoint(100.0, 3900.0)
+        ), rooms.getFirst().outline());
+    }
+
     private AutoRoomGenerationService.RoomDefaults defaults() {
         return new AutoRoomGenerationService.RoomDefaults(
                 "Dachraum",

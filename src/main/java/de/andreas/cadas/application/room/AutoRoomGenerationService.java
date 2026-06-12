@@ -29,21 +29,21 @@ public final class AutoRoomGenerationService {
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
     public List<Room> synchronize(Level level, RoomDefaults defaults) {
-        List<WallRectangle> wallRectangles = wallRectangles(level);
         if (level.walls().isEmpty()) {
             return List.of();
         }
+        List<DetectedRoom> loopRooms = detectRoomsFromWallLoops(level);
+        if (!loopRooms.isEmpty()) {
+            return matchWithExistingRooms(level.rooms(), loopRooms, defaults, level.walls());
+        }
+        List<WallRectangle> wallRectangles = wallRectangles(level);
         if (wallRectangles.size() == level.walls().size()) {
             List<DetectedRoom> detectedRooms = detectRooms(wallRectangles);
             if (!detectedRooms.isEmpty()) {
                 return matchWithExistingRooms(level.rooms(), detectedRooms, defaults, level.walls());
             }
         }
-        List<DetectedRoom> detectedRooms = detectRoomsFromWallLoops(level);
-        if (detectedRooms.isEmpty()) {
-            return List.of();
-        }
-        return matchWithExistingRooms(level.rooms(), detectedRooms, defaults, level.walls());
+        return List.of();
     }
 
     private List<WallRectangle> wallRectangles(Level level) {
@@ -138,7 +138,7 @@ public final class AutoRoomGenerationService {
                 continue;
             }
             orderedLoop(componentWalls, graph)
-                    .map(loop -> new DetectedRoom(offsetLoopToInnerContour(level, loop), deriveLoopVertexHeights(loop)))
+                    .map(loop -> new DetectedRoom(offsetLoopToInnerContour(level, loop), List.of()))
                     .filter(detectedRoom -> detectedRoom.outline().size() >= 3)
                     .ifPresent(rooms::add);
         }
@@ -493,20 +493,6 @@ public final class AutoRoomGenerationService {
         return List.copyOf(heights);
     }
 
-    private List<Length> deriveLoopVertexHeights(List<LoopEdge> loop) {
-        if (loop.isEmpty()) {
-            return List.of();
-        }
-        List<Length> heights = new ArrayList<>();
-        for (int index = 0; index < loop.size(); index++) {
-            LoopEdge previous = loop.get((index - 1 + loop.size()) % loop.size());
-            LoopEdge current = loop.get(index);
-            double averaged = (previous.endHeightMillimeters() + current.startHeightMillimeters()) / 2.0;
-            heights.add(Length.ofMillimeters(averaged));
-        }
-        return List.copyOf(heights);
-    }
-
     private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
         boolean inside = false;
         int lastIndex = outline.size() - 1;
@@ -572,13 +558,6 @@ public final class AutoRoomGenerationService {
                 return wall.heightAtStart();
             }
             return wall.heightAtEnd();
-        }
-
-        double endHeightMillimeters() {
-            if (samePlanPoint(end, wall.axis().end())) {
-                return wall.heightAtEnd();
-            }
-            return wall.heightAtStart();
         }
 
         private boolean samePlanPoint(PlanPoint first, PlanPoint second) {

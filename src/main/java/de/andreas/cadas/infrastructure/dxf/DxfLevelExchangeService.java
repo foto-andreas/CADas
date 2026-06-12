@@ -37,7 +37,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
     private static final Length DEFAULT_WALL_HEIGHT = Length.ofMillimeters(2750.0);
     private static final Length DEFAULT_ROOM_HEIGHT = Length.ofMillimeters(2600.0);
     private static final Length DEFAULT_FLOOR_THICKNESS = Length.ofMillimeters(180.0);
-    private static final Length DEFAULT_CEILING_THICKNESS = Length.ofMillimeters(200.0);
+    private static final Length DEFAULT_CEILING_THICKNESS = Length.ofMillimeters(1.0);
     private static final Length DEFAULT_DOOR_WIDTH = Length.ofMillimeters(1010.0);
     private static final Length DEFAULT_DOOR_HEIGHT = Length.ofMillimeters(2010.0);
     private static final Length DEFAULT_WINDOW_WIDTH = Length.ofMillimeters(1200.0);
