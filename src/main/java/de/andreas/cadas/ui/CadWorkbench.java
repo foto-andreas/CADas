@@ -17,9 +17,12 @@ import de.andreas.cadas.application.layers.SurfaceCoveringPreset;
 import de.andreas.cadas.application.layers.SurfaceCoveringPresetService;
 import de.andreas.cadas.application.layers.DwgBlockCatalogService;
 import de.andreas.cadas.application.layers.SurfaceLayerEffectService;
+import de.andreas.cadas.application.layers.SurfaceLayerConsistencyService;
 import de.andreas.cadas.application.layers.TileLayoutRequest;
 import de.andreas.cadas.application.layers.TileLayoutService;
 import de.andreas.cadas.application.layers.TilePlacement;
+import de.andreas.cadas.application.layers.WallSurfaceSideService;
+import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
 import de.andreas.cadas.application.parts.DoorPreset;
 import de.andreas.cadas.application.parts.PartLibraryImportService;
 import de.andreas.cadas.application.parts.StairPreset;
@@ -164,6 +167,8 @@ public final class CadWorkbench extends BorderPane {
     private final ProjectExchangeService projectExchangeService = new DxfProjectExchangeService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
+    private final SurfaceLayerConsistencyService surfaceLayerConsistencyService = new SurfaceLayerConsistencyService();
+    private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
 
@@ -912,8 +917,8 @@ public final class CadWorkbench extends BorderPane {
         clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
         applySelectionPropertiesButton.setDisable(!hasSelection);
         applyEndpointHeightButton.setDisable(selectedEndpointGroup == null);
-        boolean hasSurfaceTarget = currentSurfaceTargetKey().isPresent();
-        boolean hasSurfaceSelection = surfaceLayerList.getSelectionModel().getSelectedIndex() >= 0;
+        boolean hasSurfaceTarget = currentSurfaceSelectionContext().isPresent();
+        boolean hasSurfaceSelection = selectedSurfaceLayer().isPresent();
         addSurfaceLayerButton.setDisable(!hasSurfaceTarget);
         updateSurfaceLayerButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
         removeSurfaceLayerButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
@@ -2766,23 +2771,26 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void refreshSurfaceLayerSection() {
-        Optional<String> targetKey = currentSurfaceTargetKey();
-        if (targetKey.isEmpty()) {
-            surfaceLayerTargetLabel.setText("Keine passende Wand- oder Raumfläche ausgewählt.");
+        Optional<SurfaceSelectionContext> selectionContext = currentSurfaceSelectionContext();
+        if (selectionContext.isEmpty()) {
+            surfaceLayerTargetLabel.setText(currentSurfaceSelectionHint());
             surfaceLayerList.getItems().clear();
             surfaceLayerCoverageLabel.setText("Keine Ebenen ausgewählt.");
             updateActionButtons();
             return;
         }
-        surfaceLayerTargetLabel.setText("Fläche: " + currentSurfaceType().toString() + " auf `" + targetKey.get() + "`");
-        SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(currentSurfaceType(), targetKey.get());
-        if (stack == null) {
+        SurfaceSelectionContext context = selectionContext.get();
+        surfaceLayerTargetLabel.setText(context.label());
+        Optional<SurfaceLayerStack> stack = currentDisplaySurfaceLayerStack();
+        if (stack.isEmpty()) {
             surfaceLayerList.getItems().clear();
-            surfaceLayerCoverageLabel.setText("Noch keine Ebene auf dieser Fläche.");
+            surfaceLayerCoverageLabel.setText(context.targetKeys().size() > 1
+                    ? "Ausgewählte Wände haben noch keine gemeinsame Belagsfolge."
+                    : "Noch keine Ebene auf dieser Fläche.");
             updateActionButtons();
             return;
         }
-        surfaceLayerList.getItems().setAll(stack.layers().stream().map(this::describeSurfaceLayer).toList());
+        surfaceLayerList.getItems().setAll(stack.get().layers().stream().map(this::describeSurfaceLayer).toList());
         if (!surfaceLayerList.getItems().isEmpty() && surfaceLayerList.getSelectionModel().getSelectedIndex() < 0) {
             surfaceLayerList.getSelectionModel().selectFirst();
         }
@@ -2838,81 +2846,100 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void addSurfaceLayer() {
-        Optional<String> targetKey = currentSurfaceTargetKey();
-        if (targetKey.isEmpty()) {
+        Optional<SurfaceSelectionContext> selectionContext = currentSurfaceSelectionContext();
+        if (selectionContext.isEmpty()) {
+            showSurfaceLayerError("Belag kann nicht angelegt werden.", currentSurfaceSelectionHint());
+            return;
+        }
+        if (!validateSurfaceLayerSelection(selectionContext.get())) {
             return;
         }
         rememberStateForUndo();
-        SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(currentSurfaceType(), targetKey.get());
-        if (stack == null) {
-            stack = new SurfaceLayerStack(currentSurfaceType(), targetKey.get());
-            activeLevel.get().addSurfaceLayerStack(stack);
+        for (String targetKey : selectionContext.get().targetKeys()) {
+            SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(selectionContext.get().surfaceType(), targetKey);
+            if (stack == null) {
+                stack = new SurfaceLayerStack(selectionContext.get().surfaceType(), targetKey);
+                activeLevel.get().addSurfaceLayerStack(stack);
+            }
+            stack.addLayer(buildSurfaceLayerFromInputs());
         }
-        stack.addLayer(buildSurfaceLayerFromInputs());
-        afterSurfaceLayerMutation("Ebene hinzugefügt.");
+        afterSurfaceLayerMutation(selectionContext.get().targetKeys().size() > 1
+                ? "Belag auf ausgewählte Wände angewendet."
+                : "Ebene hinzugefügt.");
     }
 
     private void updateSurfaceLayer() {
-        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
-        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
-        if (stack == null || selectedLayer == null) {
+        List<SurfaceLayerStack> stacks = currentSurfaceLayerStacks();
+        int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
+        if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
         rememberStateForUndo();
-        replaceSurfaceLayer(stack, selectedLayer.id(), new SurfaceLayer(
-                selectedLayer.id(),
-                currentSurfaceLayerName(),
-                currentSurfaceLayerThickness(),
-                selectedLayer.visible(),
-                currentSurfaceTileWidth(),
-                currentSurfaceTileHeight(),
-                currentSurfaceLayoutMode(),
-                currentSurfaceLayoutOffset(),
-                currentSurfaceMinimumOffset(),
-                currentSurfaceMinimumEdgeWidth(),
-                currentSurfaceMinimumStartEndMargin(),
-                currentSurfaceJointWidth(),
-                currentSurfaceCoveringSource()
-        ));
+        for (SurfaceLayerStack stack : stacks) {
+            SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
+            replaceSurfaceLayer(stack, selectedLayer.id(), new SurfaceLayer(
+                    selectedLayer.id(),
+                    currentSurfaceLayerName(),
+                    currentSurfaceLayerThickness(),
+                    selectedLayer.visible(),
+                    currentSurfaceTileWidth(),
+                    currentSurfaceTileHeight(),
+                    currentSurfaceLayoutMode(),
+                    currentSurfaceLayoutOffset(),
+                    currentSurfaceMinimumOffset(),
+                    currentSurfaceMinimumEdgeWidth(),
+                    currentSurfaceMinimumStartEndMargin(),
+                    currentSurfaceJointWidth(),
+                    currentSurfaceCoveringSource()
+            ));
+        }
         afterSurfaceLayerMutation("Ebene aktualisiert.");
     }
 
     private void removeSurfaceLayer() {
-        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
-        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
-        if (stack == null || selectedLayer == null) {
+        List<SurfaceLayerStack> stacks = currentSurfaceLayerStacks();
+        int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
+        if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
         rememberStateForUndo();
-        stack.removeLayer(selectedLayer.id());
-        if (stack.layers().isEmpty()) {
-            activeLevel.get().removeSurfaceLayerStack(stack.id());
+        for (SurfaceLayerStack stack : stacks) {
+            SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
+            stack.removeLayer(selectedLayer.id());
+            if (stack.layers().isEmpty()) {
+                activeLevel.get().removeSurfaceLayerStack(stack.id());
+            }
         }
         afterSurfaceLayerMutation("Ebene entfernt.");
     }
 
     private void toggleSurfaceLayerVisibility() {
-        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
-        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
-        if (stack == null || selectedLayer == null) {
+        List<SurfaceLayerStack> stacks = currentSurfaceLayerStacks();
+        int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
+        if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
         rememberStateForUndo();
-        stack.setVisibility(selectedLayer.id(), !selectedLayer.visible());
+        for (SurfaceLayerStack stack : stacks) {
+            SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
+            stack.setVisibility(selectedLayer.id(), !selectedLayer.visible());
+        }
         afterSurfaceLayerMutation("Ebenensichtbarkeit umgeschaltet.");
     }
 
     private void moveSurfaceLayer(int direction) {
-        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
         int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
-        if (stack == null || selectedIndex < 0) {
+        List<SurfaceLayerStack> stacks = currentSurfaceLayerStacks();
+        if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
         rememberStateForUndo();
-        SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
-        stack.moveLayer(selectedLayer.id(), selectedIndex + direction);
+        for (SurfaceLayerStack stack : stacks) {
+            SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
+            stack.moveLayer(selectedLayer.id(), selectedIndex + direction);
+        }
         afterSurfaceLayerMutation("Ebenenreihenfolge geändert.");
-        int newIndex = Math.max(0, Math.min(selectedIndex + direction, stack.layers().size() - 1));
+        int newIndex = Math.max(0, Math.min(selectedIndex + direction, stacks.getFirst().layers().size() - 1));
         surfaceLayerList.getSelectionModel().select(newIndex);
     }
 
@@ -3031,12 +3058,11 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private Optional<SurfaceLayerStack> currentSurfaceLayerStack() {
-        return currentSurfaceTargetKey()
-                .map(targetKey -> activeLevel.get().findSurfaceLayerStack(currentSurfaceType(), targetKey));
+        return currentDisplaySurfaceLayerStack();
     }
 
     private Optional<SurfaceLayer> selectedSurfaceLayer() {
-        SurfaceLayerStack stack = currentSurfaceLayerStack().orElse(null);
+        SurfaceLayerStack stack = currentDisplaySurfaceLayerStack().orElse(null);
         int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
         if (stack == null || selectedIndex < 0 || selectedIndex >= stack.layers().size()) {
             return Optional.empty();
@@ -3045,14 +3071,9 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private Optional<String> currentSurfaceTargetKey() {
-        if (selectedSelection.get() == null) {
-            return Optional.empty();
-        }
-        return switch (selectedSelection.get().kind()) {
-            case WALL -> Optional.of(selectedSelection.get().elementId());
-            case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> Optional.of(selectedSelection.get().elementId());
-            default -> Optional.empty();
-        };
+        return currentSurfaceSelectionContext()
+                .filter(context -> context.targetKeys().size() == 1)
+                .map(context -> context.targetKeys().getFirst());
     }
 
     private SurfaceType currentSurfaceType() {
@@ -3089,6 +3110,151 @@ public final class CadWorkbench extends BorderPane {
         return activeLevel.get().rooms().stream()
                 .filter(room -> room.id().toString().equals(selectedSelection.get().elementId()))
                 .findFirst();
+    }
+
+    private Optional<Room> selectedSurfaceRoom() {
+        List<String> roomIds = selectedSelections.stream()
+                .filter(selection -> selection.kind() == RenderableKind.ROOM_VOLUME
+                        || selection.kind() == RenderableKind.ROOM_FLOOR
+                        || selection.kind() == RenderableKind.ROOM_CEILING)
+                .map(SelectionKey::elementId)
+                .distinct()
+                .toList();
+        if (roomIds.size() != 1) {
+            return Optional.empty();
+        }
+        return activeLevel.get().rooms().stream()
+                .filter(room -> room.id().toString().equals(roomIds.getFirst()))
+                .findFirst();
+    }
+
+    private List<Wall> selectedWalls() {
+        Set<String> wallIds = selectedSelections.stream()
+                .filter(selection -> selection.kind() == RenderableKind.WALL)
+                .map(SelectionKey::elementId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (wallIds.isEmpty()) {
+            return List.of();
+        }
+        return activeLevel.get().walls().stream()
+                .filter(wall -> wallIds.contains(wall.id().toString()))
+                .toList();
+    }
+
+    private Optional<SurfaceSelectionContext> currentSurfaceSelectionContext() {
+        SurfaceType surfaceType = currentSurfaceType();
+        if (surfaceType == SurfaceType.WALL_INTERIOR || surfaceType == SurfaceType.WALL_EXTERIOR) {
+            List<Wall> walls = selectedWalls();
+            if (walls.isEmpty()) {
+                return Optional.empty();
+            }
+            if (surfaceType == SurfaceType.WALL_INTERIOR) {
+                Optional<Room> room = selectedSurfaceRoom();
+                if (room.isEmpty()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new SurfaceSelectionContext(
+                        surfaceType,
+                        walls.stream().map(wall -> WallSurfaceTargetKey.interior(wall.id(), room.get().id())).toList(),
+                        "Fläche: Innenwand auf Raum `" + room.get().name() + "` und " + walls.size() + " Wand/Wände"
+                ));
+            }
+            if (selectedSurfaceRoom().isPresent()) {
+                return Optional.empty();
+            }
+            return Optional.of(new SurfaceSelectionContext(
+                    surfaceType,
+                    walls.stream().map(wall -> wall.id().toString()).toList(),
+                    "Fläche: Außenwand auf " + walls.size() + " Wand/Wände"
+            ));
+        }
+        Optional<Room> room = selectedSurfaceRoom();
+        if (room.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new SurfaceSelectionContext(
+                surfaceType,
+                List.of(room.get().id().toString()),
+                "Fläche: " + surfaceType + " auf Raum `" + room.get().name() + "`"
+        ));
+    }
+
+    private String currentSurfaceSelectionHint() {
+        return switch (currentSurfaceType()) {
+            case WALL_INTERIOR -> "Für Innenwand-Beläge genau einen Raum und mindestens eine Wand auswählen.";
+            case WALL_EXTERIOR -> "Für Außenwand-Beläge eine oder mehrere Wände ohne Raumauswahl auswählen.";
+            case FLOOR, CEILING -> "Für Boden- oder Deckenbeläge genau einen Raum auswählen.";
+            default -> "Keine passende Fläche ausgewählt.";
+        };
+    }
+
+    private Optional<SurfaceLayerStack> currentDisplaySurfaceLayerStack() {
+        List<SurfaceLayerStack> stacks = currentSurfaceLayerStacks();
+        if (stacks.isEmpty()) {
+            return Optional.empty();
+        }
+        if (stacks.size() == 1) {
+            return Optional.of(stacks.getFirst());
+        }
+        SurfaceLayerStack reference = stacks.getFirst();
+        boolean allSelectedWallsCovered = currentSurfaceSelectionContext()
+                .map(context -> context.targetKeys().size() == stacks.size())
+                .orElse(false);
+        if (!allSelectedWallsCovered) {
+            return Optional.empty();
+        }
+        boolean equalSequence = stacks.stream()
+                .skip(1)
+                .allMatch(stack -> surfaceLayerConsistencyService.haveEqualSequence(reference, stack));
+        return equalSequence ? Optional.of(reference) : Optional.empty();
+    }
+
+    private List<SurfaceLayerStack> currentSurfaceLayerStacks() {
+        return currentSurfaceSelectionContext()
+                .map(context -> context.targetKeys().stream()
+                        .map(targetKey -> activeLevel.get().findSurfaceLayerStack(context.surfaceType(), targetKey))
+                        .filter(stack -> stack != null)
+                        .toList())
+                .orElseGet(List::of);
+    }
+
+    private boolean validateSurfaceLayerSelection(SurfaceSelectionContext context) {
+        if (context.surfaceType() == SurfaceType.WALL_INTERIOR) {
+            Room room = selectedSurfaceRoom().orElseThrow();
+            boolean invalidWallSelected = selectedWalls().stream()
+                    .anyMatch(wall -> !wallSurfaceSideService.hasInteriorSide(activeLevel.get(), wall, room.id()));
+            if (invalidWallSelected) {
+                showSurfaceLayerError(
+                        "Innenwand-Belag kann nicht angelegt werden.",
+                        "Der ausgewählte Raum grenzt nicht an alle ausgewählten Wände."
+                );
+                return false;
+            }
+        }
+        if (context.surfaceType() == SurfaceType.WALL_EXTERIOR) {
+            boolean invalidWallSelected = selectedWalls().stream()
+                    .anyMatch(wall -> !wallSurfaceSideService.hasExteriorSide(activeLevel.get(), wall));
+            if (invalidWallSelected) {
+                showSurfaceLayerError(
+                        "Außenwand-Belag kann nicht angelegt werden.",
+                        "Mindestens eine ausgewählte Wand hat keine raumfreie Seite. Wähle für Innenwände zusätzlich den passenden Raum aus."
+                );
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void showSurfaceLayerError(String header, String content) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, content, ButtonType.OK);
+        alert.setTitle("Belag");
+        alert.setHeaderText(header);
+        alert.getDialogPane().setPrefWidth(520);
+        Window window = getScene() != null ? getScene().getWindow() : null;
+        if (window != null) {
+            alert.initOwner(window);
+        }
+        alert.showAndWait();
     }
 
     private void replaceSurfaceLayer(SurfaceLayerStack stack, UUID layerId, SurfaceLayer replacement) {
@@ -3957,6 +4123,9 @@ public final class CadWorkbench extends BorderPane {
     private boolean isTranslatableSelection(SelectionKey selectionKey) {
         return selectionKey.kind() == RenderableKind.WALL
                 || selectionKey.kind() == RenderableKind.STAIR;
+    }
+
+    private record SurfaceSelectionContext(SurfaceType surfaceType, List<String> targetKeys, String label) {
     }
 
     private MouseEvent mouseEvent(javafx.event.EventType<MouseEvent> type,
