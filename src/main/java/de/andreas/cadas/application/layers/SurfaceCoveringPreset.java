@@ -13,6 +13,7 @@ public record SurfaceCoveringPreset(
         Length offset,
         Length minimumOffset,
         Length minimumEdgeWidth,
+        Length jointWidth,
         String coveringSource
 ) {
 

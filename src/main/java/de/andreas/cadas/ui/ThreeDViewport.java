@@ -660,6 +660,7 @@ public final class ThreeDViewport extends BorderPane {
             case "stair" -> Color.web("#7a6d60");
             case "roof" -> Color.web("#8e5f54");
             case "surface-layer" -> Color.web("#8e7b5e");
+            case "joint" -> Color.web("#443e35");
             default -> Color.web("#8c877f");
         };
         if ((selectedSelection != null && selectedSelection.equals(renderableBox.selectionKey()))
