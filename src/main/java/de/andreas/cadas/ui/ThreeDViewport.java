@@ -3,6 +3,7 @@ package de.andreas.cadas.ui;
 import de.andreas.cadas.application.view.CameraPose;
 import de.andreas.cadas.application.view.ProjectionMode;
 import de.andreas.cadas.application.view.RenderableBox;
+import de.andreas.cadas.application.view.RenderableMesh;
 import de.andreas.cadas.application.view.RotationAxis;
 import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.application.view.ThreeDCameraController;
@@ -53,6 +54,10 @@ import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
 import javafx.scene.shape.CullFace;
 import javafx.scene.shape.DrawMode;
+import javafx.scene.shape.MeshView;
+import javafx.scene.shape.TriangleMesh;
+import javafx.collections.ObservableFloatArray;
+import javafx.collections.ObservableIntegerArray;
 import javafx.scene.transform.Rotate;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
@@ -152,12 +157,13 @@ public final class ThreeDViewport extends BorderPane {
                 surfaceRenderingCheckBox.isSelected()
         );
         rebuildScene(sceneModel);
-        sceneHintLabel.setVisible(sceneModel.boxes().isEmpty());
-        sceneHintLabel.setManaged(sceneModel.boxes().isEmpty());
-        if (!sceneModel.boxes().isEmpty() && (fitToSceneRequested || sceneWasEmpty)) {
+        boolean isEmpty = sceneModel.boxes().isEmpty() && sceneModel.meshes().isEmpty();
+        sceneHintLabel.setVisible(isEmpty);
+        sceneHintLabel.setManaged(isEmpty);
+        if (!isEmpty && (fitToSceneRequested || sceneWasEmpty)) {
             fitCameraToScene();
         }
-        sceneWasEmpty = sceneModel.boxes().isEmpty();
+        sceneWasEmpty = isEmpty;
     }
 
     public void setSelectedSelection(SelectionKey selectedSelection) {
@@ -422,7 +428,7 @@ public final class ThreeDViewport extends BorderPane {
 
     private void rebuildScene(ThreeDSceneModel sceneModel) {
         modelGroup.getChildren().clear();
-        lastRenderedBodyCount = sceneModel.boxes().size();
+        lastRenderedBodyCount = sceneModel.boxes().size() + sceneModel.meshes().size();
         Map<String, Group> groupedByLevel = new LinkedHashMap<>();
         double minX = Double.POSITIVE_INFINITY;
         double maxX = Double.NEGATIVE_INFINITY;
@@ -469,9 +475,29 @@ public final class ThreeDViewport extends BorderPane {
             minZ = Math.min(minZ, cz - halfExtZ);
             maxZ = Math.max(maxZ, cz + halfExtZ);
         }
+        for (RenderableMesh rm : sceneModel.meshes()) {
+            Group levelGroup = groupedByLevel.computeIfAbsent(rm.levelName(), ignored -> new Group());
+            levelGroup.getChildren().add(createMeshNode(rm));
+            float[] pts = rm.points();
+            for (int i = 0; i < pts.length; i += 3) {
+                double cx = pts[i] * WORLD_SCALE;
+                double cy = -(rm.baseY() + pts[i + 1]) * WORLD_SCALE;
+                double cz = pts[i + 2] * WORLD_SCALE;
+                minX = Math.min(minX, cx);
+                maxX = Math.max(maxX, cx);
+                minY = Math.min(minY, cy);
+                maxY = Math.max(maxY, cy);
+                minZ = Math.min(minZ, cz);
+                maxZ = Math.max(maxZ, cz);
+            }
+            double yBottom = -(rm.baseY() + rm.height()) * WORLD_SCALE;
+            double yTop = -rm.baseY() * WORLD_SCALE;
+            minY = Math.min(minY, Math.min(yBottom, yTop));
+            maxY = Math.max(maxY, Math.max(yBottom, yTop));
+        }
         modelGroup.getChildren().addAll(groupedByLevel.values());
-        sceneStatsLabel.setText("3D-Szene: " + sceneModel.boxes().size() + " Körper");
-        if (sceneModel.boxes().isEmpty()) {
+        sceneStatsLabel.setText("3D-Szene: " + lastRenderedBodyCount + " Körper");
+        if (sceneModel.boxes().isEmpty() && sceneModel.meshes().isEmpty()) {
             sceneCenterX = 0.0;
             sceneCenterZ = 0.0;
             sceneSpanHorizontal = 5_000.0 * WORLD_SCALE;
@@ -654,10 +680,21 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private PhongMaterial material(RenderableBox renderableBox) {
-        boolean isJoint = "joint".equals(renderableBox.materialKey());
-        boolean isSelected = (selectedSelection != null && selectedSelection.equals(renderableBox.selectionKey()))
-                || selectedSelections.contains(renderableBox.selectionKey());
-        Color color = switch (renderableBox.materialKey()) {
+        Color color = colorForKey(renderableBox.materialKey(), renderableBox.selectionKey());
+        PhongMaterial material = new PhongMaterial(color);
+        if ("joint".equals(renderableBox.materialKey())) {
+            material.setDiffuseColor(color);
+            material.setSpecularColor(Color.web("#222222"));
+        } else {
+            material.setSpecularColor(color.brighter());
+        }
+        return material;
+    }
+
+    private Color colorForKey(String materialKey, SelectionKey selectionKey) {
+        boolean isSelected = (selectedSelection != null && selectedSelection.equals(selectionKey))
+                || selectedSelections.contains(selectionKey);
+        Color base = switch (materialKey) {
             case "wall" -> Color.web("#5b738a");
             case "door" -> Color.web("#c88349", 0.3);
             case "window" -> Color.web("#7ab9d6", 0.3);
@@ -671,19 +708,49 @@ public final class ThreeDViewport extends BorderPane {
             default -> Color.web("#8c877f");
         };
         if (isSelected) {
-            color = color.deriveColor(0, 1.0, 1.2, 1.0);
+            base = base.deriveColor(0, 1.0, 1.2, 1.0);
         }
+        return base;
+    }
+
+    private Node createMeshNode(RenderableMesh rm) {
+        TriangleMesh mesh = new TriangleMesh();
+        ObservableFloatArray meshPoints = mesh.getPoints();
+        ObservableFloatArray texCoords = mesh.getTexCoords();
+        ObservableIntegerArray faces = mesh.getFaces();
+        ObservableIntegerArray smoothingGroups = mesh.getFaceSmoothingGroups();
+        float[] src = rm.points();
+        for (int i = 0; i < src.length; i += 3) {
+            meshPoints.addAll(src[i] * (float) WORLD_SCALE, src[i + 1] * (float) WORLD_SCALE, src[i + 2] * (float) WORLD_SCALE);
+        }
+        int vertexCount = src.length / 3;
+        for (int i = 0; i < vertexCount; i++) {
+            texCoords.addAll(0f, 0f);
+        }
+        for (int i = 0; i < rm.faceCount(); i++) {
+            int vi = i * 3;
+            faces.addAll(vi, 0, vi + 1, 0, vi + 2, 0);
+        }
+        for (int i = 0; i < rm.faceCount(); i++) {
+            smoothingGroups.addAll(0);
+        }
+        MeshView meshView = new MeshView(mesh);
+        meshView.setTranslateY(-rm.baseY() * WORLD_SCALE);
+        Color color = colorForKey(rm.materialKey(), rm.selectionKey());
         PhongMaterial material = new PhongMaterial(color);
-        if (isJoint) {
-            Color baseJointColor = isSelected
-                    ? Color.web("#1a1510").deriveColor(0, 1.0, 1.5, 1.0)
-                    : Color.web("#1a1510");
-            material.setDiffuseColor(baseJointColor);
-            material.setSpecularColor(Color.web("#222222"));
-        } else {
-            material.setSpecularColor(color.brighter());
-        }
-        return material;
+        material.setSpecularColor(color.brighter());
+        meshView.setMaterial(material);
+        meshView.setDrawMode(surfaceRenderingMode ? DrawMode.FILL : DrawMode.LINE);
+        meshView.setCullFace(CullFace.NONE);
+        meshView.setOpacity(rm.opacity());
+        meshView.setUserData(rm.selectionKey());
+        meshView.setOnMouseClicked(event -> {
+            if (rm.selectionKey() != null) {
+                selectionConsumer.accept(rm.selectionKey());
+                event.consume();
+            }
+        });
+        return meshView;
     }
 
     private void updateCamera() {
