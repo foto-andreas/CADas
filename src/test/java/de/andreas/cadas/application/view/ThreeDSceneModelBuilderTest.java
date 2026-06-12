@@ -24,6 +24,7 @@ import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
+import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
 import de.andreas.cadas.application.room.AutoRoomGenerationService;
 
 import java.util.List;
@@ -263,6 +264,83 @@ class ThreeDSceneModelBuilderTest {
                 .filter(box -> box.width() > box.depth())
                 .count();
         assertTrue(horizontaleFugenSegmente > 1, "Horizontale Fugen dürfen nicht auf ein Segment pro Reihe kollabieren.");
+    }
+
+    @Test
+    void rendertLegacyInnenwandBelagNichtAufDerAussenseite() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        Room room = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(100, 100),
+                new PlanPoint(3900, 2900),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, wall.id().toString());
+        SurfaceLayer layer = SurfaceLayer.create("Putz", Length.of(12, LengthUnit.MILLIMETER), Length.of(60, LengthUnit.CENTIMETER), Length.of(30, LengthUnit.CENTIMETER), Length.zero());
+        stack.addLayer(layer);
+        level.addSurfaceLayerStack(stack);
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), true);
+
+        List<RenderableBox> wallLayers = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .toList();
+        assertEquals(1, wallLayers.size());
+        assertTrue(wallLayers.getFirst().centerZ() > 0.0);
+    }
+
+    @Test
+    void rendertRaumbezogenenInnenwandBelagNurAufDerSeiteDesAusgewaehltenRaums() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(2000, 0), new PlanPoint(2000, 3000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        Room leftRoom = Room.rectangular(
+                "Links",
+                new PlanPoint(100, 100),
+                new PlanPoint(1900, 2900),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        Room rightRoom = Room.rectangular(
+                "Rechts",
+                new PlanPoint(2100, 100),
+                new PlanPoint(3900, 2900),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(leftRoom);
+        level.addRoom(rightRoom);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, WallSurfaceTargetKey.interior(wall.id(), leftRoom.id()));
+        SurfaceLayer layer = SurfaceLayer.create("Putz", Length.of(12, LengthUnit.MILLIMETER), Length.of(60, LengthUnit.CENTIMETER), Length.of(30, LengthUnit.CENTIMETER), Length.zero());
+        stack.addLayer(layer);
+        level.addSurfaceLayerStack(stack);
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), true);
+
+        List<RenderableBox> wallLayers = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .toList();
+        assertEquals(1, wallLayers.size());
+        assertTrue(wallLayers.getFirst().centerX() < 2000.0);
     }
 
     @Test

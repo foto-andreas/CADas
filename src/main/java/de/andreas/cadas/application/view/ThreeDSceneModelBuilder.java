@@ -4,6 +4,8 @@ import de.andreas.cadas.application.layers.SurfaceLayerEffectService;
 import de.andreas.cadas.application.layers.TileLayoutRequest;
 import de.andreas.cadas.application.layers.TileLayoutService;
 import de.andreas.cadas.application.layers.TilePlacement;
+import de.andreas.cadas.application.layers.WallSurfaceSideService;
+import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
 import de.andreas.cadas.application.room.OrthogonalPolygonDecompositionService;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
@@ -43,6 +45,7 @@ public final class ThreeDSceneModelBuilder {
     private static final double JOINT_SURFACE_OFFSET = 2.0;
     private final OrthogonalPolygonDecompositionService decompositionService = new OrthogonalPolygonDecompositionService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
+    private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
     private final List<RenderableMesh> meshes = new ArrayList<>();
 
@@ -654,29 +657,30 @@ public final class ThreeDSceneModelBuilder {
     private List<RenderableBox> buildWallSurfaceLayers(Level level, double baseHeight) {
         List<RenderableBox> boxes = new ArrayList<>();
         for (Wall wall : level.walls()) {
-            SurfaceLayerStack interior = level.findSurfaceLayerStack(SurfaceType.WALL_INTERIOR, wall.id().toString());
-            if (interior != null) {
-                boxes.addAll(buildWallSurfaceLayerBoxes(level.name(), wall, interior, baseHeight));
-            }
-            SurfaceLayerStack exterior = level.findSurfaceLayerStack(SurfaceType.WALL_EXTERIOR, wall.id().toString());
-            if (exterior != null) {
-                boxes.addAll(buildWallSurfaceLayerBoxes(level.name(), wall, exterior, baseHeight));
-            }
+            level.surfaceLayerStacks().stream()
+                    .filter(stack -> stack.surfaceType() == SurfaceType.WALL_INTERIOR || stack.surfaceType() == SurfaceType.WALL_EXTERIOR)
+                    .filter(stack -> WallSurfaceTargetKey.matchesWall(stack.targetKey(), wall.id()))
+                    .forEach(stack -> boxes.addAll(buildWallSurfaceLayerBoxes(level, level.name(), wall, stack, baseHeight)));
         }
         return boxes;
     }
 
-    private List<RenderableBox> buildWallSurfaceLayerBoxes(String levelName, Wall wall, SurfaceLayerStack stack, double baseHeight) {
+    private List<RenderableBox> buildWallSurfaceLayerBoxes(Level level, String levelName, Wall wall, SurfaceLayerStack stack, double baseHeight) {
         List<RenderableBox> boxes = new ArrayList<>();
         double cumulativeThickness = wall.thickness().toMillimeters() / 2.0;
+        WallSurfaceSideService.WallLayerSides wallLayerSides = wallSurfaceSideService.resolve(level, wall, stack.surfaceType(), stack.targetKey());
         for (SurfaceLayer layer : stack.layers()) {
             if (!layer.visible()) {
                 cumulativeThickness += layer.thickness().toMillimeters();
                 continue;
             }
             double centerOffset = cumulativeThickness + layer.thickness().toMillimeters() / 2.0;
-            boxes.add(wallSurfaceLayerBox(levelName, wall, layer, baseHeight, centerOffset));
-            boxes.add(wallSurfaceLayerBox(levelName, wall, layer, baseHeight, -centerOffset));
+            if (wallLayerSides.positiveSide()) {
+                boxes.add(wallSurfaceLayerBox(levelName, wall, layer, baseHeight, centerOffset));
+            }
+            if (wallLayerSides.negativeSide()) {
+                boxes.add(wallSurfaceLayerBox(levelName, wall, layer, baseHeight, -centerOffset));
+            }
             cumulativeThickness += layer.thickness().toMillimeters();
         }
         return boxes;
