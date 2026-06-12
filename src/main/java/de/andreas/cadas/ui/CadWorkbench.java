@@ -302,6 +302,10 @@ public final class CadWorkbench extends BorderPane {
     private PlanPoint selectionDragAnchor;
     private List<Wall> selectionDragBaseWalls = List.of();
     private List<Staircase> selectionDragBaseStaircases = List.of();
+    private UUID openingDragId;
+    private PlanSegment openingDragWallAxis;
+    private double openingDragWidth;
+    private double openingDragOffsetDelta;
 
     public CadWorkbench() {
         setPadding(new Insets(12));
@@ -1184,6 +1188,36 @@ public final class CadWorkbench extends BorderPane {
                 SelectionKey editSelection = selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null);
                 updateSelection(editSelection, event.isShortcutDown() || event.isShiftDown());
                 prepareSelectionDrag(editSelection, editPoint);
+                openingDragId = null;
+                openingDragWallAxis = null;
+                openingDragWidth = 0;
+                openingDragOffsetDelta = 0;
+                if (editSelection != null && (editSelection.kind() == RenderableKind.DOOR || editSelection.kind() == RenderableKind.WINDOW)) {
+                    UUID elementId = UUID.fromString(editSelection.elementId());
+                    if (editSelection.kind() == RenderableKind.DOOR) {
+                        activeLevel.get().doors().stream()
+                                .filter(door -> door.id().equals(elementId))
+                                .findFirst()
+                                .ifPresent(door -> {
+                                    Wall wall = activeLevel.get().findWall(door.wallId());
+                                    openingDragId = door.id();
+                                    openingDragWallAxis = wall.axis();
+                                    openingDragWidth = door.width().toMillimeters();
+                                    openingDragOffsetDelta = door.offsetFromStart().toMillimeters() - openingDragWallAxis.projectedLength(editPoint).toMillimeters();
+                                });
+                    } else {
+                        activeLevel.get().windows().stream()
+                                .filter(window -> window.id().equals(elementId))
+                                .findFirst()
+                                .ifPresent(window -> {
+                                    Wall wall = activeLevel.get().findWall(window.wallId());
+                                    openingDragId = window.id();
+                                    openingDragWallAxis = wall.axis();
+                                    openingDragWidth = window.width().toMillimeters();
+                                    openingDragOffsetDelta = window.offsetFromStart().toMillimeters() - openingDragWallAxis.projectedLength(editPoint).toMillimeters();
+                                });
+                    }
+                }
             }
             render();
             return;
@@ -1240,6 +1274,28 @@ public final class CadWorkbench extends BorderPane {
                 markThreeDDirty();
                 render();
             }
+            if (openingDragId != null) {
+                if (!historyCapturedForDrag) {
+                    rememberStateForUndo();
+                    historyCapturedForDrag = true;
+                }
+                DraftingConstraints constraints = currentConstraints(false);
+                PlanPoint snappedPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
+                double wallLength = openingDragWallAxis.length().toMillimeters();
+                double rawOffset = openingDragWallAxis.projectedLength(snappedPoint).toMillimeters() + openingDragOffsetDelta;
+                double clampedOffset = Math.max(0.0, Math.min(wallLength - openingDragWidth, rawOffset));
+                Length newOffset = Length.of(clampedOffset, LengthUnit.MILLIMETER);
+                activeLevel.get().replaceDoors(activeLevel.get().doors().stream()
+                        .map(door -> door.id().equals(openingDragId) ? door.withOffset(newOffset) : door)
+                        .toList());
+                activeLevel.get().replaceWindows(activeLevel.get().windows().stream()
+                        .map(window -> window.id().equals(openingDragId) ? window.withOffset(newOffset) : window)
+                        .toList());
+                synchronizeRoomsFromWalls(activeLevel.get());
+                markThreeDDirty();
+                render();
+                return;
+            }
             if (selectionDragAnchor != null) {
                 if (!historyCapturedForDrag) {
                     rememberStateForUndo();
@@ -1272,6 +1328,18 @@ public final class CadWorkbench extends BorderPane {
         }
 
         if (selectedEndpointGroup != null) {
+            historyCapturedForDrag = false;
+            updatePropertySectionVisibility();
+            updateActionButtons();
+            render();
+            return;
+        }
+
+        if (openingDragId != null) {
+            openingDragId = null;
+            openingDragWallAxis = null;
+            openingDragWidth = 0;
+            openingDragOffsetDelta = 0;
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -3016,6 +3084,10 @@ public final class CadWorkbench extends BorderPane {
                     guideLines.clear();
                     clearSelectionsInternal();
                     selectedEndpointGroup = null;
+                    openingDragId = null;
+                    openingDragWallAxis = null;
+                    openingDragWidth = 0;
+                    openingDragOffsetDelta = 0;
                     draftStart = null;
                     previewSegment = null;
                     pendingGuideOrientation = null;
@@ -3066,6 +3138,10 @@ public final class CadWorkbench extends BorderPane {
         selectionDragAnchor = null;
         selectionDragBaseWalls = List.of();
         selectionDragBaseStaircases = List.of();
+        openingDragId = null;
+        openingDragWallAxis = null;
+        openingDragWidth = 0;
+        openingDragOffsetDelta = 0;
         draftStart = null;
         previewSegment = null;
         pendingGuideOrientation = null;
@@ -3086,6 +3162,10 @@ public final class CadWorkbench extends BorderPane {
         selectionDragAnchor = null;
         selectionDragBaseWalls = List.of();
         selectionDragBaseStaircases = List.of();
+        openingDragId = null;
+        openingDragWallAxis = null;
+        openingDragWidth = 0;
+        openingDragOffsetDelta = 0;
         historyCapturedForDrag = false;
         updateActionButtons();
         render();

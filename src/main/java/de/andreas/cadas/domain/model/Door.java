@@ -26,5 +26,9 @@ public record Door(
     public static Door create(UUID wallId, Length offsetFromStart, Length width, Length height, Length thresholdHeight) {
         return new Door(UUID.randomUUID(), wallId, offsetFromStart, width, height, thresholdHeight);
     }
+
+    public Door withOffset(Length offset) {
+        return new Door(id, wallId, offset, width, height, thresholdHeight);
+    }
 }
 
