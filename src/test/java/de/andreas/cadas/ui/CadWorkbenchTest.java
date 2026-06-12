@@ -1,5 +1,15 @@
 package de.andreas.cadas.ui;
 
+import de.andreas.cadas.domain.geometry.Length;
+import de.andreas.cadas.domain.geometry.LengthUnit;
+import de.andreas.cadas.domain.geometry.PlanPoint;
+import de.andreas.cadas.domain.geometry.PlanSegment;
+import de.andreas.cadas.domain.model.ProjectModel;
+import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.Wall;
+import de.andreas.cadas.infrastructure.dxf.DxfProjectExchangeService;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -76,6 +86,88 @@ class CadWorkbenchTest {
 
         WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
         Assertions.assertEquals("EDIT", snapshot.activeTool());
+    }
+
+    @Test
+    void belagsauswahlWechseltMitRaumUndWandSauberZwischenKontexten() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSelect("ROOM", 0, false);
+            workbench.automationSetSurfaceType("CEILING");
+            return null;
+        });
+        WorkbenchAutomationSnapshot nurRaum = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertEquals("CEILING", nurRaum.surfaceType());
+        Assertions.assertEquals("FLOOR,CEILING", nurRaum.surfaceTypeOptions());
+
+        aufFxThread(() -> {
+            workbench.automationSelect("WALL", 0, true);
+            return null;
+        });
+        WorkbenchAutomationSnapshot raumUndWand = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertEquals("WALL_INTERIOR", raumUndWand.surfaceType());
+        Assertions.assertEquals("WALL_INTERIOR", raumUndWand.surfaceTypeOptions());
+
+        aufFxThread(() -> {
+            workbench.automationSelect("ROOM", 0, false);
+            return null;
+        });
+        WorkbenchAutomationSnapshot wiederNurRaum = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertEquals("CEILING", wiederNurRaum.surfaceType());
+        Assertions.assertEquals("FLOOR,CEILING", wiederNurRaum.surfaceTypeOptions());
+    }
+
+    @Test
+    void belagsauswahlZeigtBeiNurWandNurAussenwandAn() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSelect("WALL", 0, false);
+            return null;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertEquals("WALL_EXTERIOR", snapshot.surfaceType());
+        Assertions.assertEquals("WALL_EXTERIOR", snapshot.surfaceTypeOptions());
+    }
+
+    private Path erzeugeEinfachesProjektAlsDxf() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Testhaus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(4000, 0), new PlanPoint(4000, 3000)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(4000, 3000), new PlanPoint(0, 3000)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(0, 3000), new PlanPoint(0, 0)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addRoom(Room.rectangular(
+                "Wohnen",
+                new PlanPoint(100, 100),
+                new PlanPoint(3900, 2900),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        ));
+        Path datei = Files.createTempFile("cadas-workbench-", ".dxf");
+        new DxfProjectExchangeService().exportProject(project, datei);
+        return datei;
     }
 
     private static <T> T aufFxThread(FxCallable<T> aufgabe) throws Exception {

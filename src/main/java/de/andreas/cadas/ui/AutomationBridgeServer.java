@@ -66,6 +66,18 @@ public final class AutomationBridgeServer {
             workbench.automationSetWorkspace(required(query, "value"));
             return workbench.automationSnapshot();
         }));
+        server.createContext("/surfaceType", exchange -> handleMutation(exchange, query -> {
+            workbench.automationSetSurfaceType(required(query, "value"));
+            return workbench.automationSnapshot();
+        }));
+        server.createContext("/select", exchange -> handleMutation(exchange, query -> {
+            workbench.automationSelect(
+                    required(query, "kind"),
+                    Integer.parseInt(query.getOrDefault("index", "0")),
+                    parseBoolean(query.get("toggle"))
+            );
+            return workbench.automationSnapshot();
+        }));
         server.createContext("/field", exchange -> handleMutation(exchange, query -> {
             workbench.automationSetField(required(query, "name"), required(query, "value"));
             return workbench.automationSnapshot();
@@ -202,6 +214,11 @@ public final class AutomationBridgeServer {
                 + "\"threeDBodyCount\":" + snapshot.threeDBodyCount() + ","
                 + "\"threeDHasContent\":" + snapshot.threeDHasContent() + ","
                 + "\"threeDCameraStatus\":\"" + escape(snapshot.threeDCameraStatus()) + "\","
+                + "\"surfaceType\":\"" + escape(snapshot.surfaceType()) + "\","
+                + "\"surfaceTypeOptions\":\"" + escape(snapshot.surfaceTypeOptions()) + "\","
+                + "\"surfaceTargetLabel\":\"" + escape(snapshot.surfaceTargetLabel()) + "\","
+                + "\"surfaceSelectionHint\":\"" + escape(snapshot.surfaceSelectionHint()) + "\","
+                + "\"surfaceCoverageLabel\":\"" + escape(snapshot.surfaceCoverageLabel()) + "\","
                 + "\"statusText\":\"" + escape(snapshot.statusText()) + "\","
                 + "\"zoom\":" + snapshot.zoom() + ","
                 + "\"offsetX\":" + snapshot.offsetX() + ","
