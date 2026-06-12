@@ -337,13 +337,13 @@ public final class ThreeDViewport extends BorderPane {
         Button backViewButton = new Button("Hinten");
         backViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.SOUTH));
         Button rightViewButton = new Button("Rechts");
-        rightViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.EAST));
+        rightViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.WEST));
         Button leftViewButton = new Button("Links");
-        leftViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.WEST));
+        leftViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.EAST));
         Button orbitLeftButton = new Button("←");
-        orbitLeftButton.setOnAction(event -> nudgeOrbit(-15.0, 0.0));
+        orbitLeftButton.setOnAction(event -> nudgeOrbit(15.0, 0.0));
         Button orbitRightButton = new Button("→");
-        orbitRightButton.setOnAction(event -> nudgeOrbit(15.0, 0.0));
+        orbitRightButton.setOnAction(event -> nudgeOrbit(-15.0, 0.0));
         Button orbitUpButton = new Button("↑");
         orbitUpButton.setOnAction(event -> nudgeOrbit(0.0, 8.0));
         Button orbitDownButton = new Button("↓");
@@ -650,8 +650,8 @@ public final class ThreeDViewport extends BorderPane {
     private PhongMaterial material(RenderableBox renderableBox) {
         Color color = switch (renderableBox.materialKey()) {
             case "wall" -> Color.web("#5b738a");
-            case "door" -> Color.web("#c88349");
-            case "window" -> Color.web("#7ab9d6");
+            case "door" -> Color.web("#c88349", 0.3);
+            case "window" -> Color.web("#7ab9d6", 0.3);
             case "room-floor" -> Color.web("#b89c7d");
             case "room-ceiling" -> Color.web("#d7d3c8");
             case "room-volume" -> Color.web("#d8c6aa");
@@ -739,9 +739,11 @@ public final class ThreeDViewport extends BorderPane {
         double halbeBildHoehe = Math.tan(Math.toRadians(activeFovDegrees / 2.0));
         double halbeBildBreite = halbeBildHoehe;
         double minHalbeBild = Math.min(halbeBildHoehe, halbeBildBreite);
+        double elevation = Math.abs(cameraPose.elevationDegrees());
+        boolean isTopDownView = elevation > 80.0;
         double modelHalfHorizontalUnits = sceneSpanHorizontal / 2.0;
         double horizontalAbstand = (modelHalfHorizontalUnits * FIT_PADDING_FACTOR) / minHalbeBild;
-        double modelHeightUnits = sceneHeightMax;
+        double modelHeightUnits = isTopDownView ? sceneSpanHorizontal : sceneHeightMax;
         double heightAbstand = (modelHeightUnits * FIT_PADDING_FACTOR) / (2.0 * halbeBildHoehe);
         double benoetigterAbstandUnits = Math.max(horizontalAbstand, heightAbstand) + 20.0;
         double clamped = Math.max(MIN_CAMERA_DISTANCE_UNITS,
