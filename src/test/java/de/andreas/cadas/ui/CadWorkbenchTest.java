@@ -89,6 +89,28 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void statushinweisPasstZumAktivenWerkzeug() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot wand = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertTrue(wand.statusText().contains("Linksklick startet"));
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("EDIT");
+            return null;
+        });
+
+        WorkbenchAutomationSnapshot bearbeiten = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertTrue(bearbeiten.statusText().contains("Linksklick wählt aus"));
+    }
+
+    @Test
     void belagsauswahlWechseltMitRaumUndWandSauberZwischenKontexten() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {
