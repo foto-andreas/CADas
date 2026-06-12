@@ -84,7 +84,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (String entry : metadata) {
             String[] parts = entry.split("\\|");
             switch (parts[0]) {
-                case "PROJECT" -> importedProjectName = desanitize(parts[1]);
+                case "PROJECT" -> importedProjectName = stripDxfExtension(desanitize(parts[1]));
                 case "LEVEL" -> levels.computeIfAbsent(desanitize(parts[1]), Level::new);
                 case "WALL" -> {
                     Level level = levels.computeIfAbsent(desanitize(parts[1]), Level::new);
@@ -465,6 +465,14 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
 
     private String desanitize(String value) {
         return value.replace('/', '|');
+    }
+
+    private String stripDxfExtension(String name) {
+        String result = name;
+        while (result.toLowerCase().endsWith(".dxf")) {
+            result = result.substring(0, result.length() - 4);
+        }
+        return result;
     }
 
     private String sanitizeLayerName(String value) {

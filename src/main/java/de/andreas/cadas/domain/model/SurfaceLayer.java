@@ -16,6 +16,7 @@ public record SurfaceLayer(
         Length layoutOffset,
         Length minimumOffset,
         Length minimumEdgeWidth,
+        Length jointWidth,
         String coveringSource
 ) {
 
@@ -29,6 +30,7 @@ public record SurfaceLayer(
         Objects.requireNonNull(layoutOffset, "layoutOffset darf nicht null sein.");
         Objects.requireNonNull(minimumOffset, "minimumOffset darf nicht null sein.");
         Objects.requireNonNull(minimumEdgeWidth, "minimumEdgeWidth darf nicht null sein.");
+        Objects.requireNonNull(jointWidth, "jointWidth darf nicht null sein.");
         Objects.requireNonNull(coveringSource, "coveringSource darf nicht null sein.");
     }
 
@@ -39,7 +41,7 @@ public record SurfaceLayer(
             Length tileHeight,
             Length minimumOffset
     ) {
-        return new SurfaceLayer(UUID.randomUUID(), name, thickness, true, tileWidth, tileHeight, SurfaceLayoutMode.AUTOMATIC, Length.zero(), minimumOffset, Length.zero(), "");
+        return new SurfaceLayer(UUID.randomUUID(), name, thickness, true, tileWidth, tileHeight, SurfaceLayoutMode.AUTOMATIC, Length.zero(), minimumOffset, Length.zero(), Length.ofMillimeters(2), "");
     }
 
     public static SurfaceLayer create(
@@ -51,17 +53,18 @@ public record SurfaceLayer(
             Length layoutOffset,
             Length minimumOffset,
             Length minimumEdgeWidth,
+            Length jointWidth,
             String coveringSource
     ) {
-        return new SurfaceLayer(UUID.randomUUID(), name, thickness, true, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, coveringSource);
+        return new SurfaceLayer(UUID.randomUUID(), name, thickness, true, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, jointWidth, coveringSource);
     }
 
     public SurfaceLayer rename(String newName) {
-        return new SurfaceLayer(id, newName, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, coveringSource);
+        return new SurfaceLayer(id, newName, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, jointWidth, coveringSource);
     }
 
     public SurfaceLayer withVisibility(boolean newVisibility) {
-        return new SurfaceLayer(id, name, thickness, newVisibility, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, coveringSource);
+        return new SurfaceLayer(id, name, thickness, newVisibility, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, jointWidth, coveringSource);
     }
 
     public SurfaceLayer reconfigure(
@@ -73,6 +76,7 @@ public record SurfaceLayer(
             Length newLayoutOffset,
             Length newMinimumOffset,
             Length newMinimumEdgeWidth,
+            Length newJointWidth,
             String newCoveringSource
     ) {
         return new SurfaceLayer(
@@ -86,6 +90,7 @@ public record SurfaceLayer(
                 newLayoutOffset,
                 newMinimumOffset,
                 newMinimumEdgeWidth,
+                newJointWidth,
                 newCoveringSource
         );
     }
