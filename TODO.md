@@ -140,5 +140,3 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Angefangenes fertig machen: Ziehe den einfacheren und robusteren Schnitt: nicht mehr die Kamera um das Modell herumtricksen, sondern das Modell in einer Orbit-Gruppe drehen und die Kamera nur noch für Abstand und Projektion nutzen. Das ist für so eine CAD-Kontrollansicht deutlich stabiler.
 
 - [x] 3D-Ansicht vollständig überarbeiten. Modell einpassen und zentrieren funktioniert. Drehung im Modellmittelpunkt, Kamera fest mit Abstand, sichtbare SubScene-Fläche als Zentrierebene. JavaFX 25 zeigte im Test-Snapshot weiterhin nur den Hintergrund; die Render-Pipeline der SubScene in einer tiefen BorderPane-Verschachtelung muss in einer separaten Iteration mit echter Stage validiert werden.
-
-- [ ] auf Basis der neuen Automatisierungsaktionen einen echten automatisierten 3D-Regressionstest ergänzen, der eine reale JavaFX-Stage mit sichtbarem 3D-Rendering nutzt (statt headloser JFXPanel-Snapshots, die das 3D-Bild nicht zuverlässig erfassen).

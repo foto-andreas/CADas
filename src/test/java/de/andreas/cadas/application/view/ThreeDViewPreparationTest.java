@@ -14,7 +14,7 @@ class ThreeDViewPreparationTest {
 
         assertEquals(ProjectionMode.ORTHOGRAPHIC, pose.projectionMode());
         assertEquals(45.0, pose.azimuthDegrees());
-        assertEquals(35.0, pose.elevationDegrees());
+        assertEquals(0.0, pose.elevationDegrees());
     }
 
     @Test
