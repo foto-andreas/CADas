@@ -9,11 +9,12 @@ import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.application.view.RenderableBox;
+import de.andreas.cadas.application.view.RenderableKind;
+import de.andreas.cadas.application.view.RenderableMesh;
 import de.andreas.cadas.application.view.RotationAxis;
+import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.application.view.ThreeDSceneModel;
 import de.andreas.cadas.application.view.ThreeDSceneModelBuilder;
-import de.andreas.cadas.application.view.RenderableKind;
-import de.andreas.cadas.application.view.SelectionKey;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Assertions;
@@ -35,7 +36,9 @@ class ThreeDViewportRenderTest {
                 "Es müssen Wände vorhanden sein.");
         Assertions.assertTrue(scene.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_FLOOR),
                 "Es muss ein Raum-Boden vorhanden sein.");
-        Assertions.assertTrue(scene.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_CEILING),
+        Assertions.assertTrue(
+                scene.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_CEILING)
+                        || scene.meshes().stream().anyMatch(mesh -> mesh.kind() == RenderableKind.ROOM_CEILING),
                 "Es muss eine Raum-Decke vorhanden sein.");
     }
 
