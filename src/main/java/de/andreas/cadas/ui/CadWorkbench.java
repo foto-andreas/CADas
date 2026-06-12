@@ -66,6 +66,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import javax.imageio.ImageIO;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -100,6 +101,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -118,6 +120,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import javafx.embed.swing.SwingFXUtils;
 
 public final class CadWorkbench extends BorderPane {
 
@@ -170,6 +173,7 @@ public final class CadWorkbench extends BorderPane {
     private final SurfaceLayerConsistencyService surfaceLayerConsistencyService = new SurfaceLayerConsistencyService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
+    private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
 
     private final ObjectProperty<Level> activeLevel = new SimpleObjectProperty<>(project.primaryLevel());
@@ -255,6 +259,7 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> surfaceJointWidthUnit = new ComboBox<>();
     private final TextField dwgBlockNameField = new TextField();
     private final Label surfaceLayerTargetLabel = new Label("Keine Fläche ausgewählt.");
+    private final Label surfaceLayerSelectionHintLabel = new Label("Für Beläge zuerst eine passende Fläche auswählen.");
     private final Label surfaceLayerCoverageLabel = new Label("Keine Ebenen ausgewählt.");
     private final ComboBox<Level> levelSelector = new ComboBox<>();
     private final ComboBox<DrawingTool> toolSelector = new ComboBox<>();
@@ -689,6 +694,12 @@ public final class CadWorkbench extends BorderPane {
     private ScrollPane buildPropertyPane() {
         selectionSummaryLabel.setWrapText(true);
         selectionSummaryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
+        surfaceLayerTargetLabel.setWrapText(true);
+        surfaceLayerTargetLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #5c5146;");
+        surfaceLayerSelectionHintLabel.setWrapText(true);
+        surfaceLayerSelectionHintLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6b6258;");
+        surfaceLayerCoverageLabel.setWrapText(true);
+        surfaceLayerCoverageLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
         cadLibrarySummaryLabel.setWrapText(true);
         cadLibrarySummaryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
         propertySections.getChildren().setAll(
@@ -740,18 +751,20 @@ public final class CadWorkbench extends BorderPane {
                 createPropertySection(
                         "Ebenen",
                         surfaceLayerTargetLabel,
-                        propertyRow("Fläche", surfaceTypeSelector),
+                        surfaceLayerSelectionHintLabel,
+                        propertyRow("Belagstyp", surfaceTypeSelector),
                         propertyRow("Preset", surfacePresetSelector),
                         surfaceLayerList,
                         surfaceLayerCoverageLabel,
+                        new Separator(),
                         propertyRow("Name", surfaceLayerNameField),
                         propertyRow("Dicke", surfaceLayerThicknessField, surfaceLayerThicknessUnit),
-                        propertyRow("Breite", surfaceTileWidthField, surfaceTileWidthUnit),
-                        propertyRow("Höhe", surfaceTileHeightField, surfaceTileHeightUnit),
+                        propertyRow("Modulbreite", surfaceTileWidthField, surfaceTileWidthUnit),
+                        propertyRow("Modulhöhe", surfaceTileHeightField, surfaceTileHeightUnit),
                         propertyRow("Versatzmodus", surfaceLayoutModeSelector),
                         propertyRow("Versatz", surfaceLayoutOffsetField, surfaceLayoutOffsetUnit),
                         propertyRow("Mindestversatz", surfaceMinimumOffsetField, surfaceMinimumOffsetUnit),
-                        propertyRow("Mindestbreite Rand", surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit),
+                        propertyRow("Mindestrand links/rechts", surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit),
                         propertyRow("Mindestbreite Anfang/Ende", surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit),
                         propertyRow("Fugenbreite", surfaceJointWidthField, surfaceJointWidthUnit),
                         propertyRow("DWG-Block", dwgBlockNameField),
@@ -845,6 +858,7 @@ public final class CadWorkbench extends BorderPane {
             node.setManaged(visible);
         }
         selectionSummaryLabel.setText(selectionSummary());
+        refreshSurfaceTypeSelector();
         refreshSurfaceLayerSection();
     }
 
@@ -1019,8 +1033,6 @@ public final class CadWorkbench extends BorderPane {
 
     private void initializeSurfaceLayerControls() {
         availableSurfacePresets.setAll(new SurfaceCoveringPresetService().defaults());
-        surfaceTypeSelector.getItems().setAll(SurfaceType.values());
-        surfaceTypeSelector.setValue(SurfaceType.WALL_INTERIOR);
         surfacePresetSelector.setItems(availableSurfacePresets);
         if (!availableSurfacePresets.isEmpty()) {
             surfacePresetSelector.setValue(availableSurfacePresets.getFirst());
@@ -1029,8 +1041,14 @@ public final class CadWorkbench extends BorderPane {
         surfaceLayoutModeSelector.setValue(SurfaceLayoutMode.AUTOMATIC);
         surfaceLayerList.setPrefHeight(120);
         surfaceLayerList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> syncInputsFromSelectedSurfaceLayer());
-        surfaceTypeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> refreshSurfaceLayerSection());
+        surfaceTypeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
+            if (newValue == SurfaceType.FLOOR || newValue == SurfaceType.CEILING) {
+                preferredRoomSurfaceType = newValue;
+            }
+            refreshSurfaceLayerSection();
+        });
         surfacePresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applySurfacePreset(newValue));
+        refreshSurfaceTypeSelector();
         applySurfacePreset(surfacePresetSelector.getValue());
     }
 
@@ -1095,7 +1113,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(stairHeightField, "Legt die Gesamthöhe der nächsten Treppe fest.");
         applyTooltip(stairHeightUnit, "Bestimmt die Einheit für die Treppenhöhe.");
         applyTooltip(stairStepsField, "Legt die Stufenanzahl der nächsten Treppe fest.");
-        applyTooltip(surfaceTypeSelector, "Bestimmt, ob die Ebene auf einer Innenwand, Außenwand, dem Boden oder der Decke der aktuell ausgewählten Fläche liegt.");
+        applyTooltip(surfaceTypeSelector, "Zeigt nur die Belagstypen an, die zur aktuellen Auswahl passen. Raum allein erlaubt Boden oder Decke, Raum plus Wand erlaubt Innenwand, Wand allein erlaubt Außenwand.");
         applyTooltip(surfacePresetSelector, "Wählt einen Beispielbelag oder eine DWG-Referenz aus und übernimmt deren Standardwerte in die Ebenenfelder.");
         applyTooltip(surfaceLayerList, "Zeigt die Ebenen der aktuell ausgewählten Fläche in ihrer Stapelreihenfolge an.");
         applyTooltip(surfaceLayerNameField, "Legt den Namen der Ebene fest, etwa Fliese, Rigips, Dämmplatte oder eine DWG-Referenz.");
@@ -1118,6 +1136,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(surfaceJointWidthUnit, "Bestimmt die Einheit für die Fugenbreite.");
         applyTooltip(dwgBlockNameField, "Erfasst einen konkreten Blocknamen aus einer geladenen DWG-Bibliothek, damit daraus ein auswählbares Oberflächen-Preset wird.");
         applyTooltip(surfaceLayerTargetLabel, "Zeigt, auf welcher Wand- oder Raumfläche die aktuellen Ebenen bearbeitet werden.");
+        applyTooltip(surfaceLayerSelectionHintLabel, "Erklärt, welche Kombination aus Raum- und Wandauswahl für den aktuell sichtbaren Belagstyp erforderlich ist.");
         applyTooltip(surfaceLayerCoverageLabel, "Zeigt eine Kurzbewertung der aktuellen Platten- oder Fliesenbelegung der markierten Ebene.");
         applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
     }
@@ -2773,7 +2792,8 @@ public final class CadWorkbench extends BorderPane {
     private void refreshSurfaceLayerSection() {
         Optional<SurfaceSelectionContext> selectionContext = currentSurfaceSelectionContext();
         if (selectionContext.isEmpty()) {
-            surfaceLayerTargetLabel.setText(currentSurfaceSelectionHint());
+            surfaceLayerTargetLabel.setText("Keine passende Belagsfläche ausgewählt.");
+            surfaceLayerSelectionHintLabel.setText(currentSurfaceSelectionHint());
             surfaceLayerList.getItems().clear();
             surfaceLayerCoverageLabel.setText("Keine Ebenen ausgewählt.");
             updateActionButtons();
@@ -2781,6 +2801,7 @@ public final class CadWorkbench extends BorderPane {
         }
         SurfaceSelectionContext context = selectionContext.get();
         surfaceLayerTargetLabel.setText(context.label());
+        surfaceLayerSelectionHintLabel.setText(context.hint());
         Optional<SurfaceLayerStack> stack = currentDisplaySurfaceLayerStack();
         if (stack.isEmpty()) {
             surfaceLayerList.getItems().clear();
@@ -3077,25 +3098,18 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private SurfaceType currentSurfaceType() {
-        SurfaceType selectedType = Optional.ofNullable(surfaceTypeSelector.getValue()).orElse(SurfaceType.WALL_INTERIOR);
-        if (selectedSelection.get() != null && selectedSelection.get().kind() == RenderableKind.WALL) {
-            if (selectedType != SurfaceType.WALL_INTERIOR && selectedType != SurfaceType.WALL_EXTERIOR) {
-                surfaceTypeSelector.setValue(SurfaceType.WALL_INTERIOR);
-                return SurfaceType.WALL_INTERIOR;
-            }
+        List<SurfaceType> availableTypes = availableSurfaceTypesForSelection();
+        if (availableTypes.isEmpty()) {
+            return SurfaceType.WALL_INTERIOR;
+        }
+        SurfaceType selectedType = surfaceTypeSelector.getValue();
+        if (selectedType != null && availableTypes.contains(selectedType)) {
             return selectedType;
         }
-        if (selectedSelection.get() != null
-                && (selectedSelection.get().kind() == RenderableKind.ROOM_VOLUME
-                || selectedSelection.get().kind() == RenderableKind.ROOM_FLOOR
-                || selectedSelection.get().kind() == RenderableKind.ROOM_CEILING)) {
-            if (selectedType != SurfaceType.FLOOR && selectedType != SurfaceType.CEILING) {
-                surfaceTypeSelector.setValue(SurfaceType.FLOOR);
-                return SurfaceType.FLOOR;
-            }
-            return selectedType;
+        if (availableTypes.contains(preferredRoomSurfaceType)) {
+            return preferredRoomSurfaceType;
         }
-        return selectedType;
+        return availableTypes.getFirst();
     }
 
     private Optional<Room> selectedRoom() {
@@ -3110,6 +3124,37 @@ public final class CadWorkbench extends BorderPane {
         return activeLevel.get().rooms().stream()
                 .filter(room -> room.id().toString().equals(selectedSelection.get().elementId()))
                 .findFirst();
+    }
+
+    private List<SurfaceType> availableSurfaceTypesForSelection() {
+        boolean hasWalls = !selectedWalls().isEmpty();
+        boolean hasSingleRoom = selectedSurfaceRoom().isPresent();
+        if (hasWalls && hasSingleRoom) {
+            return List.of(SurfaceType.WALL_INTERIOR);
+        }
+        if (hasWalls) {
+            return List.of(SurfaceType.WALL_EXTERIOR);
+        }
+        if (hasSingleRoom) {
+            return List.of(SurfaceType.FLOOR, SurfaceType.CEILING);
+        }
+        return List.of();
+    }
+
+    private void refreshSurfaceTypeSelector() {
+        List<SurfaceType> availableTypes = availableSurfaceTypesForSelection();
+        SurfaceType currentValue = surfaceTypeSelector.getValue();
+        if (!surfaceTypeSelector.getItems().equals(availableTypes)) {
+            surfaceTypeSelector.getItems().setAll(availableTypes);
+        }
+        SurfaceType preferredType = availableTypes.contains(preferredRoomSurfaceType)
+                ? preferredRoomSurfaceType
+                : availableTypes.stream().findFirst().orElse(null);
+        SurfaceType nextValue = currentValue != null && availableTypes.contains(currentValue) ? currentValue : preferredType;
+        if (surfaceTypeSelector.getValue() != nextValue) {
+            surfaceTypeSelector.setValue(nextValue);
+        }
+        surfaceTypeSelector.setDisable(availableTypes.size() <= 1);
     }
 
     private Optional<Room> selectedSurfaceRoom() {
@@ -3156,7 +3201,8 @@ public final class CadWorkbench extends BorderPane {
                 return Optional.of(new SurfaceSelectionContext(
                         surfaceType,
                         walls.stream().map(wall -> WallSurfaceTargetKey.interior(wall.id(), room.get().id())).toList(),
-                        "Fläche: Innenwand auf Raum `" + room.get().name() + "` und " + walls.size() + " Wand/Wände"
+                        "Fläche: Innenwand auf Raum `" + room.get().name() + "` und " + walls.size() + " Wand/Wände",
+                        "Innenwand-Beläge werden aus dem ausgewählten Raum auf die angrenzende Wandseite gelegt."
                 ));
             }
             if (selectedSurfaceRoom().isPresent()) {
@@ -3165,7 +3211,8 @@ public final class CadWorkbench extends BorderPane {
             return Optional.of(new SurfaceSelectionContext(
                     surfaceType,
                     walls.stream().map(wall -> wall.id().toString()).toList(),
-                    "Fläche: Außenwand auf " + walls.size() + " Wand/Wände"
+                    "Fläche: Außenwand auf " + walls.size() + " Wand/Wände",
+                    "Außenwand-Beläge werden nur auf raumfreie Wandseiten gelegt."
             ));
         }
         Optional<Room> room = selectedSurfaceRoom();
@@ -3175,7 +3222,10 @@ public final class CadWorkbench extends BorderPane {
         return Optional.of(new SurfaceSelectionContext(
                 surfaceType,
                 List.of(room.get().id().toString()),
-                "Fläche: " + surfaceType + " auf Raum `" + room.get().name() + "`"
+                "Fläche: " + (surfaceType == SurfaceType.CEILING ? "Decke" : "Boden") + " auf Raum `" + room.get().name() + "`",
+                surfaceType == SurfaceType.CEILING
+                        ? "Deckenbeläge wirken auf die Unterseite der Raumdecke."
+                        : "Bodenbeläge liegen oberhalb des Rohbodens innerhalb des ausgewählten Raums."
         ));
     }
 
@@ -3823,6 +3873,11 @@ public final class CadWorkbench extends BorderPane {
                 threeDViewport.renderedBodyCount(),
                 threeDViewport.hasVisibleSceneContent(),
                 threeDViewport.cameraStatusText(),
+                Optional.ofNullable(surfaceTypeSelector.getValue()).map(Enum::name).orElse(""),
+                String.join(",", surfaceTypeSelector.getItems().stream().map(Enum::name).toList()),
+                surfaceLayerTargetLabel.getText(),
+                surfaceLayerSelectionHintLabel.getText(),
+                surfaceLayerCoverageLabel.getText(),
                 draftLabel.getText(),
                 zoom,
                 offsetX,
@@ -3864,6 +3919,49 @@ public final class CadWorkbench extends BorderPane {
         activeWorkspaceMode.set(WorkspaceMode.valueOf(workspaceName.trim().toUpperCase(Locale.ROOT)));
         updateWorkspaceMode();
         refreshThreeDIfNeeded();
+    }
+
+    public void automationSetSurfaceType(String surfaceTypeName) {
+        SurfaceType targetType = SurfaceType.valueOf(surfaceTypeName.trim().toUpperCase(Locale.ROOT));
+        if (!surfaceTypeSelector.getItems().contains(targetType)) {
+            throw new IllegalArgumentException("Belagstyp `" + surfaceTypeName + "` passt nicht zur aktuellen Auswahl.");
+        }
+        surfaceTypeSelector.setValue(targetType);
+        updatePropertySectionVisibility();
+        render();
+    }
+
+    public void automationSelect(String kindName, int index, boolean toggle) {
+        SelectionKey selectionKey = switch (kindName.trim().toUpperCase(Locale.ROOT)) {
+            case "WALL" -> activeLevel.get().walls().stream()
+                    .skip(index)
+                    .findFirst()
+                    .map(wall -> new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()))
+                    .orElseThrow(() -> new IllegalArgumentException("Wandindex `" + index + "` ist ungültig."));
+            case "ROOM", "ROOM_VOLUME" -> activeLevel.get().rooms().stream()
+                    .skip(index)
+                    .findFirst()
+                    .map(room -> new SelectionKey(RenderableKind.ROOM_VOLUME, activeLevel.get().name(), room.id().toString()))
+                    .orElseThrow(() -> new IllegalArgumentException("Raumindex `" + index + "` ist ungültig."));
+            case "DOOR" -> activeLevel.get().doors().stream()
+                    .skip(index)
+                    .findFirst()
+                    .map(door -> new SelectionKey(RenderableKind.DOOR, activeLevel.get().name(), door.id().toString()))
+                    .orElseThrow(() -> new IllegalArgumentException("Türindex `" + index + "` ist ungültig."));
+            case "WINDOW" -> activeLevel.get().windows().stream()
+                    .skip(index)
+                    .findFirst()
+                    .map(window -> new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString()))
+                    .orElseThrow(() -> new IllegalArgumentException("Fensterindex `" + index + "` ist ungültig."));
+            case "STAIR" -> activeLevel.get().staircases().stream()
+                    .skip(index)
+                    .findFirst()
+                    .map(stair -> new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), stair.id().toString()))
+                    .orElseThrow(() -> new IllegalArgumentException("Treppenindex `" + index + "` ist ungültig."));
+            default -> throw new IllegalArgumentException("Bauteilart `" + kindName + "` wird von der Automatisierung nicht unterstützt.");
+        };
+        updateSelection(selectionKey, toggle);
+        render();
     }
 
     public void automationSetField(String fieldName, String value) {
@@ -3912,6 +4010,7 @@ public final class CadWorkbench extends BorderPane {
             case "exportLevelDxf" -> exportCurrentLevel(requirePath(path, actionName));
             case "importLevelDxf" -> importLevel(requirePath(path, actionName));
             case "importPartLibrary" -> importPartLibrary(requirePath(path, actionName));
+            case "exportWorkbenchSnapshot" -> exportWorkbenchSnapshot(requirePath(path, actionName));
             case "exportThreeDSnapshot" -> {
                 activeWorkspaceMode.set(WorkspaceMode.THREE_D);
                 updateWorkspaceMode();
@@ -4017,6 +4116,21 @@ public final class CadWorkbench extends BorderPane {
             default -> throw new IllegalArgumentException("Automatisierungsaktion `" + actionName + "` ist unbekannt.");
         }
         return result;
+    }
+
+    private void exportWorkbenchSnapshot(Path path) {
+        try {
+            Path parent = path.toAbsolutePath().getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            applyCss();
+            layout();
+            WritableImage image = snapshot(null, null);
+            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", path.toFile());
+        } catch (IOException exception) {
+            throw new IllegalStateException("Workbench-Snapshot konnte nicht geschrieben werden.", exception);
+        }
     }
 
     public void automationSetStatusText(String text) {
@@ -4125,7 +4239,7 @@ public final class CadWorkbench extends BorderPane {
                 || selectionKey.kind() == RenderableKind.STAIR;
     }
 
-    private record SurfaceSelectionContext(SurfaceType surfaceType, List<String> targetKeys, String label) {
+    private record SurfaceSelectionContext(SurfaceType surfaceType, List<String> targetKeys, String label, String hint) {
     }
 
     private MouseEvent mouseEvent(javafx.event.EventType<MouseEvent> type,
