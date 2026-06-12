@@ -7,6 +7,8 @@ import de.andreas.cadas.application.view.RenderableMesh;
 import de.andreas.cadas.application.view.RotationAxis;
 import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.application.view.ThreeDCameraController;
+import de.andreas.cadas.application.view.ThreeDSceneBounds;
+import de.andreas.cadas.application.view.ThreeDSceneFitService;
 import de.andreas.cadas.application.view.ThreeDSceneModel;
 import de.andreas.cadas.application.view.ThreeDSceneModelBuilder;
 import de.andreas.cadas.application.view.ThreeDViewPreparation;
@@ -45,8 +47,6 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -75,6 +75,7 @@ public final class ThreeDViewport extends BorderPane {
     private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
     private final ThreeDCameraController cameraController = new ThreeDCameraController();
+    private final ThreeDSceneFitService sceneFitService = new ThreeDSceneFitService();
     private final PerspectiveCamera perspectiveCamera = new PerspectiveCamera(true);
     private final Group worldRoot = new Group();
 
@@ -102,14 +103,14 @@ public final class ThreeDViewport extends BorderPane {
 
     private ProjectModel currentProject;
     private CameraPose cameraPose = viewPreparation.defaultPose();
+    private ThreeDSceneBounds sceneBounds = ThreeDSceneBounds.fallback(
+            5_000.0 * WORLD_SCALE,
+            3_000.0 * WORLD_SCALE,
+            5_000.0 * WORLD_SCALE
+    );
     private SelectionKey selectedSelection;
     private Set<SelectionKey> selectedSelections = Set.of();
     private boolean fitToSceneRequested = true;
-    private double sceneCenterX;
-    private double sceneCenterZ;
-    private double sceneSpanHorizontal;
-    private double sceneHeightMax;
-    private double sceneCenterY;
     private double dragStartX;
     private double dragStartY;
     private CameraPose dragStartPose;
@@ -180,11 +181,11 @@ public final class ThreeDViewport extends BorderPane {
         }
     }
 
-    public void applyViewOrientation(ViewOrientation viewOrientation) {
+    public void applyViewPreset(ThreeDViewPreset viewPreset) {
         cameraPose = viewPreparation.poseForAngles(
-                projectionModeSelector.getValue(),
-                viewOrientation.cameraAzimuthDegrees(),
-                viewOrientation.cameraElevationDegrees()
+                currentProjectionMode(),
+                viewPreset.cameraAzimuthDegrees(),
+                viewPreset.cameraElevationDegrees()
         );
         fitToSceneRequested = true;
         if (currentProject != null) {
@@ -194,10 +195,8 @@ public final class ThreeDViewport extends BorderPane {
         updateCamera();
     }
 
-    public void resetToCurrentOrientation() {
-        ProjectionMode projectionMode = projectionModeSelector.getValue() == null
-                ? ProjectionMode.PERSPECTIVE
-                : projectionModeSelector.getValue();
+    public void resetToDefaultView() {
+        ProjectionMode projectionMode = currentProjectionMode();
         CameraPose defaultPose = viewPreparation.defaultPose();
         cameraPose = new CameraPose(
                 projectionMode,
@@ -214,6 +213,10 @@ public final class ThreeDViewport extends BorderPane {
             return;
         }
         updateCamera();
+    }
+
+    public void centerCurrentView() {
+        fitCameraToScene();
     }
 
     public void resetElevationToZero() {
@@ -335,19 +338,13 @@ public final class ThreeDViewport extends BorderPane {
         Label title = new Label("3D-Ansicht");
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
         Button isometricViewButton = new Button("Iso");
-        isometricViewButton.setOnAction(event -> resetToCurrentOrientation());
-        Button topViewButton = new Button("Oben");
-        topViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.BOTTOM));
-        Button bottomViewButton = new Button("Unten");
-        bottomViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.TOP));
-        Button frontViewButton = new Button("Vorne");
-        frontViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.NORTH));
-        Button backViewButton = new Button("Hinten");
-        backViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.SOUTH));
-        Button rightViewButton = new Button("Rechts");
-        rightViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.WEST));
-        Button leftViewButton = new Button("Links");
-        leftViewButton.setOnAction(event -> applyViewOrientation(ViewOrientation.EAST));
+        isometricViewButton.setOnAction(event -> resetToDefaultView());
+        Button topViewButton = viewPresetButton(ThreeDViewPreset.TOP);
+        Button bottomViewButton = viewPresetButton(ThreeDViewPreset.BOTTOM);
+        Button frontViewButton = viewPresetButton(ThreeDViewPreset.FRONT);
+        Button backViewButton = viewPresetButton(ThreeDViewPreset.BACK);
+        Button rightViewButton = viewPresetButton(ThreeDViewPreset.RIGHT);
+        Button leftViewButton = viewPresetButton(ThreeDViewPreset.LEFT);
         Button orbitLeftButton = new Button("←");
         orbitLeftButton.setOnAction(event -> nudgeOrbit(15.0, 0.0));
         Button orbitRightButton = new Button("→");
@@ -357,14 +354,8 @@ public final class ThreeDViewport extends BorderPane {
         Button orbitDownButton = new Button("↓");
         orbitDownButton.setOnAction(event -> nudgeOrbit(0.0, -8.0));
         Button fitSceneButton = new Button("Modell einpassen");
-        fitSceneButton.setOnAction(event -> fitCameraToScene());
-        applyTooltip(isometricViewButton, "Setzt auf die Standardansicht zurück (Azimut 45°, Elevation 0°, Abstand 9 m) – Höhe, Tiefe und Breite gleichzeitig sichtbar.");
-        applyTooltip(topViewButton, "Wechselt die 3D-Kamera auf eine Draufsicht.");
-        applyTooltip(bottomViewButton, "Wechselt die 3D-Kamera auf eine Untersicht.");
-        applyTooltip(frontViewButton, "Wechselt die 3D-Kamera auf eine Vorderansicht.");
-        applyTooltip(backViewButton, "Wechselt die 3D-Kamera auf eine Rückansicht.");
-        applyTooltip(rightViewButton, "Wechselt die 3D-Kamera auf eine rechte Seitenansicht.");
-        applyTooltip(leftViewButton, "Wechselt die 3D-Kamera auf eine linke Seitenansicht.");
+        fitSceneButton.setOnAction(event -> centerCurrentView());
+        applyTooltip(isometricViewButton, "Setzt auf die räumliche Standardansicht zurück und passt das Modell in dieser Orientierung ein.");
         applyTooltip(orbitLeftButton, "Dreht die 3D-Kamera schrittweise nach links.");
         applyTooltip(orbitRightButton, "Dreht die 3D-Kamera schrittweise nach rechts.");
         applyTooltip(orbitUpButton, "Hebt die 3D-Kamera schrittweise an.");
@@ -498,17 +489,20 @@ public final class ThreeDViewport extends BorderPane {
         modelGroup.getChildren().addAll(groupedByLevel.values());
         sceneStatsLabel.setText("3D-Szene: " + lastRenderedBodyCount + " Körper");
         if (sceneModel.boxes().isEmpty() && sceneModel.meshes().isEmpty()) {
-            sceneCenterX = 0.0;
-            sceneCenterZ = 0.0;
-            sceneSpanHorizontal = 5_000.0 * WORLD_SCALE;
-            sceneHeightMax = 3_000.0 * WORLD_SCALE;
-            sceneCenterY = 0.0;
+            sceneBounds = ThreeDSceneBounds.fallback(
+                    5_000.0 * WORLD_SCALE,
+                    3_000.0 * WORLD_SCALE,
+                    5_000.0 * WORLD_SCALE
+            );
         } else {
-            sceneCenterX = (minX + maxX) / 2.0;
-            sceneCenterZ = (minZ + maxZ) / 2.0;
-            sceneSpanHorizontal = Math.max(1_500.0 * WORLD_SCALE, Math.max(maxX - minX, maxZ - minZ));
-            sceneHeightMax = Math.max(1_500.0 * WORLD_SCALE, maxY - minY);
-            sceneCenterY = (minY + maxY) / 2.0;
+            sceneBounds = ThreeDSceneBounds.fromExtents(
+                    minX,
+                    maxX,
+                    minY,
+                    maxY,
+                    minZ,
+                    maxZ
+            );
         }
     }
 
@@ -584,7 +578,7 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void automationFitToScene() {
-        fitCameraToScene();
+        centerCurrentView();
     }
 
     public void setProjectionMode(ProjectionMode projectionMode) {
@@ -626,9 +620,9 @@ public final class ThreeDViewport extends BorderPane {
         sb.append("model=").append(modelGroup.getTransforms()).append("|");
         sb.append("scene=").append(sceneGroup.getTransforms()).append("|");
         sb.append("worldRoot=").append(worldRoot.getChildren().size()).append("|");
-        sb.append("camDistMM=").append(cameraPose.distance()).append("|");
-        sb.append("sceneSpan=").append(sceneSpanHorizontal).append("|");
-        sb.append("sceneHeight=").append(sceneHeightMax).append("|");
+        sb.append("camDistMM=").append(worldUnitsToMillimeters(cameraPose.distance())).append("|");
+        sb.append("sceneSpanMM=").append(worldUnitsToMillimeters(sceneBounds.horizontalSpan())).append("|");
+        sb.append("sceneHeightMM=").append(worldUnitsToMillimeters(sceneBounds.spanY())).append("|");
         return sb.toString();
     }
 
@@ -767,7 +761,7 @@ public final class ThreeDViewport extends BorderPane {
         // Norden (großes Plan-Y) in der Draufsicht korrekt unten dargestellt.
         modelGroup.getTransforms().setAll(
                 new Scale(1.0, 1.0, -1.0),
-                new Translate(-sceneCenterX, -sceneCenterY, sceneCenterZ)
+                new Translate(-sceneBounds.centerX(), -sceneBounds.centerY(), sceneBounds.centerZ())
         );
         orbitGroup.getTransforms().setAll(
                 new Rotate(-cameraPose.azimuthDegrees(), Rotate.Y_AXIS),
@@ -801,10 +795,10 @@ public final class ThreeDViewport extends BorderPane {
                 projName,
                 cameraPose.azimuthDegrees(),
                 cameraPose.elevationDegrees(),
-                cameraPose.distance() / 1000.0,
-                cameraPose.panX(),
-                cameraPose.panY(),
-                sceneSpanHorizontal
+                worldUnitsToMillimeters(cameraPose.distance()) / 1000.0,
+                worldUnitsToMillimeters(cameraPose.panX()),
+                worldUnitsToMillimeters(cameraPose.panY()),
+                worldUnitsToMillimeters(sceneBounds.horizontalSpan())
         ));
     }
 
@@ -815,7 +809,7 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private void fitCameraToScene() {
-        if (sceneSpanHorizontal <= 0.0) {
+        if (!sceneBounds.hasContent()) {
             return;
         }
 
@@ -823,18 +817,19 @@ public final class ThreeDViewport extends BorderPane {
                 ? ORTHO_FOV_DEGREES : DEFAULT_PERSPECTIVE_FOV_DEGREES;
         double padding = cameraPose.projectionMode() == ProjectionMode.ORTHOGRAPHIC
                 ? ORTHO_FIT_PADDING : PERSPECTIVE_FIT_PADDING;
-
-        perspectiveCamera.setFieldOfView(fov);
-        double halbeBildHoehe = Math.tan(Math.toRadians(fov / 2.0));
-        double elevation = Math.abs(cameraPose.elevationDegrees());
-        boolean isTopDownView = elevation > 80.0;
-        double modelHalfHorizontalUnits = sceneSpanHorizontal / 2.0;
-        double horizontalAbstand = (modelHalfHorizontalUnits * padding) / halbeBildHoehe;
-        double modelHeightUnits = isTopDownView ? sceneSpanHorizontal : sceneHeightMax;
-        double heightAbstand = (modelHeightUnits * padding) / (2.0 * halbeBildHoehe);
-        double benoetigterAbstandUnits = Math.max(horizontalAbstand, heightAbstand) + 20.0;
-        double clamped = Math.max(MIN_CAMERA_DISTANCE_UNITS,
-                Math.min(MAX_CAMERA_DISTANCE_UNITS, benoetigterAbstandUnits));
+        double viewportWidth = subScene.getWidth() > 0.0 ? subScene.getWidth() : getWidth();
+        double viewportHeight = subScene.getHeight() > 0.0 ? subScene.getHeight() : getHeight();
+        double clamped = sceneFitService.calculateDistance(
+                sceneBounds,
+                cameraPose,
+                viewportWidth,
+                viewportHeight,
+                fov,
+                padding,
+                20.0,
+                MIN_CAMERA_DISTANCE_UNITS,
+                MAX_CAMERA_DISTANCE_UNITS
+        );
 
         cameraPose = new CameraPose(
                 cameraPose.projectionMode(),
@@ -854,5 +849,22 @@ public final class ThreeDViewport extends BorderPane {
         tooltip.setWrapText(true);
         tooltip.setMaxWidth(320);
         Tooltip.install(node, tooltip);
+    }
+
+    private ProjectionMode currentProjectionMode() {
+        return projectionModeSelector.getValue() == null
+                ? cameraPose.projectionMode()
+                : projectionModeSelector.getValue();
+    }
+
+    private Button viewPresetButton(ThreeDViewPreset viewPreset) {
+        Button button = new Button(viewPreset.label());
+        button.setOnAction(event -> applyViewPreset(viewPreset));
+        applyTooltip(button, viewPreset.tooltip());
+        return button;
+    }
+
+    private double worldUnitsToMillimeters(double worldUnits) {
+        return worldUnits / WORLD_SCALE;
     }
 }

@@ -34,7 +34,7 @@ class ThreeDViewportRenderTest {
         Assertions.assertFalse(scene.boxes().isEmpty(), "Es müssen 3D-Körper vorliegen.");
         Assertions.assertTrue(scene.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.WALL),
                 "Es müssen Wände vorhanden sein.");
-        Assertions.assertTrue(scene.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_FLOOR),
+        Assertions.assertTrue(scene.meshes().stream().anyMatch(mesh -> mesh.kind() == RenderableKind.ROOM_FLOOR),
                 "Es muss ein Raum-Boden vorhanden sein.");
         Assertions.assertTrue(
                 scene.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_CEILING)

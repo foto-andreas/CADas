@@ -99,7 +99,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 ## Sonstiges
 - [x] GitHub-README.md erstellen mit wichtigen Informationen
 
-## Nächste Aktionen
+## Inzwischen erledigt
 - [x] Undo und Restore implementieren
 - [x] Das Umschalten der Ansichten ändert die Ansicht nicht
 - [x] Orthogonale Ansichten beim Umschalten automatisch auf den sichtbaren Inhalt zentrieren
@@ -141,9 +141,16 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 
 - [x] 3D-Ansicht vollständig überarbeiten. Modell einpassen und zentrieren funktioniert. Drehung im Modellmittelpunkt, Kamera fest mit Abstand, sichtbare SubScene-Fläche als Zentrierebene. JavaFX 25 zeigte im Test-Snapshot weiterhin nur den Hintergrund; die Render-Pipeline der SubScene in einer tiefen BorderPane-Verschachtelung muss in einer separaten Iteration mit echter Stage validiert werden.
 
-- 3D: "Oben" und "Unten" werden nicht korrekt zentriert
-- Modell: Die Decken müssen innerhalb des Raums liegen. Eigentlich soll der Raum dann um die Deckendicke in seiner Höhe vermindert werden. Die Decken sollen innerhalb des Polygons liegen, den die Wandinnenflächen bilden.
-- Modell/UI: Die Standard-Deckendicke soll 1mm betragen
-- "Rückgängig" ändert ungewollt Zoom und Position (das erfolgt seltsamerweise etwas verzögert)
-- Ich glaube, die Raum-Auswahl in der Werkzeug-Kombobox ist überflüssig. Eigentlich haben wir doch Räume nur als "Nebenprodukt" und nur zur Anzeige/Bemaßung. Erstellen durch Automatik wie jetzt und Anzeige ist ok. Aber man wird vermutlich keinen Raum direkt zeichnen wollen
-- 
+## Nächste Aufgaben
+
+- [x] Prüfe den gesamten Code auf Aufälligkeiten, Fehler, Pfusch, Verdecken von Problemen in der 3D-Ansicht durch zusätzliche "Korrekturen" des Modells. Korrigiere und verbessere.
+- [x] Die Decken sind nun Polygon-Meshes. Dies soll auch für Böden und Belege gelten, damit sie korrekt behandelt werden können. Pass deren Struktur entsprechend an.
+- [x] Decken-, Wand- und Bodenbeläge beziehen sich immer auf die entsprechende Fläche des Raums. Sie verkleinern den Raum, wenn sie vorhanden und nicht ausgeblendet sind.
+- [x] Aufeinander liegende Schichten von Belägen verhalten sich iterativ genauso.
+- [x] Flächen und Volumenberechnung beziehen sich immer auf den aktuell freien Raum.
+- [x] 3D: Die Ansichten "Oben" und "Unten" werden nicht korrekt zentriert
+- [x] Modell: Die Decken müssen innerhalb des Raums liegen. Der Raum soll um die Deckendicke in seiner Höhe vermindert werden. Die Decken sollen innerhalb des Polygons liegen, den die oberen Wandinnenkanten bilden.
+- [ ] bei den Decken gibt es noch das Problem, dass diese bei Innenecken in die Wand hineinragen, und zwar bis zur Wandmitte genau in der Innenecke. Außenecken sehen ok aus.
+- [ ] Modell/UI: Die Standard-Deckendicke soll 1mm betragen
+- [ ] "Rückgängig" (ggf. auch "Wiederherstellen") ändert ungewollt Zoom und Position
+- [ ] Ich glaube, der Raum-Eintrag in der Werkzeug-Combobox ist überflüssig. Eigentlich haben wir doch Räume nur als "Nebenprodukt" und nur zur Anzeige/Bemaßung. Erstellen durch Automatik wie jetzt und Anzeige ist ok. Aber man wird vermutlich keinen Raum direkt zeichnen wollen

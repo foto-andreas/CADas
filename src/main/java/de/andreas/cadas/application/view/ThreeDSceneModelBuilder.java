@@ -63,7 +63,7 @@ public final class ThreeDSceneModelBuilder {
                     .max()
                     .orElse(0.0);
             double wallBaseHeight = baseHeight + floorOffset;
-            boxes.addAll(buildRoomFloor(level, baseHeight, surfaceRenderingMode));
+            buildRoomFloor(level, baseHeight);
             boxes.addAll(buildWallFoundations(level, baseHeight));
             boxes.addAll(buildRoomInteriors(level, baseHeight, renderSurfaceLayers, surfaceRenderingMode));
             boxes.addAll(buildWalls(level, wallBaseHeight, surfaceRenderingMode));
@@ -103,30 +103,24 @@ public final class ThreeDSceneModelBuilder {
         return Math.max(wallHeight, Math.max(roomHeight, stairHeight));
     }
 
-    private List<RenderableBox> buildRoomFloor(Level level, double baseHeight, boolean surfaceRenderingMode) {
-        List<RenderableBox> boxes = new ArrayList<>();
+    private void buildRoomFloor(Level level, double baseHeight) {
         for (Room room : level.rooms()) {
             double floorThickness = room.floorThickness().toMillimeters();
-            if (floorThickness <= 0.0) continue;
-            for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : roomRectangles(room)) {
-                boxes.add(new RenderableBox(
-                        new SelectionKey(RenderableKind.ROOM_FLOOR, level.name(), room.id().toString()),
-                        level.name(),
-                        RenderableKind.ROOM_FLOOR,
-                        rectangle.centerX(),
-                        baseHeight + floorThickness / 2.0,
-                        rectangle.centerY(),
-                        rectangle.width(),
-                        floorThickness,
-                        rectangle.height(),
-                        RotationAxis.Y,
-                        0.0,
-                        "room-floor",
-                        1.0
-                ));
+            if (floorThickness <= 0.0) {
+                continue;
             }
+            addFlatSurfaceMesh(
+                    new SelectionKey(RenderableKind.ROOM_FLOOR, level.name(), room.id().toString()),
+                    level.name(),
+                    RenderableKind.ROOM_FLOOR,
+                    roomRectangles(room),
+                    baseHeight,
+                    floorThickness,
+                    floorThickness,
+                    "room-floor",
+                    1.0
+            );
         }
-        return boxes;
     }
 
     private List<RenderableBox> buildWallFoundations(Level level, double baseHeight) {
@@ -191,41 +185,23 @@ public final class ThreeDSceneModelBuilder {
     private void buildFlatRoomCeilingMesh(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles, boolean surfaceRenderingMode) {
         double ceilingThickness = Math.max(0.1, room.ceilingThickness().toMillimeters());
         double baseY = baseHeight + room.floorThickness().toMillimeters() + room.maximumCeilingHeightMillimeters();
-        List<Float> vertexValues = new ArrayList<>();
-        for (OrthogonalPolygonDecompositionService.CellRectangle r : rectangles) {
-            float x0 = (float) r.minX();
-            float x1 = (float) r.maxX();
-            float z0 = (float) r.minY();
-            float z1 = (float) r.maxY();
-            vertexValues.add(x0); vertexValues.add(0f); vertexValues.add(z0);
-            vertexValues.add(x1); vertexValues.add(0f); vertexValues.add(z0);
-            vertexValues.add(x1); vertexValues.add(0f); vertexValues.add(z1);
-            vertexValues.add(x0); vertexValues.add(0f); vertexValues.add(z0);
-            vertexValues.add(x1); vertexValues.add(0f); vertexValues.add(z1);
-            vertexValues.add(x0); vertexValues.add(0f); vertexValues.add(z1);
-        }
-        float[] points = new float[vertexValues.size()];
-        for (int index = 0; index < vertexValues.size(); index++) {
-            points[index] = vertexValues.get(index);
-        }
-        meshes.add(new RenderableMesh(
+        addFlatSurfaceMesh(
                 new SelectionKey(RenderableKind.ROOM_CEILING, level.name(), room.id().toString()),
                 level.name(),
                 RenderableKind.ROOM_CEILING,
-                points,
-                rectangles.size() * 2,
+                rectangles,
                 baseY,
+                0.0,
                 ceilingThickness,
                 "room-ceiling",
                 surfaceRenderingMode ? 1.0 : 1.0
-        ));
+        );
     }
 
     private List<RenderableBox> buildFlatRoomVolume(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles) {
         List<RenderableBox> boxes = new ArrayList<>();
-        double floorTop = baseHeight + room.floorThickness().toMillimeters();
-        double ceilingBottom = floorTop + room.maximumCeilingHeightMillimeters();
-        double volumeHeight = Math.max(1.0, ceilingBottom - floorTop);
+        double floorTop = baseHeight + surfaceLayerEffectService.effectiveFloorThickness(level, room).toMillimeters();
+        double volumeHeight = Math.max(1.0, surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(level, room));
         for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
             boxes.add(new RenderableBox(
                     new SelectionKey(RenderableKind.ROOM_VOLUME, level.name(), room.id().toString()),
@@ -270,23 +246,17 @@ public final class ThreeDSceneModelBuilder {
                 continue;
             }
             double layerTopHeight = currentHeight + layer.thickness().toMillimeters();
-            for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
-                boxes.add(new RenderableBox(
-                        new SelectionKey(RenderableKind.SURFACE_LAYER, level.name(), layer.id().toString()),
-                        level.name(),
-                        RenderableKind.SURFACE_LAYER,
-                        rectangle.centerX(),
-                        currentHeight + layer.thickness().toMillimeters() / 2.0,
-                        rectangle.centerY(),
-                        rectangle.width(),
-                        layer.thickness().toMillimeters(),
-                        rectangle.height(),
-                        RotationAxis.Y,
-                        0.0,
-                        "surface-layer",
-                        SURFACE_LAYER_OPACITY
-                ));
-            }
+            addFlatSurfaceMesh(
+                    new SelectionKey(RenderableKind.SURFACE_LAYER, level.name(), layer.id().toString()),
+                    level.name(),
+                    RenderableKind.SURFACE_LAYER,
+                    rectangles,
+                    currentHeight,
+                    layer.thickness().toMillimeters(),
+                    layer.thickness().toMillimeters(),
+                    "surface-layer",
+                    SURFACE_LAYER_OPACITY
+            );
             boxes.addAll(buildJoints(room, layer, rectangles, layerTopHeight));
             currentHeight = layerTopHeight;
         }
@@ -406,28 +376,67 @@ public final class ThreeDSceneModelBuilder {
                 ));
             } else {
                 double layerBottomHeight = baseHeight + room.floorThickness().toMillimeters() + room.roomHeight().toMillimeters() - offsetFromCeiling;
-                for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
-                    boxes.add(new RenderableBox(
-                            new SelectionKey(RenderableKind.SURFACE_LAYER, level.name(), layer.id().toString()),
-                            level.name(),
-                            RenderableKind.SURFACE_LAYER,
-                            rectangle.centerX(),
-                            layerBottomHeight - layer.thickness().toMillimeters() / 2.0,
-                            rectangle.centerY(),
-                            rectangle.width(),
-                            layer.thickness().toMillimeters(),
-                            rectangle.height(),
-                            RotationAxis.Y,
-                            0.0,
-                            "surface-layer",
-                            SURFACE_LAYER_OPACITY
-                    ));
-                }
+                addFlatSurfaceMesh(
+                        new SelectionKey(RenderableKind.SURFACE_LAYER, level.name(), layer.id().toString()),
+                        level.name(),
+                        RenderableKind.SURFACE_LAYER,
+                        rectangles,
+                        layerBottomHeight - layer.thickness().toMillimeters(),
+                        0.0,
+                        layer.thickness().toMillimeters(),
+                        "surface-layer",
+                        SURFACE_LAYER_OPACITY
+                );
                 boxes.addAll(buildJoints(room, layer, rectangles, layerBottomHeight - layer.thickness().toMillimeters()));
             }
             offsetFromCeiling += layer.thickness().toMillimeters();
         }
         return boxes;
+    }
+
+    private void addFlatSurfaceMesh(
+            SelectionKey selectionKey,
+            String levelName,
+            RenderableKind kind,
+            List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles,
+            double baseY,
+            double surfaceOffsetY,
+            double height,
+            String materialKey,
+            double opacity
+    ) {
+        List<Float> vertexValues = new ArrayList<>();
+        float surfaceY = (float) surfaceOffsetY;
+        for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
+            float x0 = (float) rectangle.minX();
+            float x1 = (float) rectangle.maxX();
+            float z0 = (float) rectangle.minY();
+            float z1 = (float) rectangle.maxY();
+            vertexValues.add(x0); vertexValues.add(surfaceY); vertexValues.add(z0);
+            vertexValues.add(x1); vertexValues.add(surfaceY); vertexValues.add(z0);
+            vertexValues.add(x1); vertexValues.add(surfaceY); vertexValues.add(z1);
+            vertexValues.add(x0); vertexValues.add(surfaceY); vertexValues.add(z0);
+            vertexValues.add(x1); vertexValues.add(surfaceY); vertexValues.add(z1);
+            vertexValues.add(x0); vertexValues.add(surfaceY); vertexValues.add(z1);
+        }
+        if (vertexValues.isEmpty()) {
+            return;
+        }
+        float[] points = new float[vertexValues.size()];
+        for (int index = 0; index < vertexValues.size(); index++) {
+            points[index] = vertexValues.get(index);
+        }
+        meshes.add(new RenderableMesh(
+                selectionKey,
+                levelName,
+                kind,
+                points,
+                rectangles.size() * 2,
+                baseY,
+                height,
+                materialKey,
+                opacity
+        ));
     }
 
     private boolean matchesRoom(SurfaceLayerStack stack, Room room) {
@@ -456,7 +465,7 @@ public final class ThreeDSceneModelBuilder {
                 level.name(),
                 room,
                 rectangles,
-                baseHeight + room.floorThickness().toMillimeters(),
+                baseHeight + surfaceLayerEffectService.effectiveFloorThickness(level, room).toMillimeters(),
                 0.0,
                 "room-volume",
                 ROOM_VOLUME_OPACITY,
@@ -516,7 +525,7 @@ public final class ThreeDSceneModelBuilder {
                 }
                 double ceilingHeightAtPoint = room.ceilingHeightAt(new PlanPoint(centerX, centerZ));
                 double visibleHeight = "room-volume".equals(materialKey)
-                        ? ceilingHeightAtPoint - room.ceilingThickness().toMillimeters()
+                        ? surfaceLayerEffectService.effectiveHeightAt(level, room, new PlanPoint(centerX, centerZ))
                         : ceilingHeightAtPoint;
                 double height = sliceThickness > 0.0 ? sliceThickness : Math.max(40.0, visibleHeight);
                 double centerY = sliceThickness > 0.0
