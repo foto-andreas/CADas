@@ -1,6 +1,7 @@
 package de.andreas.cadas.infrastructure.dxf;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.andreas.cadas.domain.geometry.Length;
@@ -178,6 +179,53 @@ class DxfLevelExchangeServiceTest {
         assertEquals("PutZ", importedCeiling.layers().getFirst().name());
         assertEquals(SurfaceLayoutMode.FIXED, importedCeiling.layers().getFirst().layoutMode());
         assertEquals(500.0, importedCeiling.layers().getFirst().layoutOffset().toMillimeters(), 0.001);
+    }
+
+    @Test
+    void erhaeltSonderzeichenInMetadatenVerlustfrei() throws Exception {
+        Level level = new Level("Sonderzeichen");
+        Room room = Room.rectangular(
+                "Bad | Küche/Flur ä\nNord",
+                new PlanPoint(0, 0),
+                new PlanPoint(3000, 2500),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(
+                java.util.UUID.randomUUID(),
+                SurfaceType.FLOOR,
+                "Raum/" + room.id() + "|Boden"
+        );
+        stack.addLayer(new SurfaceLayer(
+                java.util.UUID.randomUUID(),
+                "Belag | Eiche/hell",
+                Length.of(12, LengthUnit.MILLIMETER),
+                true,
+                Length.of(600, LengthUnit.MILLIMETER),
+                Length.of(300, LengthUnit.MILLIMETER),
+                SurfaceLayoutMode.FIXED,
+                Length.of(100, LengthUnit.MILLIMETER),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.of(2, LengthUnit.MILLIMETER),
+                "Quelle | DWG/Block"
+        ));
+        level.addSurfaceLayerStack(stack);
+
+        Path file = tempDir.resolve("sonderzeichen.dxf");
+        exchangeService.exportLevel(level, file);
+        String dxf = Files.readString(file);
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertTrue(dxf.contains("CADAS_DXF|2"));
+        assertFalse(dxf.contains("Bad | Küche/Flur"));
+        assertEquals("Bad | Küche/Flur ä\nNord", imported.rooms().getFirst().name());
+        assertEquals("Raum/" + room.id() + "|Boden", imported.surfaceLayerStacks().getFirst().targetKey());
+        assertEquals("Belag | Eiche/hell", imported.surfaceLayerStacks().getFirst().layers().getFirst().name());
+        assertEquals("Quelle | DWG/Block", imported.surfaceLayerStacks().getFirst().layers().getFirst().coveringSource());
     }
 
     @Test

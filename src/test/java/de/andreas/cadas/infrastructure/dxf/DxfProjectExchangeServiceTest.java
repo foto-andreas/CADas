@@ -20,6 +20,7 @@ import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
 import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -194,6 +195,78 @@ class DxfProjectExchangeServiceTest {
         assertTrue(dxf.contains("\n0\nINSERT\n"));
         assertTrue(dxf.contains("\n2\nCADAS_STAIR\n"));
         assertEquals("Importname", imported.name());
+    }
+
+    @Test
+    void erhaeltSonderzeichenInProjektEtageUndRaum() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus | Süd/West.dxf", "EG | Wohnen/Kochen");
+        project.primaryLevel().addRoom(Room.rectangular(
+                "Küche | Essen/Kind",
+                new PlanPoint(0, 0),
+                new PlanPoint(3500, 3000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        ));
+
+        Path file = tempDir.resolve("projekt-sonderzeichen.dxf");
+        exchangeService.exportProject(project, file);
+        String dxf = Files.readString(file);
+        ProjectModel imported = exchangeService.importProject(file, "Fallback");
+
+        assertTrue(dxf.contains("CADAS_DXF|2"));
+        assertFalse(dxf.contains("Haus | Süd/West"));
+        assertEquals("Haus | Süd/West", imported.name());
+        assertEquals("EG | Wohnen/Kochen", imported.primaryLevel().name());
+        assertEquals("Küche | Essen/Kind", imported.primaryLevel().rooms().getFirst().name());
+    }
+
+    @Test
+    void ignoriertBeschaedigteMetadatenEintraegeBeimProjektimport() throws Exception {
+        Path file = tempDir.resolve("beschaedigte-metadaten.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                CADAS_DXF|2
+                ABC
+                wird ignoriert
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                PROJECT|Robustes+Haus
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                LEVEL|Erdgeschoss
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WALL|Erdgeschoss
+                0
+                ENDSEC
+                0
+                EOF
+                """);
+
+        ProjectModel imported = exchangeService.importProject(file, "Fallback");
+
+        assertEquals("Robustes Haus", imported.name());
+        assertEquals(1, imported.levels().size());
+        assertEquals("Erdgeschoss", imported.primaryLevel().name());
+        assertTrue(imported.primaryLevel().walls().isEmpty());
     }
 
     @Test
