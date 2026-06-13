@@ -1444,6 +1444,7 @@ public final class CadWorkbench extends BorderPane {
         }
         drawRooms(graphics);
         drawWalls(graphics);
+        drawWallSurfaceLayers(graphics);
         drawStaircases(graphics);
         drawDoors(graphics);
         drawWindows(graphics);
@@ -1545,6 +1546,221 @@ public final class CadWorkbench extends BorderPane {
                 drawDimensionLabel(graphics, wall.axis(), wall.axis().length().format(LengthUnit.METER, 2));
             }
         }
+    }
+
+    private void drawWallSurfaceLayers(GraphicsContext graphics) {
+        if (projectionService.isPlanView(activeView.get())) {
+            drawWallSurfaceLayersInPlan(graphics);
+        } else {
+            drawWallSurfaceLayersInElevation(graphics);
+        }
+    }
+
+    private void drawWallSurfaceLayersInPlan(GraphicsContext graphics) {
+        for (Wall wall : activeLevel.get().walls()) {
+            activeLevel.get().surfaceLayerStacks().stream()
+                    .filter(stack -> stack.surfaceType() == SurfaceType.WALL_INTERIOR)
+                    .filter(stack -> WallSurfaceTargetKey.matchesWall(stack.targetKey(), wall.id()))
+                    .forEach(stack -> drawWallSurfaceStackInPlan(graphics, wall, stack));
+        }
+    }
+
+    private void drawWallSurfaceStackInPlan(GraphicsContext graphics, Wall wall, SurfaceLayerStack stack) {
+        double cumulativeThickness = wall.thickness().toMillimeters() / 2.0;
+        WallSurfaceSideService.WallLayerSides sides = wallSurfaceSideService.resolve(activeLevel.get(), wall, stack.surfaceType(), stack.targetKey());
+        for (SurfaceLayer layer : stack.layers()) {
+            double layerThickness = layer.thickness().toMillimeters();
+            if (layer.visible() && layerThickness > 0.0) {
+                double centerOffset = cumulativeThickness + layerThickness / 2.0;
+                if (sides.positiveSide()) {
+                    drawWallSurfaceLayerInPlan(graphics, wall, layer, centerOffset);
+                }
+                if (sides.negativeSide()) {
+                    drawWallSurfaceLayerInPlan(graphics, wall, layer, -centerOffset);
+                }
+            }
+            cumulativeThickness += layerThickness;
+        }
+    }
+
+    private void drawWallSurfaceLayerInPlan(GraphicsContext graphics, Wall wall, SurfaceLayer layer, double centerOffset) {
+        double wallLength = wall.axis().length().toMillimeters();
+        if (wallLength <= 0.0) {
+            return;
+        }
+        PlanPoint start = wallOffsetPoint(wall, 0.0, centerOffset);
+        PlanPoint end = wallOffsetPoint(wall, wallLength, centerOffset);
+        graphics.save();
+        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.SQUARE);
+        graphics.setStroke(Color.color(0.72, 0.58, 0.34, 0.82));
+        graphics.setLineWidth(Math.max(2.0, layer.thickness().toMillimeters() * scale()));
+        graphics.strokeLine(
+                toScreenProjectedX(start, 0.0),
+                toScreenProjectedY(start, 0.0),
+                toScreenProjectedX(end, 0.0),
+                toScreenProjectedY(end, 0.0)
+        );
+        drawWallSurfaceJointsInPlan(graphics, wall, layer, centerOffset);
+        graphics.restore();
+    }
+
+    private void drawWallSurfaceJointsInPlan(GraphicsContext graphics, Wall wall, SurfaceLayer layer, double centerOffset) {
+        double wallLength = wall.axis().length().toMillimeters();
+        double jointWidth = layer.jointWidth().toMillimeters();
+        if (jointWidth < 0.001 || layer.tileWidth().toMillimeters() * scale() < 14.0) {
+            return;
+        }
+        TileLayoutRequest request = new TileLayoutRequest(
+                Length.ofMillimeters(wallLength),
+                Length.ofMillimeters(wall.maximumHeightMillimeters()),
+                layer.tileWidth(),
+                layer.tileHeight(),
+                layer.layoutMode(),
+                layer.layoutOffset(),
+                layer.minimumOffset(),
+                layer.minimumEdgeWidth(),
+                layer.minimumStartEndMargin()
+        );
+        graphics.setStroke(Color.color(0.20, 0.15, 0.09, 0.72));
+        graphics.setLineWidth(Math.max(0.8, jointWidth * scale()));
+        double sideSign = centerOffset < 0.0 ? -1.0 : 1.0;
+        var jointPositions = new java.util.HashSet<String>();
+        for (TilePlacement tile : tileLayoutService.fillSurface(request)) {
+            double jointPosition = tile.xOffset().toMillimeters() + tile.width().toMillimeters();
+            if (jointPosition <= 0.001 || jointPosition >= wallLength - 0.001) {
+                continue;
+            }
+            String key = String.format(Locale.US, "%.3f", jointPosition);
+            if (!jointPositions.add(key)) {
+                continue;
+            }
+            PlanPoint from = wallOffsetPoint(wall, jointPosition, centerOffset - sideSign * layer.thickness().toMillimeters() / 2.0);
+            PlanPoint to = wallOffsetPoint(wall, jointPosition, centerOffset + sideSign * layer.thickness().toMillimeters() / 2.0);
+            graphics.strokeLine(
+                    toScreenProjectedX(from, 0.0),
+                    toScreenProjectedY(from, 0.0),
+                    toScreenProjectedX(to, 0.0),
+                    toScreenProjectedY(to, 0.0)
+            );
+        }
+    }
+
+    private void drawWallSurfaceLayersInElevation(GraphicsContext graphics) {
+        for (Wall wall : activeLevel.get().walls()) {
+            activeLevel.get().surfaceLayerStacks().stream()
+                    .filter(stack -> stack.surfaceType() == SurfaceType.WALL_INTERIOR)
+                    .filter(stack -> WallSurfaceTargetKey.matchesWall(stack.targetKey(), wall.id()))
+                    .forEach(stack -> drawWallSurfaceStackInElevation(graphics, wall, stack));
+        }
+    }
+
+    private void drawWallSurfaceStackInElevation(GraphicsContext graphics, Wall wall, SurfaceLayerStack stack) {
+        WallSurfaceSideService.WallLayerSides sides = wallSurfaceSideService.resolve(activeLevel.get(), wall, stack.surfaceType(), stack.targetKey());
+        if (!sides.positiveSide() && !sides.negativeSide()) {
+            return;
+        }
+        for (SurfaceLayer layer : stack.layers()) {
+            if (layer.visible()) {
+                drawWallSurfaceLayerInElevation(graphics, wall, layer);
+            }
+        }
+    }
+
+    private void drawWallSurfaceLayerInElevation(GraphicsContext graphics, Wall wall, SurfaceLayer layer) {
+        double wallLength = wall.axis().length().toMillimeters();
+        double startHorizontal = projectHorizontal(wall.axis().start(), 0.0);
+        double endHorizontal = projectHorizontal(wall.axis().end(), 0.0);
+        if (wallLength <= 0.0 || Math.abs(endHorizontal - startHorizontal) < 10.0) {
+            return;
+        }
+        double startX = toScreenHorizontal(startHorizontal);
+        double endX = toScreenHorizontal(endHorizontal);
+        double floorY = toScreenVertical(0.0);
+        double startTopY = toScreenProjectedY(wall.axis().start(), wall.heightAtStart());
+        double endTopY = toScreenProjectedY(wall.axis().end(), wall.heightAtEnd());
+        graphics.save();
+        graphics.setFill(Color.color(0.72, 0.58, 0.34, 0.26));
+        graphics.fillPolygon(
+                new double[]{startX, endX, endX, startX},
+                new double[]{floorY, floorY, endTopY, startTopY},
+                4
+        );
+        graphics.setStroke(Color.color(0.47, 0.36, 0.20, 0.80));
+        graphics.setLineWidth(1.2);
+        graphics.strokePolygon(
+                new double[]{startX, endX, endX, startX},
+                new double[]{floorY, floorY, endTopY, startTopY},
+                4
+        );
+        drawWallSurfaceJointsInElevation(graphics, wall, layer, startX, endX, floorY);
+        graphics.restore();
+    }
+
+    private void drawWallSurfaceJointsInElevation(GraphicsContext graphics, Wall wall, SurfaceLayer layer, double startX, double endX, double floorY) {
+        double jointWidth = layer.jointWidth().toMillimeters();
+        double wallLength = wall.axis().length().toMillimeters();
+        double wallHeight = wall.maximumHeightMillimeters();
+        if (jointWidth < 0.001 || wallLength <= 0.0 || wallHeight <= 0.0) {
+            return;
+        }
+        TileLayoutRequest request = new TileLayoutRequest(
+                Length.ofMillimeters(wallLength),
+                Length.ofMillimeters(wallHeight),
+                layer.tileWidth(),
+                layer.tileHeight(),
+                layer.layoutMode(),
+                layer.layoutOffset(),
+                layer.minimumOffset(),
+                layer.minimumEdgeWidth(),
+                layer.minimumStartEndMargin()
+        );
+        graphics.setStroke(Color.color(0.16, 0.12, 0.08, 0.78));
+        graphics.setLineWidth(Math.max(0.7, jointWidth * scale()));
+        var horizontalKeys = new java.util.HashSet<String>();
+        var verticalKeys = new java.util.HashSet<String>();
+        for (TilePlacement tile : tileLayoutService.fillSurface(request)) {
+            double localStart = tile.xOffset().toMillimeters();
+            double localEnd = localStart + tile.width().toMillimeters();
+            double localCenter = (localStart + localEnd) / 2.0;
+            double rowTop = tile.yOffset().toMillimeters() + tile.height().toMillimeters();
+            if (rowTop <= wall.heightAt(localCenter)) {
+                String horizontalKey = String.format(Locale.US, "h:%.3f:%.3f:%.3f", rowTop, localStart, localEnd);
+                if (horizontalKeys.add(horizontalKey)) {
+                    double y = toScreenVertical(-rowTop);
+                    graphics.strokeLine(
+                            interpolateScreen(startX, endX, localStart / wallLength),
+                            y,
+                            interpolateScreen(startX, endX, localEnd / wallLength),
+                            y
+                    );
+                }
+            }
+            double localJoint = localEnd;
+            if (localJoint > 0.001 && localJoint < wallLength - 0.001) {
+                String verticalKey = String.format(Locale.US, "v:%.3f", localJoint);
+                if (verticalKeys.add(verticalKey)) {
+                    double x = interpolateScreen(startX, endX, localJoint / wallLength);
+                    double topY = toScreenVertical(-wall.heightAt(localJoint));
+                    graphics.strokeLine(x, floorY, x, topY);
+                }
+            }
+        }
+    }
+
+    private PlanPoint wallOffsetPoint(Wall wall, double localDistance, double normalOffset) {
+        double wallLength = wall.axis().length().toMillimeters();
+        PlanPoint axisPoint = wall.axis().pointAt(Length.ofMillimeters(clamp(localDistance, 0.0, wallLength)));
+        double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
+        double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
+        double length = Math.max(1.0, Math.hypot(dx, dy));
+        return new PlanPoint(
+                axisPoint.xMillimeters() - dy / length * normalOffset,
+                axisPoint.yMillimeters() + dx / length * normalOffset
+        );
+    }
+
+    private double interpolateScreen(double start, double end, double ratio) {
+        return start + (end - start) * clamp(ratio, 0.0, 1.0);
     }
 
     private void drawRooms(GraphicsContext graphics) {
@@ -2596,13 +2812,14 @@ public final class CadWorkbench extends BorderPane {
         try {
             rememberStateForUndo();
             String projectName = exchangeFileNameService.stripRepeatedExtension(sourceFile, ".dxf");
-        ProjectModel importedProject = projectExchangeService.importProject(sourceFile, projectName);
+            ProjectModel importedProject = projectExchangeService.importProject(sourceFile, projectName);
             importedProject.levels().forEach(level -> level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults())));
             project.replaceWith(importedProject);
             availableLevels.setAll(project.levels());
             guideLines.clear();
             clearSelectionsInternal();
             activateLevel(project.primaryLevel());
+            markThreeDDirty();
             fitCurrentViewToContent();
             draftLabel.setText("Gebäude-DXF importiert: " + sourceFile.getFileName());
         } catch (Exception exception) {

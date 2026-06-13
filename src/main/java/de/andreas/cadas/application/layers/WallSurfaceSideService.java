@@ -13,6 +13,7 @@ import java.util.UUID;
 public final class WallSurfaceSideService {
 
     private static final double ROOM_TEST_OFFSET = 5.0;
+    private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
     public WallLayerSides resolve(Level level, Wall wall, SurfaceType surfaceType, String targetKey) {
         Objects.requireNonNull(level, "level darf nicht null sein.");
@@ -37,38 +38,43 @@ public final class WallSurfaceSideService {
     }
 
     private WallLayerSides resolveInterior(Level level, Wall wall, String targetKey) {
+        double probeOffset = wall.thickness().toMillimeters() / 2.0
+                + ROOM_TEST_OFFSET
+                + surfaceLayerEffectService.maximumWallInteriorThicknessMillimeters(level, wall);
         return WallSurfaceTargetKey.roomId(targetKey)
                 .map(roomId -> new WallLayerSides(
-                        sideTouchesRoom(level.rooms(), wall, 1.0, roomId),
-                        sideTouchesRoom(level.rooms(), wall, -1.0, roomId)
+                        sideTouchesRoom(level.rooms(), wall, 1.0, roomId, probeOffset),
+                        sideTouchesRoom(level.rooms(), wall, -1.0, roomId, probeOffset)
                 ))
                 .orElseGet(() -> new WallLayerSides(
-                        sideTouchesAnyRoom(level, wall, 1.0),
-                        sideTouchesAnyRoom(level, wall, -1.0)
+                        sideTouchesRoom(level.rooms(), wall, 1.0, null, probeOffset),
+                        sideTouchesRoom(level.rooms(), wall, -1.0, null, probeOffset)
                 ));
     }
 
     private boolean sideTouchesAnyRoom(Level level, Wall wall, double sideSign) {
-        return sideTouchesRoom(level.rooms(), wall, sideSign, null);
+        double probeOffset = wall.thickness().toMillimeters() / 2.0
+                + ROOM_TEST_OFFSET
+                + surfaceLayerEffectService.maximumWallInteriorThicknessMillimeters(level, wall);
+        return sideTouchesRoom(level.rooms(), wall, sideSign, null, probeOffset);
     }
 
-    private boolean sideTouchesRoom(List<Room> rooms, Wall wall, double sideSign, UUID roomId) {
-        PlanPoint probePoint = probePoint(wall, sideSign);
+    private boolean sideTouchesRoom(List<Room> rooms, Wall wall, double sideSign, UUID roomId, double probeOffset) {
+        PlanPoint probePoint = probePoint(wall, sideSign, probeOffset);
         return rooms.stream()
                 .filter(room -> roomId == null || room.id().equals(roomId))
                 .anyMatch(room -> containsPoint(room.outline(), probePoint));
     }
 
-    private PlanPoint probePoint(Wall wall, double sideSign) {
+    private PlanPoint probePoint(Wall wall, double sideSign, double probeOffset) {
         double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
         double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
         double length = Math.max(1.0, Math.hypot(dx, dy));
         double normalX = -dy / length;
         double normalY = dx / length;
-        double offset = wall.thickness().toMillimeters() / 2.0 + ROOM_TEST_OFFSET;
         return new PlanPoint(
-                (wall.axis().start().xMillimeters() + wall.axis().end().xMillimeters()) / 2.0 + normalX * offset * sideSign,
-                (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0 + normalY * offset * sideSign
+                (wall.axis().start().xMillimeters() + wall.axis().end().xMillimeters()) / 2.0 + normalX * probeOffset * sideSign,
+                (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0 + normalY * probeOffset * sideSign
         );
     }
 

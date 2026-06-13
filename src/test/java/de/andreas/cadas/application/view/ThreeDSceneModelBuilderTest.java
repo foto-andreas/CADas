@@ -295,9 +295,53 @@ class ThreeDSceneModelBuilderTest {
         List<RenderableBox> wallLayers = sceneModel.boxes().stream()
                 .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
                 .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "surface-layer".equals(box.materialKey()))
                 .toList();
         assertEquals(1, wallLayers.size());
         assertTrue(wallLayers.getFirst().centerZ() > 0.0);
+    }
+
+    @Test
+    void legtFugenVonInnenwandFliesenSichtbarVorDieBelagsoberflaeche() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        Room room = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(100, 100),
+                new PlanPoint(3900, 2900),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, wall.id().toString());
+        SurfaceLayer layer = SurfaceLayer.create(
+                "Fliese",
+                Length.of(12, LengthUnit.MILLIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(30, LengthUnit.CENTIMETER),
+                Length.of(2, LengthUnit.MILLIMETER)
+        );
+        stack.addLayer(layer);
+        level.addSurfaceLayerStack(stack);
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), true);
+
+        List<RenderableBox> wallJoints = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "joint".equals(box.materialKey()))
+                .toList();
+        assertFalse(wallJoints.isEmpty());
+        assertTrue(wallJoints.stream().allMatch(box -> box.centerZ() > 100.0));
+        assertTrue(wallJoints.stream().anyMatch(box -> box.width() > box.height()));
+        assertTrue(wallJoints.stream().anyMatch(box -> box.height() > box.width()));
     }
 
     @Test
@@ -338,6 +382,7 @@ class ThreeDSceneModelBuilderTest {
         List<RenderableBox> wallLayers = sceneModel.boxes().stream()
                 .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
                 .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "surface-layer".equals(box.materialKey()))
                 .toList();
         assertEquals(1, wallLayers.size());
         assertTrue(wallLayers.getFirst().centerX() < 2000.0);
