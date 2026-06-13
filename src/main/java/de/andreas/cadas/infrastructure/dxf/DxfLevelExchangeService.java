@@ -362,32 +362,54 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
     private void importFallbackGeometry(Level level, List<DxfEntity> entities) {
         for (DxfEntity entity : entities) {
             if (entity.type().equals("LINE") && entity.layer().equals(DxfLayer.WALLS.name())) {
-                level.addWall(Wall.create(
-                        new PlanSegment(
-                                new PlanPoint(entity.doubleValue(10), entity.doubleValue(20)),
-                                new PlanPoint(entity.doubleValue(11), entity.doubleValue(21))
-                        ),
+                fallbackLineSegment(entity).ifPresent(segment -> level.addWall(Wall.create(
+                        segment,
                         DEFAULT_WALL_THICKNESS,
                         DEFAULT_WALL_HEIGHT
-                ));
+                )));
             } else if (entity.type().equals("LWPOLYLINE") && entity.layer().equals(DxfLayer.ROOMS.name())) {
-                List<Double> xValues = entity.values(10).stream().map(DxfLevelExchangeService::parseDouble).toList();
-                List<Double> yValues = entity.values(20).stream().map(DxfLevelExchangeService::parseDouble).toList();
-                List<PlanPoint> points = new ArrayList<>();
-                for (int index = 0; index < Math.min(xValues.size(), yValues.size()); index++) {
-                    points.add(new PlanPoint(xValues.get(index), yValues.get(index)));
+                List<PlanPoint> points = fallbackPolylinePoints(entity);
+                if (points.size() >= 3) {
+                    level.addRoom(new Room(
+                            UUID.randomUUID(),
+                            "Importierter Raum",
+                            points,
+                            DEFAULT_ROOM_HEIGHT,
+                            DEFAULT_FLOOR_THICKNESS,
+                            DEFAULT_CEILING_THICKNESS,
+                            null
+                    ));
                 }
-                level.addRoom(new Room(
-                        UUID.randomUUID(),
-                        "Importierter Raum",
-                        points,
-                        DEFAULT_ROOM_HEIGHT,
-                        DEFAULT_FLOOR_THICKNESS,
-                        DEFAULT_CEILING_THICKNESS,
-                        null
-                ));
             }
         }
+    }
+
+    private Optional<PlanSegment> fallbackLineSegment(DxfEntity entity) {
+        Optional<Double> startX = entity.doubleValue(10);
+        Optional<Double> startY = entity.doubleValue(20);
+        Optional<Double> endX = entity.doubleValue(11);
+        Optional<Double> endY = entity.doubleValue(21);
+        if (startX.isEmpty() || startY.isEmpty() || endX.isEmpty() || endY.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new PlanSegment(
+                new PlanPoint(startX.get(), startY.get()),
+                new PlanPoint(endX.get(), endY.get())
+        ));
+    }
+
+    private List<PlanPoint> fallbackPolylinePoints(DxfEntity entity) {
+        List<String> xValues = entity.values(10);
+        List<String> yValues = entity.values(20);
+        List<PlanPoint> points = new ArrayList<>();
+        for (int index = 0; index < Math.min(xValues.size(), yValues.size()); index++) {
+            Optional<Double> x = parseOptionalDouble(xValues.get(index));
+            Optional<Double> y = parseOptionalDouble(yValues.get(index));
+            if (x.isPresent() && y.isPresent()) {
+                points.add(new PlanPoint(x.get(), y.get()));
+            }
+        }
+        return points;
     }
 
     private List<DxfEntity> parseEntities(List<String> lines) {
@@ -482,6 +504,14 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         return Double.parseDouble(value);
     }
 
+    private static Optional<Double> parseOptionalDouble(String value) {
+        try {
+            return Optional.of(Double.parseDouble(value));
+        } catch (NumberFormatException exception) {
+            return Optional.empty();
+        }
+    }
+
     private static Optional<Integer> parseGroupCode(String value) {
         try {
             return Optional.of(Integer.parseInt(value));
@@ -557,8 +587,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             return values.getOrDefault(code, List.of());
         }
 
-        double doubleValue(int code) {
-            return firstValue(code).map(Double::parseDouble).orElse(0.0);
+        Optional<Double> doubleValue(int code) {
+            return firstValue(code).flatMap(DxfLevelExchangeService::parseOptionalDouble);
         }
     }
 
