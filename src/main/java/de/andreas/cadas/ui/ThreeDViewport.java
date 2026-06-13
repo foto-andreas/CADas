@@ -75,10 +75,9 @@ public final class ThreeDViewport extends BorderPane {
     private static final double PERSPECTIVE_FIT_PADDING = 1.8;
     private static final double ORTHO_FOV_DEGREES = 15.0;
     private static final double ORTHO_FIT_PADDING = 1.4;
-    private static final double INTERIOR_CAMERA_DISTANCE_UNITS = 10.0;
     private static final double INTERIOR_FOV_DEGREES = 64.0;
     private static final double INTERIOR_MIN_FOV_DEGREES = 28.0;
-    private static final double INTERIOR_MAX_FOV_DEGREES = 85.0;
+    private static final double INTERIOR_MAX_FOV_DEGREES = 115.0;
 
     private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
@@ -408,10 +407,10 @@ public final class ThreeDViewport extends BorderPane {
         Button fitSceneButton = new Button("Modell einpassen");
         fitSceneButton.setOnAction(event -> centerCurrentView());
         applyTooltip(isometricViewButton, "Setzt auf die räumliche Standardansicht zurück und passt das Modell in dieser Orientierung ein.");
-        applyTooltip(orbitLeftButton, "Dreht die 3D-Kamera schrittweise nach links.");
-        applyTooltip(orbitRightButton, "Dreht die 3D-Kamera schrittweise nach rechts.");
-        applyTooltip(orbitUpButton, "Hebt die 3D-Kamera schrittweise an.");
-        applyTooltip(orbitDownButton, "Senkt die 3D-Kamera schrittweise ab.");
+        applyTooltip(orbitLeftButton, "Dreht die Orbitansicht schrittweise nach links; in der Innenansicht dreht sich nur der Blick am festen Kamerastandpunkt.");
+        applyTooltip(orbitRightButton, "Dreht die Orbitansicht schrittweise nach rechts; in der Innenansicht dreht sich nur der Blick am festen Kamerastandpunkt.");
+        applyTooltip(orbitUpButton, "Hebt die Orbitansicht schrittweise an; in der Innenansicht neigt sich nur der Blick am festen Kamerastandpunkt nach oben.");
+        applyTooltip(orbitDownButton, "Senkt die Orbitansicht schrittweise ab; in der Innenansicht neigt sich nur der Blick am festen Kamerastandpunkt nach unten.");
         applyTooltip(fitSceneButton, "Richtet Kameraabstand und Mittelpunkt so aus, dass das aktuelle Modell vollständig sichtbar wird.");
         applyTooltip(surfaceLayersCheckBox, "Blendet zusätzliche Flächen-Ebenen als gestapelte 3D-Schichten ein oder aus.");
         applyTooltip(surfaceRenderingCheckBox, "Schaltet von der transparenten Modellansicht auf eine flächenbetonte Oberflächenansicht um.");
@@ -882,13 +881,13 @@ public final class ThreeDViewport extends BorderPane {
         sceneGroup.getTransforms().setAll();
         perspectiveCamera.setFieldOfView(interiorFieldOfViewDegrees);
         perspectiveCamera.getTransforms().setAll(
-                new Rotate(cameraPose.azimuthDegrees(), Rotate.Y_AXIS),
-                new Rotate(cameraPose.elevationDegrees(), Rotate.X_AXIS),
                 new Translate(
                         interiorTarget.eyeXMillimeters() * WORLD_SCALE,
                         -interiorTarget.eyeYMillimeters() * WORLD_SCALE,
-                        -interiorTarget.eyeZMillimeters() * WORLD_SCALE - INTERIOR_CAMERA_DISTANCE_UNITS
-                )
+                        -interiorTarget.eyeZMillimeters() * WORLD_SCALE
+                ),
+                new Rotate(cameraPose.azimuthDegrees(), Rotate.Y_AXIS),
+                new Rotate(cameraPose.elevationDegrees(), Rotate.X_AXIS)
         );
         subScene.setCamera(perspectiveCamera);
         applyLightPositions(260.0);
@@ -965,7 +964,7 @@ public final class ThreeDViewport extends BorderPane {
                 ProjectionMode.PERSPECTIVE,
                 0.0,
                 0.0,
-                INTERIOR_CAMERA_DISTANCE_UNITS,
+                0.0,
                 0.0,
                 0.0,
                 0.0

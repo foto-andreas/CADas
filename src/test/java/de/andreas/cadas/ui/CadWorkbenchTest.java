@@ -238,6 +238,34 @@ class CadWorkbenchTest {
                         && gezoomt.threeDCameraStatus().contains("Sichtwinkel 59°"),
                 "Status war: " + gezoomt.threeDCameraStatus()
         );
+
+        WorkbenchAutomationSnapshot weitwinkel = aufFxThread(() -> {
+            for (int index = 0; index < 10; index++) {
+                workbench.automationInvoke("threeDZoomOut", null);
+            }
+            return workbench.automationSnapshot();
+        });
+
+        Assertions.assertTrue(
+                weitwinkel.threeDCameraStatus().contains("Sichtwinkel 115°"),
+                "Status war: " + weitwinkel.threeDCameraStatus()
+        );
+
+        WorkbenchAutomationSnapshot gedreht = aufFxThread(() -> {
+            workbench.automationInvoke("threeDOrbitRight", null);
+            workbench.automationInvoke("diagnose3D", null);
+            return workbench.automationSnapshot();
+        });
+
+        Assertions.assertTrue(
+                gedreht.threeDCameraStatus().contains("3D Innenansicht:")
+                        && gedreht.threeDCameraStatus().contains("Blick 15,0° / 0,0°"),
+                "Status war: " + gedreht.threeDCameraStatus()
+        );
+        Assertions.assertTrue(
+                gedreht.statusText().contains("camPos=[Translate"),
+                "Kameratransform muss zuerst die feste Innenposition setzen: " + gedreht.statusText()
+        );
     }
 
     private Path erzeugeEinfachesProjektAlsDxf() throws Exception {

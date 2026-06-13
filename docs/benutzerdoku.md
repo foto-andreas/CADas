@@ -266,8 +266,8 @@ Derzeit gilt:
 * Im Arbeitsbereich `3D` verschiebst du mit gedrückter rechter Maustaste die Ansicht entlang der Bildschirmachsen.
 * Mit dem Mausrad zoomst du in der 3D-Orbitansicht.
 * Im Arbeitsbereich `Innen` sitzt die Kamera im ausgewählten Raum oder, ohne Auswahl, im ersten Raum der aktiven Etage.
-* In `Innen` drehst du mit gedrückter linker Maustaste den Blick aus dem Raum heraus.
-* In `Innen` ändert das Mausrad die Brennweite beziehungsweise den Sichtwinkel, ohne die Kamera aus dem Raum zu verschieben.
+* In `Innen` drehst du mit gedrückter linker Maustaste den Blick am festen Kamerastandpunkt im Raum.
+* In `Innen` ändert das Mausrad die Brennweite beziehungsweise den Sichtwinkel bis in den starken Weitwinkelbereich, ohne die Kamera aus dem Raum zu verschieben.
 * Die 3D-Ansicht nutzt dafür eine feste Kamera mit Modell-Orbit; `Modell einpassen` und `Ansicht zentrieren` halten das Modell im Blick.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
 * `Oberflächenrendering` blendet die transparenten Raumvolumina aus und zeigt stattdessen die sichtbaren Flächen, Beläge, Fliesenfugen und Öffnungen als baunähere Ansicht.
@@ -336,7 +336,7 @@ Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D`, `3D` und `Innen`.
 
 * `2D` zeigt die Zeichenfläche mit Linealen und Grundrisswerkzeugen.
 * `3D` nutzt denselben Platz für die räumliche Orbit-Kontrollansicht.
-* `Innen` nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in den aktuellen Raum und zeigt Innenwand-Beläge aus dem Raum heraus. Mit dem Mausrad stellst du dort den Sichtwinkel ein.
+* `Innen` nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in den aktuellen Raum und zeigt Innenwand-Beläge aus dem Raum heraus. Mit dem Mausrad stellst du dort den Sichtwinkel ein; die Blickdrehung verlässt den Raum nicht.
 * Dadurch bleibt mehr Platz für die aktive Arbeitsansicht, statt 2D und 3D ständig parallel einzublenden.
 
 ## DWG-Blöcke für Oberflächen verwenden

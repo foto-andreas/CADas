@@ -155,6 +155,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] bei den Decken gibt es noch das Problem, dass diese bei Innenecken in die Wand hineinragen, und zwar bis zur Wandmitte genau in der Innenecke. Außenecken sehen ok aus.
 - [x] Echte 3D-Innenansicht mit raumgebundener Kamera im bestehenden 3D-Fenster umsetzen.
 - [x] Innenansicht im 3D-Fenster mit Sichtwinkel-/Brennweiten-Zoom ergänzen.
+- [x] Innenkamera beim Drehen am festen Kamerastandpunkt halten und Weitwinkelbereich erweitern.
 - [x] Modell/UI: Die Standard-Deckendicke soll 1mm betragen
 - [x] Aktuell gibt es Fundamente unter den Wänden, der Boden ist leer und mit etwas Abstand unter dem Haus ist eine Ebene, die wie Fußboden aussieht.
 - [x] "Rückgängig" (ggf. auch "Wiederherstellen") ändert ungewollt Zoom und Position
