@@ -52,20 +52,22 @@ class DxfLevelExchangeServiceTest {
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER)
         ));
-        level.addDoor(Door.create(
+        Door door = Door.create(
                 wall.id(),
                 Length.of(1.0, LengthUnit.METER),
                 Length.of(1.01, LengthUnit.METER),
                 Length.of(2.01, LengthUnit.METER),
                 Length.zero()
-        ));
-        level.addWindow(WindowElement.create(
+        );
+        level.addDoor(door);
+        WindowElement window = WindowElement.create(
                 wall.id(),
                 Length.of(2.0, LengthUnit.METER),
                 Length.of(1.2, LengthUnit.METER),
                 Length.of(90, LengthUnit.CENTIMETER),
                 Length.of(1.2, LengthUnit.METER)
-        ));
+        );
+        level.addWindow(window);
         level.addStaircase(new Staircase(
                 java.util.UUID.randomUUID(),
                 StairType.SWITCHBACK,
@@ -85,10 +87,54 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1, imported.doors().size());
         assertEquals(1, imported.windows().size());
         assertEquals(1, imported.staircases().size());
+        assertEquals(door.id(), imported.doors().getFirst().id());
+        assertEquals(window.id(), imported.windows().getFirst().id());
         assertEquals("Küche", imported.rooms().getFirst().name());
         assertEquals(14.0, imported.rooms().getFirst().areaSquareMeters(), 0.001);
         assertEquals(StairType.SWITCHBACK, imported.staircases().getFirst().stairType());
         assertEquals(1, imported.staircases().getFirst().rotationQuarterTurns());
+    }
+
+    @Test
+    void importiertAlteOeffnungsMetadatenOhneObjektIds() throws Exception {
+        java.util.UUID wallId = java.util.UUID.randomUUID();
+        Path file = tempDir.resolve("alte-oeffnungen.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WALL|%s|175.000|2750.000|0.000|0.000|4000.000|0.000
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                DOOR|%s|1000.000|1010.000|2010.000|0.000
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WINDOW|%s|2200.000|1200.000|900.000|1200.000
+                0
+                ENDSEC
+                0
+                EOF
+                """.formatted(wallId, wallId, wallId));
+
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertEquals(1, imported.walls().size());
+        assertEquals(1, imported.doors().size());
+        assertEquals(1, imported.windows().size());
+        assertEquals(wallId, imported.doors().getFirst().wallId());
+        assertEquals(wallId, imported.windows().getFirst().wallId());
     }
 
     @Test

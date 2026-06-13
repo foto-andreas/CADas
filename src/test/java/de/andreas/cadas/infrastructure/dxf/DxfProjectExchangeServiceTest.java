@@ -9,6 +9,7 @@ import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
+import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.Roof;
@@ -20,6 +21,7 @@ import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
 import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
+import de.andreas.cadas.domain.model.WindowElement;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -35,14 +37,31 @@ class DxfProjectExchangeServiceTest {
     @Test
     void exportiertUndImportiertMehrereEtagenUndDachInEinerDatei() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
-        project.primaryLevel().addWall(new Wall(
+        Wall wall = new Wall(
                 java.util.UUID.randomUUID(),
                 new PlanSegment(new PlanPoint(0, 0), new PlanPoint(5000, 0)),
                 Length.of(17.5, LengthUnit.CENTIMETER),
                 Length.of(3.1, LengthUnit.METER),
                 Length.of(2.5, LengthUnit.METER),
                 Length.of(3.1, LengthUnit.METER)
-        ));
+        );
+        project.primaryLevel().addWall(wall);
+        Door door = Door.create(
+                wall.id(),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(1.01, LengthUnit.METER),
+                Length.of(2.01, LengthUnit.METER),
+                Length.zero()
+        );
+        project.primaryLevel().addDoor(door);
+        WindowElement window = WindowElement.create(
+                wall.id(),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(1.2, LengthUnit.METER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(1.2, LengthUnit.METER)
+        );
+        project.primaryLevel().addWindow(window);
         project.primaryLevel().addRoom(Room.rectangular(
                 "Wohnen",
                 new PlanPoint(0, 0),
@@ -79,9 +98,65 @@ class DxfProjectExchangeServiceTest {
         assertEquals("Haus", imported.name());
         assertTrue(imported.roof().isPresent());
         assertEquals(1, imported.primaryLevel().staircases().size());
+        assertEquals(door.id(), imported.primaryLevel().doors().getFirst().id());
+        assertEquals(window.id(), imported.primaryLevel().windows().getFirst().id());
         assertEquals("Obergeschoss", imported.levels().get(1).name());
         assertEquals(2500.0, imported.primaryLevel().walls().getFirst().startHeight().toMillimeters(), 0.001);
         assertEquals(3100.0, imported.primaryLevel().walls().getFirst().endHeight().toMillimeters(), 0.001);
+    }
+
+    @Test
+    void importiertAlteGebaeudeOeffnungenOhneObjektIds() throws Exception {
+        java.util.UUID wallId = java.util.UUID.randomUUID();
+        Path file = tempDir.resolve("alte-gebaeude-oeffnungen.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                PROJECT|Altbau
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                LEVEL|Erdgeschoss
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WALL|Erdgeschoss|%s|175.000|2750.000|0.000|0.000|4000.000|0.000
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                DOOR|Erdgeschoss|%s|1000.000|1010.000|2010.000|0.000
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WINDOW|Erdgeschoss|%s|2200.000|1200.000|900.000|1200.000
+                0
+                ENDSEC
+                0
+                EOF
+                """.formatted(wallId, wallId, wallId));
+
+        ProjectModel imported = exchangeService.importProject(file, "Fallback");
+
+        assertEquals("Altbau", imported.name());
+        assertEquals(1, imported.primaryLevel().doors().size());
+        assertEquals(1, imported.primaryLevel().windows().size());
+        assertEquals(wallId, imported.primaryLevel().doors().getFirst().wallId());
+        assertEquals(wallId, imported.primaryLevel().windows().getFirst().wallId());
     }
 
     @Test

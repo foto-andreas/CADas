@@ -143,25 +143,11 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     }
                     case "DOOR" -> {
                         Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
-                        level.addDoor(new Door(
-                                UUID.randomUUID(),
-                                UUID.fromString(parts[2]),
-                                Length.ofMillimeters(parseDouble(parts[3])),
-                                Length.ofMillimeters(parseDouble(parts[4])),
-                                Length.ofMillimeters(parseDouble(parts[5])),
-                                Length.ofMillimeters(parseDouble(parts[6]))
-                        ));
+                        level.addDoor(deserializeDoor(parts));
                     }
                     case "WINDOW" -> {
                         Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
-                        level.addWindow(new WindowElement(
-                                UUID.randomUUID(),
-                                UUID.fromString(parts[2]),
-                                Length.ofMillimeters(parseDouble(parts[3])),
-                                Length.ofMillimeters(parseDouble(parts[4])),
-                                Length.ofMillimeters(parseDouble(parts[5])),
-                                Length.ofMillimeters(parseDouble(parts[6]))
-                        ));
+                        level.addWindow(deserializeWindow(parts));
                     }
                     case "STAIR" -> {
                         Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
@@ -344,8 +330,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (Door door : level.doors()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
-                    "DOOR|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                    "DOOR|%s|%s|%s|%.3f|%.3f|%.3f|%.3f",
                     DxfMetadataCodec.encode(level.name()),
+                    door.id(),
                     door.wallId(),
                     door.offsetFromStart().toMillimeters(),
                     door.width().toMillimeters(),
@@ -356,8 +343,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (WindowElement window : level.windows()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
-                    "WINDOW|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                    "WINDOW|%s|%s|%s|%.3f|%.3f|%.3f|%.3f",
                     DxfMetadataCodec.encode(level.name()),
+                    window.id(),
                     window.wallId(),
                     window.offsetFromStart().toMillimeters(),
                     window.width().toMillimeters(),
@@ -509,6 +497,48 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
 
     private double parseDouble(String text) {
         return Double.parseDouble(text);
+    }
+
+    private Door deserializeDoor(String[] parts) {
+        if (parts.length >= 8) {
+            return new Door(
+                    UUID.fromString(parts[2]),
+                    UUID.fromString(parts[3]),
+                    Length.ofMillimeters(parseDouble(parts[4])),
+                    Length.ofMillimeters(parseDouble(parts[5])),
+                    Length.ofMillimeters(parseDouble(parts[6])),
+                    Length.ofMillimeters(parseDouble(parts[7]))
+            );
+        }
+        return new Door(
+                UUID.randomUUID(),
+                UUID.fromString(parts[2]),
+                Length.ofMillimeters(parseDouble(parts[3])),
+                Length.ofMillimeters(parseDouble(parts[4])),
+                Length.ofMillimeters(parseDouble(parts[5])),
+                Length.ofMillimeters(parseDouble(parts[6]))
+        );
+    }
+
+    private WindowElement deserializeWindow(String[] parts) {
+        if (parts.length >= 8) {
+            return new WindowElement(
+                    UUID.fromString(parts[2]),
+                    UUID.fromString(parts[3]),
+                    Length.ofMillimeters(parseDouble(parts[4])),
+                    Length.ofMillimeters(parseDouble(parts[5])),
+                    Length.ofMillimeters(parseDouble(parts[6])),
+                    Length.ofMillimeters(parseDouble(parts[7]))
+            );
+        }
+        return new WindowElement(
+                UUID.randomUUID(),
+                UUID.fromString(parts[2]),
+                Length.ofMillimeters(parseDouble(parts[3])),
+                Length.ofMillimeters(parseDouble(parts[4])),
+                Length.ofMillimeters(parseDouble(parts[5])),
+                Length.ofMillimeters(parseDouble(parts[6]))
+        );
     }
 
     private String serializeSlopedCeiling(Room room) {

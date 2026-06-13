@@ -680,6 +680,7 @@ Der Export enthält aktuell:
 * wiederverwendbare Tür-, Fenster- und Treppenblöcke mit `INSERT`-Referenzen
 * Handles sowie eine einfache `OBJECTS`- und Layout-Grundstruktur
 * `CADAS_META` mit Marker `CADAS_DXF|2`; Textfelder werden UTF-8-kodiert, damit Umlaute, `/` und `|` im Rundlauf erhalten bleiben
+* stabile Objekt-IDs für Türen und Fenster, damit Auswahl- und Bearbeitungsbezüge nach dem Re-Import erhalten bleiben
 
 Beim Import liest CADas weiterhin ältere CADas-DXF-Dateien ohne Versionsmarker. Einzelne beschädigte oder fremde Metadaten-Einträge werden übersprungen, damit nutzbare Geometrie und gültige Fachobjekte weiter geladen werden können.
 
