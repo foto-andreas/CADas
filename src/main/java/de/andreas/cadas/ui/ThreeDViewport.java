@@ -81,7 +81,6 @@ public final class ThreeDViewport extends BorderPane {
     private static final double INTERIOR_MAX_FOV_DEGREES = 115.0;
     private static final double INTERIOR_WALK_MILLIMETERS_PER_PIXEL = 8.0;
     private static final double MAX_INTERIOR_WALL_CLEARANCE_MILLIMETERS = 150.0;
-    private static final double JOINT_MIN_RENDER_UNITS = 0.5;
 
     private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
@@ -715,13 +714,14 @@ public final class ThreeDViewport extends BorderPane {
         // Größen und Positionen kommen aus dem Fachmodell in Millimetern und werden hier
         // mit WORLD_SCALE in JavaFX-Einheiten umgerechnet. So passen die Boxen zum
         // Kamera-Abstand in derselben Einheit.
-        double widthUnits = Math.max(1.0, renderableBox.width() * WORLD_SCALE);
-        double heightUnits = Math.max(1.0, renderableBox.height() * WORLD_SCALE);
-        double depthUnits = Math.max(1.0, renderableBox.depth() * WORLD_SCALE);
-        if ("joint".equals(renderableBox.materialKey())) {
-            widthUnits = Math.max(widthUnits, JOINT_MIN_RENDER_UNITS);
-            heightUnits = Math.max(heightUnits, JOINT_MIN_RENDER_UNITS);
-            depthUnits = Math.max(depthUnits, JOINT_MIN_RENDER_UNITS);
+        boolean joint = "joint".equals(renderableBox.materialKey());
+        double widthUnits = renderableBox.width() * WORLD_SCALE;
+        double heightUnits = renderableBox.height() * WORLD_SCALE;
+        double depthUnits = renderableBox.depth() * WORLD_SCALE;
+        if (!joint) {
+            widthUnits = Math.max(1.0, widthUnits);
+            heightUnits = Math.max(1.0, heightUnits);
+            depthUnits = Math.max(1.0, depthUnits);
         }
         Box box = new Box(widthUnits, heightUnits, depthUnits);
         box.setTranslateX(renderableBox.centerX() * WORLD_SCALE);
