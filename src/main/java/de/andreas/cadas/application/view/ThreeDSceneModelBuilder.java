@@ -677,9 +677,11 @@ public final class ThreeDSceneModelBuilder {
             double centerOffset = cumulativeThickness + layer.thickness().toMillimeters() / 2.0;
             if (wallLayerSides.positiveSide()) {
                 boxes.add(wallSurfaceLayerBox(levelName, wall, layer, baseHeight, centerOffset));
+                boxes.addAll(buildWallSurfaceJoints(levelName, wall, layer, baseHeight, cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0));
             }
             if (wallLayerSides.negativeSide()) {
                 boxes.add(wallSurfaceLayerBox(levelName, wall, layer, baseHeight, -centerOffset));
+                boxes.addAll(buildWallSurfaceJoints(levelName, wall, layer, baseHeight, -(cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0)));
             }
             cumulativeThickness += layer.thickness().toMillimeters();
         }
@@ -708,6 +710,99 @@ public final class ThreeDSceneModelBuilder {
                 wall.axis().angle().degrees(),
                 "surface-layer",
                 SURFACE_LAYER_OPACITY
+        );
+    }
+
+    private List<RenderableBox> buildWallSurfaceJoints(String levelName, Wall wall, SurfaceLayer layer, double baseHeight, double perpendicularOffset) {
+        List<RenderableBox> joints = new ArrayList<>();
+        double wallLength = wall.axis().length().toMillimeters();
+        double wallHeight = wall.maximumHeightMillimeters();
+        double jointWidth = layer.jointWidth().toMillimeters();
+        if (wallLength <= 0.0 || wallHeight <= 0.0 || jointWidth < 0.001) {
+            return joints;
+        }
+        TileLayoutRequest request = new TileLayoutRequest(
+                Length.ofMillimeters(wallLength),
+                Length.ofMillimeters(wallHeight),
+                layer.tileWidth(),
+                layer.tileHeight(),
+                layer.layoutMode(),
+                layer.layoutOffset(),
+                layer.minimumOffset(),
+                layer.minimumEdgeWidth(),
+                layer.minimumStartEndMargin()
+        );
+        List<TilePlacement> tiles = tileLayoutService.fillSurface(request);
+        var horizontalKeys = new java.util.HashSet<String>();
+        var verticalKeys = new java.util.HashSet<String>();
+        for (TilePlacement tile : tiles) {
+            double tileX = tile.xOffset().toMillimeters();
+            double tileY = tile.yOffset().toMillimeters();
+            double tileWidth = tile.width().toMillimeters();
+            double tileHeight = tile.height().toMillimeters();
+            double horizontalCenterY = baseHeight + tileY + tileHeight - jointWidth / 2.0;
+            String horizontalKey = String.format(java.util.Locale.US, "h:%.3f:%.3f:%.3f", horizontalCenterY, tileX, tileX + tileWidth);
+            if (horizontalKeys.add(horizontalKey)) {
+                joints.add(wallSurfaceJointBox(
+                        levelName,
+                        wall,
+                        layer,
+                        tileX + tileWidth / 2.0,
+                        horizontalCenterY,
+                        tileWidth,
+                        jointWidth,
+                        perpendicularOffset
+                ));
+            }
+            double verticalCenterX = tileX + tileWidth - jointWidth / 2.0;
+            String verticalKey = String.format(java.util.Locale.US, "v:%.3f:%.3f:%.3f", verticalCenterX, tileY, tileY + tileHeight);
+            if (verticalKeys.add(verticalKey)) {
+                joints.add(wallSurfaceJointBox(
+                        levelName,
+                        wall,
+                        layer,
+                        verticalCenterX,
+                        baseHeight + tileY + tileHeight / 2.0,
+                        jointWidth,
+                        tileHeight,
+                        perpendicularOffset
+                ));
+            }
+        }
+        return joints;
+    }
+
+    private RenderableBox wallSurfaceJointBox(
+            String levelName,
+            Wall wall,
+            SurfaceLayer layer,
+            double localCenterX,
+            double centerY,
+            double width,
+            double height,
+            double perpendicularOffset
+    ) {
+        double wallLength = wall.axis().length().toMillimeters();
+        PlanPoint wallPoint = wall.axis().pointAt(Length.ofMillimeters(Math.max(0.0, Math.min(localCenterX, wallLength))));
+        double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
+        double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
+        double length = Math.max(1.0, Math.hypot(dx, dy));
+        double normalX = -dy / length;
+        double normalY = dx / length;
+        return new RenderableBox(
+                new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
+                levelName,
+                RenderableKind.SURFACE_LAYER,
+                wallPoint.xMillimeters() + normalX * perpendicularOffset,
+                centerY,
+                wallPoint.yMillimeters() + normalY * perpendicularOffset,
+                width,
+                height,
+                JOINT_HEIGHT,
+                RotationAxis.Y,
+                wall.axis().angle().degrees(),
+                "joint",
+                1.0
         );
     }
 

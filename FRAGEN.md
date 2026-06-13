@@ -18,3 +18,6 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * DXF-Metadaten müssen textuelle Fachwerte verlustfrei kodieren und alte CADas-DXF-Dateien ohne Versionsmarker weiter importieren.
 * Die UI-Architektur kann direkt auf `JavaFX` und eine Desktop-Anwendung mit Zeichenfläche ausgerichtet werden.
 * Das erste MVP wird bewusst fachlich eingegrenzt, damit der 2D-Grundrisskern stabil wird, bevor er um komplexere Bauteile erweitert wird.
+
+## Noch zu klären
+* Eine echte 3D-Innenansicht braucht eine fachliche Festlegung für Raumkamera, Clipping der umgebenden Bauteile und Navigation. Bis dahin bleibt die 3D-Ansicht eine Orbit-Kontrollansicht mit sichtbaren Innenwand-Fugen.

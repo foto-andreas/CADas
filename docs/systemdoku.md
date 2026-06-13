@@ -105,6 +105,7 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 
 * Ebenen lassen sich auf ausgewählten Wand- und Raumflächen anlegen, umbenennen, ein- und ausblenden, umsortieren und mit Presets vorbelegen.
 * Sichtbare Wand-Innenlagen verschieben die automatisch abgeleitete Raum-Innenkante.
+* Sichtbare Innenwand-Fliesen werden in der 2D-Grundrissansicht als Belagsstreifen, in Seitenansichten als Fliesenraster und in 3D mit Fugen auf der Wandoberfläche gerendert.
 * Sichtbare Boden- und Deckenlagen verringern die lichte Raumhöhe und beeinflussen Volumen sowie 3D-Ableitung.
 * Registrierte `DWG`-Dateien werden als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
 * Über optionale `.blocks`-Katalogdateien oder manuelle Eingabe lassen sich zusätzlich konkrete DWG-Blocknamen als Oberflächen-Presets registrieren.
@@ -140,7 +141,7 @@ Die Standardteilversorgung besteht aus drei Ebenen:
 
 Die 2D-Zeichenfläche arbeitet intern in Millimetern und transformiert diese Weltkoordinaten mit Offset und Zoom auf Bildschirmkoordinaten. Dadurch bleiben Raster, Snap und Bemaßung konsistent, auch wenn die Ansicht verschoben oder skaliert wird.
 
-Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Dachflächen und optionale Oberflächen-Ebenen ab. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Für die Steuerung wird das Modell in einer eigenen Orbit-Gruppe um die Modellmitte gedreht; die Kamera selbst übernimmt nur Abstand und Projektion. Panning verschiebt die Ansicht bewusst entlang der Bildschirmachsen. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
+Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Dachflächen und optionale Oberflächen-Ebenen ab. Wandbeläge erhalten dabei zusätzlich dünne Fugen-Boxen, damit Fliesen auf Innenwänden nicht nur als glatte Schicht erscheinen. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Für die Steuerung wird das Modell in einer eigenen Orbit-Gruppe um die Modellmitte gedreht; die Kamera selbst übernimmt nur Abstand und Projektion. Panning verschiebt die Ansicht bewusst entlang der Bildschirmachsen. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
 
 Zusätzlich gibt es einen Oberflächenmodus: Transparente Raumkörper werden ausgeblendet, während Wände, Beläge, Boden- und Deckenflächen sichtbar bleiben. Öffnungen in Wänden geben dadurch den Blick in den Innenraum frei. Schräge Decken werden mit erhöhter Segmentdichte diskretisiert, damit die Kanten in 3D weniger treppenartig erscheinen.
 

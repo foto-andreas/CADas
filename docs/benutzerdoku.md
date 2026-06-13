@@ -229,7 +229,10 @@ Damit entsteht keine symbolische Schräge mehr, sondern eine fachlich wirksame I
 
 * In Seitenansichten werden Wände mit schräger Oberkante dargestellt.
 * Räume erscheinen dort nicht nur rechteckig, sondern mit polygonaler Deckenkontur.
+* Sichtbare Innenwand-Beläge erscheinen im Grundriss als schmaler Belagsstreifen an der betroffenen Wandseite; bei ausreichendem Zoom werden die Fliesenfugen entlang der Wand als kurze Querstriche sichtbar.
+* In den 2D-Seitenansichten werden Innenwand-Fliesen als Wandansicht mit Fliesenraster dargestellt.
 * In 3D werden die Raumvolumina und Wandkörper aus diesen Eckhöhen abgeleitet.
+* In 3D erzeugen sichtbare Wandfliesen zusätzlich eigene Fugen auf der Wandoberfläche, wenn `3D Ebenen` aktiv ist.
 
 ### Einfacher Fallback für Rechteckräume
 
@@ -264,7 +267,7 @@ Derzeit gilt:
 * Mit dem Mausrad zoomst du in der 3D-Ansicht.
 * Die 3D-Ansicht nutzt dafür eine feste Kamera mit Modell-Orbit; `Modell einpassen` und `Ansicht zentrieren` halten das Modell im Blick.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
-* `Oberflächenrendering` blendet die transparenten Raumvolumina aus und zeigt stattdessen die sichtbaren Flächen, Beläge und Öffnungen als baunähere Ansicht.
+* `Oberflächenrendering` blendet die transparenten Raumvolumina aus und zeigt stattdessen die sichtbaren Flächen, Beläge, Fliesenfugen und Öffnungen als baunähere Ansicht.
 * Über `Iso`, `Oben`, `Vorne` und `Rechts` wechselst du auf schnelle 3D-Kamerapresets.
 * Über die Geschoss-Checkboxen blendest du einzelne Etagen in der 3D-Ansicht ein oder aus.
 * Die Option `3D Ebenen` blendet zusätzliche Oberflächen-Schichten ein oder aus.
@@ -396,6 +399,7 @@ Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepfleg
 Für Anwender wichtig:
 
 * Sichtbare Innenlagen auf Wänden verkleinern den Raum entlang der Innenkante.
+* Innenwand-Fliesen werden im Grundriss, in 2D-Seitenansichten und in der 3D-Oberflächenansicht sichtbar.
 * Sichtbare Boden- und Deckenlagen verändern die lichte Raumhöhe und damit das Volumen.
 * Die 3D-Ansicht zeigt diese Ebenen auf Wunsch als gestapelte Schichten an.
 * Registrierte `DWG`-Bibliotheken erscheinen zusätzlich als auswählbare Referenz-Presets für Ebenen.
