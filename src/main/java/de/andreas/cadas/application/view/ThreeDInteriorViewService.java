@@ -1,10 +1,12 @@
 package de.andreas.cadas.application.view;
 
+import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.Wall;
 
+import java.util.List;
 import java.util.Objects;
 
 public final class ThreeDInteriorViewService {
@@ -24,7 +26,8 @@ public final class ThreeDInteriorViewService {
                 room.centerPoint().xMillimeters(),
                 levelBaseHeightMillimeters(project, level.name()) + room.floorThickness().toMillimeters() + eyeHeight,
                 room.centerPoint().yMillimeters(),
-                eyeHeight
+                eyeHeight,
+                room.outline()
         );
     }
 
@@ -65,7 +68,11 @@ public final class ThreeDInteriorViewService {
             double eyeXMillimeters,
             double eyeYMillimeters,
             double eyeZMillimeters,
-            double eyeHeightAboveFloorMillimeters
+            double eyeHeightAboveFloorMillimeters,
+            List<PlanPoint> roomOutline
     ) {
+        public InteriorViewTarget {
+            roomOutline = List.copyOf(roomOutline);
+        }
     }
 }

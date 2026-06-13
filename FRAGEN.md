@@ -18,5 +18,5 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * DXF-Metadaten müssen textuelle Fachwerte verlustfrei kodieren und alte CADas-DXF-Dateien ohne Versionsmarker weiter importieren.
 * Die UI-Architektur kann direkt auf `JavaFX` und eine Desktop-Anwendung mit Zeichenfläche ausgerichtet werden.
 * Das erste MVP wird bewusst fachlich eingegrenzt, damit der 2D-Grundrisskern stabil wird, bevor er um komplexere Bauteile erweitert wird.
-* Die erste 3D-Innenansicht wird als Raumkamera im bestehenden 3D-Fenster umgesetzt: ausgewählter Raum oder erster Raum der aktiven Etage, perspektivische Augenhöhe, Blickdrehung am festen Kamerastandpunkt und Sichtwinkel-Zoom per Mausrad bis 115°.
+* Die erste 3D-Innenansicht wird als Raumkamera im bestehenden 3D-Fenster umgesetzt: ausgewählter Raum oder erster Raum der aktiven Etage, perspektivische Augenhöhe, Blickdrehung am festen Kamerastandpunkt, begrenzte Vor-/Zurückbewegung im Raum und Sichtwinkel-Zoom per Mausrad bis 115°.
 * Wandbeläge auf Innen- und Außenflächen werden an Türen und Fenstern ausgespart. Dafür werden maximale sichtbare Rechtecke gebildet; die Kachelbelegung darf an virtuellen Rechteckgrenzen nicht neu starten.

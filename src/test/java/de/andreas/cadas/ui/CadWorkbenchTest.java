@@ -239,6 +239,40 @@ class CadWorkbenchTest {
                 "Status war: " + gezoomt.threeDCameraStatus()
         );
 
+        WorkbenchAutomationSnapshot bewegt = aufFxThread(() -> {
+            workbench.automationInvoke("threeDPanUp", null);
+            return workbench.automationSnapshot();
+        });
+
+        Assertions.assertTrue(
+                bewegt.threeDCameraStatus().contains("3D Innenansicht:")
+                        && bewegt.threeDCameraStatus().contains("Position 2,00/1,02 m"),
+                "Status war: " + bewegt.threeDCameraStatus()
+        );
+
+        WorkbenchAutomationSnapshot nachSnapshot = aufFxThread(() -> {
+            Path snapshotDatei = Files.createTempFile("cadas-innenkamera-", ".png");
+            workbench.automationInvoke("exportSubSceneSnapshot", snapshotDatei);
+            return workbench.automationSnapshot();
+        });
+
+        Assertions.assertTrue(
+                nachSnapshot.threeDCameraStatus().contains("Position 2,00/1,02 m"),
+                "Snapshot-Export darf die Innenposition nicht zurücksetzen: " + nachSnapshot.threeDCameraStatus()
+        );
+
+        WorkbenchAutomationSnapshot begrenzt = aufFxThread(() -> {
+            for (int index = 0; index < 10; index++) {
+                workbench.automationInvoke("threeDPanUp", null);
+            }
+            return workbench.automationSnapshot();
+        });
+
+        Assertions.assertTrue(
+                begrenzt.threeDCameraStatus().contains("Position 2,00/0,25 m"),
+                "Status war: " + begrenzt.threeDCameraStatus()
+        );
+
         WorkbenchAutomationSnapshot weitwinkel = aufFxThread(() -> {
             for (int index = 0; index < 10; index++) {
                 workbench.automationInvoke("threeDZoomOut", null);

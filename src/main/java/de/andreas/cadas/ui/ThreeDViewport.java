@@ -14,6 +14,7 @@ import de.andreas.cadas.application.view.ThreeDSceneFitService;
 import de.andreas.cadas.application.view.ThreeDSceneModel;
 import de.andreas.cadas.application.view.ThreeDSceneModelBuilder;
 import de.andreas.cadas.application.view.ThreeDViewPreparation;
+import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
@@ -78,6 +79,9 @@ public final class ThreeDViewport extends BorderPane {
     private static final double INTERIOR_FOV_DEGREES = 64.0;
     private static final double INTERIOR_MIN_FOV_DEGREES = 28.0;
     private static final double INTERIOR_MAX_FOV_DEGREES = 115.0;
+    private static final double INTERIOR_WALK_MILLIMETERS_PER_PIXEL = 8.0;
+    private static final double MAX_INTERIOR_WALL_CLEARANCE_MILLIMETERS = 150.0;
+    private static final double JOINT_MIN_RENDER_UNITS = 0.5;
 
     private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
@@ -129,6 +133,10 @@ public final class ThreeDViewport extends BorderPane {
     private CameraMode cameraMode = CameraMode.ORBIT;
     private InteriorViewTarget interiorTarget;
     private double interiorFieldOfViewDegrees = INTERIOR_FOV_DEGREES;
+    private double interiorEyeXMillimeters;
+    private double interiorEyeZMillimeters;
+    private double dragStartInteriorEyeXMillimeters;
+    private double dragStartInteriorEyeZMillimeters;
 
     public ThreeDViewport(Consumer<SelectionKey> selectionConsumer) {
         this.selectionConsumer = selectionConsumer;
@@ -310,6 +318,8 @@ public final class ThreeDViewport extends BorderPane {
             dragStartX = event.getSceneX();
             dragStartY = event.getSceneY();
             dragStartPose = cameraPose;
+            dragStartInteriorEyeXMillimeters = interiorEyeXMillimeters;
+            dragStartInteriorEyeZMillimeters = interiorEyeZMillimeters;
             dragButton = event.getButton();
         });
         subScene.setOnMouseDragged(event -> {
@@ -320,6 +330,8 @@ public final class ThreeDViewport extends BorderPane {
             double deltaY = event.getSceneY() - dragStartY;
             if (dragButton == MouseButton.PRIMARY) {
                 cameraPose = cameraController.orbit(dragStartPose, deltaX * 0.35, -deltaY * 0.35);
+            } else if (dragButton == MouseButton.SECONDARY && cameraMode == CameraMode.INTERIOR) {
+                moveInteriorCamera(deltaY);
             } else if (dragButton == MouseButton.SECONDARY && cameraMode == CameraMode.ORBIT) {
                 cameraPose = cameraController.pan(dragStartPose, deltaX, deltaY);
             }
@@ -618,6 +630,14 @@ public final class ThreeDViewport extends BorderPane {
 
     public void automationPan(double deltaScreenX, double deltaScreenY) {
         fitToSceneRequested = false;
+        if (cameraMode == CameraMode.INTERIOR) {
+            dragStartPose = cameraPose;
+            dragStartInteriorEyeXMillimeters = interiorEyeXMillimeters;
+            dragStartInteriorEyeZMillimeters = interiorEyeZMillimeters;
+            moveInteriorCamera(deltaScreenY);
+            updateCamera();
+            return;
+        }
         cameraPose = cameraController.pan(cameraPose, deltaScreenX, deltaScreenY);
         updateCamera();
     }
@@ -699,9 +719,9 @@ public final class ThreeDViewport extends BorderPane {
         double heightUnits = Math.max(1.0, renderableBox.height() * WORLD_SCALE);
         double depthUnits = Math.max(1.0, renderableBox.depth() * WORLD_SCALE);
         if ("joint".equals(renderableBox.materialKey())) {
-            widthUnits = Math.max(widthUnits, 2.0);
-            heightUnits = Math.max(heightUnits, 2.0);
-            depthUnits = Math.max(depthUnits, 2.0);
+            widthUnits = Math.max(widthUnits, JOINT_MIN_RENDER_UNITS);
+            heightUnits = Math.max(heightUnits, JOINT_MIN_RENDER_UNITS);
+            depthUnits = Math.max(depthUnits, JOINT_MIN_RENDER_UNITS);
         }
         Box box = new Box(widthUnits, heightUnits, depthUnits);
         box.setTranslateX(renderableBox.centerX() * WORLD_SCALE);
@@ -882,9 +902,9 @@ public final class ThreeDViewport extends BorderPane {
         perspectiveCamera.setFieldOfView(interiorFieldOfViewDegrees);
         perspectiveCamera.getTransforms().setAll(
                 new Translate(
-                        interiorTarget.eyeXMillimeters() * WORLD_SCALE,
+                        interiorEyeXMillimeters * WORLD_SCALE,
                         -interiorTarget.eyeYMillimeters() * WORLD_SCALE,
-                        -interiorTarget.eyeZMillimeters() * WORLD_SCALE
+                        -interiorEyeZMillimeters * WORLD_SCALE
                 ),
                 new Rotate(cameraPose.azimuthDegrees(), Rotate.Y_AXIS),
                 new Rotate(cameraPose.elevationDegrees(), Rotate.X_AXIS)
@@ -892,13 +912,33 @@ public final class ThreeDViewport extends BorderPane {
         subScene.setCamera(perspectiveCamera);
         applyLightPositions(260.0);
         cameraStatusLabel.setText(String.format(Locale.GERMAN,
-                "3D Innenansicht: %s | Augenhöhe %.2f m | Blick %.1f° / %.1f° | Sichtwinkel %.0f°",
+                "3D Innenansicht: %s | Augenhöhe %.2f m | Position %.2f/%.2f m | Blick %.1f° / %.1f° | Sichtwinkel %.0f°",
                 interiorTarget.roomName(),
                 interiorTarget.eyeHeightAboveFloorMillimeters() / 1000.0,
+                interiorEyeXMillimeters / 1000.0,
+                interiorEyeZMillimeters / 1000.0,
                 cameraPose.azimuthDegrees(),
                 cameraPose.elevationDegrees(),
                 interiorFieldOfViewDegrees
         ));
+    }
+
+    private void moveInteriorCamera(double deltaY) {
+        if (interiorTarget == null || dragStartPose == null) {
+            return;
+        }
+        double distanceMillimeters = -deltaY * INTERIOR_WALK_MILLIMETERS_PER_PIXEL;
+        double azimuthRadians = Math.toRadians(dragStartPose.azimuthDegrees());
+        double forwardX = Math.sin(azimuthRadians);
+        double forwardZ = -Math.cos(azimuthRadians);
+        PlanPoint bounded = boundedInteriorEyePosition(
+                dragStartInteriorEyeXMillimeters,
+                dragStartInteriorEyeZMillimeters,
+                dragStartInteriorEyeXMillimeters + forwardX * distanceMillimeters,
+                dragStartInteriorEyeZMillimeters + forwardZ * distanceMillimeters
+        );
+        interiorEyeXMillimeters = bounded.xMillimeters();
+        interiorEyeZMillimeters = bounded.yMillimeters();
     }
 
     private void zoomInteriorFieldOfView(double factor) {
@@ -919,7 +959,6 @@ public final class ThreeDViewport extends BorderPane {
 
     private void fitCameraToScene() {
         if (cameraMode == CameraMode.INTERIOR) {
-            resetInteriorPose();
             updateCamera();
             return;
         }
@@ -960,6 +999,10 @@ public final class ThreeDViewport extends BorderPane {
 
     private void resetInteriorPose() {
         interiorFieldOfViewDegrees = INTERIOR_FOV_DEGREES;
+        if (interiorTarget != null) {
+            interiorEyeXMillimeters = interiorTarget.eyeXMillimeters();
+            interiorEyeZMillimeters = interiorTarget.eyeZMillimeters();
+        }
         cameraPose = new CameraPose(
                 ProjectionMode.PERSPECTIVE,
                 0.0,
@@ -997,6 +1040,94 @@ public final class ThreeDViewport extends BorderPane {
 
     private double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private PlanPoint boundedInteriorEyePosition(double startX, double startZ, double targetX, double targetZ) {
+        if (isAllowedInteriorEyePosition(targetX, targetZ)) {
+            return new PlanPoint(targetX, targetZ);
+        }
+        double low = 0.0;
+        double high = 1.0;
+        for (int index = 0; index < 24; index++) {
+            double ratio = (low + high) / 2.0;
+            double x = startX + (targetX - startX) * ratio;
+            double z = startZ + (targetZ - startZ) * ratio;
+            if (isAllowedInteriorEyePosition(x, z)) {
+                low = ratio;
+            } else {
+                high = ratio;
+            }
+        }
+        return new PlanPoint(
+                startX + (targetX - startX) * low,
+                startZ + (targetZ - startZ) * low
+        );
+    }
+
+    private boolean isAllowedInteriorEyePosition(double xMillimeters, double zMillimeters) {
+        if (interiorTarget == null || interiorTarget.roomOutline().size() < 3) {
+            return true;
+        }
+        PlanPoint point = new PlanPoint(xMillimeters, zMillimeters);
+        return isInsideRoom(point) && distanceToRoomBoundary(point) >= interiorWallClearanceMillimeters();
+    }
+
+    private boolean isInsideRoom(PlanPoint point) {
+        List<PlanPoint> outline = interiorTarget.roomOutline();
+        boolean inside = false;
+        for (int current = 0, previous = outline.size() - 1; current < outline.size(); previous = current++) {
+            PlanPoint a = outline.get(current);
+            PlanPoint b = outline.get(previous);
+            boolean crossesHorizontalRay = (a.yMillimeters() > point.yMillimeters()) != (b.yMillimeters() > point.yMillimeters());
+            if (crossesHorizontalRay) {
+                double intersectionX = (b.xMillimeters() - a.xMillimeters())
+                        * (point.yMillimeters() - a.yMillimeters())
+                        / (b.yMillimeters() - a.yMillimeters())
+                        + a.xMillimeters();
+                if (point.xMillimeters() < intersectionX) {
+                    inside = !inside;
+                }
+            }
+        }
+        return inside;
+    }
+
+    private double distanceToRoomBoundary(PlanPoint point) {
+        List<PlanPoint> outline = interiorTarget.roomOutline();
+        double minimumDistance = Double.POSITIVE_INFINITY;
+        for (int index = 0; index < outline.size(); index++) {
+            PlanPoint start = outline.get(index);
+            PlanPoint end = outline.get((index + 1) % outline.size());
+            minimumDistance = Math.min(minimumDistance, distanceToSegment(point, start, end));
+        }
+        return minimumDistance;
+    }
+
+    private double distanceToSegment(PlanPoint point, PlanPoint start, PlanPoint end) {
+        double dx = end.xMillimeters() - start.xMillimeters();
+        double dy = end.yMillimeters() - start.yMillimeters();
+        double lengthSquared = dx * dx + dy * dy;
+        if (lengthSquared <= 0.001) {
+            return point.distanceTo(start).toMillimeters();
+        }
+        double ratio = clamp(
+                ((point.xMillimeters() - start.xMillimeters()) * dx + (point.yMillimeters() - start.yMillimeters()) * dy) / lengthSquared,
+                0.0,
+                1.0
+        );
+        double closestX = start.xMillimeters() + ratio * dx;
+        double closestY = start.yMillimeters() + ratio * dy;
+        return Math.hypot(point.xMillimeters() - closestX, point.yMillimeters() - closestY);
+    }
+
+    private double interiorWallClearanceMillimeters() {
+        List<PlanPoint> outline = interiorTarget.roomOutline();
+        double minX = outline.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0);
+        double maxX = outline.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0);
+        double minY = outline.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0);
+        double maxY = outline.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0);
+        double smallerSpan = Math.min(maxX - minX, maxY - minY);
+        return Math.max(20.0, Math.min(MAX_INTERIOR_WALL_CLEARANCE_MILLIMETERS, smallerSpan / 10.0));
     }
 
     private enum CameraMode {
