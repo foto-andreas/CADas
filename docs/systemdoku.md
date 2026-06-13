@@ -50,6 +50,8 @@ Für macOS gibt es zusätzlich Gradle-Aufgaben auf Basis von `jpackage`:
   Konkreter Adapter für ASCII-DXF-Import und -Export.
 * `de.andreas.cadas.application.layers`
   Belags-Presets, Kachelbelegung, Schichtwirkungen auf Raumgeometrie und Konsistenz zusätzlicher Oberflächen-Ebenen.
+* `de.andreas.cadas.application.view`
+  Ableitung renderbarer 3D-Modelle, Kamerasteuerung, Innenansicht und Belags-Ausschnitte für Wandöffnungen.
 
 ## Verantwortlichkeiten
 
@@ -81,7 +83,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 ### Anwendungslogik
 
-`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam. `SelectionTranslationService` verschiebt ausgewählte Wände und Treppen parallel als Gruppe. Deren Höhen werden in der Workbench zusätzlich als gemeinsamer Eckknoten bearbeitet und über `AutoRoomGenerationService` in polygonale Raumdecken und Volumen überführt. `QuarterTurnRotationService` kapselt die 90°-Drehung rotierbarer Bauteile testbar außerhalb der UI. `SurfaceLayerEffectService` berechnet die Wirkung sichtbarer Wand-, Boden- und Deckenlagen auf Innenkontur, lichte Höhe und Volumen. `ThreeDSceneModelBuilder` leitet aus denselben Domänenobjekten einen renderbaren 3D-Szenengraphen ab, `ThreeDCameraController` kapselt Orbit-, Pan-, Zoom- und Projektionswechsel der 3D-Ansicht, und `ThreeDInteriorViewService` berechnet die raumgebundene Innenkamera.
+`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam. `SelectionTranslationService` verschiebt ausgewählte Wände und Treppen parallel als Gruppe. Deren Höhen werden in der Workbench zusätzlich als gemeinsamer Eckknoten bearbeitet und über `AutoRoomGenerationService` in polygonale Raumdecken und Volumen überführt. `QuarterTurnRotationService` kapselt die 90°-Drehung rotierbarer Bauteile testbar außerhalb der UI. `SurfaceLayerEffectService` berechnet die Wirkung sichtbarer Wand-, Boden- und Deckenlagen auf Innenkontur, lichte Höhe und Volumen. `WallSurfaceOpeningService` bildet aus Türen und Fenstern maximale sichtbare Wandbelags-Rechtecke sowie Draufsicht-Intervalle. `ThreeDSceneModelBuilder` leitet aus denselben Domänenobjekten einen renderbaren 3D-Szenengraphen ab, `ThreeDCameraController` kapselt Orbit-, Pan-, Zoom- und Projektionswechsel der 3D-Ansicht, und `ThreeDInteriorViewService` berechnet die raumgebundene Innenkamera.
 
 `SelectionQueryService` kapselt die fachliche Auswahlauflösung unter dem Cursor. Dadurch liegt die Priorisierung von Öffnungen, Treppen, Wänden und Räumen nicht mehr direkt in der JavaFX-Workbench.
 
@@ -105,7 +107,8 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 
 * Ebenen lassen sich auf ausgewählten Wand- und Raumflächen anlegen, umbenennen, ein- und ausblenden, umsortieren und mit Presets vorbelegen.
 * Sichtbare Wand-Innenlagen verschieben die automatisch abgeleitete Raum-Innenkante.
-* Sichtbare Innenwand-Fliesen werden in der 2D-Grundrissansicht als Belagsstreifen, in Seitenansichten als Fliesenraster und in 3D mit Fugen auf der Wandoberfläche gerendert.
+* Sichtbare Innen- und Außenwand-Beläge werden in der 2D-Grundrissansicht als Belagsstreifen, in Seitenansichten als Raster und in 3D mit Fugen auf der Wandoberfläche gerendert.
+* Türen und Fenster schneiden Wandbeläge aus. Die sichtbaren Belagsflächen werden als maximale Rechtecke zerlegt; das Kachelraster läuft über virtuelle Rechteckgrenzen hinweg und wird nur an echten Öffnungskanten geklippt.
 * Sichtbare Boden- und Deckenlagen verringern die lichte Raumhöhe und beeinflussen Volumen sowie 3D-Ableitung.
 * Registrierte `DWG`-Dateien werden als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
 * Über optionale `.blocks`-Katalogdateien oder manuelle Eingabe lassen sich zusätzlich konkrete DWG-Blocknamen als Oberflächen-Presets registrieren.
@@ -141,7 +144,7 @@ Die Standardteilversorgung besteht aus drei Ebenen:
 
 Die 2D-Zeichenfläche arbeitet intern in Millimetern und transformiert diese Weltkoordinaten mit Offset und Zoom auf Bildschirmkoordinaten. Dadurch bleiben Raster, Snap und Bemaßung konsistent, auch wenn die Ansicht verschoben oder skaliert wird.
 
-Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Dachflächen und optionale Oberflächen-Ebenen ab. Wandbeläge erhalten dabei zusätzlich dünne Fugen-Boxen, damit Fliesen auf Innenwänden nicht nur als glatte Schicht erscheinen. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Für die Orbit-Steuerung wird das Modell in einer eigenen Orbit-Gruppe um die Modellmitte gedreht; die Kamera selbst übernimmt nur Abstand und Projektion. Die Innenansicht nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in Weltkoordinaten und zeigt nur die Zielebene. Panning verschiebt die Orbitansicht bewusst entlang der Bildschirmachsen. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
+Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Dachflächen und optionale Oberflächen-Ebenen ab. Wandbeläge erhalten dabei zusätzlich dünne Fugen-Boxen, damit Fliesen und Platten auf Wänden nicht nur als glatte Schicht erscheinen. Türen und Fenster werden aus diesen Wandbelägen ausgespart; die Fugen werden auf dem vollständigen Wandraster berechnet und gegen die sichtbaren Maximalrechtecke geklippt. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Für die Orbit-Steuerung wird das Modell in einer eigenen Orbit-Gruppe um die Modellmitte gedreht; die Kamera selbst übernimmt nur Abstand und Projektion. Die Innenansicht nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in Weltkoordinaten und zeigt nur die Zielebene. In der Innenansicht verändert der Zoom den Sichtwinkel statt die Kamera aus dem Raum zu verschieben. Panning verschiebt die Orbitansicht bewusst entlang der Bildschirmachsen. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
 
 Zusätzlich gibt es einen Oberflächenmodus: Transparente Raumkörper werden ausgeblendet, während Wände, Beläge, Boden- und Deckenflächen sichtbar bleiben. Öffnungen in Wänden geben dadurch den Blick in den Innenraum frei. Schräge Decken werden mit erhöhter Segmentdichte diskretisiert, damit die Kanten in 3D weniger treppenartig erscheinen.
 
@@ -164,7 +167,9 @@ Aktuell abgesichert sind unter anderem:
 * Standardteil-Bibliothek für Türen, Fenster und Treppen
 * Dach- und Ebenendomäne für weitere Ausbaustufen
 * 3D-Geometrieableitung für Wände, Räume, Öffnungen, Treppen und Dach
+* Ausschnitt von Wandbelägen und Fugen an Türen und Fenstern
 * Kameragrundverhalten für Orbit, Pan, Zoom und Projektionswechsel
+* raumgebundene 3D-Innenansicht mit Sichtwinkel-Zoom
 * Kamera-Presets für die sechs orthogonalen Ansichten
 * Auswahlpriorisierung für Türen, Fenster, Treppen, Wände und Räume
 * 90°-Drehung für Wände, Räume und Treppen

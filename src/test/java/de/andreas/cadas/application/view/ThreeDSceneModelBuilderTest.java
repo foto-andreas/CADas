@@ -345,6 +345,73 @@ class ThreeDSceneModelBuilderTest {
     }
 
     @Test
+    void spartÖffnungenAusInnenwandBelägenUndFugenAus() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        level.addRoom(Room.rectangular(
+                "Wohnen",
+                new PlanPoint(100, 100),
+                new PlanPoint(3900, 2900),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        ));
+        level.addDoor(Door.create(
+                wall.id(),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(2.1, LengthUnit.METER),
+                Length.zero()
+        ));
+        level.addWindow(WindowElement.create(
+                wall.id(),
+                Length.of(2.4, LengthUnit.METER),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(1.2, LengthUnit.METER)
+        ));
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, wall.id().toString());
+        SurfaceLayer layer = SurfaceLayer.create(
+                "Dämmplatte",
+                Length.of(20, LengthUnit.MILLIMETER),
+                Length.of(125, LengthUnit.CENTIMETER),
+                Length.of(62.5, LengthUnit.CENTIMETER),
+                Length.of(2, LengthUnit.MILLIMETER)
+        );
+        stack.addLayer(layer);
+        level.addSurfaceLayerStack(stack);
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), true);
+
+        List<RenderableBox> wallLayerBodies = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "surface-layer".equals(box.materialKey()))
+                .toList();
+        List<RenderableBox> wallJoints = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "joint".equals(box.materialKey()))
+                .toList();
+
+        assertEquals(5, wallLayerBodies.size());
+        assertFalse(wallLayerBodies.stream().anyMatch(box -> Math.abs(box.width() - 4000.0) < 0.001
+                && Math.abs(box.height() - 2800.0) < 0.001));
+        assertFalse(wallLayerBodies.stream().anyMatch(box -> overlapsWallOpening(box, 180.0, 1000.0, 1900.0, 0.0, 2100.0)));
+        assertFalse(wallLayerBodies.stream().anyMatch(box -> overlapsWallOpening(box, 180.0, 2400.0, 3400.0, 900.0, 2100.0)));
+        assertFalse(wallJoints.isEmpty());
+        assertFalse(wallJoints.stream().anyMatch(box -> overlapsWallOpening(box, 180.0, 1000.0, 1900.0, 0.0, 2100.0)));
+        assertFalse(wallJoints.stream().anyMatch(box -> overlapsWallOpening(box, 180.0, 2400.0, 3400.0, 900.0, 2100.0)));
+        assertTrue(wallJoints.stream().anyMatch(box -> Math.abs(box.width() - 2.0) < 0.001 || Math.abs(box.height() - 2.0) < 0.001));
+    }
+
+    @Test
     void rendertRaumbezogenenInnenwandBelagNurAufDerSeiteDesAusgewaehltenRaums() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         var level = project.primaryLevel();
@@ -469,6 +536,24 @@ class ThreeDSceneModelBuilderTest {
             PlanPoint end = points.get((index + 1) % points.size());
             level.addWall(Wall.create(new PlanSegment(start, end), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
         }
+    }
+
+    private boolean overlapsWallOpening(
+            RenderableBox box,
+            double baseHeight,
+            double openingStart,
+            double openingEnd,
+            double openingLower,
+            double openingUpper
+    ) {
+        double localStart = box.centerX() - box.width() / 2.0;
+        double localEnd = box.centerX() + box.width() / 2.0;
+        double localLower = box.centerY() - baseHeight - box.height() / 2.0;
+        double localUpper = box.centerY() - baseHeight + box.height() / 2.0;
+        return localStart < openingEnd - 0.001
+                && localEnd > openingStart + 0.001
+                && localLower < openingUpper - 0.001
+                && localUpper > openingLower + 0.001;
     }
 
     @Test

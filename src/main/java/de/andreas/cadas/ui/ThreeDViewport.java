@@ -77,6 +77,8 @@ public final class ThreeDViewport extends BorderPane {
     private static final double ORTHO_FIT_PADDING = 1.4;
     private static final double INTERIOR_CAMERA_DISTANCE_UNITS = 10.0;
     private static final double INTERIOR_FOV_DEGREES = 64.0;
+    private static final double INTERIOR_MIN_FOV_DEGREES = 28.0;
+    private static final double INTERIOR_MAX_FOV_DEGREES = 85.0;
 
     private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
@@ -127,6 +129,7 @@ public final class ThreeDViewport extends BorderPane {
     private boolean surfaceRenderingMode;
     private CameraMode cameraMode = CameraMode.ORBIT;
     private InteriorViewTarget interiorTarget;
+    private double interiorFieldOfViewDegrees = INTERIOR_FOV_DEGREES;
 
     public ThreeDViewport(Consumer<SelectionKey> selectionConsumer) {
         this.selectionConsumer = selectionConsumer;
@@ -327,6 +330,7 @@ public final class ThreeDViewport extends BorderPane {
         subScene.setOnMouseReleased(event -> dragButton = MouseButton.NONE);
         subScene.setOnScroll(event -> {
             if (cameraMode == CameraMode.INTERIOR) {
+                zoomInteriorFieldOfView(event.getDeltaY() > 0 ? 0.92 : 1.08);
                 return;
             }
             cameraPose = cameraController.zoom(cameraPose, event.getDeltaY() > 0 ? 0.92 : 1.08);
@@ -620,6 +624,10 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void automationZoom(double factor) {
+        if (cameraMode == CameraMode.INTERIOR) {
+            zoomInteriorFieldOfView(factor);
+            return;
+        }
         fitToSceneRequested = false;
         cameraPose = cameraController.zoom(cameraPose, factor);
         updateCamera();
@@ -692,7 +700,9 @@ public final class ThreeDViewport extends BorderPane {
         double heightUnits = Math.max(1.0, renderableBox.height() * WORLD_SCALE);
         double depthUnits = Math.max(1.0, renderableBox.depth() * WORLD_SCALE);
         if ("joint".equals(renderableBox.materialKey())) {
+            widthUnits = Math.max(widthUnits, 2.0);
             heightUnits = Math.max(heightUnits, 2.0);
+            depthUnits = Math.max(depthUnits, 2.0);
         }
         Box box = new Box(widthUnits, heightUnits, depthUnits);
         box.setTranslateX(renderableBox.centerX() * WORLD_SCALE);
@@ -870,7 +880,7 @@ public final class ThreeDViewport extends BorderPane {
         modelGroup.getTransforms().setAll(new Scale(1.0, 1.0, -1.0));
         orbitGroup.getTransforms().clear();
         sceneGroup.getTransforms().setAll();
-        perspectiveCamera.setFieldOfView(INTERIOR_FOV_DEGREES);
+        perspectiveCamera.setFieldOfView(interiorFieldOfViewDegrees);
         perspectiveCamera.getTransforms().setAll(
                 new Rotate(cameraPose.azimuthDegrees(), Rotate.Y_AXIS),
                 new Rotate(cameraPose.elevationDegrees(), Rotate.X_AXIS),
@@ -883,12 +893,23 @@ public final class ThreeDViewport extends BorderPane {
         subScene.setCamera(perspectiveCamera);
         applyLightPositions(260.0);
         cameraStatusLabel.setText(String.format(Locale.GERMAN,
-                "3D Innenansicht: %s | Augenhöhe %.2f m | Blick %.1f° / %.1f°",
+                "3D Innenansicht: %s | Augenhöhe %.2f m | Blick %.1f° / %.1f° | Sichtwinkel %.0f°",
                 interiorTarget.roomName(),
                 interiorTarget.eyeHeightAboveFloorMillimeters() / 1000.0,
                 cameraPose.azimuthDegrees(),
-                cameraPose.elevationDegrees()
+                cameraPose.elevationDegrees(),
+                interiorFieldOfViewDegrees
         ));
+    }
+
+    private void zoomInteriorFieldOfView(double factor) {
+        fitToSceneRequested = false;
+        interiorFieldOfViewDegrees = clamp(
+                interiorFieldOfViewDegrees * factor,
+                INTERIOR_MIN_FOV_DEGREES,
+                INTERIOR_MAX_FOV_DEGREES
+        );
+        updateCamera();
     }
 
     private void nudgeOrbit(double azimuthDelta, double elevationDelta) {
@@ -939,6 +960,7 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private void resetInteriorPose() {
+        interiorFieldOfViewDegrees = INTERIOR_FOV_DEGREES;
         cameraPose = new CameraPose(
                 ProjectionMode.PERSPECTIVE,
                 0.0,
@@ -972,6 +994,10 @@ public final class ThreeDViewport extends BorderPane {
 
     private double worldUnitsToMillimeters(double worldUnits) {
         return worldUnits / WORLD_SCALE;
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private enum CameraMode {

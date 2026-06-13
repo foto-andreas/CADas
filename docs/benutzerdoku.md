@@ -229,10 +229,10 @@ Damit entsteht keine symbolische Schräge mehr, sondern eine fachlich wirksame I
 
 * In Seitenansichten werden Wände mit schräger Oberkante dargestellt.
 * Räume erscheinen dort nicht nur rechteckig, sondern mit polygonaler Deckenkontur.
-* Sichtbare Innenwand-Beläge erscheinen im Grundriss als schmaler Belagsstreifen an der betroffenen Wandseite; bei ausreichendem Zoom werden die Fliesenfugen entlang der Wand als kurze Querstriche sichtbar.
-* In den 2D-Seitenansichten werden Innenwand-Fliesen als Wandansicht mit Fliesenraster dargestellt.
+* Sichtbare Innen- und Außenwand-Beläge erscheinen im Grundriss als schmaler Belagsstreifen an der betroffenen Wandseite; Türen und Fenster unterbrechen diesen Streifen.
+* In den 2D-Seitenansichten werden Wandbeläge als Wandansicht mit Fliesen- oder Plattenraster dargestellt. Türen und Fenster bleiben ausgespart, und die Fugen laufen über virtuelle Teilrechtecke hinweg weiter.
 * In 3D werden die Raumvolumina und Wandkörper aus diesen Eckhöhen abgeleitet.
-* In 3D erzeugen sichtbare Wandfliesen zusätzlich eigene Fugen auf der Wandoberfläche, wenn `3D Ebenen` aktiv ist.
+* In 3D erzeugen sichtbare Wandfliesen und Plattenbeläge zusätzlich eigene Fugen auf der Wandoberfläche, wenn `3D Ebenen` aktiv ist. Öffnungen werden auch dort ausgespart.
 
 ### Einfacher Fallback für Rechteckräume
 
@@ -267,6 +267,7 @@ Derzeit gilt:
 * Mit dem Mausrad zoomst du in der 3D-Orbitansicht.
 * Im Arbeitsbereich `Innen` sitzt die Kamera im ausgewählten Raum oder, ohne Auswahl, im ersten Raum der aktiven Etage.
 * In `Innen` drehst du mit gedrückter linker Maustaste den Blick aus dem Raum heraus.
+* In `Innen` ändert das Mausrad die Brennweite beziehungsweise den Sichtwinkel, ohne die Kamera aus dem Raum zu verschieben.
 * Die 3D-Ansicht nutzt dafür eine feste Kamera mit Modell-Orbit; `Modell einpassen` und `Ansicht zentrieren` halten das Modell im Blick.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
 * `Oberflächenrendering` blendet die transparenten Raumvolumina aus und zeigt stattdessen die sichtbaren Flächen, Beläge, Fliesenfugen und Öffnungen als baunähere Ansicht.
@@ -335,7 +336,7 @@ Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D`, `3D` und `Innen`.
 
 * `2D` zeigt die Zeichenfläche mit Linealen und Grundrisswerkzeugen.
 * `3D` nutzt denselben Platz für die räumliche Orbit-Kontrollansicht.
-* `Innen` nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in den aktuellen Raum und zeigt Innenwand-Beläge aus dem Raum heraus.
+* `Innen` nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in den aktuellen Raum und zeigt Innenwand-Beläge aus dem Raum heraus. Mit dem Mausrad stellst du dort den Sichtwinkel ein.
 * Dadurch bleibt mehr Platz für die aktive Arbeitsansicht, statt 2D und 3D ständig parallel einzublenden.
 
 ## DWG-Blöcke für Oberflächen verwenden
@@ -402,7 +403,7 @@ Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepfleg
 Für Anwender wichtig:
 
 * Sichtbare Innenlagen auf Wänden verkleinern den Raum entlang der Innenkante.
-* Innenwand-Fliesen werden im Grundriss, in 2D-Seitenansichten und in der 3D-Oberflächenansicht sichtbar.
+* Innen- und Außenwand-Beläge werden im Grundriss, in 2D-Seitenansichten und in der 3D-Oberflächenansicht sichtbar. Türen und Fenster schneiden Belag und Fugen an der jeweiligen Öffnung aus.
 * Sichtbare Boden- und Deckenlagen verändern die lichte Raumhöhe und damit das Volumen.
 * Die 3D-Ansicht zeigt diese Ebenen auf Wunsch als gestapelte Schichten an.
 * Registrierte `DWG`-Bibliotheken erscheinen zusätzlich als auswählbare Referenz-Presets für Ebenen.
