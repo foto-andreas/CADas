@@ -35,6 +35,8 @@ import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.application.view.WallSurfaceOpeningService;
 import de.andreas.cadas.application.view.WallSurfaceOpeningService.WallSurfaceInterval;
 import de.andreas.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle;
+import de.andreas.cadas.application.view.WallSurfacePlanGeometryService;
+import de.andreas.cadas.application.view.WallSurfacePlanGeometryService.WallSurfacePlanPolygon;
 import de.andreas.cadas.domain.geometry.Angle;
 import de.andreas.cadas.domain.geometry.Grid;
 import de.andreas.cadas.domain.geometry.Length;
@@ -177,6 +179,7 @@ public final class CadWorkbench extends BorderPane {
     private final SurfaceLayerConsistencyService surfaceLayerConsistencyService = new SurfaceLayerConsistencyService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
+    private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
@@ -1600,22 +1603,30 @@ public final class CadWorkbench extends BorderPane {
     private void drawWallSurfaceStackInPlan(GraphicsContext graphics, Wall wall, SurfaceLayerStack stack) {
         double cumulativeThickness = wall.thickness().toMillimeters() / 2.0;
         WallSurfaceSideService.WallLayerSides sides = wallSurfaceSideService.resolve(activeLevel.get(), wall, stack.surfaceType(), stack.targetKey());
-        for (SurfaceLayer layer : stack.layers()) {
+        for (int layerIndex = 0; layerIndex < stack.layers().size(); layerIndex++) {
+            SurfaceLayer layer = stack.layers().get(layerIndex);
             double layerThickness = layer.thickness().toMillimeters();
             if (layer.visible() && layerThickness > 0.0) {
                 double centerOffset = cumulativeThickness + layerThickness / 2.0;
                 if (sides.positiveSide()) {
-                    drawWallSurfaceLayerInPlan(graphics, wall, layer, centerOffset);
+                    drawWallSurfaceLayerInPlan(graphics, wall, stack, layer, layerIndex, centerOffset);
                 }
                 if (sides.negativeSide()) {
-                    drawWallSurfaceLayerInPlan(graphics, wall, layer, -centerOffset);
+                    drawWallSurfaceLayerInPlan(graphics, wall, stack, layer, layerIndex, -centerOffset);
                 }
             }
             cumulativeThickness += layerThickness;
         }
     }
 
-    private void drawWallSurfaceLayerInPlan(GraphicsContext graphics, Wall wall, SurfaceLayer layer, double centerOffset) {
+    private void drawWallSurfaceLayerInPlan(
+            GraphicsContext graphics,
+            Wall wall,
+            SurfaceLayerStack stack,
+            SurfaceLayer layer,
+            int layerIndex,
+            double centerOffset
+    ) {
         double wallLength = wall.axis().length().toMillimeters();
         if (wallLength <= 0.0) {
             return;
@@ -1625,21 +1636,37 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         graphics.save();
-        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.SQUARE);
-        graphics.setStroke(Color.color(0.72, 0.58, 0.34, 0.82));
-        graphics.setLineWidth(Math.max(2.0, layer.thickness().toMillimeters() * scale()));
+        graphics.setFill(Color.color(0.72, 0.58, 0.34, 0.82));
         for (WallSurfaceInterval interval : visibleIntervals) {
-            PlanPoint start = wallOffsetPoint(wall, interval.startMillimeters(), centerOffset);
-            PlanPoint end = wallOffsetPoint(wall, interval.endMillimeters(), centerOffset);
-            graphics.strokeLine(
-                    toScreenProjectedX(start, 0.0),
-                    toScreenProjectedY(start, 0.0),
-                    toScreenProjectedX(end, 0.0),
-                    toScreenProjectedY(end, 0.0)
-            );
+            fillWallSurfaceIntervalInPlan(graphics, wall, stack, layer, layerIndex, centerOffset, interval);
         }
         drawWallSurfaceJointsInPlan(graphics, wall, layer, centerOffset, visibleIntervals);
         graphics.restore();
+    }
+
+    private void fillWallSurfaceIntervalInPlan(
+            GraphicsContext graphics,
+            Wall wall,
+            SurfaceLayerStack stack,
+            SurfaceLayer layer,
+            int layerIndex,
+            double centerOffset,
+            WallSurfaceInterval interval
+    ) {
+        WallSurfacePlanPolygon polygon = wallSurfacePlanGeometryService.surfacePolygon(
+                activeLevel.get(),
+                wall,
+                stack,
+                layer,
+                layerIndex,
+                centerOffset,
+                interval
+        );
+        graphics.fillPolygon(
+                polygon.points().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray(),
+                polygon.points().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray(),
+                polygon.points().size()
+        );
     }
 
     private void drawWallSurfaceJointsInPlan(
