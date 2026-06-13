@@ -119,7 +119,7 @@ Für den aktuellen Stand gilt:
 * Wände, Räume, Türen, Fenster und Treppen werden sichtbar als DXF-Geometrie exportiert.
 * Zielversion für neue produktive DXF-Dateien ist `AutoCAD 2000` mit `$ACADVER = AC1015`.
 * Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
-* Neue Exporte schreiben `CADAS_DXF|2` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben.
+* Neue Exporte schreiben `CADAS_DXF|2` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben. Türen und Fenster behalten in dieser Metadatenspur ihre Objekt-IDs.
 * Der Import bleibt zu älteren CADas-DXF-Metadaten ohne Versionsmarker kompatibel und überspringt einzelne beschädigte Metadatensätze, statt den gesamten Import abzubrechen.
 * Der Export schreibt aktuell metrische Kopfvariablen über `$INSUNITS = 4` und `$MEASUREMENT = 1`.
 * Exportierte Entities werden explizit als Model-Space-Elemente gekennzeichnet und mit eigenen Handles versehen.
@@ -157,7 +157,7 @@ Aktuell abgesichert sind unter anderem:
 * Flächen- und Volumenberechnung von Räumen
 * DXF-Roundtrip für die Grundobjekte des MVP
 * DXF-Header, Model-Space-Kennzeichnung, `TABLES`, `BLOCKS`, `INSERT` und `OBJECTS` für bessere AutoCAD-Kompatibilität
-* DXF-Metadaten-Versionierung, Sonderzeichen-Rundlauf und toleranter Import beschädigter Metadaten
+* DXF-Metadaten-Versionierung, Sonderzeichen-Rundlauf, stabile Öffnungs-IDs und toleranter Import beschädigter Metadaten
 * Dateinamennormalisierung für DXF-Import und -Export
 * DWG-Blockkataloge für Oberflächen-Presets
 * Standardteil-Bibliothek für Türen, Fenster und Treppen

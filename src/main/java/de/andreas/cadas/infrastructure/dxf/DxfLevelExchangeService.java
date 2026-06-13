@@ -108,7 +108,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             );
             appendMetadataText(dxf, context, start, String.format(
                     Locale.US,
-                    "DOOR|%s|%.3f|%.3f|%.3f|%.3f",
+                    "DOOR|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                    door.id(),
                     door.wallId(),
                     door.offsetFromStart().toMillimeters(),
                     door.width().toMillimeters(),
@@ -134,7 +135,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             );
             appendMetadataText(dxf, context, start, String.format(
                     Locale.US,
-                    "WINDOW|%s|%.3f|%.3f|%.3f|%.3f",
+                    "WINDOW|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                    window.id(),
                     window.wallId(),
                     window.offsetFromStart().toMillimeters(),
                     window.width().toMillimeters(),
@@ -288,20 +290,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             ));
                         }
                     }
-                    case "DOOR" -> pendingDoors.add(Door.create(
-                            UUID.fromString(parts[1]),
-                            Length.ofMillimeters(parseDouble(parts[2])),
-                            Length.ofMillimeters(parseDouble(parts[3])),
-                            Length.ofMillimeters(parseDouble(parts[4])),
-                            Length.ofMillimeters(parseDouble(parts[5]))
-                    ));
-                    case "WINDOW" -> pendingWindows.add(WindowElement.create(
-                            UUID.fromString(parts[1]),
-                            Length.ofMillimeters(parseDouble(parts[2])),
-                            Length.ofMillimeters(parseDouble(parts[3])),
-                            Length.ofMillimeters(parseDouble(parts[4])),
-                            Length.ofMillimeters(parseDouble(parts[5]))
-                    ));
+                    case "DOOR" -> pendingDoors.add(deserializeDoor(parts));
+                    case "WINDOW" -> pendingWindows.add(deserializeWindow(parts));
                     case "STAIR" -> importedStaircases.add(new Staircase(
                             UUID.fromString(parts[1]),
                             StairType.valueOf(parts[2]),
@@ -502,6 +492,46 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
 
     private static double parseDouble(String value) {
         return Double.parseDouble(value);
+    }
+
+    private static Door deserializeDoor(String[] parts) {
+        if (parts.length >= 7) {
+            return new Door(
+                    UUID.fromString(parts[1]),
+                    UUID.fromString(parts[2]),
+                    Length.ofMillimeters(parseDouble(parts[3])),
+                    Length.ofMillimeters(parseDouble(parts[4])),
+                    Length.ofMillimeters(parseDouble(parts[5])),
+                    Length.ofMillimeters(parseDouble(parts[6]))
+            );
+        }
+        return Door.create(
+                UUID.fromString(parts[1]),
+                Length.ofMillimeters(parseDouble(parts[2])),
+                Length.ofMillimeters(parseDouble(parts[3])),
+                Length.ofMillimeters(parseDouble(parts[4])),
+                Length.ofMillimeters(parseDouble(parts[5]))
+        );
+    }
+
+    private static WindowElement deserializeWindow(String[] parts) {
+        if (parts.length >= 7) {
+            return new WindowElement(
+                    UUID.fromString(parts[1]),
+                    UUID.fromString(parts[2]),
+                    Length.ofMillimeters(parseDouble(parts[3])),
+                    Length.ofMillimeters(parseDouble(parts[4])),
+                    Length.ofMillimeters(parseDouble(parts[5])),
+                    Length.ofMillimeters(parseDouble(parts[6]))
+            );
+        }
+        return WindowElement.create(
+                UUID.fromString(parts[1]),
+                Length.ofMillimeters(parseDouble(parts[2])),
+                Length.ofMillimeters(parseDouble(parts[3])),
+                Length.ofMillimeters(parseDouble(parts[4])),
+                Length.ofMillimeters(parseDouble(parts[5]))
+        );
     }
 
     private static Optional<Double> parseOptionalDouble(String value) {
