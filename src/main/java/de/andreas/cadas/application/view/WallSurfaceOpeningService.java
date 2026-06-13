@@ -1,0 +1,225 @@
+package de.andreas.cadas.application.view;
+
+import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.Level;
+import de.andreas.cadas.domain.model.Wall;
+import de.andreas.cadas.domain.model.WindowElement;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.TreeSet;
+
+public final class WallSurfaceOpeningService {
+
+    private static final double EPSILON = 0.001;
+
+    public List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall) {
+        double wallLength = wall.axis().length().toMillimeters();
+        double wallHeight = wall.maximumHeightMillimeters();
+        if (wallLength <= EPSILON || wallHeight <= EPSILON) {
+            return List.of();
+        }
+        List<WallOpeningRectangle> openings = openingRectangles(level, wall);
+        if (openings.isEmpty()) {
+            return List.of(new WallSurfaceRectangle(0.0, wallLength, 0.0, wallHeight));
+        }
+
+        TreeSet<Double> heightCuts = new TreeSet<>();
+        heightCuts.add(0.0);
+        heightCuts.add(wallHeight);
+        for (WallOpeningRectangle opening : openings) {
+            heightCuts.add(opening.lowerHeightMillimeters());
+            heightCuts.add(opening.upperHeightMillimeters());
+        }
+
+        List<Double> heights = new ArrayList<>(heightCuts);
+        List<WallSurfaceRectangle> bands = new ArrayList<>();
+        for (int index = 0; index < heights.size() - 1; index++) {
+            double lower = heights.get(index);
+            double upper = heights.get(index + 1);
+            if (upper - lower <= EPSILON) {
+                continue;
+            }
+            addVisibleBandRectangles(bands, openings, wallLength, lower, upper);
+        }
+        return mergeVertically(bands);
+    }
+
+    public List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall) {
+        double wallLength = wall.axis().length().toMillimeters();
+        if (wallLength <= EPSILON) {
+            return List.of();
+        }
+        List<WallOpeningRectangle> openings = openingRectangles(level, wall);
+        if (openings.isEmpty()) {
+            return List.of(new WallSurfaceInterval(0.0, wallLength));
+        }
+        List<WallSurfaceInterval> mergedOpenings = mergeOpeningIntervals(openings);
+        List<WallSurfaceInterval> intervals = new ArrayList<>();
+        double cursor = 0.0;
+        for (WallSurfaceInterval opening : mergedOpenings) {
+            if (opening.startMillimeters() - cursor > EPSILON) {
+                intervals.add(new WallSurfaceInterval(cursor, opening.startMillimeters()));
+            }
+            cursor = Math.max(cursor, opening.endMillimeters());
+        }
+        if (wallLength - cursor > EPSILON) {
+            intervals.add(new WallSurfaceInterval(cursor, wallLength));
+        }
+        return List.copyOf(intervals);
+    }
+
+    public List<WallOpeningRectangle> openingRectangles(Level level, Wall wall) {
+        double wallLength = wall.axis().length().toMillimeters();
+        double wallHeight = wall.maximumHeightMillimeters();
+        if (wallLength <= EPSILON || wallHeight <= EPSILON) {
+            return List.of();
+        }
+        List<WallOpeningRectangle> openings = new ArrayList<>();
+        for (Door door : level.doors()) {
+            if (!door.wallId().equals(wall.id())) {
+                continue;
+            }
+            addOpening(openings, door.offsetFromStart().toMillimeters(), door.offsetFromStart().add(door.width()).toMillimeters(), 0.0, door.height().toMillimeters(), wallLength, wallHeight);
+        }
+        for (WindowElement window : level.windows()) {
+            if (!window.wallId().equals(wall.id())) {
+                continue;
+            }
+            addOpening(openings, window.offsetFromStart().toMillimeters(), window.offsetFromStart().add(window.width()).toMillimeters(), window.sillHeight().toMillimeters(), window.sillHeight().toMillimeters() + window.windowHeight().toMillimeters(), wallLength, wallHeight);
+        }
+        openings.sort(Comparator.comparingDouble(WallOpeningRectangle::startMillimeters)
+                .thenComparingDouble(WallOpeningRectangle::lowerHeightMillimeters));
+        return List.copyOf(openings);
+    }
+
+    private void addOpening(
+            List<WallOpeningRectangle> openings,
+            double start,
+            double end,
+            double lower,
+            double upper,
+            double wallLength,
+            double wallHeight
+    ) {
+        double clippedStart = clamp(start, 0.0, wallLength);
+        double clippedEnd = clamp(end, 0.0, wallLength);
+        double clippedLower = clamp(lower, 0.0, wallHeight);
+        double clippedUpper = clamp(upper, 0.0, wallHeight);
+        if (clippedEnd - clippedStart > EPSILON && clippedUpper - clippedLower > EPSILON) {
+            openings.add(new WallOpeningRectangle(clippedStart, clippedEnd, clippedLower, clippedUpper));
+        }
+    }
+
+    private void addVisibleBandRectangles(
+            List<WallSurfaceRectangle> rectangles,
+            List<WallOpeningRectangle> openings,
+            double wallLength,
+            double lower,
+            double upper
+    ) {
+        List<WallOpeningRectangle> blockingOpenings = openings.stream()
+                .filter(opening -> opening.upperHeightMillimeters() > lower + EPSILON)
+                .filter(opening -> opening.lowerHeightMillimeters() < upper - EPSILON)
+                .sorted(Comparator.comparingDouble(WallOpeningRectangle::startMillimeters))
+                .toList();
+        double cursor = 0.0;
+        for (WallOpeningRectangle opening : blockingOpenings) {
+            if (opening.startMillimeters() - cursor > EPSILON) {
+                rectangles.add(new WallSurfaceRectangle(cursor, opening.startMillimeters(), lower, upper));
+            }
+            cursor = Math.max(cursor, opening.endMillimeters());
+        }
+        if (wallLength - cursor > EPSILON) {
+            rectangles.add(new WallSurfaceRectangle(cursor, wallLength, lower, upper));
+        }
+    }
+
+    private List<WallSurfaceRectangle> mergeVertically(List<WallSurfaceRectangle> rectangles) {
+        List<WallSurfaceRectangle> merged = new ArrayList<>();
+        for (WallSurfaceRectangle rectangle : rectangles) {
+            int mergeIndex = findVerticalMergeCandidate(merged, rectangle);
+            if (mergeIndex >= 0) {
+                WallSurfaceRectangle previous = merged.remove(mergeIndex);
+                merged.add(new WallSurfaceRectangle(
+                        previous.startMillimeters(),
+                        previous.endMillimeters(),
+                        previous.lowerHeightMillimeters(),
+                        rectangle.upperHeightMillimeters()
+                ));
+            } else {
+                merged.add(rectangle);
+            }
+        }
+        return List.copyOf(merged);
+    }
+
+    private int findVerticalMergeCandidate(List<WallSurfaceRectangle> rectangles, WallSurfaceRectangle rectangle) {
+        for (int index = rectangles.size() - 1; index >= 0; index--) {
+            if (rectangles.get(index).touchesVertically(rectangle)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private List<WallSurfaceInterval> mergeOpeningIntervals(List<WallOpeningRectangle> openings) {
+        List<WallSurfaceInterval> merged = new ArrayList<>();
+        for (WallOpeningRectangle opening : openings.stream()
+                .sorted(Comparator.comparingDouble(WallOpeningRectangle::startMillimeters))
+                .toList()) {
+            if (merged.isEmpty() || opening.startMillimeters() > merged.getLast().endMillimeters() + EPSILON) {
+                merged.add(new WallSurfaceInterval(opening.startMillimeters(), opening.endMillimeters()));
+                continue;
+            }
+            WallSurfaceInterval previous = merged.removeLast();
+            merged.add(new WallSurfaceInterval(
+                    previous.startMillimeters(),
+                    Math.max(previous.endMillimeters(), opening.endMillimeters())
+            ));
+        }
+        return merged;
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    public record WallSurfaceRectangle(
+            double startMillimeters,
+            double endMillimeters,
+            double lowerHeightMillimeters,
+            double upperHeightMillimeters
+    ) {
+
+        public double widthMillimeters() {
+            return endMillimeters - startMillimeters;
+        }
+
+        public double heightMillimeters() {
+            return upperHeightMillimeters - lowerHeightMillimeters;
+        }
+
+        boolean touchesVertically(WallSurfaceRectangle other) {
+            return Math.abs(startMillimeters - other.startMillimeters) <= EPSILON
+                    && Math.abs(endMillimeters - other.endMillimeters) <= EPSILON
+                    && Math.abs(upperHeightMillimeters - other.lowerHeightMillimeters) <= EPSILON;
+        }
+    }
+
+    public record WallSurfaceInterval(double startMillimeters, double endMillimeters) {
+
+        public double lengthMillimeters() {
+            return endMillimeters - startMillimeters;
+        }
+    }
+
+    public record WallOpeningRectangle(
+            double startMillimeters,
+            double endMillimeters,
+            double lowerHeightMillimeters,
+            double upperHeightMillimeters
+    ) {
+    }
+}

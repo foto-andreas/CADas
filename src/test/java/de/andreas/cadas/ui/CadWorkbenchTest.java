@@ -222,6 +222,22 @@ class CadWorkbenchTest {
                 snapshot.threeDCameraStatus().contains("Augenhöhe 1,60 m"),
                 "Status war: " + snapshot.threeDCameraStatus()
         );
+        Assertions.assertTrue(
+                snapshot.threeDCameraStatus().contains("Sichtwinkel 64°"),
+                "Status war: " + snapshot.threeDCameraStatus()
+        );
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("threeDZoomIn", null);
+            return null;
+        });
+        WorkbenchAutomationSnapshot gezoomt = aufFxThread(workbench::automationSnapshot);
+
+        Assertions.assertTrue(
+                gezoomt.threeDCameraStatus().contains("3D Innenansicht:")
+                        && gezoomt.threeDCameraStatus().contains("Sichtwinkel 59°"),
+                "Status war: " + gezoomt.threeDCameraStatus()
+        );
     }
 
     private Path erzeugeEinfachesProjektAlsDxf() throws Exception {

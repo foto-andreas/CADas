@@ -61,6 +61,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Türen, Fenster und Treppen in 3D aus den bestehenden Domänenobjekten ableiten.
 - [x] Dachgeometrie für das erste Satteldach visualisieren.
 - [x] Zusätzliche Flächen-Ebenen optional als gestapelte Schichten visualisieren.
+- [x] Wandbeläge in 2D und 3D an Türen und Fenstern aussparen und Fugen ohne virtuelle Raster-Neustarts fortführen.
 - [x] Einfache Material- und Farbzuordnung für Bauteilarten definieren.
 - [x] Auswahl und Hervorhebung von 3D-Objekten vorbereiten.
 - [x] Synchronisation zwischen 2D-Auswahl und 3D-Auswahl vorbereiten.
@@ -72,6 +73,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] CRUD, Sichtbarkeit und Reihenfolge von Ebenen je Fläche, Raum, Etage und Modell unterstützen.
 - [x] Schichtstärken pro Ebene verarbeiten.
 - [x] Rechteckige Kachelbelegung mit Richtung, automatischem Versatz und Mindestversatz umsetzen.
+- [x] Maximale Wandbelags-Rechtecke um Öffnungen bilden und Beläge an echten Öffnungskanten begrenzen.
 - [x] Konsistenzregeln für gleiche Ebenenfolgen in gleichen Bereichen definieren.
 - [x] Raumkonturen zusätzlich um sichtbare Wand-Innenbeläge und weitere wirksame Wandebenen verschieben, sobald diese auf Wänden fachlich geführt werden.
 
@@ -152,6 +154,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Modell: Die Decken müssen innerhalb des Raums liegen. Der Raum soll um die Deckendicke in seiner Höhe vermindert werden. Die Decken sollen innerhalb des Polygons liegen, den die oberen Wandinnenkanten bilden.
 - [x] bei den Decken gibt es noch das Problem, dass diese bei Innenecken in die Wand hineinragen, und zwar bis zur Wandmitte genau in der Innenecke. Außenecken sehen ok aus.
 - [x] Echte 3D-Innenansicht mit raumgebundener Kamera im bestehenden 3D-Fenster umsetzen.
+- [x] Innenansicht im 3D-Fenster mit Sichtwinkel-/Brennweiten-Zoom ergänzen.
 - [x] Modell/UI: Die Standard-Deckendicke soll 1mm betragen
 - [x] Aktuell gibt es Fundamente unter den Wänden, der Boden ist leer und mit etwas Abstand unter dem Haus ist eine Ebene, die wie Fußboden aussieht.
 - [x] "Rückgängig" (ggf. auch "Wiederherstellen") ändert ungewollt Zoom und Position

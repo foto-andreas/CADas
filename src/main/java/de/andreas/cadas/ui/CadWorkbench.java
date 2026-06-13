@@ -32,6 +32,9 @@ import de.andreas.cadas.application.parts.WindowPreset;
 import de.andreas.cadas.application.room.AutoRoomGenerationService;
 import de.andreas.cadas.application.view.RenderableKind;
 import de.andreas.cadas.application.view.SelectionKey;
+import de.andreas.cadas.application.view.WallSurfaceOpeningService;
+import de.andreas.cadas.application.view.WallSurfaceOpeningService.WallSurfaceInterval;
+import de.andreas.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle;
 import de.andreas.cadas.domain.geometry.Angle;
 import de.andreas.cadas.domain.geometry.Grid;
 import de.andreas.cadas.domain.geometry.Length;
@@ -173,6 +176,7 @@ public final class CadWorkbench extends BorderPane {
     private final TileLayoutService tileLayoutService = new TileLayoutService();
     private final SurfaceLayerConsistencyService surfaceLayerConsistencyService = new SurfaceLayerConsistencyService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
+    private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
@@ -1583,10 +1587,14 @@ public final class CadWorkbench extends BorderPane {
     private void drawWallSurfaceLayersInPlan(GraphicsContext graphics) {
         for (Wall wall : activeLevel.get().walls()) {
             activeLevel.get().surfaceLayerStacks().stream()
-                    .filter(stack -> stack.surfaceType() == SurfaceType.WALL_INTERIOR)
+                    .filter(stack -> isWallSurfaceType(stack.surfaceType()))
                     .filter(stack -> WallSurfaceTargetKey.matchesWall(stack.targetKey(), wall.id()))
                     .forEach(stack -> drawWallSurfaceStackInPlan(graphics, wall, stack));
         }
+    }
+
+    private boolean isWallSurfaceType(SurfaceType surfaceType) {
+        return surfaceType == SurfaceType.WALL_INTERIOR || surfaceType == SurfaceType.WALL_EXTERIOR;
     }
 
     private void drawWallSurfaceStackInPlan(GraphicsContext graphics, Wall wall, SurfaceLayerStack stack) {
@@ -1612,23 +1620,35 @@ public final class CadWorkbench extends BorderPane {
         if (wallLength <= 0.0) {
             return;
         }
-        PlanPoint start = wallOffsetPoint(wall, 0.0, centerOffset);
-        PlanPoint end = wallOffsetPoint(wall, wallLength, centerOffset);
+        List<WallSurfaceInterval> visibleIntervals = wallSurfaceOpeningService.visiblePlanIntervals(activeLevel.get(), wall);
+        if (visibleIntervals.isEmpty()) {
+            return;
+        }
         graphics.save();
         graphics.setLineCap(javafx.scene.shape.StrokeLineCap.SQUARE);
         graphics.setStroke(Color.color(0.72, 0.58, 0.34, 0.82));
         graphics.setLineWidth(Math.max(2.0, layer.thickness().toMillimeters() * scale()));
-        graphics.strokeLine(
-                toScreenProjectedX(start, 0.0),
-                toScreenProjectedY(start, 0.0),
-                toScreenProjectedX(end, 0.0),
-                toScreenProjectedY(end, 0.0)
-        );
-        drawWallSurfaceJointsInPlan(graphics, wall, layer, centerOffset);
+        for (WallSurfaceInterval interval : visibleIntervals) {
+            PlanPoint start = wallOffsetPoint(wall, interval.startMillimeters(), centerOffset);
+            PlanPoint end = wallOffsetPoint(wall, interval.endMillimeters(), centerOffset);
+            graphics.strokeLine(
+                    toScreenProjectedX(start, 0.0),
+                    toScreenProjectedY(start, 0.0),
+                    toScreenProjectedX(end, 0.0),
+                    toScreenProjectedY(end, 0.0)
+            );
+        }
+        drawWallSurfaceJointsInPlan(graphics, wall, layer, centerOffset, visibleIntervals);
         graphics.restore();
     }
 
-    private void drawWallSurfaceJointsInPlan(GraphicsContext graphics, Wall wall, SurfaceLayer layer, double centerOffset) {
+    private void drawWallSurfaceJointsInPlan(
+            GraphicsContext graphics,
+            Wall wall,
+            SurfaceLayer layer,
+            double centerOffset,
+            List<WallSurfaceInterval> visibleIntervals
+    ) {
         double wallLength = wall.axis().length().toMillimeters();
         double jointWidth = layer.jointWidth().toMillimeters();
         if (jointWidth < 0.001 || layer.tileWidth().toMillimeters() * scale() < 14.0) {
@@ -1654,6 +1674,9 @@ public final class CadWorkbench extends BorderPane {
             if (jointPosition <= 0.001 || jointPosition >= wallLength - 0.001) {
                 continue;
             }
+            if (!isVisiblePlanJoint(jointPosition, visibleIntervals)) {
+                continue;
+            }
             String key = String.format(Locale.US, "%.3f", jointPosition);
             if (!jointPositions.add(key)) {
                 continue;
@@ -1669,10 +1692,16 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
+    private boolean isVisiblePlanJoint(double jointPosition, List<WallSurfaceInterval> visibleIntervals) {
+        return visibleIntervals.stream()
+                .anyMatch(interval -> jointPosition > interval.startMillimeters() + 0.001
+                        && jointPosition < interval.endMillimeters() - 0.001);
+    }
+
     private void drawWallSurfaceLayersInElevation(GraphicsContext graphics) {
         for (Wall wall : activeLevel.get().walls()) {
             activeLevel.get().surfaceLayerStacks().stream()
-                    .filter(stack -> stack.surfaceType() == SurfaceType.WALL_INTERIOR)
+                    .filter(stack -> isWallSurfaceType(stack.surfaceType()))
                     .filter(stack -> WallSurfaceTargetKey.matchesWall(stack.targetKey(), wall.id()))
                     .forEach(stack -> drawWallSurfaceStackInElevation(graphics, wall, stack));
         }
@@ -1697,34 +1726,56 @@ public final class CadWorkbench extends BorderPane {
         if (wallLength <= 0.0 || Math.abs(endHorizontal - startHorizontal) < 10.0) {
             return;
         }
+        List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(activeLevel.get(), wall);
+        if (visibleRectangles.isEmpty()) {
+            return;
+        }
         double startX = toScreenHorizontal(startHorizontal);
         double endX = toScreenHorizontal(endHorizontal);
-        double floorY = toScreenVertical(0.0);
-        double startTopY = toScreenProjectedY(wall.axis().start(), wall.heightAtStart());
-        double endTopY = toScreenProjectedY(wall.axis().end(), wall.heightAtEnd());
         graphics.save();
         graphics.setFill(Color.color(0.72, 0.58, 0.34, 0.26));
-        graphics.fillPolygon(
-                new double[]{startX, endX, endX, startX},
-                new double[]{floorY, floorY, endTopY, startTopY},
-                4
-        );
         graphics.setStroke(Color.color(0.47, 0.36, 0.20, 0.80));
         graphics.setLineWidth(1.2);
-        graphics.strokePolygon(
-                new double[]{startX, endX, endX, startX},
-                new double[]{floorY, floorY, endTopY, startTopY},
-                4
-        );
-        drawWallSurfaceJointsInElevation(graphics, wall, layer, startX, endX, floorY);
+        for (WallSurfaceRectangle rectangle : visibleRectangles) {
+            double startRatio = rectangle.startMillimeters() / wallLength;
+            double endRatio = rectangle.endMillimeters() / wallLength;
+            double rectStartX = interpolateScreen(startX, endX, startRatio);
+            double rectEndX = interpolateScreen(startX, endX, endRatio);
+            double startTop = Math.min(rectangle.upperHeightMillimeters(), wall.heightAt(rectangle.startMillimeters()));
+            double endTop = Math.min(rectangle.upperHeightMillimeters(), wall.heightAt(rectangle.endMillimeters()));
+            if (startTop <= rectangle.lowerHeightMillimeters() && endTop <= rectangle.lowerHeightMillimeters()) {
+                continue;
+            }
+            double bottomY = toScreenVertical(-rectangle.lowerHeightMillimeters());
+            double startTopY = toScreenVertical(-startTop);
+            double endTopY = toScreenVertical(-endTop);
+            graphics.fillPolygon(
+                    new double[]{rectStartX, rectEndX, rectEndX, rectStartX},
+                    new double[]{bottomY, bottomY, endTopY, startTopY},
+                    4
+            );
+            graphics.strokePolygon(
+                    new double[]{rectStartX, rectEndX, rectEndX, rectStartX},
+                    new double[]{bottomY, bottomY, endTopY, startTopY},
+                    4
+            );
+        }
+        drawWallSurfaceJointsInElevation(graphics, wall, layer, startX, endX, visibleRectangles);
         graphics.restore();
     }
 
-    private void drawWallSurfaceJointsInElevation(GraphicsContext graphics, Wall wall, SurfaceLayer layer, double startX, double endX, double floorY) {
+    private void drawWallSurfaceJointsInElevation(
+            GraphicsContext graphics,
+            Wall wall,
+            SurfaceLayer layer,
+            double startX,
+            double endX,
+            List<WallSurfaceRectangle> visibleRectangles
+    ) {
         double jointWidth = layer.jointWidth().toMillimeters();
         double wallLength = wall.axis().length().toMillimeters();
         double wallHeight = wall.maximumHeightMillimeters();
-        if (jointWidth < 0.001 || wallLength <= 0.0 || wallHeight <= 0.0) {
+        if (jointWidth < 0.001 || wallLength <= 0.0 || wallHeight <= 0.0 || visibleRectangles.isEmpty()) {
             return;
         }
         TileLayoutRequest request = new TileLayoutRequest(
@@ -1745,28 +1796,77 @@ public final class CadWorkbench extends BorderPane {
         for (TilePlacement tile : tileLayoutService.fillSurface(request)) {
             double localStart = tile.xOffset().toMillimeters();
             double localEnd = localStart + tile.width().toMillimeters();
-            double localCenter = (localStart + localEnd) / 2.0;
             double rowTop = tile.yOffset().toMillimeters() + tile.height().toMillimeters();
-            if (rowTop <= wall.heightAt(localCenter)) {
-                String horizontalKey = String.format(Locale.US, "h:%.3f:%.3f:%.3f", rowTop, localStart, localEnd);
-                if (horizontalKeys.add(horizontalKey)) {
-                    double y = toScreenVertical(-rowTop);
-                    graphics.strokeLine(
-                            interpolateScreen(startX, endX, localStart / wallLength),
-                            y,
-                            interpolateScreen(startX, endX, localEnd / wallLength),
-                            y
-                    );
-                }
+            drawClippedWallSurfaceJointsInElevation(
+                    graphics,
+                    horizontalKeys,
+                    "h",
+                    wallLength,
+                    startX,
+                    endX,
+                    visibleRectangles,
+                    localStart,
+                    localEnd,
+                    rowTop - jointWidth,
+                    rowTop
+            );
+            drawClippedWallSurfaceJointsInElevation(
+                    graphics,
+                    verticalKeys,
+                    "v",
+                    wallLength,
+                    startX,
+                    endX,
+                    visibleRectangles,
+                    localEnd - jointWidth,
+                    localEnd,
+                    tile.yOffset().toMillimeters(),
+                    tile.yOffset().toMillimeters() + tile.height().toMillimeters()
+            );
+        }
+    }
+
+    private void drawClippedWallSurfaceJointsInElevation(
+            GraphicsContext graphics,
+            Set<String> keys,
+            String prefix,
+            double wallLength,
+            double startX,
+            double endX,
+            List<WallSurfaceRectangle> visibleRectangles,
+            double localStartX,
+            double localEndX,
+            double localLowerY,
+            double localUpperY
+    ) {
+        for (WallSurfaceRectangle rectangle : visibleRectangles) {
+            double clippedStartX = Math.max(localStartX, rectangle.startMillimeters());
+            double clippedEndX = Math.min(localEndX, rectangle.endMillimeters());
+            double clippedLowerY = Math.max(localLowerY, rectangle.lowerHeightMillimeters());
+            double clippedUpperY = Math.min(localUpperY, rectangle.upperHeightMillimeters());
+            if (clippedEndX - clippedStartX <= 0.001 || clippedUpperY - clippedLowerY <= 0.001) {
+                continue;
             }
-            double localJoint = localEnd;
-            if (localJoint > 0.001 && localJoint < wallLength - 0.001) {
-                String verticalKey = String.format(Locale.US, "v:%.3f", localJoint);
-                if (verticalKeys.add(verticalKey)) {
-                    double x = interpolateScreen(startX, endX, localJoint / wallLength);
-                    double topY = toScreenVertical(-wall.heightAt(localJoint));
-                    graphics.strokeLine(x, floorY, x, topY);
-                }
+            String key = String.format(Locale.US, "%s:%.3f:%.3f:%.3f:%.3f", prefix, clippedStartX, clippedEndX, clippedLowerY, clippedUpperY);
+            if (!keys.add(key)) {
+                continue;
+            }
+            double centerX = interpolateScreen(startX, endX, ((clippedStartX + clippedEndX) / 2.0) / wallLength);
+            double centerY = toScreenVertical(-((clippedLowerY + clippedUpperY) / 2.0));
+            if ("h".equals(prefix)) {
+                graphics.strokeLine(
+                        interpolateScreen(startX, endX, clippedStartX / wallLength),
+                        centerY,
+                        interpolateScreen(startX, endX, clippedEndX / wallLength),
+                        centerY
+                );
+            } else {
+                graphics.strokeLine(
+                        centerX,
+                        toScreenVertical(-clippedLowerY),
+                        centerX,
+                        toScreenVertical(-clippedUpperY)
+                );
             }
         }
     }
@@ -4319,13 +4419,13 @@ public final class CadWorkbench extends BorderPane {
                 threeDViewport.automationPan(0.0, 60.0);
             }
             case "threeDZoomIn" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationZoom(0.92);
             }
             case "threeDZoomOut" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationZoom(1.08);
