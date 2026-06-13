@@ -160,6 +160,67 @@ class DxfProjectExchangeServiceTest {
     }
 
     @Test
+    void importiertGebaeudeOeffnungenReihenfolgeunabhaengigUndNurMitHostWand() throws Exception {
+        java.util.UUID wallId = java.util.UUID.randomUUID();
+        java.util.UUID missingWallId = java.util.UUID.randomUUID();
+        java.util.UUID doorId = java.util.UUID.randomUUID();
+        java.util.UUID windowId = java.util.UUID.randomUUID();
+        Path file = tempDir.resolve("oeffnungen-reihenfolge.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                CADAS_DXF|2
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                PROJECT|Haus
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                LEVEL|Erdgeschoss
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                DOOR|Erdgeschoss|%s|%s|1000.000|1010.000|2010.000|0.000
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WINDOW|Erdgeschoss|%s|%s|2200.000|1200.000|900.000|1200.000
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WALL|Erdgeschoss|%s|175.000|2750.000|2750.000|2750.000|0.000|0.000|4000.000|0.000
+                0
+                ENDSEC
+                0
+                EOF
+                """.formatted(doorId, wallId, windowId, missingWallId, wallId));
+
+        ProjectModel imported = exchangeService.importProject(file, "Fallback");
+
+        assertEquals(1, imported.primaryLevel().doors().size());
+        assertEquals(doorId, imported.primaryLevel().doors().getFirst().id());
+        assertTrue(imported.primaryLevel().windows().isEmpty());
+    }
+
+    @Test
     void exportiertUndImportiertOberflaechenStapelMitEtagen() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         project.primaryLevel().addRoom(Room.rectangular(
