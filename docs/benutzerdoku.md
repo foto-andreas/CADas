@@ -81,7 +81,9 @@ Die obere Werkzeugleiste ist bewusst kompakt gehalten. Dort liegen:
 * Etage hinzufügen
 * Rückgängig und Wiederherstellen
 * Auswahl löschen und Auswahl aufheben
-* Anzeige-Optionen wie Raster, Snap, Bemaßung, Fläche und Hilfslinien
+* schneller Zugriff auf Raster, Raster-Snap, Punkt-Snap, Bemaßung und `2D zentrieren`
+
+Weitere Anzeigeoptionen wie Flächen-/Volumenwerte, Hilfslinien und Nordpfeil liegen im Menü `Optionen`, damit die Werkzeugleiste auch auf kleineren Fenstern ohne Überlauf nutzbar bleibt.
 
 ### Eigenschaftenleiste
 
@@ -306,7 +308,7 @@ Wichtige Kürzel der aktuellen Oberfläche:
 * `Esc`: Auswahl aufheben
 * `Cmd+0` oder `Strg+0`: 2D-Ansicht zentrieren
 * `Cmd+Shift+0` oder `Strg+Shift+0`: 3D-Ansicht zentrieren
-* `Cmd+E`, `Cmd+W`, `Cmd+R`, `Cmd+T`, `Cmd+D`, `Cmd+F`: Werkzeuge `Bearbeiten`, `Wand`, `Raum`, `Treppe`, `Tür`, `Fenster`
+* `Cmd+E`, `Cmd+W`, `Cmd+T`, `Cmd+D`, `Cmd+F`: Werkzeuge `Bearbeiten`, `Wand`, `Treppe`, `Tür`, `Fenster`
 
 ## Ansichten umschalten
 
@@ -370,12 +372,12 @@ Mit dem Werkzeug `Wand` zeichnest du lineare Wände.
 * Mit gedrückter `Shift`-Taste wird frei gezeichnet.
 * Wandstärke und Wandhöhe kommen aus den aktuellen Eingabefeldern.
 
-### Raum
+### Räume auswählen und bearbeiten
 
-Mit dem Werkzeug `Raum` zeichnest du keinen separaten Rechteckraum mehr.
+Räume werden nicht mehr mit einem eigenen Zeichenwerkzeug erstellt.
 
 * Räume werden automatisch aus geschlossenen Wandzügen erzeugt.
-* Mit dem Werkzeug `Raum` klickst du in einen automatisch erkannten Raum, um ihn gezielt auszuwählen.
+* Im Werkzeug `Bearbeiten` klickst du in einen automatisch erkannten Raum, um ihn gezielt auszuwählen.
 * Raumname, Raumhöhe, Bodenstärke, Deckenstärke und Dachschräge kommen aus den aktuellen Eingaben und können dann auf die Auswahl angewendet werden.
 * Wenn du eine gemeinsame Wandecke verschiebst, wird die Raumkontur automatisch nachgeführt und darf dabei auch schräg oder polygonal werden.
 
@@ -672,10 +674,14 @@ Der Export enthält aktuell:
 
 * sichtbare DXF-Geometrie für Wände, Räume, Öffnungen und Treppen
 * CADas-Metadaten für verlustärmeren Re-Import
-* metrische DXF-Kennzeichnung für Millimeter und Model-Space
+* Zielversion `AutoCAD 2000` / `$ACADVER = AC1015`
+* metrische DXF-Kennzeichnung mit `$INSUNITS = 4`, `$MEASUREMENT = 1` und Model-Space
 * DXF-Tabellen für Layer, Linientypen, Textstil und Block-Records
 * wiederverwendbare Tür-, Fenster- und Treppenblöcke mit `INSERT`-Referenzen
 * Handles sowie eine einfache `OBJECTS`- und Layout-Grundstruktur
+* `CADAS_META` mit Marker `CADAS_DXF|2`; Textfelder werden UTF-8-kodiert, damit Umlaute, `/` und `|` im Rundlauf erhalten bleiben
+
+Beim Import liest CADas weiterhin ältere CADas-DXF-Dateien ohne Versionsmarker. Einzelne beschädigte oder fremde Metadaten-Einträge werden übersprungen, damit nutzbare Geometrie und gültige Fachobjekte weiter geladen werden können.
 
 ### Dateinamen
 

@@ -67,7 +67,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * optionale Himmelsrichtung
 * Live-Anzeige von Länge und Winkel
 * ein- und ausblendbare Bemaßung für Wände
-* Werkzeugmodus für Wände, Räume, Türen, Fenster und Bearbeitung
+* Werkzeugmodus für Wände, Treppen, Türen, Fenster und Bearbeitung; Räume werden automatisch abgeleitet und im Bearbeiten-Werkzeug ausgewählt
 * umschaltbarer Mittelbereich für 2D-Zeichenfläche oder 3D-Ansicht
 * 3D-Ansicht mit Orbit, Zoom, Pan und Auswahlrückkopplung
 * Mehrfachauswahl mit Eigenschaftenübernahme auf mehrere passende Bauteile
@@ -117,7 +117,10 @@ Für den aktuellen Stand gilt:
 
 * Gebäude-DXF ist die Standardfunktion für den Austausch kompletter Modelle mit mehreren Etagen.
 * Wände, Räume, Türen, Fenster und Treppen werden sichtbar als DXF-Geometrie exportiert.
+* Zielversion für neue produktive DXF-Dateien ist `AutoCAD 2000` mit `$ACADVER = AC1015`.
 * Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
+* Neue Exporte schreiben `CADAS_DXF|2` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben.
+* Der Import bleibt zu älteren CADas-DXF-Metadaten ohne Versionsmarker kompatibel und überspringt einzelne beschädigte Metadatensätze, statt den gesamten Import abzubrechen.
 * Der Export schreibt aktuell metrische Kopfvariablen über `$INSUNITS = 4` und `$MEASUREMENT = 1`.
 * Exportierte Entities werden explizit als Model-Space-Elemente gekennzeichnet und mit eigenen Handles versehen.
 * `TABLES` für Layer-, Linientyp-, Textstil- und Block-Record-Grunddaten werden geschrieben.
@@ -154,6 +157,7 @@ Aktuell abgesichert sind unter anderem:
 * Flächen- und Volumenberechnung von Räumen
 * DXF-Roundtrip für die Grundobjekte des MVP
 * DXF-Header, Model-Space-Kennzeichnung, `TABLES`, `BLOCKS`, `INSERT` und `OBJECTS` für bessere AutoCAD-Kompatibilität
+* DXF-Metadaten-Versionierung, Sonderzeichen-Rundlauf und toleranter Import beschädigter Metadaten
 * Dateinamennormalisierung für DXF-Import und -Export
 * DWG-Blockkataloge für Oberflächen-Presets
 * Standardteil-Bibliothek für Türen, Fenster und Treppen

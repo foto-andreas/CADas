@@ -4,6 +4,7 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 
 ## Festlegungen
 * Erstes AutoCAD-kompatibles Austauschformat ist `DXF`.
+* Neue produktive DXF-Dateien zielen auf `AutoCAD 2000` / `$ACADVER = AC1015`, metrische Einheiten und CADas-Metadatenmarker `CADAS_DXF|2`.
 * Die grafische Oberfläche wird mit `JavaFX` umgesetzt.
 * Die Architektur wird plattformneutral angelegt, aktiv verifiziert wird zunächst auf `macOS`.
 * Das erste fachliche MVP umfasst Etagen, Wände, Türen, Fenster und Bemaßungen.
@@ -14,5 +15,6 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 
 ## Auswirkung auf die Umsetzung
 * Die Formatarchitektur muss von Anfang an so geschnitten sein, dass `DXF` zuerst geliefert und `DWG` später ergänzbar wird.
+* DXF-Metadaten müssen textuelle Fachwerte verlustfrei kodieren und alte CADas-DXF-Dateien ohne Versionsmarker weiter importieren.
 * Die UI-Architektur kann direkt auf `JavaFX` und eine Desktop-Anwendung mit Zeichenfläche ausgerichtet werden.
 * Das erste MVP wird bewusst fachlich eingegrenzt, damit der 2D-Grundrisskern stabil wird, bevor er um komplexere Bauteile erweitert wird.
