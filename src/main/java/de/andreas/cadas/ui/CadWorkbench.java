@@ -126,7 +126,8 @@ public final class CadWorkbench extends BorderPane {
 
     private enum WorkspaceMode {
         TWO_D("2D"),
-        THREE_D("3D");
+        THREE_D("3D"),
+        INTERIOR("Innen");
 
         private final String label;
 
@@ -386,6 +387,13 @@ public final class CadWorkbench extends BorderPane {
         activeWorkspaceMode.addListener((ignored, oldValue, newValue) -> {
             updateWorkspaceMode();
             if (newValue == WorkspaceMode.THREE_D) {
+                threeDViewport.activateOrbitView();
+                refreshThreeDIfNeeded();
+            } else if (newValue == WorkspaceMode.INTERIOR) {
+                if (!activateInteriorViewForCurrentRoom()) {
+                    activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                    return;
+                }
                 refreshThreeDIfNeeded();
             }
             render();
@@ -487,6 +495,7 @@ public final class CadWorkbench extends BorderPane {
         box.getChildren().add(new Label("Arbeitsbereich:"));
         box.getChildren().add(workspaceModeButton(WorkspaceMode.TWO_D));
         box.getChildren().add(workspaceModeButton(WorkspaceMode.THREE_D));
+        box.getChildren().add(workspaceModeButton(WorkspaceMode.INTERIOR));
         box.getChildren().add(new Separator(Orientation.VERTICAL));
         box.getChildren().add(new Label("2D-Ansichten:"));
         box.getChildren().add(viewButton("⤒ Oben", () -> activeView.set(ViewOrientation.TOP), "Schaltet auf die feste Draufsicht um."));
@@ -550,9 +559,11 @@ public final class CadWorkbench extends BorderPane {
         button.setStyle(workspaceModeButtonStyle(workspaceMode == activeWorkspaceMode.get()));
         activeWorkspaceMode.addListener((ignored, oldValue, newValue) ->
                 button.setStyle(workspaceModeButtonStyle(workspaceMode == newValue)));
-        applyTooltip(button, workspaceMode == WorkspaceMode.TWO_D
-                ? "Zeigt die 2D-Zeichenfläche im großen Mittelbereich an."
-                : "Zeigt die 3D-Ansicht im großen Mittelbereich an und spart Platz gegenüber der Parallelansicht.");
+        applyTooltip(button, switch (workspaceMode) {
+            case TWO_D -> "Zeigt die 2D-Zeichenfläche im großen Mittelbereich an.";
+            case THREE_D -> "Zeigt die 3D-Orbitansicht im großen Mittelbereich an und spart Platz gegenüber der Parallelansicht.";
+            case INTERIOR -> "Öffnet die 3D-Innenansicht im aktuell ausgewählten Raum oder im ersten Raum der aktiven Etage.";
+        });
         return button;
     }
 
@@ -609,6 +620,18 @@ public final class CadWorkbench extends BorderPane {
         threeDViewport.setManaged(!showTwoD);
     }
 
+    private boolean activateInteriorViewForCurrentRoom() {
+        Optional<Room> targetRoom = selectedSurfaceRoom()
+                .or(this::selectedRoom)
+                .or(() -> activeLevel.get().rooms().stream().findFirst());
+        if (targetRoom.isEmpty()) {
+            draftLabel.setText("Innenansicht braucht einen Raum auf der aktiven Etage.");
+            return false;
+        }
+        threeDViewport.activateInteriorView(project, activeLevel.get(), targetRoom.get());
+        return true;
+    }
+
     private MenuBar buildMenuBar() {
         Menu dateiMenu = new Menu("Datei");
         dateiMenu.getItems().addAll(
@@ -635,6 +658,7 @@ public final class CadWorkbench extends BorderPane {
         ansichtMenu.getItems().addAll(
                 menuItem("2D-Arbeitsbereich", () -> activeWorkspaceMode.set(WorkspaceMode.TWO_D), null),
                 menuItem("3D-Arbeitsbereich", () -> activeWorkspaceMode.set(WorkspaceMode.THREE_D), null),
+                menuItem("3D-Innenansicht", () -> activeWorkspaceMode.set(WorkspaceMode.INTERIOR), null),
                 new SeparatorMenuItem()
         );
         for (ViewOrientation viewOrientation : ViewOrientation.values()) {
@@ -4235,13 +4259,13 @@ public final class CadWorkbench extends BorderPane {
             case "importPartLibrary" -> importPartLibrary(requirePath(path, actionName));
             case "exportWorkbenchSnapshot" -> exportWorkbenchSnapshot(requirePath(path, actionName));
             case "exportThreeDSnapshot" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.exportSnapshot(requirePath(path, actionName));
             }
             case "exportSubSceneSnapshot" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.exportSubSceneSnapshot(requirePath(path, actionName));
@@ -4339,6 +4363,12 @@ public final class CadWorkbench extends BorderPane {
             default -> throw new IllegalArgumentException("Automatisierungsaktion `" + actionName + "` ist unbekannt.");
         }
         return result;
+    }
+
+    private void activateThreeDWorkspaceForSnapshot() {
+        if (activeWorkspaceMode.get() == WorkspaceMode.TWO_D) {
+            activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+        }
     }
 
     private void exportWorkbenchSnapshot(Path path) {

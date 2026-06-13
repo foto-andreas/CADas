@@ -7,6 +7,8 @@ import de.andreas.cadas.application.view.RenderableMesh;
 import de.andreas.cadas.application.view.RotationAxis;
 import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.application.view.ThreeDCameraController;
+import de.andreas.cadas.application.view.ThreeDInteriorViewService;
+import de.andreas.cadas.application.view.ThreeDInteriorViewService.InteriorViewTarget;
 import de.andreas.cadas.application.view.ThreeDSceneBounds;
 import de.andreas.cadas.application.view.ThreeDSceneFitService;
 import de.andreas.cadas.application.view.ThreeDSceneModel;
@@ -14,11 +16,13 @@ import de.andreas.cadas.application.view.ThreeDSceneModelBuilder;
 import de.andreas.cadas.application.view.ThreeDViewPreparation;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
+import de.andreas.cadas.domain.model.Room;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -71,11 +75,14 @@ public final class ThreeDViewport extends BorderPane {
     private static final double PERSPECTIVE_FIT_PADDING = 1.8;
     private static final double ORTHO_FOV_DEGREES = 15.0;
     private static final double ORTHO_FIT_PADDING = 1.4;
+    private static final double INTERIOR_CAMERA_DISTANCE_UNITS = 10.0;
+    private static final double INTERIOR_FOV_DEGREES = 64.0;
 
     private final ThreeDViewPreparation viewPreparation = new ThreeDViewPreparation();
     private final ThreeDSceneModelBuilder modelBuilder = new ThreeDSceneModelBuilder();
     private final ThreeDCameraController cameraController = new ThreeDCameraController();
     private final ThreeDSceneFitService sceneFitService = new ThreeDSceneFitService();
+    private final ThreeDInteriorViewService interiorViewService = new ThreeDInteriorViewService();
     private final PerspectiveCamera perspectiveCamera = new PerspectiveCamera(true);
     private final Group worldRoot = new Group();
 
@@ -118,6 +125,8 @@ public final class ThreeDViewport extends BorderPane {
     private boolean sceneWasEmpty = true;
     private int lastRenderedBodyCount;
     private boolean surfaceRenderingMode;
+    private CameraMode cameraMode = CameraMode.ORBIT;
+    private InteriorViewTarget interiorTarget;
 
     public ThreeDViewport(Consumer<SelectionKey> selectionConsumer) {
         this.selectionConsumer = selectionConsumer;
@@ -151,6 +160,9 @@ public final class ThreeDViewport extends BorderPane {
         if (visibleLevels.isEmpty() && !project.levels().isEmpty()) {
             visibleLevels = Set.of(project.primaryLevel().name());
         }
+        if (cameraMode == CameraMode.INTERIOR && interiorTarget != null) {
+            visibleLevels = Set.of(interiorTarget.levelName());
+        }
         ThreeDSceneModel sceneModel = modelBuilder.build(
                 project,
                 visibleLevels,
@@ -163,6 +175,8 @@ public final class ThreeDViewport extends BorderPane {
         sceneHintLabel.setManaged(isEmpty);
         if (!isEmpty && (fitToSceneRequested || sceneWasEmpty)) {
             fitCameraToScene();
+        } else {
+            updateCamera();
         }
         sceneWasEmpty = isEmpty;
     }
@@ -182,6 +196,8 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void applyViewPreset(ThreeDViewPreset viewPreset) {
+        cameraMode = CameraMode.ORBIT;
+        interiorTarget = null;
         cameraPose = viewPreparation.poseForAngles(
                 currentProjectionMode(),
                 viewPreset.cameraAzimuthDegrees(),
@@ -196,6 +212,8 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void resetToDefaultView() {
+        cameraMode = CameraMode.ORBIT;
+        interiorTarget = null;
         ProjectionMode projectionMode = currentProjectionMode();
         CameraPose defaultPose = viewPreparation.defaultPose();
         cameraPose = new CameraPose(
@@ -216,6 +234,11 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void centerCurrentView() {
+        if (cameraMode == CameraMode.INTERIOR) {
+            resetInteriorPose();
+            updateCamera();
+            return;
+        }
         fitCameraToScene();
     }
 
@@ -235,6 +258,28 @@ public final class ThreeDViewport extends BorderPane {
             return;
         }
         updateCamera();
+    }
+
+    public void activateOrbitView() {
+        cameraMode = CameraMode.ORBIT;
+        interiorTarget = null;
+        fitToSceneRequested = true;
+        if (currentProject != null) {
+            refresh(currentProject);
+            return;
+        }
+        updateCamera();
+    }
+
+    public void activateInteriorView(ProjectModel project, Level level, Room room) {
+        currentProject = project;
+        interiorTarget = interiorViewService.targetFor(project, level, room);
+        cameraMode = CameraMode.INTERIOR;
+        resetInteriorPose();
+        projectionModeSelector.setValue(ProjectionMode.PERSPECTIVE);
+        surfaceRenderingCheckBox.setSelected(true);
+        fitToSceneRequested = false;
+        refresh(project);
     }
 
     private void configureCameras() {
@@ -273,7 +318,7 @@ public final class ThreeDViewport extends BorderPane {
             double deltaY = event.getSceneY() - dragStartY;
             if (dragButton == MouseButton.PRIMARY) {
                 cameraPose = cameraController.orbit(dragStartPose, deltaX * 0.35, -deltaY * 0.35);
-            } else if (dragButton == MouseButton.SECONDARY) {
+            } else if (dragButton == MouseButton.SECONDARY && cameraMode == CameraMode.ORBIT) {
                 cameraPose = cameraController.pan(dragStartPose, deltaX, deltaY);
             }
             fitToSceneRequested = false;
@@ -281,6 +326,9 @@ public final class ThreeDViewport extends BorderPane {
         });
         subScene.setOnMouseReleased(event -> dragButton = MouseButton.NONE);
         subScene.setOnScroll(event -> {
+            if (cameraMode == CameraMode.INTERIOR) {
+                return;
+            }
             cameraPose = cameraController.zoom(cameraPose, event.getDeltaY() > 0 ? 0.92 : 1.08);
             fitToSceneRequested = false;
             updateCamera();
@@ -760,6 +808,10 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private void updateCamera() {
+        if (cameraMode == CameraMode.INTERIOR && interiorTarget != null) {
+            updateInteriorCamera();
+            return;
+        }
 
         // Das Modell wird im Ursprung zentriert (modelGroup). Die orbitGroup dreht
         // das zentrierte Modell um den Ursprung. Die sceneGroup verschiebt das Modell
@@ -814,6 +866,31 @@ public final class ThreeDViewport extends BorderPane {
         ));
     }
 
+    private void updateInteriorCamera() {
+        modelGroup.getTransforms().setAll(new Scale(1.0, 1.0, -1.0));
+        orbitGroup.getTransforms().clear();
+        sceneGroup.getTransforms().setAll();
+        perspectiveCamera.setFieldOfView(INTERIOR_FOV_DEGREES);
+        perspectiveCamera.getTransforms().setAll(
+                new Rotate(cameraPose.azimuthDegrees(), Rotate.Y_AXIS),
+                new Rotate(cameraPose.elevationDegrees(), Rotate.X_AXIS),
+                new Translate(
+                        interiorTarget.eyeXMillimeters() * WORLD_SCALE,
+                        -interiorTarget.eyeYMillimeters() * WORLD_SCALE,
+                        -interiorTarget.eyeZMillimeters() * WORLD_SCALE - INTERIOR_CAMERA_DISTANCE_UNITS
+                )
+        );
+        subScene.setCamera(perspectiveCamera);
+        applyLightPositions(260.0);
+        cameraStatusLabel.setText(String.format(Locale.GERMAN,
+                "3D Innenansicht: %s | Augenhöhe %.2f m | Blick %.1f° / %.1f°",
+                interiorTarget.roomName(),
+                interiorTarget.eyeHeightAboveFloorMillimeters() / 1000.0,
+                cameraPose.azimuthDegrees(),
+                cameraPose.elevationDegrees()
+        ));
+    }
+
     private void nudgeOrbit(double azimuthDelta, double elevationDelta) {
         fitToSceneRequested = false;
         cameraPose = cameraController.orbit(cameraPose, azimuthDelta, elevationDelta);
@@ -821,6 +898,11 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private void fitCameraToScene() {
+        if (cameraMode == CameraMode.INTERIOR) {
+            resetInteriorPose();
+            updateCamera();
+            return;
+        }
         if (!sceneBounds.hasContent()) {
             return;
         }
@@ -856,6 +938,18 @@ public final class ThreeDViewport extends BorderPane {
         updateCamera();
     }
 
+    private void resetInteriorPose() {
+        cameraPose = new CameraPose(
+                ProjectionMode.PERSPECTIVE,
+                0.0,
+                0.0,
+                INTERIOR_CAMERA_DISTANCE_UNITS,
+                0.0,
+                0.0,
+                0.0
+        );
+    }
+
     private void applyTooltip(Node node, String text) {
         Tooltip tooltip = new Tooltip(text);
         tooltip.setWrapText(true);
@@ -878,5 +972,10 @@ public final class ThreeDViewport extends BorderPane {
 
     private double worldUnitsToMillimeters(double worldUnits) {
         return worldUnits / WORLD_SCALE;
+    }
+
+    private enum CameraMode {
+        ORBIT,
+        INTERIOR
     }
 }

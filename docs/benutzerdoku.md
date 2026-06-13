@@ -262,9 +262,11 @@ Derzeit gilt:
 
 ### Navigation in 3D
 
-* Mit gedrückter linker Maustaste drehst du das Modell um seine Mitte.
-* Mit gedrückter rechter Maustaste verschiebst du die 3D-Ansicht entlang der Bildschirmachsen.
-* Mit dem Mausrad zoomst du in der 3D-Ansicht.
+* Im Arbeitsbereich `3D` drehst du mit gedrückter linker Maustaste das Modell um seine Mitte.
+* Im Arbeitsbereich `3D` verschiebst du mit gedrückter rechter Maustaste die Ansicht entlang der Bildschirmachsen.
+* Mit dem Mausrad zoomst du in der 3D-Orbitansicht.
+* Im Arbeitsbereich `Innen` sitzt die Kamera im ausgewählten Raum oder, ohne Auswahl, im ersten Raum der aktiven Etage.
+* In `Innen` drehst du mit gedrückter linker Maustaste den Blick aus dem Raum heraus.
 * Die 3D-Ansicht nutzt dafür eine feste Kamera mit Modell-Orbit; `Modell einpassen` und `Ansicht zentrieren` halten das Modell im Blick.
 * Über `Projektion` schaltest du zwischen orthografischer und perspektivischer Darstellung um.
 * `Oberflächenrendering` blendet die transparenten Raumvolumina aus und zeigt stattdessen die sichtbaren Flächen, Beläge, Fliesenfugen und Öffnungen als baunähere Ansicht.
@@ -327,12 +329,13 @@ Die sechs orthogonalen Ansichten werden oberhalb der Zeichenfläche über feste 
 Die Umschaltung wirkt auf die 2D-Projektion und auf die Kompassdarstellung. Besonders bei `Oben` ist der Nordwinkel relevant.
 Die 3D-Kamera bleibt davon bewusst unabhängig und wird über die 3D-Bedienelemente gesteuert.
 
-## Zwischen 2D und 3D umschalten
+## Zwischen 2D, 3D und Innenansicht umschalten
 
-Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D` und `3D`.
+Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D`, `3D` und `Innen`.
 
 * `2D` zeigt die Zeichenfläche mit Linealen und Grundrisswerkzeugen.
-* `3D` nutzt denselben Platz für die räumliche Modellansicht.
+* `3D` nutzt denselben Platz für die räumliche Orbit-Kontrollansicht.
+* `Innen` nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in den aktuellen Raum und zeigt Innenwand-Beläge aus dem Raum heraus.
 * Dadurch bleibt mehr Platz für die aktive Arbeitsansicht, statt 2D und 3D ständig parallel einzublenden.
 
 ## DWG-Blöcke für Oberflächen verwenden

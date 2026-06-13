@@ -151,7 +151,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] 3D: Die Ansichten "Oben" und "Unten" werden nicht korrekt zentriert
 - [x] Modell: Die Decken müssen innerhalb des Raums liegen. Der Raum soll um die Deckendicke in seiner Höhe vermindert werden. Die Decken sollen innerhalb des Polygons liegen, den die oberen Wandinnenkanten bilden.
 - [x] bei den Decken gibt es noch das Problem, dass diese bei Innenecken in die Wand hineinragen, und zwar bis zur Wandmitte genau in der Innenecke. Außenecken sehen ok aus.
-- [ ] Echte 3D-Innenansicht mit raumgebundener Kamera, Clipping-Regeln und Navigation fachlich festlegen und umsetzen.
+- [x] Echte 3D-Innenansicht mit raumgebundener Kamera im bestehenden 3D-Fenster umsetzen.
 - [x] Modell/UI: Die Standard-Deckendicke soll 1mm betragen
 - [x] Aktuell gibt es Fundamente unter den Wänden, der Boden ist leer und mit etwas Abstand unter dem Haus ist eine Ebene, die wie Fußboden aussieht.
 - [x] "Rückgängig" (ggf. auch "Wiederherstellen") ändert ungewollt Zoom und Position

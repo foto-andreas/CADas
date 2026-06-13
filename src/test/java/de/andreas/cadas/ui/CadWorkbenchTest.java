@@ -196,6 +196,34 @@ class CadWorkbenchTest {
         );
     }
 
+    @Test
+    void innenansichtNutztDas3dFensterMitRaumkamera() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetWorkspace("INTERIOR");
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+
+        Assertions.assertTrue(snapshot.threeDHasContent());
+        Assertions.assertTrue(
+                snapshot.threeDCameraStatus().contains("3D Innenansicht:"),
+                "Status war: " + snapshot.threeDCameraStatus()
+                        + " | Räume: " + snapshot.roomCount()
+                        + " | Hinweis: " + snapshot.statusText()
+        );
+        Assertions.assertTrue(
+                snapshot.threeDCameraStatus().contains("Augenhöhe 1,60 m"),
+                "Status war: " + snapshot.threeDCameraStatus()
+        );
+    }
+
     private Path erzeugeEinfachesProjektAlsDxf() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Testhaus", "Erdgeschoss");
         var level = project.primaryLevel();
