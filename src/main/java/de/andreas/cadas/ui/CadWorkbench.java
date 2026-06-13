@@ -4371,25 +4371,25 @@ public final class CadWorkbench extends BorderPane {
                 threeDViewport.exportSubSceneSnapshot(requirePath(path, actionName));
             }
             case "threeDOrbitLeft" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationOrbit(-15.0, 0.0);
             }
             case "threeDOrbitRight" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationOrbit(15.0, 0.0);
             }
             case "threeDOrbitUp" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationOrbit(0.0, 8.0);
             }
             case "threeDOrbitDown" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationOrbit(0.0, -8.0);
@@ -4443,7 +4443,7 @@ public final class CadWorkbench extends BorderPane {
                 threeDViewport.resetToDefaultView();
             }
             case "diagnose3D" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 result = automationSnapshot();
