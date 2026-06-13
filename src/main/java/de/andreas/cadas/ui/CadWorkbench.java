@@ -4395,25 +4395,25 @@ public final class CadWorkbench extends BorderPane {
                 threeDViewport.automationOrbit(0.0, -8.0);
             }
             case "threeDPanRight" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationPan(90.0, 0.0);
             }
             case "threeDPanLeft" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationPan(-90.0, 0.0);
             }
             case "threeDPanUp" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationPan(0.0, -60.0);
             }
             case "threeDPanDown" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+                activateThreeDWorkspaceForSnapshot();
                 updateWorkspaceMode();
                 refreshThreeDIfNeeded();
                 threeDViewport.automationPan(0.0, 60.0);
