@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public final class DxfProjectExchangeService implements ProjectExchangeService {
 
@@ -86,6 +87,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
 
         Map<String, Level> levels = new LinkedHashMap<>();
         Map<String, SurfaceLayerStack> lastStackByLevel = new LinkedHashMap<>();
+        Map<String, List<Door>> pendingDoorsByLevel = new LinkedHashMap<>();
+        Map<String, List<WindowElement>> pendingWindowsByLevel = new LinkedHashMap<>();
         String importedProjectName = projectName;
         Roof importedRoof = null;
         boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadata);
@@ -142,12 +145,14 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                         }
                     }
                     case "DOOR" -> {
-                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
-                        level.addDoor(deserializeDoor(parts));
+                        String levelName = DxfMetadataCodec.decode(parts[1], encodedFields);
+                        levels.computeIfAbsent(levelName, Level::new);
+                        pendingDoorsByLevel.computeIfAbsent(levelName, ignored -> new ArrayList<>()).add(deserializeDoor(parts));
                     }
                     case "WINDOW" -> {
-                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
-                        level.addWindow(deserializeWindow(parts));
+                        String levelName = DxfMetadataCodec.decode(parts[1], encodedFields);
+                        levels.computeIfAbsent(levelName, Level::new);
+                        pendingWindowsByLevel.computeIfAbsent(levelName, ignored -> new ArrayList<>()).add(deserializeWindow(parts));
                     }
                     case "STAIR" -> {
                         Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
@@ -206,6 +211,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 // Fremde oder beschädigte Metadaten sollen den Geometrieimport nicht blockieren.
             }
         }
+
+        addValidOpenings(levels, pendingDoorsByLevel, pendingWindowsByLevel);
 
         if (levels.isEmpty()) {
             return ProjectModel.withDefaultLevel(importedProjectName, "Erdgeschoss");
@@ -440,6 +447,24 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         target.replaceSurfaceLayerStacks(source.surfaceLayerStacks().stream()
                 .map(SurfaceLayerStack::copy)
                 .toList());
+    }
+
+    private void addValidOpenings(
+            Map<String, Level> levels,
+            Map<String, List<Door>> pendingDoorsByLevel,
+            Map<String, List<WindowElement>> pendingWindowsByLevel
+    ) {
+        for (Map.Entry<String, Level> entry : levels.entrySet()) {
+            Set<UUID> wallIds = entry.getValue().walls().stream()
+                    .map(Wall::id)
+                    .collect(Collectors.toSet());
+            pendingDoorsByLevel.getOrDefault(entry.getKey(), List.of()).stream()
+                    .filter(door -> wallIds.contains(door.wallId()))
+                    .forEach(entry.getValue()::addDoor);
+            pendingWindowsByLevel.getOrDefault(entry.getKey(), List.of()).stream()
+                    .filter(window -> wallIds.contains(window.wallId()))
+                    .forEach(entry.getValue()::addWindow);
+        }
     }
 
     private void appendLineEntity(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, String layer, PlanPoint start, PlanPoint end) {
