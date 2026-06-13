@@ -324,6 +324,54 @@ class DxfLevelExchangeServiceTest {
     }
 
     @Test
+    void fallbackImportUeberspringtUnvollstaendigeOderKaputteGeometrie() throws Exception {
+        Path file = tempDir.resolve("fallback-kaputt.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                LINE
+                8
+                WALLS
+                10
+                defekt
+                20
+                0
+                11
+                1000
+                21
+                0
+                0
+                LWPOLYLINE
+                8
+                ROOMS
+                90
+                2
+                70
+                1
+                10
+                0
+                20
+                0
+                10
+                1000
+                20
+                0
+                0
+                ENDSEC
+                0
+                EOF
+                """);
+
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertTrue(imported.walls().isEmpty());
+        assertTrue(imported.rooms().isEmpty());
+    }
+
+    @Test
     void exportiertUndImportiertRaeumeMitDachschraege() throws Exception {
         Level level = new Level("Dachgeschoss");
         level.addRoom(Room.rectangular(
