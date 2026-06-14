@@ -13,19 +13,28 @@ import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
 
 import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public final class SelectionQueryService {
 
     public Optional<SelectionKey> findSelection(Level level, PlanPoint point, Length tolerance) {
-        return findDoorSelection(level, point, tolerance)
-                .or(() -> findWindowSelection(level, point, tolerance))
-                .or(() -> findStairSelection(level, point))
-                .or(() -> findWallSelection(level, point, tolerance))
-                .or(() -> findRoomSelection(level, point));
+        return findSelections(level, point, tolerance).stream().findFirst();
     }
 
-    private Optional<SelectionKey> findDoorSelection(Level level, PlanPoint point, Length tolerance) {
+    public List<SelectionKey> findSelections(Level level, PlanPoint point, Length tolerance) {
+        List<SelectionKey> selections = new ArrayList<>();
+        selections.addAll(findDoorSelections(level, point, tolerance));
+        selections.addAll(findWindowSelections(level, point, tolerance));
+        selections.addAll(findStairSelections(level, point));
+        selections.addAll(findWallSelections(level, point, tolerance));
+        selections.addAll(findRoomSelections(level, point));
+        return List.copyOf(selections);
+    }
+
+    private List<SelectionKey> findDoorSelections(Level level, PlanPoint point, Length tolerance) {
+        List<SelectionKey> selections = new ArrayList<>();
         for (Door door : level.doors()) {
             Wall wall = level.findWall(door.wallId());
             PlanSegment segment = new PlanSegment(
@@ -33,13 +42,14 @@ public final class SelectionQueryService {
                     wall.axis().pointAt(door.offsetFromStart().add(door.width()))
             );
             if (segment.distanceTo(point).compareTo(tolerance) <= 0) {
-                return Optional.of(new SelectionKey(RenderableKind.DOOR, level.name(), door.id().toString()));
+                selections.add(new SelectionKey(RenderableKind.DOOR, level.name(), door.id().toString()));
             }
         }
-        return Optional.empty();
+        return selections;
     }
 
-    private Optional<SelectionKey> findWindowSelection(Level level, PlanPoint point, Length tolerance) {
+    private List<SelectionKey> findWindowSelections(Level level, PlanPoint point, Length tolerance) {
+        List<SelectionKey> selections = new ArrayList<>();
         for (WindowElement window : level.windows()) {
             Wall wall = level.findWall(window.wallId());
             PlanSegment segment = new PlanSegment(
@@ -47,34 +57,35 @@ public final class SelectionQueryService {
                     wall.axis().pointAt(window.offsetFromStart().add(window.width()))
             );
             if (segment.distanceTo(point).compareTo(tolerance) <= 0) {
-                return Optional.of(new SelectionKey(RenderableKind.WINDOW, level.name(), window.id().toString()));
+                selections.add(new SelectionKey(RenderableKind.WINDOW, level.name(), window.id().toString()));
             }
         }
-        return Optional.empty();
+        return selections;
     }
 
-    private Optional<SelectionKey> findRoomSelection(Level level, PlanPoint point) {
+    private List<SelectionKey> findRoomSelections(Level level, PlanPoint point) {
         return level.rooms().stream()
                 .filter(room -> containsPoint(room, point))
-                .findFirst()
-                .map(room -> new SelectionKey(RenderableKind.ROOM_VOLUME, level.name(), room.id().toString()));
+                .map(room -> new SelectionKey(RenderableKind.ROOM_VOLUME, level.name(), room.id().toString()))
+                .toList();
     }
 
-    private Optional<SelectionKey> findStairSelection(Level level, PlanPoint point) {
+    private List<SelectionKey> findStairSelections(Level level, PlanPoint point) {
         return level.staircases().stream()
                 .filter(staircase -> point.xMillimeters() >= staircase.minX()
                         && point.xMillimeters() <= staircase.maxX()
                         && point.yMillimeters() >= staircase.minY()
                         && point.yMillimeters() <= staircase.maxY())
-                .findFirst()
-                .map(staircase -> new SelectionKey(RenderableKind.STAIR, level.name(), staircase.id().toString()));
+                .map(staircase -> new SelectionKey(RenderableKind.STAIR, level.name(), staircase.id().toString()))
+                .toList();
     }
 
-    private Optional<SelectionKey> findWallSelection(Level level, PlanPoint point, Length tolerance) {
+    private List<SelectionKey> findWallSelections(Level level, PlanPoint point, Length tolerance) {
         return level.walls().stream()
                 .filter(wall -> wall.axis().distanceTo(point).toMillimeters() <= Math.max(tolerance.toMillimeters(), wall.thickness().toMillimeters() / 2.0))
-                .min(Comparator.comparingDouble(wall -> wall.axis().distanceTo(point).toMillimeters()))
-                .map(wall -> new SelectionKey(RenderableKind.WALL, level.name(), wall.id().toString()));
+                .sorted(Comparator.comparingDouble(wall -> wall.axis().distanceTo(point).toMillimeters()))
+                .map(wall -> new SelectionKey(RenderableKind.WALL, level.name(), wall.id().toString()))
+                .toList();
     }
 
     private boolean containsPoint(Room room, PlanPoint point) {

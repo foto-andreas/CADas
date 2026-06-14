@@ -967,14 +967,18 @@ public final class CadWorkbench extends BorderPane {
         if (selectedSelections.size() > 1) {
             return selectedSelections.size() + " Bauteile ausgewählt. Änderungen über die sichtbaren Eigenschaften werden auf passende Auswahlen gemeinsam angewendet.";
         }
-        return "Ausgewählt: " + switch (selectedSelection.get().kind()) {
+        return "Ausgewählt: " + selectionLabel(selectedSelection.get()) + " auf Etage `" + selectedSelection.get().levelName() + "`.";
+    }
+
+    private String selectionLabel(SelectionKey selection) {
+        return switch (selection.kind()) {
             case WALL -> "Wand";
             case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> "automatisch abgeleiteter Raum";
             case DOOR -> "Tür";
             case WINDOW -> "Fenster";
             case STAIR -> "Treppe";
-            default -> selectedSelection.get().kind().name();
-        } + " auf Etage `" + selectedSelection.get().levelName() + "`.";
+            default -> selection.kind().name();
+        };
     }
 
     private void updateActionButtons() {
@@ -1330,7 +1334,7 @@ public final class CadWorkbench extends BorderPane {
                         ));
                 draftLabel.setText("Wandecke ausgewählt. `Eckhöhe anwenden` setzt die Höhe auf alle verbundenen Wandenden.");
             } else {
-                SelectionKey editSelection = selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null);
+                SelectionKey editSelection = editSelectionAt(editPoint, event.isAltDown());
                 updateSelection(editSelection, event.isShortcutDown() || event.isShiftDown());
                 prepareSelectionDrag(editSelection, editPoint);
                 openingDragId = null;
@@ -1383,6 +1387,21 @@ public final class CadWorkbench extends BorderPane {
             previewSegment = null;
         }
         render();
+    }
+
+    private SelectionKey editSelectionAt(PlanPoint editPoint, boolean cycleSelection) {
+        List<SelectionKey> candidates = selectionQueryService.findSelections(activeLevel.get(), editPoint, SNAP_TOLERANCE);
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        if (!cycleSelection || candidates.size() == 1) {
+            return candidates.getFirst();
+        }
+        SelectionKey currentSelection = selectedSelection.get();
+        int currentIndex = candidates.indexOf(currentSelection);
+        SelectionKey nextSelection = candidates.get((currentIndex + 1) % candidates.size());
+        draftLabel.setText("Auswahl umgeschaltet: " + selectionLabel(nextSelection) + ".");
+        return nextSelection;
     }
 
     private void handleMouseDragged(MouseEvent event) {
@@ -2815,7 +2834,7 @@ public final class CadWorkbench extends BorderPane {
 
     private String statusHintForCurrentTool() {
         return switch (currentTool()) {
-            case EDIT -> "Werkzeug: Bearbeiten | Linksklick wählt aus, Rechtsziehen verschiebt die Ansicht, Alt+Rechtsklick entfernt Hilfslinien.";
+            case EDIT -> "Werkzeug: Bearbeiten | Linksklick wählt aus, Alt+Linksklick schaltet überdeckte Treffer durch, Rechtsziehen verschiebt die Ansicht, Alt+Rechtsklick entfernt Hilfslinien.";
             case WALL -> "Werkzeug: Wand | Linksklick startet und beendet Wände, Shift erlaubt freie Winkel.";
             case DOOR -> "Werkzeug: Tür | Linksklick auf eine Wand platziert die Tür mit den aktuellen Maßen.";
             case WINDOW -> "Werkzeug: Fenster | Linksklick auf eine Wand platziert das Fenster mit den aktuellen Maßen.";

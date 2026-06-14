@@ -3,6 +3,7 @@ package de.andreas.cadas.application.drawing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.application.view.RenderableKind;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
@@ -15,6 +16,8 @@ import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
+
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -94,5 +97,32 @@ class SelectionQueryServiceTest {
         Level level = new Level("Leeres Geschoss");
 
         assertTrue(selectionQueryService.findSelection(level, new PlanPoint(10_000, 10_000), TOLERANCE).isEmpty());
+    }
+
+    @Test
+    void liefertAlleUebereinanderliegendenTrefferInPrioritaetsreihenfolge() {
+        Level level = new Level("Erdgeschoss");
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(5_000, 0)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        );
+        Room room = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, -500),
+                new PlanPoint(5_000, 2_500),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addWall(wall);
+        level.addRoom(room);
+
+        List<SelectionKey> selections = selectionQueryService.findSelections(level, new PlanPoint(2_500, 0), TOLERANCE);
+
+        assertEquals(2, selections.size());
+        assertEquals(RenderableKind.WALL, selections.getFirst().kind());
+        assertEquals(RenderableKind.ROOM_VOLUME, selections.get(1).kind());
+        assertEquals(selections.getFirst(), selectionQueryService.findSelection(level, new PlanPoint(2_500, 0), TOLERANCE).orElseThrow());
     }
 }
