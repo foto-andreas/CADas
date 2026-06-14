@@ -12,6 +12,7 @@ import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
@@ -144,6 +145,20 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
+    void nutztReststueckeGedrehtNurBeiPassenderSchnittbeschraenkung() {
+        ProjectModel drehbaresProjekt = projektMitZweiZuschnittRaeumen(SurfaceCutRestriction.FREE);
+        ProjectModel gerichtetesProjekt = projektMitZweiZuschnittRaeumen(SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS);
+
+        MaterialSummary drehbaresMaterial = service.create(drehbaresProjekt).materials().getFirst();
+        MaterialSummary gerichtetesMaterial = service.create(gerichtetesProjekt).materials().getFirst();
+
+        assertEquals(1, drehbaresMaterial.requiredPieces());
+        assertEquals(2, gerichtetesMaterial.requiredPieces());
+        assertTrue(drehbaresMaterial.values().contains("frei"));
+        assertTrue(gerichtetesMaterial.values().contains("Verlegerichtung"));
+    }
+
+    @Test
     void ziehtFensteroeffnungVonInnenwandMaterialAb() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Wall wall = Wall.create(
@@ -182,7 +197,40 @@ class SurfaceMaterialListServiceTest {
         assertTrue(report.toMarkdown().contains("Reststücke"));
     }
 
+    private ProjectModel projektMitZweiZuschnittRaeumen(SurfaceCutRestriction cutRestriction) {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room links = Room.rectangular(
+                "Links",
+                new PlanPoint(0, 0),
+                new PlanPoint(300, 200),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        Room rechts = Room.rectangular(
+                "Rechts",
+                new PlanPoint(500, 0),
+                new PlanPoint(800, 200),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(links);
+        project.primaryLevel().addRoom(rechts);
+        SurfaceLayerStack linksStack = new SurfaceLayerStack(SurfaceType.FLOOR, links.id().toString());
+        linksStack.addLayer(layer("Platte", Length.of(50, LengthUnit.CENTIMETER), Length.of(30, LengthUnit.CENTIMETER), cutRestriction));
+        SurfaceLayerStack rechtsStack = new SurfaceLayerStack(SurfaceType.FLOOR, rechts.id().toString());
+        rechtsStack.addLayer(layer("Platte", Length.of(50, LengthUnit.CENTIMETER), Length.of(30, LengthUnit.CENTIMETER), cutRestriction));
+        project.primaryLevel().addSurfaceLayerStack(linksStack);
+        project.primaryLevel().addSurfaceLayerStack(rechtsStack);
+        return project;
+    }
+
     private SurfaceLayer layer(String name, Length tileWidth, Length tileHeight) {
+        return layer(name, tileWidth, tileHeight, SurfaceCutRestriction.fallback());
+    }
+
+    private SurfaceLayer layer(String name, Length tileWidth, Length tileHeight, SurfaceCutRestriction cutRestriction) {
         return SurfaceLayer.create(
                 name,
                 Length.of(10, LengthUnit.MILLIMETER),
@@ -194,6 +242,7 @@ class SurfaceMaterialListServiceTest {
                 Length.zero(),
                 Length.zero(),
                 Length.of(2, LengthUnit.MILLIMETER),
+                cutRestriction,
                 ""
         );
     }

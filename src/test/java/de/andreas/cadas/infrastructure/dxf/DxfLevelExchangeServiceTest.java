@@ -12,6 +12,7 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
@@ -163,7 +164,9 @@ class DxfLevelExchangeServiceTest {
                 Length.zero(),
                 Length.of(10, LengthUnit.MILLIMETER),
                 Length.of(20, LengthUnit.MILLIMETER),
+                Length.of(20, LengthUnit.MILLIMETER),
                 Length.of(2, LengthUnit.MILLIMETER),
+                SurfaceCutRestriction.OUTER_CUTS_ROTATABLE,
                 "Kacheln"
         ));
         floorStack.addLayer(new SurfaceLayer(
@@ -213,6 +216,7 @@ class DxfLevelExchangeServiceTest {
         assertEquals("Fliese", importedFloor.layers().getFirst().name());
         assertEquals(600.0, importedFloor.layers().getFirst().tileWidth().toMillimeters(), 0.001);
         assertEquals(2.0, importedFloor.layers().getFirst().jointWidth().toMillimeters(), 0.001);
+        assertEquals(SurfaceCutRestriction.OUTER_CUTS_ROTATABLE, importedFloor.layers().getFirst().cutRestriction());
         assertTrue(importedFloor.layers().getFirst().visible());
         assertEquals("Daemmung", importedFloor.layers().get(1).name());
         assertEquals(SurfaceLayoutMode.FIXED, importedFloor.layers().get(1).layoutMode());
@@ -266,7 +270,7 @@ class DxfLevelExchangeServiceTest {
         String dxf = Files.readString(file);
         Level imported = exchangeService.importLevel(file, "Import");
 
-        assertTrue(dxf.contains("CADAS_DXF|2"));
+        assertTrue(dxf.contains("CADAS_DXF|3"));
         assertFalse(dxf.contains("Bad | Küche/Flur"));
         assertEquals("Bad | Küche/Flur ä\nNord", imported.rooms().getFirst().name());
         assertEquals("Raum/" + room.id() + "|Boden", imported.surfaceLayerStacks().getFirst().targetKey());

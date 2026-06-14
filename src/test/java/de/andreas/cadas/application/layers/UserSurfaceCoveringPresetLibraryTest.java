@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
 
 import java.nio.file.FileAlreadyExistsException;
@@ -36,6 +37,7 @@ class UserSurfaceCoveringPresetLibraryTest {
                 Length.of(6, LengthUnit.CENTIMETER),
                 Length.of(12, LengthUnit.CENTIMETER),
                 Length.of(3, LengthUnit.MILLIMETER),
+                SurfaceCutRestriction.OUTER_CUTS_ROTATABLE,
                 "Standard: Test"
         );
 
@@ -55,6 +57,7 @@ class UserSurfaceCoveringPresetLibraryTest {
         assertEquals(Length.of(6, LengthUnit.CENTIMETER), loadedPreset.minimumEdgeWidth());
         assertEquals(Length.of(12, LengthUnit.CENTIMETER), loadedPreset.minimumStartEndMargin());
         assertEquals(Length.of(3, LengthUnit.MILLIMETER), loadedPreset.jointWidth());
+        assertEquals(SurfaceCutRestriction.OUTER_CUTS_ROTATABLE, loadedPreset.cutRestriction());
     }
 
     @Test

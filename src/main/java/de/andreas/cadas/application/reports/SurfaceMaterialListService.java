@@ -194,6 +194,7 @@ public final class SurfaceMaterialListService {
                 Double.toString(layer.minimumEdgeWidth().toMillimeters()),
                 Double.toString(layer.minimumStartEndMargin().toMillimeters()),
                 Double.toString(layer.jointWidth().toMillimeters()),
+                layer.cutRestriction().name(),
                 layer.coveringSource()
         );
     }
@@ -598,7 +599,7 @@ public final class SurfaceMaterialListService {
                     layer.tileWidth().toMillimeters(),
                     layer.tileHeight().toMillimeters(),
                     cutPieces,
-                    false,
+                    layer.cutRestriction().allowsMaterialRotation(),
                     pendingEntries.size()
             );
         }
@@ -612,7 +613,8 @@ public final class SurfaceMaterialListService {
                     + ", Mindestversatz " + length(layer.minimumOffset(), LengthUnit.CENTIMETER, 1)
                     + ", Mindestrand " + length(layer.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1)
                     + ", Anfang/Ende " + length(layer.minimumStartEndMargin(), LengthUnit.CENTIMETER, 1)
-                    + ", Fuge " + length(layer.jointWidth(), LengthUnit.MILLIMETER, 1);
+                    + ", Fuge " + length(layer.jointWidth(), LengthUnit.MILLIMETER, 1)
+                    + ", Schnittbeschränkung " + layer.cutRestriction().label();
         }
     }
 

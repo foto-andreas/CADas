@@ -16,6 +16,7 @@ import de.andreas.cadas.domain.model.Roof;
 import de.andreas.cadas.domain.model.RoofType;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
@@ -246,7 +247,9 @@ class DxfProjectExchangeServiceTest {
                 Length.zero(),
                 Length.of(5, LengthUnit.MILLIMETER),
                 Length.of(10, LengthUnit.MILLIMETER),
+                Length.of(10, LengthUnit.MILLIMETER),
                 Length.of(1, LengthUnit.MILLIMETER),
+                SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
                 "Holz"
         ));
         project.primaryLevel().addSurfaceLayerStack(egFloor);
@@ -291,6 +294,7 @@ class DxfProjectExchangeServiceTest {
         assertEquals(1, importedEg.surfaceLayerStacks().getFirst().layers().size());
         assertEquals("Parkett", importedEg.surfaceLayerStacks().getFirst().layers().getFirst().name());
         assertEquals(1.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().jointWidth().toMillimeters(), 0.001);
+        assertEquals(SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().cutRestriction());
         assertEquals(egRoom.id(), importedEg.rooms().getFirst().id(), "Raum-UUID muss im Rundlauf erhalten bleiben");
 
         var importedOg = imported.levels().get(1);
@@ -350,7 +354,7 @@ class DxfProjectExchangeServiceTest {
         String dxf = Files.readString(file);
         ProjectModel imported = exchangeService.importProject(file, "Fallback");
 
-        assertTrue(dxf.contains("CADAS_DXF|2"));
+        assertTrue(dxf.contains("CADAS_DXF|3"));
         assertFalse(dxf.contains("Haus | Süd/West"));
         assertEquals("Haus | Süd/West", imported.name());
         assertEquals("EG | Wohnen/Kochen", imported.primaryLevel().name());

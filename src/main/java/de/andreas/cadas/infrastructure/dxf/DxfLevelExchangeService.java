@@ -7,6 +7,7 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
@@ -188,7 +189,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             for (SurfaceLayer layer : sls.layers()) {
                 appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                         Locale.US,
-                        "SLL|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s",
+                        "SLL|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s",
                         layer.id(),
                         DxfMetadataCodec.encode(layer.name()),
                         layer.thickness().toMillimeters(),
@@ -201,7 +202,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                         layer.minimumEdgeWidth().toMillimeters(),
                         layer.minimumStartEndMargin().toMillimeters(),
                         layer.jointWidth().toMillimeters(),
-                        DxfMetadataCodec.encode(layer.coveringSource())
+                        DxfMetadataCodec.encode(layer.coveringSource()),
+                        layer.cutRestriction().name()
                 ));
             }
         }
@@ -325,6 +327,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                                     Length.ofMillimeters(parseDouble(parts[10])),
                                     Length.ofMillimeters(parts.length >= 14 ? parseDouble(parts[11]) : parseDouble(parts[10])),
                                     Length.ofMillimeters(parts.length >= 14 ? parseDouble(parts[12]) : parseDouble(parts[11])),
+                                    SurfaceCutRestriction.fromStoredValue(parts.length >= 15 ? parts[14] : null),
                                     DxfMetadataCodec.decode(parts.length >= 14 ? parts[13] : parts[12], encodedFields)
                             );
                             stack.addLayer(layer);

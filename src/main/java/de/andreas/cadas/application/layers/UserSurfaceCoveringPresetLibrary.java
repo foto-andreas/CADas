@@ -1,6 +1,7 @@
 package de.andreas.cadas.application.layers;
 
 import de.andreas.cadas.domain.geometry.Length;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
 
 import java.io.IOException;
@@ -85,6 +86,7 @@ public final class UserSurfaceCoveringPresetLibrary {
         properties.setProperty("minimumEdgeWidthMm", Double.toString(savedPreset.minimumEdgeWidth().toMillimeters()));
         properties.setProperty("minimumStartEndMarginMm", Double.toString(savedPreset.minimumStartEndMargin().toMillimeters()));
         properties.setProperty("jointWidthMm", Double.toString(savedPreset.jointWidth().toMillimeters()));
+        properties.setProperty("cutRestriction", savedPreset.cutRestriction().name());
         properties.setProperty("coveringSource", savedPreset.coveringSource());
         properties.setProperty("originalCoveringSource", preset.coveringSource());
         try (OutputStream output = Files.newOutputStream(target)) {
@@ -134,6 +136,7 @@ public final class UserSurfaceCoveringPresetLibrary {
                 length(properties, "minimumEdgeWidthMm"),
                 length(properties, "minimumStartEndMarginMm"),
                 length(properties, "jointWidthMm"),
+                SurfaceCutRestriction.fromStoredValue(properties.getProperty("cutRestriction")),
                 path.toAbsolutePath().normalize().toString()
         );
     }
@@ -157,6 +160,7 @@ public final class UserSurfaceCoveringPresetLibrary {
                 preset.minimumEdgeWidth(),
                 preset.minimumStartEndMargin(),
                 preset.jointWidth(),
+                preset.cutRestriction(),
                 target.toAbsolutePath().normalize().toString()
         );
     }

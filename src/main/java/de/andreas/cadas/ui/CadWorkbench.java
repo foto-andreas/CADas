@@ -49,6 +49,7 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
@@ -276,6 +277,7 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> surfaceMinimumStartEndMarginUnit = new ComboBox<>();
     private final TextField surfaceJointWidthField = new TextField("2");
     private final ComboBox<LengthUnit> surfaceJointWidthUnit = new ComboBox<>();
+    private final ComboBox<SurfaceCutRestriction> surfaceCutRestrictionSelector = new ComboBox<>();
     private final TextField dwgBlockNameField = new TextField();
     private final Label surfaceLayerTargetLabel = new Label("Keine Fläche ausgewählt.");
     private final Label surfaceLayerSelectionHintLabel = new Label("Für Beläge zuerst eine passende Fläche auswählen.");
@@ -803,6 +805,7 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Mindestrand links/rechts", surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit),
                         propertyRow("Mindestbreite Anfang/Ende", surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit),
                         propertyRow("Fugenbreite", surfaceJointWidthField, surfaceJointWidthUnit),
+                        propertyRow("Schnittbeschränkung", surfaceCutRestrictionSelector),
                         propertyRow("DWG-Block", dwgBlockNameField),
                         new HBox(6.0, addSurfaceLayerButton, updateSurfaceLayerButton),
                         new HBox(6.0, removeSurfaceLayerButton, toggleSurfaceLayerVisibilityButton),
@@ -1087,6 +1090,8 @@ public final class CadWorkbench extends BorderPane {
         }
         surfaceLayoutModeSelector.getItems().setAll(SurfaceLayoutMode.values());
         surfaceLayoutModeSelector.setValue(SurfaceLayoutMode.AUTOMATIC);
+        surfaceCutRestrictionSelector.getItems().setAll(SurfaceCutRestriction.values());
+        surfaceCutRestrictionSelector.setValue(SurfaceCutRestriction.fallback());
         surfaceLayerList.setPrefHeight(120);
         surfaceLayerList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> syncInputsFromSelectedSurfaceLayer());
         surfaceTypeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
@@ -1198,6 +1203,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(surfaceMinimumStartEndMarginUnit, "Bestimmt die Einheit für die Mindestbreite der Anfangs- und Endreihe.");
         applyTooltip(surfaceJointWidthField, "Legt die Breite der Fugen zwischen den Fliesen oder Platten fest.");
         applyTooltip(surfaceJointWidthUnit, "Bestimmt die Einheit für die Fugenbreite.");
+        applyTooltip(surfaceCutRestrictionSelector, "Legt fest, ob Zuschnitte beliebig frei verwendet werden dürfen, ob Schnittkanten nur an Außenkanten liegen dürfen oder ob zusätzlich die Verlegerichtung ohne Drehung eingehalten werden muss.");
         applyTooltip(dwgBlockNameField, "Erfasst einen konkreten Blocknamen aus einer geladenen DWG-Bibliothek, damit daraus ein auswählbares Oberflächen-Preset wird.");
         applyTooltip(surfaceLayerTargetLabel, "Zeigt, auf welcher Wand- oder Raumfläche die aktuellen Ebenen bearbeitet werden.");
         applyTooltip(surfaceLayerSelectionHintLabel, "Erklärt, welche Kombination aus Raum- und Wandauswahl für den aktuell sichtbaren Belagstyp erforderlich ist.");
@@ -3290,6 +3296,7 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceMinimumEdgeWidth(),
                 currentSurfaceMinimumStartEndMargin(),
                 currentSurfaceJointWidth(),
+                currentSurfaceCutRestriction(),
                 currentSurfaceCoveringSource()
         );
     }
@@ -3343,6 +3350,7 @@ public final class CadWorkbench extends BorderPane {
         setLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, preset.minimumEdgeWidth(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, preset.minimumStartEndMargin(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, preset.jointWidth(), LengthUnit.MILLIMETER);
+        surfaceCutRestrictionSelector.setValue(preset.cutRestriction());
         dwgBlockNameField.setText(extractDwgBlockName(preset.coveringSource()).orElse(""));
     }
 
@@ -3381,7 +3389,7 @@ public final class CadWorkbench extends BorderPane {
         int tileCount = estimatedTileCount(layer);
         String sourceLabel = formatCoveringSourceLabel(layer.coveringSource());
         String source = sourceLabel.isBlank() ? "" : " | Quelle: " + sourceLabel;
-        return layer.name() + " | " + layer.thickness().format(LengthUnit.MILLIMETER, 1) + " | " + visibility + " | " + tileCount + " Elemente" + source;
+        return layer.name() + " | " + layer.thickness().format(LengthUnit.MILLIMETER, 1) + " | " + visibility + " | " + tileCount + " Elemente | " + layer.cutRestriction().label() + source;
     }
 
     private int estimatedTileCount(SurfaceLayer layer) {
@@ -3419,6 +3427,7 @@ public final class CadWorkbench extends BorderPane {
         syncLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, selectedLayer.minimumEdgeWidth(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, selectedLayer.minimumStartEndMargin(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, selectedLayer.jointWidth(), LengthUnit.MILLIMETER);
+        surfaceCutRestrictionSelector.setValue(selectedLayer.cutRestriction());
         surfaceLayerCoverageLabel.setText(describeSurfaceLayer(selectedLayer));
         updateActionButtons();
     }
@@ -3468,6 +3477,7 @@ public final class CadWorkbench extends BorderPane {
                     currentSurfaceMinimumEdgeWidth(),
                     currentSurfaceMinimumStartEndMargin(),
                     currentSurfaceJointWidth(),
+                    currentSurfaceCutRestriction(),
                     currentSurfaceCoveringSource()
             ));
         }
@@ -3541,6 +3551,7 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceMinimumEdgeWidth(),
                 currentSurfaceMinimumStartEndMargin(),
                 currentSurfaceJointWidth(),
+                currentSurfaceCutRestriction(),
                 currentSurfaceCoveringSource()
         );
     }
@@ -3584,6 +3595,10 @@ public final class CadWorkbench extends BorderPane {
 
     private Length currentSurfaceJointWidth() {
         return parseLength(surfaceJointWidthField, surfaceJointWidthUnit.getValue()).orElse(Length.ofMillimeters(2));
+    }
+
+    private SurfaceCutRestriction currentSurfaceCutRestriction() {
+        return Optional.ofNullable(surfaceCutRestrictionSelector.getValue()).orElse(SurfaceCutRestriction.fallback());
     }
 
     private String currentSurfaceCoveringSource() {

@@ -1,6 +1,7 @@
 package de.andreas.cadas.application.layers;
 
 import de.andreas.cadas.domain.geometry.Length;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
 
 public record SurfaceCoveringPreset(
@@ -15,6 +16,7 @@ public record SurfaceCoveringPreset(
         Length minimumEdgeWidth,
         Length minimumStartEndMargin,
         Length jointWidth,
+        SurfaceCutRestriction cutRestriction,
         String coveringSource
 ) {
 
@@ -31,7 +33,24 @@ public record SurfaceCoveringPreset(
             Length jointWidth,
             String coveringSource
     ) {
-        this(id, name, thickness, tileWidth, tileHeight, layoutMode, offset, minimumOffset, minimumEdgeWidth, minimumEdgeWidth, jointWidth, coveringSource);
+        this(id, name, thickness, tileWidth, tileHeight, layoutMode, offset, minimumOffset, minimumEdgeWidth, minimumEdgeWidth, jointWidth, SurfaceCutRestriction.fallback(), coveringSource);
+    }
+
+    public SurfaceCoveringPreset(
+            String id,
+            String name,
+            Length thickness,
+            Length tileWidth,
+            Length tileHeight,
+            SurfaceLayoutMode layoutMode,
+            Length offset,
+            Length minimumOffset,
+            Length minimumEdgeWidth,
+            Length minimumStartEndMargin,
+            Length jointWidth,
+            String coveringSource
+    ) {
+        this(id, name, thickness, tileWidth, tileHeight, layoutMode, offset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, SurfaceCutRestriction.fallback(), coveringSource);
     }
 
     @Override

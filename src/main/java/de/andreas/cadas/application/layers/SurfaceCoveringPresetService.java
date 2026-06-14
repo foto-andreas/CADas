@@ -2,6 +2,7 @@ package de.andreas.cadas.application.layers;
 
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
 
 import java.nio.file.Path;
@@ -23,6 +24,7 @@ public final class SurfaceCoveringPresetService {
                         Length.of(8, LengthUnit.CENTIMETER),
                         Length.of(8, LengthUnit.CENTIMETER),
                         Length.of(2, LengthUnit.MILLIMETER),
+                        SurfaceCutRestriction.OUTER_CUTS_ROTATABLE,
                         "Standard: Fliese"
                 ),
                 new SurfaceCoveringPreset(
@@ -37,6 +39,7 @@ public final class SurfaceCoveringPresetService {
                         Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(2, LengthUnit.MILLIMETER),
+                        SurfaceCutRestriction.FREE,
                         "Standard: Dämmplatte"
                 ),
                 new SurfaceCoveringPreset(
@@ -51,6 +54,7 @@ public final class SurfaceCoveringPresetService {
                         Length.of(15, LengthUnit.CENTIMETER),
                         Length.of(15, LengthUnit.CENTIMETER),
                         Length.of(1, LengthUnit.MILLIMETER),
+                        SurfaceCutRestriction.FREE,
                         "Standard: Rigips"
                 ),
                 new SurfaceCoveringPreset(
@@ -65,6 +69,7 @@ public final class SurfaceCoveringPresetService {
                         Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(10, LengthUnit.CENTIMETER),
                         Length.of(3, LengthUnit.MILLIMETER),
+                        SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
                         "Standard: OSB"
                 ),
                 new SurfaceCoveringPreset(
@@ -79,6 +84,7 @@ public final class SurfaceCoveringPresetService {
                         Length.of(5, LengthUnit.CENTIMETER),
                         Length.of(5, LengthUnit.CENTIMETER),
                         Length.zero(),
+                        SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
                         "Standard: Tapete"
                 )
         );
@@ -99,6 +105,7 @@ public final class SurfaceCoveringPresetService {
                 Length.of(10, LengthUnit.CENTIMETER),
                 Length.of(10, LengthUnit.CENTIMETER),
                 Length.zero(),
+                SurfaceCutRestriction.fallback(),
                 path.toAbsolutePath().toString()
         );
     }
@@ -119,6 +126,7 @@ public final class SurfaceCoveringPresetService {
                 Length.of(10, LengthUnit.CENTIMETER),
                 Length.of(10, LengthUnit.CENTIMETER),
                 Length.zero(),
+                SurfaceCutRestriction.fallback(),
                 path.toAbsolutePath() + "#" + normalizedBlockName
         );
     }

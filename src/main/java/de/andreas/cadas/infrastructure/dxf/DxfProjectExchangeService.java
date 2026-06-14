@@ -15,6 +15,7 @@ import de.andreas.cadas.domain.model.SlopedCeilingProfile;
 import de.andreas.cadas.domain.model.SlopedCeilingSide;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
+import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceLayoutMode;
@@ -199,6 +200,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                     Length.ofMillimeters(parseDouble(parts[11])),
                                     Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[12]) : parseDouble(parts[11])),
                                     Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[13]) : parseDouble(parts[12])),
+                                    SurfaceCutRestriction.fromStoredValue(parts.length >= 16 ? parts[15] : null),
                                     DxfMetadataCodec.decode(parts.length >= 15 ? parts[14] : parts[13], encodedFields)
                             );
                             stack.addLayer(layer);
@@ -388,7 +390,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             for (SurfaceLayer layer : sls.layers()) {
                 appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                         Locale.US,
-                        "SLL|%s|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s",
+                        "SLL|%s|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s",
                         DxfMetadataCodec.encode(level.name()),
                         layer.id(),
                         DxfMetadataCodec.encode(layer.name()),
@@ -402,7 +404,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                         layer.minimumEdgeWidth().toMillimeters(),
                         layer.minimumStartEndMargin().toMillimeters(),
                         layer.jointWidth().toMillimeters(),
-                        DxfMetadataCodec.encode(layer.coveringSource())
+                        DxfMetadataCodec.encode(layer.coveringSource()),
+                        layer.cutRestriction().name()
                 ));
             }
         }
