@@ -117,8 +117,10 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 * Türen und Fenster schneiden Wandbeläge aus. Die sichtbaren Belagsflächen werden als maximale Rechtecke zerlegt; das Kachelraster läuft über virtuelle Rechteckgrenzen hinweg und wird nur an echten Öffnungskanten geklippt.
 * Sichtbare Boden- und Deckenlagen verringern die lichte Raumhöhe und beeinflussen Volumen sowie 3D-Ableitung.
 * `UserSurfaceCoveringPresetLibrary` speichert eigene Belags-Presets unter `~/.config/CADas/Belag` als `.cadasbelag` und lädt sie beim Start in die Preset-Auswahl.
-* Registrierte `DWG`-Dateien werden in dasselbe Belagsverzeichnis übernommen und als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
-* Über optionale `.blocks`-Katalogdateien oder manuelle Eingabe lassen sich zusätzlich konkrete DWG-Blocknamen als Oberflächen-Presets registrieren.
+* Registrierte `DWG`-Dateien werden in dasselbe Belagsverzeichnis übernommen, über externe Konverter analysiert und als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
+* `DwgLibraryAnalyzer` kapselt die DWG-Konvertierung über externe Programme wie `dwg2dxf` oder `dwgread`; CADas linkt und bündelt keine DWG-Bibliotheken.
+* Aus der konvertierten DXF-Geometrie werden Einheiten, Blockursprünge, Skalierung, Rotation, Layer, Handles, Inserts und echte Blockmaße abgeleitet.
+* Über optionale `.blocks`-Katalogdateien, manuelle Eingabe oder die analysierte Blockauswahl lassen sich konkrete DWG-Blöcke als Oberflächen- oder Objekt-Presets registrieren.
 * `SurfaceMaterialListService` erzeugt aus den sichtbaren Belägen eine Materialliste mit Fläche, Stückzahl, Materialfläche, Schnitten und Raum-Komplexität. Boden- und Deckenflächen werden über die orthogonale Raumzerlegung bewertet; Wandbeläge nutzen die vorhandenen maximalen Wandrechtecke mit ausgesparten Türen, Fenstern und anstoßenden Innenwänden.
 * Reststücke werden materialweit weitergeführt und vor dem Anschnitt eines neuen Werkstücks genutzt. Bei mehreren passenden Reststücken wird das mit dem geringsten Verschnitt bevorzugt.
 * `SurfaceCutRestriction` unterscheidet freie Zuschnitte, außen begrenzte Schnittkanten und feste Verlegerichtung mit außen begrenzten Schnittkanten. Diese Information wird gespeichert und in der Materialliste berücksichtigt.
@@ -126,7 +128,7 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 
 ## Dateiformatstrategie
 
-Die konkreten Austauschadapter sind `DxfProjectExchangeService` und `DxfLevelExchangeService`. Sie kapseln den DXF-Import und -Export bewusst hinter `ProjectExchangeService` und `LevelExchangeService`, damit eine spätere `DWG`-Unterstützung als weiterer Infrastrukturadapter ergänzt werden kann.
+Die konkreten Austauschadapter sind `DxfProjectExchangeService` und `DxfLevelExchangeService`. Sie kapseln den DXF-Import und -Export bewusst hinter `ProjectExchangeService` und `LevelExchangeService`. DWG-Bibliotheken werden nicht direkt als Austauschformat geschrieben, sondern über eine separate externe Konverter-Schicht gelesen und anschließend als CADas-Presets genutzt.
 
 Für den aktuellen Stand gilt:
 
@@ -201,8 +203,8 @@ Build und Tests laufen über:
 
 Die bestehende Struktur ist absichtlich so geschnitten, dass die nächsten Ausbauschritte sauber ergänzt werden können:
 
-* die vorhandene `DWG`-Datei später über eine separat gekapselte Formatadapter-Schicht nutzbar machen
-* echte `DWG`-Geometrie für Raumobjekte auswerten statt nur referenzierte Rechteck-Presets zu führen
+* weitere DWG-Konverter und AutoCAD-Elementtypen über dieselbe Adapter-Schicht ergänzen
+* produktive DWG-Bibliotheken gegen die Blockgeometrie-, Einheiten- und Preview-Auswertung verifizieren
 * komplexere 3D-Geometrie jenseits von Box-Ableitungen ergänzen
 * grafische Verwaltungsoberflächen für Dach- und Oberflächen-Ebenen ergänzen
 

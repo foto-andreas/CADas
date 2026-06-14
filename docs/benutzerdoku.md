@@ -345,26 +345,39 @@ Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D`, `3D` und `Innen`.
 
 ## DWG-Blöcke für Oberflächen verwenden
 
-Für geladene `DWG`-Bibliotheken gibt es jetzt zwei Wege, konkrete Blöcke als Oberflächen-Presets auswählbar zu machen:
+CADas liefert keine `DWG`-Bibliotheken und keine DWG-Konverter mit aus. Für echte Blockgeometrie muss lokal ein externer Konverter verfügbar sein. Auf macOS ist der einfachste Weg:
 
-* automatisch über eine optionale Katalogdatei neben der `DWG`
-* manuell über das Feld `DWG-Block` in der Ebenenverwaltung
+```bash
+brew install libredwg
+```
 
-Beim Laden wird die `DWG` zusammen mit vorhandenen `.blocks`-Katalogen in `~/.config/CADas/Belag` übernommen. Dadurch bleiben die Referenzen auch dann stabil, wenn die ursprünglich ausgewählte Datei später verschoben wird.
+CADas nutzt dann `dwg2dxf` oder alternativ `dwgread` als externes Programm. Wenn der Konverter nicht im `PATH` liegt, kann `CADAS_DWG_CONVERTER` auf die ausführbare Datei zeigen.
 
-### Automatischer Katalog
+Beim Laden wird die `DWG` zusammen mit vorhandenen `.blocks`-Katalogen in `~/.config/CADas/Belag` übernommen. Danach analysiert CADas Einheiten, Blocknamen, Blockursprünge, Layer, Handles, Inserts, Skalierung und Rotation aus der konvertierten DXF-Geometrie.
 
-Lege neben die Bibliothek eine Textdatei mit dem Namen `<dateiname>.blocks` oder `<basisname>.blocks`.
+In der Eigenschaftenleiste unter `CAD-Bibliotheken` siehst du:
+
+* den Konverter- und Analysestatus
+* ein Suchfeld für Blockname, Layer oder Datei
+* die analysierten Blöcke mit Maßen
+* eine einfache Vorschau mit Blockgrenzen und Ursprung
+* `Als Belag`, um einen Block als Oberflächen-Preset zu übernehmen
+* `Als Objekt`, um einen Block als Raumobjekt-Preset zu übernehmen
+* die Objektnutzung: steht auf Bodenbelag, Bodenbelag wird ausgespart oder wandmontiert
+
+### Optionaler Katalog
+
+Eine `.blocks`-Datei ist weiterhin als Ergänzung möglich, etwa wenn eine DWG nicht vollständig analysiert werden kann oder nur bestimmte Blöcke angeboten werden sollen. Lege neben die Bibliothek eine Textdatei mit dem Namen `<dateiname>.blocks` oder `<basisname>.blocks`.
 
 Beispiel:
 
 ```text
 Rigips_1250x2000
 OSB_2500x675
-Daemmplatte_1200x600
+Dämmplatte_1200x600
 ```
 
-Jede nichtleere Zeile wird dann beim Laden der `DWG` als eigener auswählbarer `DWG-Block` registriert.
+Jede nichtleere Zeile wird beim Laden der `DWG` als eigener auswählbarer `DWG`-Block registriert. Wenn die Analyse denselben Block findet, übernimmt CADas die echten Maße; sonst wird ein Referenz-Preset mit Standardmaß angelegt.
 
 ### Manuelle Registrierung
 
@@ -373,6 +386,8 @@ Jede nichtleere Zeile wird dann beim Laden der `DWG` als eigener auswählbarer `
 3. Trage unter `DWG-Block` einen konkreten Blocknamen ein.
 4. Klicke auf `DWG-Block hinzufügen`.
 5. Das neue Preset erscheint danach direkt in der Preset-Auswahl.
+
+Für Raumobjekte kannst du zusätzlich `DWG`-Dateien unter `~/.config/CADas/Objekte` ablegen. CADas analysiert deren Blöcke beim Start und erzeugt daraus Objekt-Presets mit echtem Footprint. Wenn kein Konverter verfügbar ist oder die Datei nicht lesbar ist, wird die Datei weiterhin als einfache Referenz mit Standardmaß angeboten.
 
 ## Werkzeuge
 
@@ -776,14 +791,15 @@ Die Anwendung bringt Standard-Presets für:
 Über `Teilebibliothek laden` können zwei Typen eingebunden werden:
 
 * `.cadasparts` für direkt importierbare CADas-Presets
-* `.dwg` als registrierte externe CAD-Bibliothek für Oberflächen-Presets und Blockquellen
+* `.dwg` als registrierte externe CAD-Bibliothek für Belags- und Objekt-Presets
 
 Aktuell gilt:
 
 * `.cadasparts` erweitert die auswählbaren Presets sofort.
-* `.dwg` wird nach `~/.config/CADas/Belag` übernommen, registriert und in der Eigenschaftenleiste dokumentiert.
-* Konkrete `DWG`-Blöcke lassen sich über `.blocks`-Kataloge oder manuell als Oberflächen-Presets freischalten.
-* `DWG`-Objekte für die Platzierung im Raum werden aus `~/.config/CADas/Objekte` als referenzierte Objekt-Presets geladen.
+* `.dwg` wird nach `~/.config/CADas/Belag` übernommen, analysiert und in der Eigenschaftenleiste dokumentiert.
+* Konkrete `DWG`-Blöcke lassen sich per Suche und Vorschau als Belag oder Objekt übernehmen.
+* `DWG`-Objekte für die Platzierung im Raum werden aus `~/.config/CADas/Objekte` mit echter Blockgeometrie geladen, sofern ein externer Konverter verfügbar ist.
+* Nicht lesbare `DWG`-Dateien werden verständlich als Diagnose angezeigt und nicht still als korrekte Geometrie behandelt.
 
 ## Automatisierung für Tests
 
@@ -825,7 +841,7 @@ Damit kann ein Testablauf beispielsweise so aussehen:
 Die aktuelle Version konzentriert sich bewusst auf einen robusten Grundrisskern mit erster 3D-Ableitung. Noch nicht umgesetzt oder noch nicht vollständig ausgebaut sind unter anderem:
 
 * freie 3D-Modellierung jenseits der aus dem Grundriss abgeleiteten Körper
-* vollständige binäre `DWG`-Verarbeitung direkt aus dem Dateiformat statt der heutigen Blockkatalog- und Referenznutzung
+* vollständige binäre `DWG`-Verarbeitung direkt im Prozess; aktuell nutzt CADas bewusst externe Konverter und bündelt keine DWG-Libraries
 * grafische Verwaltung von Dachmodellen und zusätzlichen Flächen-Ebenen
 
 ## Nächste fachliche Ausbaustufen
@@ -834,5 +850,5 @@ Die nächsten geplanten Schritte sind:
 
 * komplexere 3D-Geometrien und Materialdarstellungen
 * grafische Verwaltung für Dach- und Oberflächen-Ebenen
-* vollständige `DWG`-Anbindung direkt aus dem Format
+* weitere DWG-Qualitätssicherung mit produktiven Kundenbibliotheken und zusätzlichen AutoCAD-Elementtypen
 * tiefere AutoCAD-Kompatibilität über zusätzliche DXF-Datentypen und weitergehende Zeichnungsmetadaten

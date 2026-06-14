@@ -11,7 +11,7 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * Treppen, Dächer und zusätzliche Flächen-Ebenen folgen nach dem robusten 2D-Grundrisskern.
 * Zunächst wird eine kleine interne Standardbibliothek für Türen, Fenster und einfache Treppen bereitgestellt.
 * Externe Teilebibliotheken werden danach ergänzt.
-* Die vorhandene Datei `Variotherm Vorlage 2024 PARTNER_deutsch.dwg` muss später zwingend nutzbar gemacht werden.
+* `DWG`-Geometrie wird über externe Konverter nutzbar gemacht. CADas liefert keine DWG-Bibliotheken und keine DWG-Konverter mit aus.
 
 ## Auswirkung auf die Umsetzung
 * Die Formatarchitektur muss von Anfang an so geschnitten sein, dass `DXF` zuerst geliefert und `DWG` später ergänzbar wird.
@@ -22,6 +22,8 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * Wandbeläge auf Innen- und Außenflächen werden an Türen und Fenstern ausgespart. Dafür werden maximale sichtbare Rechtecke gebildet; die Kachelbelegung darf an virtuellen Rechteckgrenzen nicht neu starten.
 * Belags-Materiallisten verwenden Reststücke weiter, beachten die Schnittbeschränkung des Belags und werden in der Anwendung als gerendertes Markdown angezeigt.
 * Erste Raumobjekte werden als Fachobjekte gespeichert, in 2D, Innenansicht und 3D gemeinsam ein-/ausblendbar gemacht und über DXF-Metadaten rundgeführt.
+* Für `DWG`-Bibliotheken ist `libredwg` per `brew install libredwg` der bevorzugte lokale Konverter. CADas erkennt `dwg2dxf`, `dwgread` oder `CADAS_DWG_CONVERTER`.
+* Analysierte `DWG`-Blöcke können als Belag oder als Raumobjekt übernommen werden. Raumobjekte speichern zusätzlich den Montagemodus: auf Bodenbelag, Bodenbelag ausgespart oder wandmontiert.
 
 ## Offene Folgeentscheidungen
-* `DWG`-Dateien unter `~/.config/CADas/Objekte` werden aktuell als referenzierte rechteckige Objekt-Presets geladen. Ob und wie die echte DWG-Blockgeometrie direkt ausgewertet wird, bleibt offen und darf nicht als erledigt betrachtet werden.
+* Keine offenen Folgeentscheidungen für die aktuelle DWG-Konverter-Anbindung.
