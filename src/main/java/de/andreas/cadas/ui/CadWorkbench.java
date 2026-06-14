@@ -11,6 +11,10 @@ import de.andreas.cadas.application.drawing.SelectionTranslationService;
 import de.andreas.cadas.application.drawing.SnapService;
 import de.andreas.cadas.application.drawing.WallEditingService;
 import de.andreas.cadas.application.drawing.WallEndpointSelection;
+import de.andreas.cadas.application.dwg.DwgBlockDefinition;
+import de.andreas.cadas.application.dwg.DwgConversionAvailability;
+import de.andreas.cadas.application.dwg.DwgLibraryAnalysis;
+import de.andreas.cadas.application.dwg.DwgLibraryAnalyzer;
 import de.andreas.cadas.application.exchange.LevelExchangeService;
 import de.andreas.cadas.application.exchange.ProjectExchangeService;
 import de.andreas.cadas.application.layers.SurfaceCoveringPreset;
@@ -53,6 +57,7 @@ import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectMountingMode;
 import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
@@ -72,6 +77,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -200,6 +206,7 @@ public final class CadWorkbench extends BorderPane {
     private final MarkdownHtmlRenderer markdownHtmlRenderer = new MarkdownHtmlRenderer();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
+    private final DwgLibraryAnalyzer dwgLibraryAnalyzer = new DwgLibraryAnalyzer();
     private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
 
@@ -288,6 +295,12 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> surfaceJointWidthUnit = new ComboBox<>();
     private final ComboBox<SurfaceCutRestriction> surfaceCutRestrictionSelector = new ComboBox<>();
     private final TextField dwgBlockNameField = new TextField();
+    private final TextField dwgBlockSearchField = new TextField();
+    private final ComboBox<DwgBlockDefinition> dwgBlockSelector = new ComboBox<>();
+    private final ComboBox<RoomObjectMountingMode> dwgObjectFloorModeSelector = new ComboBox<>();
+    private final Label dwgStatusLabel = new Label("Noch keine DWG-Bibliothek analysiert.");
+    private final Label dwgBlockDetailLabel = new Label("Kein DWG-Block ausgewählt.");
+    private final Canvas dwgPreviewCanvas = new Canvas(220, 150);
     private final Label surfaceLayerTargetLabel = new Label("Keine Fläche ausgewählt.");
     private final Label surfaceLayerSelectionHintLabel = new Label("Für Beläge zuerst eine passende Fläche auswählen.");
     private final Label surfaceLayerCoverageLabel = new Label("Keine Ebenen ausgewählt.");
@@ -298,6 +311,7 @@ public final class CadWorkbench extends BorderPane {
     private final ObservableList<StairPreset> availableStairPresets = FXCollections.observableArrayList();
     private final ObservableList<RoomObjectPreset> availableRoomObjectPresets = FXCollections.observableArrayList();
     private final ObservableList<SurfaceCoveringPreset> availableSurfacePresets = FXCollections.observableArrayList();
+    private final ObservableList<DwgBlockDefinition> availableDwgBlocks = FXCollections.observableArrayList();
     private final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection, this::switchToThreeDWorkspaceFromViewport);
     private final ViewProjectionService projectionService = new ViewProjectionService();
     private final ProjectedModelBoundsService projectedBoundsService = new ProjectedModelBoundsService();
@@ -318,6 +332,9 @@ public final class CadWorkbench extends BorderPane {
     private final Button moveSurfaceLayerDownButton = new Button("Nach unten");
     private final Button saveSurfacePresetButton = new Button("Speichern");
     private final Button addDwgBlockPresetButton = new Button("DWG-Block hinzufügen");
+    private final Button refreshDwgLibraryButton = new Button("DWG prüfen");
+    private final Button addDwgBlockAsSurfaceButton = new Button("Als Belag");
+    private final Button addDwgBlockAsObjectButton = new Button("Als Objekt");
     private final ContextMenu selectionContextMenu = new ContextMenu();
     private final Label cadLibrarySummaryLabel = new Label("Keine externen CAD-Bibliotheken registriert.");
 
@@ -328,6 +345,7 @@ public final class CadWorkbench extends BorderPane {
 
     private final ObservableList<GuideLine> guideLines = FXCollections.observableArrayList();
     private final ObservableList<Path> cadLibraryReferences = FXCollections.observableArrayList();
+    private final Map<Path, DwgLibraryAnalysis> dwgAnalysesByPath = new LinkedHashMap<>();
     private final LinkedHashSet<SelectionKey> selectedSelections = new LinkedHashSet<>();
 
     private double zoom = 1.0;
@@ -399,6 +417,7 @@ public final class CadWorkbench extends BorderPane {
         toolSelector.setValue(DrawingTool.WALL);
         initializePresetSelectors();
         initializeSurfaceLayerControls();
+        initializeDwgLibraryControls();
         levelSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
                 activateLevel(newValue);
@@ -448,7 +467,6 @@ public final class CadWorkbench extends BorderPane {
         });
         configureActionButtons();
         registerConfiguredDwgLibraries();
-        registerBundledDwgLibraries();
     }
 
     private void configureLayout() {
@@ -774,6 +792,10 @@ public final class CadWorkbench extends BorderPane {
         surfaceLayerCoverageLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
         cadLibrarySummaryLabel.setWrapText(true);
         cadLibrarySummaryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
+        dwgStatusLabel.setWrapText(true);
+        dwgStatusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
+        dwgBlockDetailLabel.setWrapText(true);
+        dwgBlockDetailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
         propertySections.getChildren().setAll(
                 createPropertySection("Auswahl", selectionSummaryLabel, applySelectionPropertiesButton),
                 createPropertySection(
@@ -852,7 +874,14 @@ public final class CadWorkbench extends BorderPane {
                 ),
                 createPropertySection(
                         "CAD-Bibliotheken",
-                        cadLibrarySummaryLabel
+                        cadLibrarySummaryLabel,
+                        dwgStatusLabel,
+                        propertyRow("DWG-Suche", dwgBlockSearchField),
+                        propertyRow("DWG-Block", dwgBlockSelector),
+                        dwgPreviewCanvas,
+                        dwgBlockDetailLabel,
+                        propertyRow("Objektnutzung", dwgObjectFloorModeSelector),
+                        new HBox(6.0, refreshDwgLibraryButton, addDwgBlockAsSurfaceButton, addDwgBlockAsObjectButton)
                 )
         );
         propertySections.setPadding(new Insets(4, 0, 4, 0));
@@ -902,6 +931,9 @@ public final class CadWorkbench extends BorderPane {
         moveSurfaceLayerDownButton.setOnAction(event -> moveSurfaceLayer(1));
         saveSurfacePresetButton.setOnAction(event -> saveCurrentSurfacePreset());
         addDwgBlockPresetButton.setOnAction(event -> addDwgBlockPreset());
+        refreshDwgLibraryButton.setOnAction(event -> refreshCurrentDwgLibraryAnalysis());
+        addDwgBlockAsSurfaceButton.setOnAction(event -> addSelectedDwgBlockAsSurfacePreset());
+        addDwgBlockAsObjectButton.setOnAction(event -> addSelectedDwgBlockAsObjectPreset());
         rebuildSelectionContextMenu();
         applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
         applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
@@ -916,8 +948,17 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(moveSurfaceLayerUpButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach oben.");
         applyTooltip(moveSurfaceLayerDownButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach unten.");
         applyTooltip(saveSurfacePresetButton, "Speichert die aktuell eingetragenen Belagswerte als eigenes Preset unter `~/.config/CADas/Belag`, fragt vor dem Überschreiben nach und fügt das Preset der Auswahl hinzu.");
-        applyTooltip(addDwgBlockPresetButton, "Registriert für die aktuell ausgewählte DWG-Bibliothek einen konkreten Blocknamen als auswählbares Oberflächen-Preset.");
-        applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf, die für spätere Teileverwendung vorgemerkt sind.");
+        applyTooltip(addDwgBlockPresetButton, "Registriert den manuell eingetragenen Blocknamen aus der aktuell ausgewählten DWG-Bibliothek als Belags-Preset. Wenn die DWG analysiert wurde, werden echte Blockmaße übernommen.");
+        applyTooltip(refreshDwgLibraryButton, "Analysiert die aktuell geladene DWG-Bibliothek erneut über einen externen Konverter wie `dwg2dxf` oder `dwgread`.");
+        applyTooltip(addDwgBlockAsSurfaceButton, "Übernimmt den ausgewählten DWG-Block mit echten Blockmaßen als Belags-Preset.");
+        applyTooltip(addDwgBlockAsObjectButton, "Übernimmt den ausgewählten DWG-Block mit echtem Footprint als Objekt-Preset.");
+        applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf.");
+        applyTooltip(dwgStatusLabel, "Zeigt, welcher externe DWG-Konverter gefunden wurde und ob die letzte Analyse erfolgreich war.");
+        applyTooltip(dwgBlockSearchField, "Filtert die analysierten DWG-Blöcke nach Blockname, Layer oder Dateiname.");
+        applyTooltip(dwgBlockSelector, "Wählt einen aus der DWG-Geometrie analysierten Block aus, der als Belag oder Objekt übernommen werden kann.");
+        applyTooltip(dwgPreviewCanvas, "Zeigt eine maßstäbliche Draufsicht-Vorschau der aus dem DWG-Block abgeleiteten 2D-Grenzen.");
+        applyTooltip(dwgBlockDetailLabel, "Zeigt Maße, Ursprung, Layer, Handles, Einheiten und Hinweise zum ausgewählten DWG-Block.");
+        applyTooltip(dwgObjectFloorModeSelector, "Legt fest, ob das aus dem DWG-Block erzeugte Objekt auf dem Bodenbelag steht, den Bodenbelag ausschneidet oder wandmontiert ohne Bodenausschnitt geführt wird.");
     }
 
     private void updatePropertySectionVisibility() {
@@ -1024,6 +1065,10 @@ public final class CadWorkbench extends BorderPane {
         toggleSurfaceLayerVisibilityButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
         moveSurfaceLayerUpButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection || surfaceLayerList.getSelectionModel().getSelectedIndex() <= 0);
         moveSurfaceLayerDownButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection || surfaceLayerList.getSelectionModel().getSelectedIndex() >= surfaceLayerList.getItems().size() - 1);
+        boolean hasDwgBlock = Optional.ofNullable(dwgBlockSelector.getValue()).filter(DwgBlockDefinition::hasGeometry).isPresent();
+        refreshDwgLibraryButton.setDisable(currentDwgLibraryPath().isEmpty());
+        addDwgBlockAsSurfaceButton.setDisable(!hasDwgBlock);
+        addDwgBlockAsObjectButton.setDisable(!hasDwgBlock);
     }
 
     private MenuItem menuItem(String label, Runnable action, KeyCombination accelerator) {
@@ -1152,16 +1197,17 @@ public final class CadWorkbench extends BorderPane {
         applySurfacePreset(surfacePresetSelector.getValue());
     }
 
-    private void registerBundledDwgLibraries() {
-        Path workspaceRoot = Path.of("").toAbsolutePath();
-        try (var files = Files.list(workspaceRoot)) {
-            files
-                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".dwg"))
-                    .sorted()
-                    .forEach(path -> registerDwgLibrary(path, false));
-        } catch (IOException ignored) {
-            // Fallback: keine automatische DWG-Registrierung möglich.
-        }
+    private void initializeDwgLibraryControls() {
+        dwgBlockSelector.setItems(availableDwgBlocks);
+        dwgBlockSelector.setPrefWidth(220);
+        dwgBlockSearchField.setPromptText("Block, Layer oder Datei");
+        dwgObjectFloorModeSelector.getItems().setAll(RoomObjectMountingMode.values());
+        dwgObjectFloorModeSelector.setValue(RoomObjectMountingMode.STANDS_ON_COVERING);
+        dwgBlockSearchField.textProperty().addListener((ignored, oldValue, newValue) -> applyDwgBlockFilter());
+        dwgBlockSelector.valueProperty().addListener((ignored, oldValue, newValue) -> refreshDwgBlockPreviewAndDetails());
+        DwgConversionAvailability availability = dwgLibraryAnalyzer.availability();
+        dwgStatusLabel.setText(availability.message());
+        drawEmptyDwgPreview("Keine DWG");
     }
 
     private void loadUserSurfacePresets() {
@@ -1174,10 +1220,21 @@ public final class CadWorkbench extends BorderPane {
 
     private void registerConfiguredDwgLibraries() {
         try {
-            userSurfacePresetLibrary.loadCadLibraries().forEach(path -> registerDwgLibrary(path, false));
+            userSurfacePresetLibrary.loadCadLibraries().forEach(this::registerConfiguredDwgLibraryReference);
         } catch (IOException exception) {
             draftLabel.setText("Gespeicherte DWG-Bibliotheken konnten nicht geladen werden: " + exception.getMessage());
         }
+    }
+
+    private void registerConfiguredDwgLibraryReference(Path sourceFile) {
+        Path normalizedSource = sourceFile.toAbsolutePath().normalize();
+        if (!cadLibraryReferences.contains(normalizedSource)) {
+            cadLibraryReferences.add(normalizedSource);
+        }
+        registerSurfacePreset(surfaceCoveringPresetService.fromDwg(normalizedSource));
+        dwgBlockCatalogService.loadCatalog(normalizedSource)
+                .forEach(blockName -> registerSurfacePreset(surfaceCoveringPresetService.fromDwgBlock(normalizedSource, blockName)));
+        updateCadLibrarySummary();
     }
 
     private <T> void selectFirstIfAvailable(ComboBox<T> selector, ObservableList<T> values) {
@@ -3011,7 +3068,7 @@ public final class CadWorkbench extends BorderPane {
                 preset.width(),
                 preset.depth(),
                 preset.height(),
-                preset.cutsFloorCovering(),
+                preset.mountingMode(),
                 preset.source()
         );
         activeLevel.get().addRoomObject(roomObject);
@@ -3318,7 +3375,7 @@ public final class CadWorkbench extends BorderPane {
         fileChooser.getExtensionFilters().setAll(
                 new FileChooser.ExtensionFilter("Unterstützte Bibliotheken", "*.cadasparts", "*.dwg", "*.DWG"),
                 new FileChooser.ExtensionFilter("CADas Teilebibliothek", "*.cadasparts"),
-                new FileChooser.ExtensionFilter("AutoCAD-Bibliothek", "*.dwg", "*.DWG"),
+                new FileChooser.ExtensionFilter("DWG-Bibliothek", "*.dwg", "*.DWG"),
                 new FileChooser.ExtensionFilter("Alle Dateien", "*.*")
         );
         fileChooser.setSelectedExtensionFilter(fileChooser.getExtensionFilters().getFirst());
@@ -3329,7 +3386,6 @@ public final class CadWorkbench extends BorderPane {
         String fileName = sourceFile.getFileName().toString();
         if (fileName.toLowerCase(Locale.ROOT).endsWith(".dwg")) {
             registerDwgLibrary(sourceFile, true);
-            draftLabel.setText("DWG-Bibliothek geladen und für Ebenen verfügbar: " + fileName);
             return;
         }
         try {
@@ -3362,23 +3418,52 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         cadLibrarySummaryLabel.setText(cadLibraryReferences.stream()
-                .map(path -> "• " + path.getFileName())
+                .map(this::cadLibrarySummaryLine)
                 .reduce((left, right) -> left + "\n" + right)
                 .orElse("Keine externen CAD-Bibliotheken registriert."));
     }
 
+    private String cadLibrarySummaryLine(Path path) {
+        DwgLibraryAnalysis analysis = dwgAnalysesByPath.get(path.toAbsolutePath().normalize());
+        if (analysis == null) {
+            return "• " + path.getFileName();
+        }
+        if (!analysis.successful()) {
+            return "• " + path.getFileName() + " | nicht lesbar: " + analysis.summary();
+        }
+        long usableBlocks = analysis.blocks().stream()
+                .filter(DwgBlockDefinition::hasGeometry)
+                .count();
+        return "• " + path.getFileName() + " | " + usableBlocks + " Blöcke";
+    }
+
     private void registerDwgLibrary(Path sourceFile, boolean askBeforeOverwrite) {
         Path registeredFile = configuredCadLibraryPath(sourceFile, askBeforeOverwrite);
-        if (!cadLibraryReferences.contains(registeredFile)) {
-            cadLibraryReferences.add(registeredFile);
+        Path normalizedRegisteredFile = registeredFile.toAbsolutePath().normalize();
+        if (!cadLibraryReferences.contains(normalizedRegisteredFile)) {
+            cadLibraryReferences.add(normalizedRegisteredFile);
         }
-        SurfaceCoveringPreset dwgPreset = surfaceCoveringPresetService.fromDwg(registeredFile);
+        DwgLibraryAnalysis analysis = analyzeDwgLibrary(normalizedRegisteredFile, false);
+        SurfaceCoveringPreset dwgPreset = surfaceCoveringPresetService.fromDwg(normalizedRegisteredFile);
         registerSurfacePreset(dwgPreset);
-        dwgBlockCatalogService.loadCatalog(registeredFile).forEach(blockName -> registerDwgBlockPreset(registeredFile, blockName));
+        dwgBlockCatalogService.loadCatalog(normalizedRegisteredFile).forEach(blockName -> registerDwgBlockPreset(normalizedRegisteredFile, blockName));
+        applyDwgBlockFilter();
         updateCadLibrarySummary();
         if (surfacePresetSelector.getValue() == null) {
             surfacePresetSelector.setValue(dwgPreset);
         }
+        draftLabel.setText("DWG-Bibliothek geladen: " + normalizedRegisteredFile.getFileName() + " | " + analysis.summary());
+    }
+
+    private DwgLibraryAnalysis analyzeDwgLibrary(Path sourceFile, boolean force) {
+        Path normalizedSource = sourceFile.toAbsolutePath().normalize();
+        if (!force && dwgAnalysesByPath.containsKey(normalizedSource)) {
+            return dwgAnalysesByPath.get(normalizedSource);
+        }
+        DwgLibraryAnalysis analysis = dwgLibraryAnalyzer.analyze(normalizedSource);
+        dwgAnalysesByPath.put(normalizedSource, analysis);
+        dwgStatusLabel.setText(normalizedSource.getFileName() + ": " + analysis.summary());
+        return analysis;
     }
 
     private Path configuredCadLibraryPath(Path sourceFile, boolean askBeforeOverwrite) {
@@ -3428,12 +3513,185 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private SurfaceCoveringPreset registerDwgBlockPreset(Path sourceFile, String blockName) {
-        SurfaceCoveringPreset preset = surfaceCoveringPresetService.fromDwgBlock(sourceFile, blockName);
+        SurfaceCoveringPreset preset = findAnalyzedDwgBlock(sourceFile, blockName)
+                .map(surfaceCoveringPresetService::fromDwgBlock)
+                .orElseGet(() -> surfaceCoveringPresetService.fromDwgBlock(sourceFile, blockName));
         registerSurfacePreset(preset);
         return availableSurfacePresets.stream()
                 .filter(candidate -> candidate.coveringSource().equals(preset.coveringSource()))
                 .findFirst()
                 .orElse(preset);
+    }
+
+    private Optional<DwgBlockDefinition> findAnalyzedDwgBlock(Path sourceFile, String blockName) {
+        Path normalizedSource = sourceFile.toAbsolutePath().normalize();
+        DwgLibraryAnalysis analysis = dwgAnalysesByPath.get(normalizedSource);
+        if (analysis == null) {
+            analysis = analyzeDwgLibrary(normalizedSource, false);
+        }
+        String normalizedBlockName = blockName == null ? "" : blockName.trim();
+        return analysis.blocks().stream()
+                .filter(block -> block.name().equalsIgnoreCase(normalizedBlockName))
+                .findFirst();
+    }
+
+    private void addSelectedDwgBlockAsSurfacePreset() {
+        DwgBlockDefinition block = dwgBlockSelector.getValue();
+        if (block == null || !block.hasGeometry()) {
+            draftLabel.setText("Bitte zuerst einen DWG-Block mit auswertbarer Geometrie auswählen.");
+            return;
+        }
+        SurfaceCoveringPreset preset = surfaceCoveringPresetService.fromDwgBlock(block);
+        registerSurfacePreset(preset);
+        surfacePresetSelector.setValue(preset);
+        dwgBlockNameField.setText(block.name());
+        applySurfacePreset(preset);
+        draftLabel.setText("DWG-Block als Belag übernommen: " + block.name());
+    }
+
+    private void addSelectedDwgBlockAsObjectPreset() {
+        DwgBlockDefinition block = dwgBlockSelector.getValue();
+        if (block == null || !block.hasGeometry()) {
+            draftLabel.setText("Bitte zuerst einen DWG-Block mit auswertbarer Geometrie auswählen.");
+            return;
+        }
+        RoomObjectMountingMode mountingMode = Optional.ofNullable(dwgObjectFloorModeSelector.getValue()).orElse(RoomObjectMountingMode.STANDS_ON_COVERING);
+        RoomObjectPreset preset = roomObjectPresetService.fromDwgBlock(block, mountingMode);
+        registerRoomObjectPreset(preset);
+        roomObjectPresetSelector.setValue(preset);
+        toolSelector.setValue(DrawingTool.OBJECT);
+        draftLabel.setText("DWG-Block als Objekt übernommen: " + block.name());
+    }
+
+    private void registerRoomObjectPreset(RoomObjectPreset preset) {
+        for (int index = 0; index < availableRoomObjectPresets.size(); index++) {
+            RoomObjectPreset existing = availableRoomObjectPresets.get(index);
+            if (existing.source().equals(preset.source()) || existing.id().equals(preset.id())) {
+                availableRoomObjectPresets.set(index, preset);
+                return;
+            }
+        }
+        availableRoomObjectPresets.add(preset);
+    }
+
+    private void refreshCurrentDwgLibraryAnalysis() {
+        Optional<Path> currentLibrary = currentDwgLibraryPath();
+        if (currentLibrary.isEmpty()) {
+            draftLabel.setText("Bitte zuerst eine DWG-Bibliothek laden oder auswählen.");
+            return;
+        }
+        DwgLibraryAnalysis analysis = analyzeDwgLibrary(currentLibrary.get(), true);
+        applyDwgBlockFilter();
+        updateCadLibrarySummary();
+        draftLabel.setText("DWG-Bibliothek geprüft: " + analysis.summary());
+    }
+
+    private void applyDwgBlockFilter() {
+        String filter = Optional.ofNullable(dwgBlockSearchField.getText()).orElse("").trim().toLowerCase(Locale.GERMAN);
+        DwgBlockDefinition previousSelection = dwgBlockSelector.getValue();
+        List<DwgBlockDefinition> filteredBlocks = dwgAnalysesByPath.values().stream()
+                .flatMap(analysis -> analysis.blocks().stream())
+                .filter(block -> blockMatchesFilter(block, filter))
+                .toList();
+        availableDwgBlocks.setAll(filteredBlocks);
+        if (previousSelection != null && filteredBlocks.stream().anyMatch(block -> block.sourceReference().equals(previousSelection.sourceReference()))) {
+            dwgBlockSelector.setValue(filteredBlocks.stream()
+                    .filter(block -> block.sourceReference().equals(previousSelection.sourceReference()))
+                    .findFirst()
+                    .orElse(null));
+        } else if (!filteredBlocks.isEmpty()) {
+            dwgBlockSelector.setValue(filteredBlocks.getFirst());
+        } else {
+            dwgBlockSelector.setValue(null);
+        }
+        refreshDwgBlockPreviewAndDetails();
+        updateActionButtons();
+    }
+
+    private boolean blockMatchesFilter(DwgBlockDefinition block, String filter) {
+        if (filter.isBlank()) {
+            return true;
+        }
+        return block.name().toLowerCase(Locale.GERMAN).contains(filter)
+                || block.sourceFile().getFileName().toString().toLowerCase(Locale.GERMAN).contains(filter)
+                || block.layers().stream().anyMatch(layer -> layer.toLowerCase(Locale.GERMAN).contains(filter));
+    }
+
+    private void refreshDwgBlockPreviewAndDetails() {
+        DwgBlockDefinition block = dwgBlockSelector.getValue();
+        if (block == null) {
+            dwgBlockDetailLabel.setText("Kein DWG-Block ausgewählt.");
+            drawEmptyDwgPreview("Kein Block");
+            return;
+        }
+        drawDwgPreview(block);
+        String layerText = block.layers().isEmpty() ? "keine Layer" : String.join(", ", block.layers());
+        String warningText = block.warnings().isEmpty() ? "" : "\nHinweise: " + String.join(" ", block.warnings());
+        dwgBlockDetailLabel.setText(String.format(
+                Locale.GERMAN,
+                "%s%nDatei: %s%nMaße: %.1f x %.1f mm%nUrsprung: %.1f / %.1f mm%nEinheit: %s%nLayer: %s%nElemente: %d | Handles: %d | Inserts: %d%s",
+                block.name(),
+                block.sourceFile().getFileName(),
+                block.widthMillimeters(),
+                block.heightMillimeters(),
+                block.originXMillimeters(),
+                block.originYMillimeters(),
+                block.unit(),
+                layerText,
+                block.entityCount(),
+                block.handles().size(),
+                block.inserts().size(),
+                warningText
+        ));
+    }
+
+    private void drawEmptyDwgPreview(String text) {
+        GraphicsContext graphics = dwgPreviewCanvas.getGraphicsContext2D();
+        graphics.setFill(Color.web("#f7f3eb"));
+        graphics.fillRect(0, 0, dwgPreviewCanvas.getWidth(), dwgPreviewCanvas.getHeight());
+        graphics.setStroke(Color.web("#b8ac9c"));
+        graphics.strokeRect(0.5, 0.5, dwgPreviewCanvas.getWidth() - 1.0, dwgPreviewCanvas.getHeight() - 1.0);
+        graphics.setFill(Color.web("#6b6258"));
+        graphics.fillText(text, 12, dwgPreviewCanvas.getHeight() / 2.0);
+    }
+
+    private void drawDwgPreview(DwgBlockDefinition block) {
+        if (!block.hasGeometry()) {
+            drawEmptyDwgPreview("Keine Geometrie");
+            return;
+        }
+        GraphicsContext graphics = dwgPreviewCanvas.getGraphicsContext2D();
+        double width = dwgPreviewCanvas.getWidth();
+        double height = dwgPreviewCanvas.getHeight();
+        graphics.setFill(Color.web("#f7f3eb"));
+        graphics.fillRect(0, 0, width, height);
+        graphics.setStroke(Color.web("#b8ac9c"));
+        graphics.strokeRect(0.5, 0.5, width - 1.0, height - 1.0);
+
+        DwgBlockDefinition safeBlock = block;
+        double padding = 16.0;
+        double scale = Math.min(
+                (width - padding * 2.0) / Math.max(1.0, safeBlock.widthMillimeters()),
+                (height - padding * 2.0) / Math.max(1.0, safeBlock.heightMillimeters())
+        );
+        double x = padding;
+        double y = padding;
+        double previewWidth = safeBlock.widthMillimeters() * scale;
+        double previewHeight = safeBlock.heightMillimeters() * scale;
+        double offsetX = x + (width - padding * 2.0 - previewWidth) / 2.0;
+        double offsetY = y + (height - padding * 2.0 - previewHeight) / 2.0;
+        graphics.setFill(Color.web("#d8c6aa"));
+        graphics.fillRect(offsetX, offsetY, previewWidth, previewHeight);
+        graphics.setStroke(Color.web("#2f2a24"));
+        graphics.strokeRect(offsetX, offsetY, previewWidth, previewHeight);
+
+        double originX = offsetX + (safeBlock.originXMillimeters() - safeBlock.bounds().minXMillimeters()) * scale;
+        double originY = offsetY + previewHeight - (safeBlock.originYMillimeters() - safeBlock.bounds().minYMillimeters()) * scale;
+        graphics.setStroke(Color.web("#b3412f"));
+        graphics.strokeLine(originX - 5.0, originY, originX + 5.0, originY);
+        graphics.strokeLine(originX, originY - 5.0, originX, originY + 5.0);
+        graphics.setFill(Color.web("#2f2a24"));
+        graphics.fillText(String.format(Locale.GERMAN, "%.0f x %.0f mm", safeBlock.widthMillimeters(), safeBlock.heightMillimeters()), 10.0, height - 10.0);
     }
 
     private void registerSurfacePreset(SurfaceCoveringPreset preset) {
@@ -3797,12 +4055,15 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private Optional<Path> currentDwgLibraryPath() {
-        return Optional.ofNullable(surfacePresetSelector.getValue())
+        return Optional.ofNullable(dwgBlockSelector.getValue())
+                .map(DwgBlockDefinition::sourceFile)
+                .or(() -> Optional.ofNullable(surfacePresetSelector.getValue())
                 .map(SurfaceCoveringPreset::coveringSource)
-                .flatMap(this::extractDwgLibraryPath)
+                .flatMap(this::extractDwgLibraryPath))
                 .or(() -> cadLibraryReferences.stream()
                         .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".dwg"))
-                        .findFirst());
+                        .findFirst())
+                .map(path -> path.toAbsolutePath().normalize());
     }
 
     private Optional<Path> extractDwgLibraryPath(String coveringSource) {
