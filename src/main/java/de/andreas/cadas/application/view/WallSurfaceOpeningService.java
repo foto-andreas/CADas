@@ -187,7 +187,8 @@ public final class WallSurfaceOpeningService {
             return;
         }
         double halfWidth = candidate.thickness().toMillimeters() / 2.0 / sine;
-        addOpening(openings, localPosition - halfWidth, localPosition + halfWidth, 0.0, wallHeight, wallLength, wallHeight);
+        double candidateHeight = Math.min(wallHeight, candidate.heightAt(candidate.axis().projectedLength(touchPoint).toMillimeters()));
+        addOpening(openings, localPosition - halfWidth, localPosition + halfWidth, 0.0, candidateHeight, wallLength, wallHeight);
     }
 
     private void addOpening(

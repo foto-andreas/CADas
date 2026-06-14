@@ -121,6 +121,30 @@ class WallSurfaceOpeningServiceTest {
         assertTrue(unaffected.stream().anyMatch(interval -> intervalMatches(interval, 0.0, 4000.0)));
     }
 
+    @Test
+    void sichtbareRechteckeUnterbrechenHalbhoheEinbindendeWandNurBisZuDerenHoehe() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall exteriorWall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        Wall halfHeightWall = Wall.create(
+                new PlanSegment(new PlanPoint(2000, 0), new PlanPoint(2000, 1500)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(1.2, LengthUnit.METER)
+        );
+        level.addWall(exteriorWall);
+        level.addWall(halfHeightWall);
+
+        List<WallSurfaceRectangle> rectangles = service.visibleRectangles(level, exteriorWall, 1.0);
+
+        assertTrue(rectangles.stream().anyMatch(rectangle -> rectangleMatches(rectangle, 0.0, 1900.0, 0.0, 1200.0)));
+        assertTrue(rectangles.stream().anyMatch(rectangle -> rectangleMatches(rectangle, 2100.0, 4000.0, 0.0, 1200.0)));
+        assertTrue(rectangles.stream().anyMatch(rectangle -> rectangleMatches(rectangle, 0.0, 4000.0, 1200.0, 2800.0)));
+    }
+
     private boolean rectangleMatches(WallSurfaceRectangle rectangle, double start, double end, double lower, double upper) {
         return Math.abs(rectangle.startMillimeters() - start) < 0.001
                 && Math.abs(rectangle.endMillimeters() - end) < 0.001

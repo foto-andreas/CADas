@@ -554,6 +554,47 @@ class ThreeDSceneModelBuilderTest {
     }
 
     @Test
+    void unterbrichtWandbelagAnHalbhoherEinbindenderWandNurBisZuDerenHoehe() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall exteriorWall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        Wall halfHeightWall = Wall.create(
+                new PlanSegment(new PlanPoint(2000, 0), new PlanPoint(2000, 1500)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(1.2, LengthUnit.METER)
+        );
+        level.addWall(exteriorWall);
+        level.addWall(halfHeightWall);
+        Room room = Room.rectangular(
+                "Raum",
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 2500),
+                Length.of(2.8, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+        SurfaceLayerStack stack = addInteriorWallStack(level, exteriorWall, room);
+        SurfaceLayer layer = stack.layers().getFirst();
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), true);
+
+        List<RenderableBox> wallLayerBodies = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "surface-layer".equals(box.materialKey()))
+                .toList();
+        assertEquals(3, wallLayerBodies.size());
+        assertTrue(wallLayerBodies.stream().anyMatch(box -> Math.abs(box.width() - 4000.0) < 0.001
+                && Math.abs(box.height() - 1600.0) < 0.001
+                && overlapsX(box, 1900.0, 2100.0)));
+    }
+
+    @Test
     void verlängertWandbelagMeshAnKonkaverInneneckeBisZumNachbarbelag() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
         var level = project.primaryLevel();
