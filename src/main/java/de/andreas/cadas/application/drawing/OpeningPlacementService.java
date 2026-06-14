@@ -23,7 +23,7 @@ public final class OpeningPlacementService {
         return findHostWall(clickPoint, walls, snapTolerance)
                 .map(hostWall -> Door.create(
                         hostWall.id(),
-                        hostWall.axis().projectedLength(clickPoint),
+                        centeredOffset(hostWall, clickPoint, width),
                         width,
                         height,
                         thresholdHeight
@@ -41,11 +41,19 @@ public final class OpeningPlacementService {
         return findHostWall(clickPoint, walls, snapTolerance)
                 .map(hostWall -> WindowElement.create(
                         hostWall.id(),
-                        hostWall.axis().projectedLength(clickPoint),
+                        centeredOffset(hostWall, clickPoint, width),
                         width,
                         sillHeight,
                         windowHeight
                 ));
+    }
+
+    private Length centeredOffset(Wall wall, PlanPoint clickPoint, Length openingWidth) {
+        double wallLength = wall.axis().length().toMillimeters();
+        double width = openingWidth.toMillimeters();
+        double centeredOffset = wall.axis().projectedLength(clickPoint).toMillimeters() - width / 2.0;
+        double maximumOffset = Math.max(0.0, wallLength - width);
+        return Length.ofMillimeters(Math.max(0.0, Math.min(centeredOffset, maximumOffset)));
     }
 
     private Optional<Wall> findHostWall(PlanPoint clickPoint, List<Wall> walls, Length snapTolerance) {
@@ -54,4 +62,3 @@ public final class OpeningPlacementService {
                 .min(Comparator.comparingDouble(wall -> wall.axis().distanceTo(clickPoint).toMillimeters()));
     }
 }
-

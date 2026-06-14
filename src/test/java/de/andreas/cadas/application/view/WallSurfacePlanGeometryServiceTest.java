@@ -61,7 +61,7 @@ class WallSurfacePlanGeometryServiceTest {
     }
 
     @Test
-    void verlängertBelagNichtInKonvexeInnenecke() {
+    void kürztBelagAnKonvexerInneneckeBisZurNachbarwandkante() {
         Level level = new Level("Erdgeschoss");
         Wall horizontal = wall(0, 0, 2000, 0);
         Wall vertical = wall(0, 0, 0, 2000);
@@ -88,7 +88,7 @@ class WallSurfacePlanGeometryServiceTest {
                 new WallSurfaceInterval(0, horizontal.axis().length().toMillimeters())
         );
 
-        assertEquals(0.0, minX(polygon), 0.001);
+        assertEquals(87.5, minX(polygon), 0.001);
     }
 
     private Wall wall(double startX, double startY, double endX, double endY) {

@@ -44,21 +44,21 @@ public final class WallSurfacePlanGeometryService {
         double innerOffset = centerOffset - sideSign * halfLayerThickness;
         double outerOffset = centerOffset + sideSign * halfLayerThickness;
         double wallLength = wall.axis().length().toMillimeters();
-        double startExtension = interval.startMillimeters() <= EPSILON
-                ? endpointExtension(level, wall, stack, layerIndex, sideSign, WallEndpoint.START)
+        double startAdjustment = interval.startMillimeters() <= EPSILON
+                ? endpointAdjustment(level, wall, stack, layerIndex, sideSign, WallEndpoint.START)
                 : 0.0;
-        double endExtension = interval.endMillimeters() >= wallLength - EPSILON
-                ? endpointExtension(level, wall, stack, layerIndex, sideSign, WallEndpoint.END)
+        double endAdjustment = interval.endMillimeters() >= wallLength - EPSILON
+                ? endpointAdjustment(level, wall, stack, layerIndex, sideSign, WallEndpoint.END)
                 : 0.0;
         return new WallSurfacePlanPolygon(List.of(
-                wallOffsetPoint(wall, interval.startMillimeters() - startExtension, innerOffset),
-                wallOffsetPoint(wall, interval.endMillimeters() + endExtension, innerOffset),
-                wallOffsetPoint(wall, interval.endMillimeters() + endExtension, outerOffset),
-                wallOffsetPoint(wall, interval.startMillimeters() - startExtension, outerOffset)
+                wallOffsetPoint(wall, interval.startMillimeters() - startAdjustment, innerOffset),
+                wallOffsetPoint(wall, interval.endMillimeters() + endAdjustment, innerOffset),
+                wallOffsetPoint(wall, interval.endMillimeters() + endAdjustment, outerOffset),
+                wallOffsetPoint(wall, interval.startMillimeters() - startAdjustment, outerOffset)
         ));
     }
 
-    private double endpointExtension(
+    private double endpointAdjustment(
             Level level,
             Wall wall,
             SurfaceLayerStack stack,
@@ -69,14 +69,24 @@ public final class WallSurfacePlanGeometryService {
         PlanPoint corner = endpoint.point(wall);
         Direction ownSide = sideDirection(wall, sideSign);
         Direction ownExtension = endpoint.extensionDirection(wall);
-        return level.walls().stream()
+        List<Double> adjustments = level.walls().stream()
                 .filter(candidate -> !candidate.id().equals(wall.id()))
-                .mapToDouble(candidate -> extensionToConnectedSurface(level, candidate, stack, layerIndex, corner, ownSide, ownExtension))
-                .max()
+                .map(candidate -> adjustmentToConnectedSurface(level, candidate, stack, layerIndex, corner, ownSide, ownExtension))
+                .filter(adjustment -> Math.abs(adjustment) > EPSILON)
+                .toList();
+        Optional<Double> extension = adjustments.stream()
+                .filter(adjustment -> adjustment > 0.0)
+                .max(Double::compare);
+        if (extension.isPresent()) {
+            return extension.get();
+        }
+        return adjustments.stream()
+                .filter(adjustment -> adjustment < 0.0)
+                .min(Double::compare)
                 .orElse(0.0);
     }
 
-    private double extensionToConnectedSurface(
+    private double adjustmentToConnectedSurface(
             Level level,
             Wall candidate,
             SurfaceLayerStack sourceStack,
@@ -90,13 +100,50 @@ public final class WallSurfacePlanGeometryService {
             return 0.0;
         }
         Direction candidateExtension = candidateEndpoint.get().extensionDirection(candidate);
-        return level.surfaceLayerStacks().stream()
+        List<Double> targetSides = matchingTargetSides(level, candidate, sourceStack);
+        double concaveExtension = level.surfaceLayerStacks().stream()
                 .filter(candidateStack -> isCompatibleStack(sourceStack, candidateStack, candidate, layerIndex))
                 .flatMapToDouble(candidateStack -> compatibleLayerSides(level, candidate, candidateStack).stream()
                         .filter(candidateSide -> isConcaveCorner(ownSide, ownExtension, candidateExtension, candidate, candidateSide))
                         .mapToDouble(candidateSide -> outerOffsetMagnitude(candidate, candidateStack, layerIndex)))
                 .max()
                 .orElse(0.0);
+        if (concaveExtension > EPSILON) {
+            return concaveExtension;
+        }
+        return targetSides.stream()
+                .filter(candidateSide -> isConvexCorner(ownSide, ownExtension, candidateExtension, candidate, candidateSide))
+                .mapToDouble(ignored -> -candidate.thickness().toMillimeters() / 2.0)
+                .min()
+                .orElse(0.0);
+    }
+
+    private List<Double> matchingTargetSides(Level level, Wall wall, SurfaceLayerStack sourceStack) {
+        WallSurfaceSideService.WallLayerSides sides = wallSurfaceSideService.resolve(
+                level,
+                wall,
+                sourceStack.surfaceType(),
+                matchingTargetKey(sourceStack, wall)
+        );
+        if (sides.positiveSide() && sides.negativeSide()) {
+            return List.of(1.0, -1.0);
+        }
+        if (sides.positiveSide()) {
+            return List.of(1.0);
+        }
+        if (sides.negativeSide()) {
+            return List.of(-1.0);
+        }
+        return List.of();
+    }
+
+    private String matchingTargetKey(SurfaceLayerStack sourceStack, Wall wall) {
+        if (sourceStack.surfaceType() != SurfaceType.WALL_INTERIOR) {
+            return wall.id().toString();
+        }
+        return WallSurfaceTargetKey.roomId(sourceStack.targetKey())
+                .map(roomId -> WallSurfaceTargetKey.interior(wall.id(), roomId))
+                .orElseGet(() -> wall.id().toString());
     }
 
     private List<Double> compatibleLayerSides(Level level, Wall wall, SurfaceLayerStack stack) {
@@ -141,6 +188,18 @@ public final class WallSurfacePlanGeometryService {
         Direction candidateSide = sideDirection(candidate, candidateSideSign);
         return ownExtension.dot(candidateSide) > CORNER_DIRECTION_DOT_LIMIT
                 && candidateExtension.dot(ownSide) > CORNER_DIRECTION_DOT_LIMIT;
+    }
+
+    private boolean isConvexCorner(
+            Direction ownSide,
+            Direction ownExtension,
+            Direction candidateExtension,
+            Wall candidate,
+            double candidateSideSign
+    ) {
+        Direction candidateSide = sideDirection(candidate, candidateSideSign);
+        return ownExtension.dot(candidateSide) < -CORNER_DIRECTION_DOT_LIMIT
+                && candidateExtension.dot(ownSide) < -CORNER_DIRECTION_DOT_LIMIT;
     }
 
     private Optional<WallEndpoint> endpointAt(Wall wall, PlanPoint point) {
