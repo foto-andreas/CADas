@@ -71,6 +71,7 @@ Die Menüleiste bündelt Datei-, Bearbeitungs-, Ansichts- und Werkzeugaktionen. 
 * Rückgängig und Wiederherstellen
 * Werkzeugwechsel per Menü
 * Ansichtswechsel und Zentrierfunktionen
+* Berichte, insbesondere Materialliste für Beläge anzeigen, drucken und als Markdown exportieren
 
 ### Werkzeugleiste
 
@@ -91,6 +92,7 @@ Links befindet sich eine dauerhaft sichtbare vertikale Liste mit Properties. Dor
 
 * allgemeine Zeichenwerte wie Rasterweite, Länge, Winkel und Nordwinkel
 * fachliche Eigenschaften für Wand, Raum, Tür, Fenster und Treppe
+* Objekt-Presets für einfache Raumobjekte
 * Ebenen- und Belagswerte für Innenwand, Außenwand, Boden, Decke und Dachflächen
 * eine Auswahlzusammenfassung
 * eine Übersicht registrierter externer CAD-Bibliotheken
@@ -288,6 +290,7 @@ Derzeit gilt:
 * Über `Auswahl löschen` entfernst du alle aktuell markierten Bauteile.
 * Ein Rechtsklick auf eine Auswahl öffnet ein Kontextmenü mit passenden Aktionen.
 * Aktuell bietet das Kontextmenü insbesondere Eigenschaften übernehmen, Auswahl löschen, Auswahl aufheben und 90°-Drehung für rotierbare Bauteile.
+* Mit `Alt` + Linksklick schaltest du zwischen übereinanderliegenden Treffern unter dem Cursor durch.
 
 ### Rückgängig und Wiederherstellen
 
@@ -315,7 +318,7 @@ Wichtige Kürzel der aktuellen Oberfläche:
 * `Esc`: Auswahl aufheben
 * `Cmd+0` oder `Strg+0`: 2D-Ansicht zentrieren
 * `Cmd+Shift+0` oder `Strg+Shift+0`: 3D-Ansicht zentrieren
-* `Cmd+E`, `Cmd+W`, `Cmd+T`, `Cmd+D`, `Cmd+F`: Werkzeuge `Bearbeiten`, `Wand`, `Treppe`, `Tür`, `Fenster`
+* `Cmd+E`, `Cmd+W`, `Cmd+T`, `Cmd+D`, `Cmd+F`, `Cmd+O`: Werkzeuge `Bearbeiten`, `Wand`, `Treppe`, `Tür`, `Fenster`, `Objekt`
 
 ## Ansichten umschalten
 
@@ -400,6 +403,7 @@ Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepfleg
 * Wähle den Flächentyp, zum Beispiel `WALL_INTERIOR`, `WALL_EXTERIOR`, `FLOOR` oder `CEILING`.
 * Wähle optional ein Preset wie `Fliese`, `Dämmplatte`, `Rigipsplatte`, `OSB-Platte`, `Tapete` oder eine registrierte `DWG-Referenz`.
 * Lege Name, Dicke, Platten- oder Fliesenmaß, Verlegeart, Mindestversatz und Mindestbreite fest.
+* Lege die Schnittbeschränkung fest: `frei`, `Schnitt nur außen` oder `Verlegerichtung, Schnitt nur außen`.
 * `Speichern` neben dem Namen legt die aktuell eingetragenen Belagswerte als eigenes Preset ab.
 * `Ebene hinzufügen` legt den Belag auf der gewählten Fläche an.
 * `Ebene aktualisieren`, `ausblenden`, `nach oben` und `nach unten` ändern Bestand und Reihenfolge.
@@ -412,6 +416,12 @@ Für Anwender wichtig:
 * Die 3D-Ansicht zeigt diese Ebenen auf Wunsch als gestapelte Schichten an.
 * Registrierte `DWG`-Bibliotheken erscheinen zusätzlich als auswählbare Referenz-Presets für Ebenen.
 
+Die Schnittbeschränkung wirkt auf die Materialliste:
+
+* `frei`: Zuschnitte dürfen beliebig gedreht auf der Fläche verwendet werden.
+* `Schnitt nur außen`: Material darf gedreht werden, aber Schnittkanten zählen nur an Außenkanten als zulässig.
+* `Verlegerichtung, Schnitt nur außen`: Materialrichtung bleibt fest; Zuschnitte sind nur an Außenkanten zulässig.
+
 ### Eigene Belagspresets
 
 Eigene Beläge werden unter `~/.config/CADas/Belag` gespeichert und beim Start automatisch in die Preset-Auswahl geladen.
@@ -422,7 +432,7 @@ Eigene Beläge werden unter `~/.config/CADas/Belag` gespeichert und beim Start a
 
 ### Materialliste für Beläge
 
-Über `Berichte` > `Materialliste Beläge anzeigen` öffnest du ein separates Fenster mit einer Markdown-Vorschau der aktuellen Belags-Materialliste.
+Über `Berichte` > `Materialliste Beläge anzeigen` öffnest du ein separates Fenster mit der gerenderten Markdown-Ansicht der aktuellen Belags-Materialliste.
 
 Die Liste enthält:
 
@@ -430,11 +440,36 @@ Die Liste enthält:
 * belegte Fläche und benötigte Stückzahl
 * Materialfläche auf Basis ganzer Platten oder Fliesen
 * Vollstücke, Zuschnitte und notwendige Schnittanzahl
+* genutzte und verbleibende Reststücke
 * eine Komplexität je Raum
 
 Die Komplexität steigt bei vielen Schnitten und kurzen Kanten. Lange Schnittkanten werden günstiger bewertet; eine Kante in voller Materiallänge ist am besten. Unterschiedliche Kantenlängen des Materials werden dabei getrennt gegen Breite und Höhe der Vollplatte bewertet.
 
-Über `Berichte` > `Materialliste Beläge als Markdown exportieren` speicherst du dieselbe Liste als `.md`-Datei.
+Die Berechnung nutzt Reststücke desselben Materials weiter, bevor ein neues Werkstück angeschnitten wird. Wenn mehrere Reststücke passen, wird das Reststück mit dem geringsten Verschnitt bevorzugt.
+
+Im Materiallistenfenster druckst du die gerenderte Ansicht über `Drucken`. Über `Berichte` > `Materialliste Beläge als Markdown exportieren` oder den Export-Knopf im Fenster speicherst du dieselbe Liste als `.md`-Datei.
+
+### Objekt
+
+Mit dem Werkzeug `Objekt` platzierst du einfache Einrichtungs- und Sanitärobjekte in erkannten Räumen.
+
+* Wähle links im Bereich `Objekt` ein Preset.
+* Klicke anschließend in einen automatisch erkannten Raum.
+* Das Objekt wird mittig an der Klickposition platziert und kann im Werkzeug `Bearbeiten` ausgewählt, verschoben oder gelöscht werden.
+* Über die Anzeigeoption `Objekte` blendest du alle Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.
+
+Aktuell enthaltene Standardobjekte:
+
+* Dusche rechteckig, halbrund und als Viertelkreis
+* Toilette
+* Waschbecken
+* Wandschrank
+* Schrank
+* Tisch rechteckig, oval und rund
+
+Beim Wandschrank wird der Bodenbelag ausgespart. Schrank und Tisch stehen auf dem Bodenbelag und schneiden ihn nicht aus.
+
+Zusätzliche `DWG`-Objektdateien unter `~/.config/CADas/Objekte` erscheinen beim Start als Objekt-Presets. Sie werden aktuell als referenzierte rechteckige Platzhalter mit Standardmaß geführt; echte DWG-Blockgeometrie ist als Folgearbeit festgehalten.
 
 ### Treppe
 
@@ -715,8 +750,9 @@ Der Export enthält aktuell:
 * DXF-Tabellen für Layer, Linientypen, Textstil und Block-Records
 * wiederverwendbare Tür-, Fenster- und Treppenblöcke mit `INSERT`-Referenzen
 * Handles sowie eine einfache `OBJECTS`- und Layout-Grundstruktur
-* `CADAS_META` mit Marker `CADAS_DXF|2`; Textfelder werden UTF-8-kodiert, damit Umlaute, `/` und `|` im Rundlauf erhalten bleiben
+* `CADAS_META` mit Marker `CADAS_DXF|3`; Textfelder werden UTF-8-kodiert, damit Umlaute, `/` und `|` im Rundlauf erhalten bleiben
 * stabile Objekt-IDs für Türen und Fenster, damit Auswahl- und Bearbeitungsbezüge nach dem Re-Import erhalten bleiben
+* Belags-Schnittbeschränkungen und Raumobjekte als CADas-Metadaten
 
 Beim Import liest CADas weiterhin ältere CADas-DXF-Dateien ohne Versionsmarker. Einzelne beschädigte oder fremde Metadaten-Einträge werden übersprungen, damit nutzbare Geometrie und gültige Fachobjekte weiter geladen werden können.
 
@@ -747,6 +783,7 @@ Aktuell gilt:
 * `.cadasparts` erweitert die auswählbaren Presets sofort.
 * `.dwg` wird nach `~/.config/CADas/Belag` übernommen, registriert und in der Eigenschaftenleiste dokumentiert.
 * Konkrete `DWG`-Blöcke lassen sich über `.blocks`-Kataloge oder manuell als Oberflächen-Presets freischalten.
+* `DWG`-Objekte für die Platzierung im Raum werden aus `~/.config/CADas/Objekte` als referenzierte Objekt-Presets geladen.
 
 ## Automatisierung für Tests
 

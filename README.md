@@ -50,12 +50,14 @@ Hinweis: Die beiden macOS-Paketierungsaufgaben laufen nur auf `macOS`, weil daf�
 Der aktuelle Schwerpunkt liegt auf dem 2D-Grundrisskern:
 
 * Wände, Räume, Türen, Fenster und Treppen
+* erste Raumobjekte wie Dusche, Toilette, Waschbecken, Schränke und Tische
 * Etagenverwaltung
 * Raster, Snap, Hilfslinien, Nordwinkel und Bearbeitung verbundener Wand-Endpunkte
 * Mehrfachauswahl, Kontextmenü, Eigenschaftenübernahme auf Auswahl und 90°-Drehung rotierbarer Bauteile
 * Menü, Tastaturkürzel, Rückgängig/Wiederherstellen und kontextabhängige Properties-Leiste
 * modulare JavaFX-Startskripte ohne die bisherigen Startwarnungen
 * gekoppelte 3D-Ansicht mit Auswahlrückkopplung, Kamerahilfe und Modell-Einpassung
+* Materialliste für Beläge mit gerenderter Markdown-Ansicht, Druck und Markdown-Export
 * Gebäude-DXF als Standard sowie Etagen-DXF als Zusatzoption
 * interne und externe Teilebibliotheken einschließlich registrierbarer `.dwg`-Referenzen
 * lokaler Automatisierungszugriff für direkte App-Tests

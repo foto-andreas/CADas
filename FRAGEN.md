@@ -4,7 +4,7 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 
 ## Festlegungen
 * Erstes AutoCAD-kompatibles Austauschformat ist `DXF`.
-* Neue produktive DXF-Dateien zielen auf `AutoCAD 2000` / `$ACADVER = AC1015`, metrische Einheiten und CADas-Metadatenmarker `CADAS_DXF|2`.
+* Neue produktive DXF-Dateien zielen auf `AutoCAD 2000` / `$ACADVER = AC1015`, metrische Einheiten und CADas-Metadatenmarker `CADAS_DXF|3`.
 * Die grafische Oberfläche wird mit `JavaFX` umgesetzt.
 * Die Architektur wird plattformneutral angelegt, aktiv verifiziert wird zunächst auf `macOS`.
 * Das erste fachliche MVP umfasst Etagen, Wände, Türen, Fenster und Bemaßungen.
@@ -20,3 +20,8 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * Das erste MVP wird bewusst fachlich eingegrenzt, damit der 2D-Grundrisskern stabil wird, bevor er um komplexere Bauteile erweitert wird.
 * Die erste 3D-Innenansicht wird als Raumkamera im bestehenden 3D-Fenster umgesetzt: ausgewählter Raum oder erster Raum der aktiven Etage, perspektivische Augenhöhe, Blickdrehung am festen Kamerastandpunkt, begrenzte Vor-/Zurückbewegung im Raum und Sichtwinkel-Zoom per Mausrad bis 115°.
 * Wandbeläge auf Innen- und Außenflächen werden an Türen und Fenstern ausgespart. Dafür werden maximale sichtbare Rechtecke gebildet; die Kachelbelegung darf an virtuellen Rechteckgrenzen nicht neu starten.
+* Belags-Materiallisten verwenden Reststücke weiter, beachten die Schnittbeschränkung des Belags und werden in der Anwendung als gerendertes Markdown angezeigt.
+* Erste Raumobjekte werden als Fachobjekte gespeichert, in 2D, Innenansicht und 3D gemeinsam ein-/ausblendbar gemacht und über DXF-Metadaten rundgeführt.
+
+## Offene Folgeentscheidungen
+* `DWG`-Dateien unter `~/.config/CADas/Objekte` werden aktuell als referenzierte rechteckige Objekt-Presets geladen. Ob und wie die echte DWG-Blockgeometrie direkt ausgewertet wird, bleibt offen und darf nicht als erledigt betrachtet werden.

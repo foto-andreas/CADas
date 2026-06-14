@@ -42,10 +42,14 @@ Für macOS gibt es zusätzlich Gradle-Aufgaben auf Basis von `jpackage`:
   Formatunabhängige Schnittstellen für Import und Export.
 * `de.andreas.cadas.application.parts`
   Interne Standard-Teilebibliothek sowie Import zusätzlicher Presets für Türen, Fenster und Treppen.
+* `de.andreas.cadas.application.objects`
+  Standard-Presets und referenzierte externe Presets für einfache Raumobjekte.
+* `de.andreas.cadas.application.reports`
+  Fachliche Berichte, Markdown-Erzeugung und HTML-Rendering auf Basis einer Standard-Markdown-Bibliothek.
 * `de.andreas.cadas.domain.geometry`
   Geometrische Grundbausteine wie Längen, Winkel, Raster, Punkte und Segmente.
 * `de.andreas.cadas.domain.model`
-  Fachliches Projektmodell für Etagen, Räume, Wände, Türen, Fenster und Treppen.
+  Fachliches Projektmodell für Etagen, Räume, Wände, Türen, Fenster, Treppen und Raumobjekte.
 * `de.andreas.cadas.infrastructure.dxf`
   Konkreter Adapter für ASCII-DXF-Import und -Export.
 * `de.andreas.cadas.application.layers`
@@ -69,7 +73,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * optionale Himmelsrichtung
 * Live-Anzeige von Länge und Winkel
 * ein- und ausblendbare Bemaßung für Wände
-* Werkzeugmodus für Wände, Treppen, Türen, Fenster und Bearbeitung; Räume werden automatisch abgeleitet und im Bearbeiten-Werkzeug ausgewählt
+* Werkzeugmodus für Wände, Treppen, Türen, Fenster, Objekte und Bearbeitung; Räume werden automatisch abgeleitet und im Bearbeiten-Werkzeug ausgewählt
 * umschaltbarer Mittelbereich für 2D-Zeichenfläche oder 3D-Ansicht
 * 3D-Ansicht mit Orbit, Zoom, Pan und Auswahlrückkopplung
 * Mehrfachauswahl mit Eigenschaftenübernahme auf mehrere passende Bauteile
@@ -78,14 +82,16 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * Gebäude-DXF als Standard sowie Etagen-DXF als Zusatzfunktion
 * Standardteil-Presets für Türen, Fenster und Treppen
 * erste Treppenplatzierung für gerade, 180°-, gegenläufige und Wendeltreppen
+* erste Raumobjekte mit Standard-Presets und gemeinsamem Sichtbarkeitsschalter
 * Flächen- und Volumenanzeige für Räume
 * Ebenenverwaltung für ausgewählte Wand- und Raumflächen mit Presets, Reihenfolge, Sichtbarkeit, DWG-Referenzen und konkreten DWG-Block-Presets
+* Materiallistenfenster mit gerendertem Markdown, Druck und Markdown-Export
 
 ### Anwendungslogik
 
-`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam. `SelectionTranslationService` verschiebt ausgewählte Wände und Treppen parallel als Gruppe. Deren Höhen werden in der Workbench zusätzlich als gemeinsamer Eckknoten bearbeitet und über `AutoRoomGenerationService` in polygonale Raumdecken und Volumen überführt. `QuarterTurnRotationService` kapselt die 90°-Drehung rotierbarer Bauteile testbar außerhalb der UI. `SurfaceLayerEffectService` berechnet die Wirkung sichtbarer Wand-, Boden- und Deckenlagen auf Innenkontur, lichte Höhe und Volumen. `WallSurfaceOpeningService` bildet aus Türen und Fenstern maximale sichtbare Wandbelags-Rechtecke sowie Draufsicht-Intervalle. `ThreeDSceneModelBuilder` leitet aus denselben Domänenobjekten einen renderbaren 3D-Szenengraphen ab, `ThreeDCameraController` kapselt Orbit-, Pan-, Zoom- und Projektionswechsel der 3D-Ansicht, und `ThreeDInteriorViewService` berechnet die raumgebundene Innenkamera.
+`DraftingService` erzwingt je nach Eingabemodus orthogonales Zeichnen oder übernimmt manuelle Längen- und Winkelvorgaben. `SnapService` entscheidet, ob auf bestehende Endpunkte oder auf das Raster eingerastet wird. `OpeningPlacementService` bindet Türen und Fenster an bestehende Wände. `WallEditingService` verschiebt verknüpfte Wand-Endpunkte gemeinsam. `SelectionTranslationService` verschiebt ausgewählte Wände, Treppen und Raumobjekte parallel als Gruppe. Deren Höhen werden in der Workbench zusätzlich als gemeinsamer Eckknoten bearbeitet und über `AutoRoomGenerationService` in polygonale Raumdecken und Volumen überführt. `QuarterTurnRotationService` kapselt die 90°-Drehung rotierbarer Bauteile testbar außerhalb der UI. `SurfaceLayerEffectService` berechnet die Wirkung sichtbarer Wand-, Boden- und Deckenlagen auf Innenkontur, lichte Höhe und Volumen. `WallSurfaceOpeningService` bildet aus Türen und Fenstern maximale sichtbare Wandbelags-Rechtecke sowie Draufsicht-Intervalle. `RoomObjectPresetService` liefert interne Objekt-Presets und referenzierte `DWG`-Objekte aus `~/.config/CADas/Objekte`. `SurfaceMaterialListService` erzeugt die Belags-Materialliste mit Reststückoptimierung, Schnittbeschränkungen und Komplexitätswerten; `MarkdownHtmlRenderer` rendert den erzeugten Markdown über `commonmark`. `ThreeDSceneModelBuilder` leitet aus denselben Domänenobjekten einen renderbaren 3D-Szenengraphen ab, `ThreeDCameraController` kapselt Orbit-, Pan-, Zoom- und Projektionswechsel der 3D-Ansicht, und `ThreeDInteriorViewService` berechnet die raumgebundene Innenkamera.
 
-`SelectionQueryService` kapselt die fachliche Auswahlauflösung unter dem Cursor. Dadurch liegt die Priorisierung von Öffnungen, Treppen, Wänden und Räumen nicht mehr direkt in der JavaFX-Workbench.
+`SelectionQueryService` kapselt die fachliche Auswahlauflösung unter dem Cursor. Dadurch liegt die Priorisierung von Öffnungen, Treppen, Wänden, Raumobjekten und Räumen nicht mehr direkt in der JavaFX-Workbench. Die Workbench kann bei überdeckten Treffern über `Alt` + Linksklick durch die Trefferliste schalten.
 
 `UndoRedoStack` kapselt den generischen Verlauf. In der Workbench werden darüber komplette Projektsnapshots einschließlich Hilfslinien, aktiver Etage und Auswahlzustand verwaltet.
 
@@ -93,7 +99,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 ### Domäne
 
-`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement`, `Staircase`, `Roof` und `SurfaceLayerStack` bilden den aktuellen Grundrisskern ab. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
+`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement`, `Staircase`, `RoomObject`, `Roof` und `SurfaceLayerStack` bilden den aktuellen Grundrisskern ab. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
 
 ## Dach- und Ebenenmodell
 
@@ -114,6 +120,8 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 * Registrierte `DWG`-Dateien werden in dasselbe Belagsverzeichnis übernommen und als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
 * Über optionale `.blocks`-Katalogdateien oder manuelle Eingabe lassen sich zusätzlich konkrete DWG-Blocknamen als Oberflächen-Presets registrieren.
 * `SurfaceMaterialListService` erzeugt aus den sichtbaren Belägen eine Materialliste mit Fläche, Stückzahl, Materialfläche, Schnitten und Raum-Komplexität. Boden- und Deckenflächen werden über die orthogonale Raumzerlegung bewertet; Wandbeläge nutzen die vorhandenen maximalen Wandrechtecke mit ausgesparten Türen, Fenstern und anstoßenden Innenwänden.
+* Reststücke werden materialweit weitergeführt und vor dem Anschnitt eines neuen Werkstücks genutzt. Bei mehreren passenden Reststücken wird das mit dem geringsten Verschnitt bevorzugt.
+* `SurfaceCutRestriction` unterscheidet freie Zuschnitte, außen begrenzte Schnittkanten und feste Verlegerichtung mit außen begrenzten Schnittkanten. Diese Information wird gespeichert und in der Materialliste berücksichtigt.
 * Die Raum-Komplexität steigt mit dem Schnittanteil und mit kurzen Schnittkanten. Schnittkanten werden getrennt gegen die jeweilige Vollplattenkante in Breite oder Höhe bewertet.
 
 ## Dateiformatstrategie
@@ -126,7 +134,7 @@ Für den aktuellen Stand gilt:
 * Wände, Räume, Türen, Fenster und Treppen werden sichtbar als DXF-Geometrie exportiert.
 * Zielversion für neue produktive DXF-Dateien ist `AutoCAD 2000` mit `$ACADVER = AC1015`.
 * Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
-* Neue Exporte schreiben `CADAS_DXF|2` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben. Türen und Fenster behalten in dieser Metadatenspur ihre Objekt-IDs.
+* Neue Exporte schreiben `CADAS_DXF|3` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben. Türen, Fenster und Raumobjekte behalten in dieser Metadatenspur ihre Objekt-IDs.
 * Der Import bleibt zu älteren CADas-DXF-Metadaten ohne Versionsmarker kompatibel und überspringt einzelne beschädigte Metadatensätze sowie Öffnungen ohne gültige Host-Wand, statt den gesamten Import abzubrechen.
 * Der Export schreibt aktuell metrische Kopfvariablen über `$INSUNITS = 4` und `$MEASUREMENT = 1`.
 * Exportierte Entities werden explizit als Model-Space-Elemente gekennzeichnet und mit eigenen Handles versehen.
@@ -140,14 +148,16 @@ Für den aktuellen Stand gilt:
 Die Standardteilversorgung besteht aus drei Ebenen:
 
 * interne Standard-Presets für Türen, Fenster und Treppen
+* interne Standard-Presets für einfache Raumobjekte
 * UI-Auswahllisten, die diese Presets direkt auf Eingabefelder anwenden
 * externer Import über `.cadasparts`, damit weitere Bibliotheken ohne Codeänderung ergänzt werden können
+* referenzierte `DWG`-Objekte aus `~/.config/CADas/Objekte` als erste objektbezogene Bibliotheksanbindung
 
 ## Rendering-Modell
 
 Die 2D-Zeichenfläche arbeitet intern in Millimetern und transformiert diese Weltkoordinaten mit Offset und Zoom auf Bildschirmkoordinaten. Dadurch bleiben Raster, Snap und Bemaßung konsistent, auch wenn die Ansicht verschoben oder skaliert wird.
 
-Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Dachflächen und optionale Oberflächen-Ebenen ab. Wandbeläge erhalten dabei zusätzlich dünne Fugen-Boxen, damit Fliesen und Platten auf Wänden nicht nur als glatte Schicht erscheinen. Türen und Fenster werden aus diesen Wandbelägen ausgespart; die Fugen werden auf dem vollständigen Wandraster berechnet und gegen die sichtbaren Maximalrechtecke geklippt. Fugen werden im JavaFX-Rendering ohne künstliche Mindestverbreiterung mit ihren skalierten Modellmaßen gezeichnet. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Für die Orbit-Steuerung wird das Modell in einer eigenen Orbit-Gruppe um die Modellmitte gedreht; die Kamera selbst übernimmt nur Abstand und Projektion. Die Innenansicht nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in Weltkoordinaten und zeigt nur die Zielebene. In der Innenansicht verändert die Blickdrehung nur die Orientierung am festen Kamerastandpunkt; rechte-Maus-Bewegung läuft entlang der Blickrichtung innerhalb der Raumkontur, und Zoom verändert den Sichtwinkel bis 115°, statt die Kamera aus dem Raum zu verschieben. Panning verschiebt die Orbitansicht bewusst entlang der Bildschirmachsen. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
+Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Raumobjekte, Dachflächen und optionale Oberflächen-Ebenen ab. Wandbeläge erhalten dabei zusätzlich dünne Fugen-Boxen, damit Fliesen und Platten auf Wänden nicht nur als glatte Schicht erscheinen. Türen und Fenster werden aus diesen Wandbelägen ausgespart; die Fugen werden auf dem vollständigen Wandraster berechnet und gegen die sichtbaren Maximalrechtecke geklippt. Fugen werden im JavaFX-Rendering ohne künstliche Mindestverbreiterung mit ihren skalierten Modellmaßen gezeichnet. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss und für Raumobjekte zusätzlich global gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Für die Orbit-Steuerung wird das Modell in einer eigenen Orbit-Gruppe um die Modellmitte gedreht; die Kamera selbst übernimmt nur Abstand und Projektion. Die Innenansicht nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in Weltkoordinaten und zeigt nur die Zielebene. In der Innenansicht verändert die Blickdrehung nur die Orientierung am festen Kamerastandpunkt; rechte-Maus-Bewegung läuft entlang der Blickrichtung innerhalb der Raumkontur, und Zoom verändert den Sichtwinkel bis 115°, statt die Kamera aus dem Raum zu verschieben. Panning verschiebt die Orbitansicht bewusst entlang der Bildschirmachsen. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
 
 Zusätzlich gibt es einen Oberflächenmodus: Transparente Raumkörper werden ausgeblendet, während Wände, Beläge, Boden- und Deckenflächen sichtbar bleiben. Öffnungen in Wänden geben dadurch den Blick in den Innenraum frei. Schräge Decken werden mit erhöhter Segmentdichte diskretisiert, damit die Kanten in 3D weniger treppenartig erscheinen.
 
@@ -168,9 +178,11 @@ Aktuell abgesichert sind unter anderem:
 * Dateinamennormalisierung für DXF-Import und -Export
 * DWG-Blockkataloge für Oberflächen-Presets
 * Standardteil-Bibliothek für Türen, Fenster und Treppen
+* Standardobjekt-Bibliothek und `DWG`-Objektreferenzen
 * Dach- und Ebenendomäne für weitere Ausbaustufen
-* 3D-Geometrieableitung für Wände, Räume, Öffnungen, Treppen und Dach
+* 3D-Geometrieableitung für Wände, Räume, Öffnungen, Treppen, Raumobjekte und Dach
 * Ausschnitt von Wandbelägen und Fugen an Türen und Fenstern
+* Materialliste mit Reststückwiederverwendung, Schnittbeschränkungen, gerendertem Markdown und Druckpfad
 * Kameragrundverhalten für Orbit, Pan, Zoom und Projektionswechsel
 * raumgebundene 3D-Innenansicht mit Sichtwinkel-Zoom und begrenzter Vor-/Zurückbewegung
 * Kamera-Presets für die sechs orthogonalen Ansichten
@@ -190,6 +202,7 @@ Build und Tests laufen über:
 Die bestehende Struktur ist absichtlich so geschnitten, dass die nächsten Ausbauschritte sauber ergänzt werden können:
 
 * die vorhandene `DWG`-Datei später über eine separat gekapselte Formatadapter-Schicht nutzbar machen
+* echte `DWG`-Geometrie für Raumobjekte auswerten statt nur referenzierte Rechteck-Presets zu führen
 * komplexere 3D-Geometrie jenseits von Box-Ableitungen ergänzen
 * grafische Verwaltungsoberflächen für Dach- und Oberflächen-Ebenen ergänzen
 

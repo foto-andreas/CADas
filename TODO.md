@@ -84,6 +84,8 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Basis an Standard-Teilen für Türen, Fenster und einfache Treppen definieren und bereitstellen.
 - [x] Import zusätzlicher Teilebibliotheken ermöglichen.
 - [x] Strukturierte Verwaltung und Nutzung importierter Teilebibliotheken umsetzen.
+- [x] Erste Raumobjekte als Standardbibliothek bereitstellen, in Räumen platzieren, ein-/ausblenden und über DXF-Metadaten rundlaufen lassen.
+- [ ] Echte `DWG`-Geometrie für Raumobjekte aus `~/.config/CADas/Objekte` auswerten; aktuell werden diese Dateien als referenzierte Rechteck-Presets geführt.
 
 ## Querschnittsthemen (laufend, aktuell erfüllt)
 - [x] Für alle UI-Aktionen ausführliche deutsche Tooltips pflegen.
@@ -91,6 +93,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Fachliche Randfälle früh als Unit-Tests absichern.
 - [x] Refactorings nur mit vorhandener oder gleichzeitig ergänzter Testabdeckung durchführen.
 - [x] Entscheidungen, Annahmen und offene Punkte fortlaufend in Markdown dokumentieren.
+- [x] Materialliste für Beläge mit Reststückwiederverwendung, Schnittbeschränkungen, gerendertem Markdown, Druck und Markdown-Export bereitstellen.
 
 ## Empfohlene erste Umsetzungsschritte
 - [x] Projekt-Setup, Build und Testbasis anlegen.
@@ -165,3 +168,5 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 
 
 - [x] Eigene Beläge über einen Button neben dem Namen als Presets unter `~/.config/CADas/Belag` speichern, beim Überschreiben nachfragen, beim Start wieder laden und DWG-Bibliotheken samt `.blocks`-Katalogen in dasselbe Konfig-Verzeichnis übernehmen.
+- [x] Zwischen übereinanderliegenden Auswahl-Treffern im Bearbeiten-Werkzeug mit `Alt` + Linksklick durchschalten.
+- [x] Beim Verschieben einer Wand die angrenzenden Endpunkte anderer Wände mitführen.
