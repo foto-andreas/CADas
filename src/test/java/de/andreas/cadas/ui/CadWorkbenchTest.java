@@ -302,6 +302,123 @@ class CadWorkbenchTest {
         );
     }
 
+    @Test
+    void einheitenwechselKonvertiertSichtbarenWertOhneLängenänderung() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            Assertions.assertEquals("CENTIMETER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("8", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+
+            workbench.automationSetUnit("surfaceMinimumEdgeWidth", "MILLIMETER");
+            Assertions.assertEquals("MILLIMETER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("80", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+
+            workbench.automationSetUnit("surfaceMinimumEdgeWidth", "METER");
+            Assertions.assertEquals("METER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("0,08", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+
+            workbench.automationSetUnit("surfaceMinimumEdgeWidth", "CENTIMETER");
+            Assertions.assertEquals("CENTIMETER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("8", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+
+            workbench.automationSetUnit("surfaceJointWidth", "CENTIMETER");
+            Assertions.assertEquals("CENTIMETER", workbench.automationUnit("surfaceJointWidth"));
+            Assertions.assertEquals("0,2", workbench.automationFieldValue("surfaceJointWidth"));
+            return null;
+        });
+    }
+
+    @Test
+    void belagseinheitenBleibenNachUpdateInGewählterEinheitStabil() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("WALL", 0, false);
+            instanz.automationSetUnit("surfaceMinimumEdgeWidth", "MILLIMETER");
+            instanz.automationSetField("surfaceMinimumEdgeWidth", "92");
+            instanz.automationInvoke("addSurfaceLayer", null);
+            instanz.automationSelectSurfaceLayer(0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            Assertions.assertEquals("MILLIMETER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("92", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+            workbench.automationInvoke("updateSurfaceLayer", null);
+            Assertions.assertEquals("MILLIMETER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("92", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+            return null;
+        });
+
+        Path exportDatei = Files.createTempFile("cadas-belagseinheit-", ".dxf");
+        aufFxThread(() -> {
+            workbench.automationInvoke("exportProjectDxf", exportDatei);
+            return null;
+        });
+
+        SurfaceLayer importedLayer = new DxfProjectExchangeService()
+                .importProject(exportDatei, "Einheitentest")
+                .primaryLevel()
+                .surfaceLayerStacks()
+                .getFirst()
+                .layers()
+                .getFirst();
+        Assertions.assertEquals(Length.of(92, LengthUnit.MILLIMETER), importedLayer.minimumEdgeWidth());
+    }
+
+    @Test
+    void ausgewählteBauteileSynchronisierenWerteInAktuellerEinheit() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("WALL", 0, false);
+            instanz.automationSetUnit("wallThickness", "MILLIMETER");
+            instanz.automationSetField("wallThickness", "92");
+            instanz.automationInvoke("applySelectionProperties", null);
+            instanz.automationSelect("WALL", 0, false);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            Assertions.assertEquals("MILLIMETER", workbench.automationUnit("wallThickness"));
+            Assertions.assertEquals("92", workbench.automationFieldValue("wallThickness"));
+            workbench.automationInvoke("applySelectionProperties", null);
+            Assertions.assertEquals("MILLIMETER", workbench.automationUnit("wallThickness"));
+            Assertions.assertEquals("92", workbench.automationFieldValue("wallThickness"));
+            return null;
+        });
+
+        Path exportDatei = Files.createTempFile("cadas-wandeinheit-", ".dxf");
+        aufFxThread(() -> {
+            workbench.automationInvoke("exportProjectDxf", exportDatei);
+            return null;
+        });
+
+        Wall importedWall = new DxfProjectExchangeService()
+                .importProject(exportDatei, "Einheitentest")
+                .primaryLevel()
+                .walls()
+                .getFirst();
+        Assertions.assertEquals(Length.of(92, LengthUnit.MILLIMETER), importedWall.thickness());
+    }
+
     private Path erzeugeEinfachesProjektAlsDxf() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Testhaus", "Erdgeschoss");
         var level = project.primaryLevel();

@@ -162,6 +162,7 @@ public final class CadWorkbench extends BorderPane {
     private static final Length DEFAULT_WINDOW_SILL = Length.of(90, LengthUnit.CENTIMETER);
     private static final Length DEFAULT_STAIR_HEIGHT = Length.of(2.80, LengthUnit.METER);
     private static final Length SNAP_TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
+    private static final int LENGTH_INPUT_DECIMALS = 3;
 
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
@@ -319,6 +320,7 @@ public final class CadWorkbench extends BorderPane {
     private double panOriginX;
     private double panOriginY;
     private boolean panning;
+    private boolean updatingLengthInput;
     private PlanPoint draftStart;
     private PlanSegment previewSegment;
     private PlanPoint lastCursor = new PlanPoint(0.0, 0.0);
@@ -999,35 +1001,44 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void initializeUnitSelectors() {
-        initializeUnitSelector(gridUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(lengthUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(wallThicknessUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(wallHeightUnit, LengthUnit.METER);
-        initializeUnitSelector(endpointHeightUnit, LengthUnit.METER);
-        initializeUnitSelector(roomHeightUnit, LengthUnit.METER);
-        initializeUnitSelector(floorThicknessUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(ceilingThicknessUnit, LengthUnit.MILLIMETER);
-        initializeUnitSelector(kneeWallHeightUnit, LengthUnit.METER);
-        initializeUnitSelector(doorWidthUnit, LengthUnit.METER);
-        initializeUnitSelector(doorHeightUnit, LengthUnit.METER);
-        initializeUnitSelector(thresholdUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(windowWidthUnit, LengthUnit.METER);
-        initializeUnitSelector(windowHeightUnit, LengthUnit.METER);
-        initializeUnitSelector(sillHeightUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(stairHeightUnit, LengthUnit.METER);
-        initializeUnitSelector(surfaceLayerThicknessUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(surfaceTileWidthUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(surfaceTileHeightUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(surfaceLayoutOffsetUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(surfaceMinimumOffsetUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(surfaceMinimumEdgeWidthUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(surfaceMinimumStartEndMarginUnit, LengthUnit.CENTIMETER);
-        initializeUnitSelector(surfaceJointWidthUnit, LengthUnit.MILLIMETER);
+        initializeUnitSelector(gridField, gridUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(lengthField, lengthUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(wallThicknessField, wallThicknessUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(wallHeightField, wallHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(endpointHeightField, endpointHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(roomHeightField, roomHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(floorThicknessField, floorThicknessUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(ceilingThicknessField, ceilingThicknessUnit, LengthUnit.MILLIMETER);
+        initializeUnitSelector(kneeWallHeightField, kneeWallHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(doorWidthField, doorWidthUnit, LengthUnit.METER);
+        initializeUnitSelector(doorHeightField, doorHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(thresholdField, thresholdUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(windowWidthField, windowWidthUnit, LengthUnit.METER);
+        initializeUnitSelector(windowHeightField, windowHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(sillHeightField, sillHeightUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(stairHeightField, stairHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(surfaceLayerThicknessField, surfaceLayerThicknessUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceTileWidthField, surfaceTileWidthUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceTileHeightField, surfaceTileHeightUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceJointWidthField, surfaceJointWidthUnit, LengthUnit.MILLIMETER);
     }
 
-    private void initializeUnitSelector(ComboBox<LengthUnit> selector, LengthUnit defaultUnit) {
+    private void initializeUnitSelector(TextField field, ComboBox<LengthUnit> selector, LengthUnit defaultUnit) {
         selector.getItems().addAll(LengthUnit.values());
         selector.setValue(defaultUnit);
+        selector.valueProperty().addListener((ignored, oldUnit, newUnit) -> convertLengthInputOnUnitChange(field, oldUnit, newUnit));
+    }
+
+    private void convertLengthInputOnUnitChange(TextField field, LengthUnit oldUnit, LengthUnit newUnit) {
+        if (updatingLengthInput || oldUnit == null || newUnit == null || oldUnit == newUnit) {
+            return;
+        }
+        parseLength(field, oldUnit)
+                .ifPresent(length -> field.setText(formatValue(length, newUnit, LENGTH_INPUT_DECIMALS)));
     }
 
     private void initializeSlopedCeilingControls() {
@@ -3236,25 +3247,25 @@ public final class CadWorkbench extends BorderPane {
         if (preset == null) {
             return;
         }
-        doorWidthField.setText(preset.width().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
-        doorHeightField.setText(preset.height().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
-        thresholdField.setText(preset.thresholdHeight().format(LengthUnit.CENTIMETER, 0).replace(" cm", "").replace('.', ','));
+        setLengthInput(doorWidthField, doorWidthUnit, preset.width(), LengthUnit.METER);
+        setLengthInput(doorHeightField, doorHeightUnit, preset.height(), LengthUnit.METER);
+        setLengthInput(thresholdField, thresholdUnit, preset.thresholdHeight(), LengthUnit.CENTIMETER);
     }
 
     private void applyWindowPreset(WindowPreset preset) {
         if (preset == null) {
             return;
         }
-        windowWidthField.setText(preset.width().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
-        windowHeightField.setText(preset.height().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
-        sillHeightField.setText(preset.sillHeight().format(LengthUnit.CENTIMETER, 0).replace(" cm", "").replace('.', ','));
+        setLengthInput(windowWidthField, windowWidthUnit, preset.width(), LengthUnit.METER);
+        setLengthInput(windowHeightField, windowHeightUnit, preset.height(), LengthUnit.METER);
+        setLengthInput(sillHeightField, sillHeightUnit, preset.sillHeight(), LengthUnit.CENTIMETER);
     }
 
     private void applyStairPreset(StairPreset preset) {
         if (preset == null) {
             return;
         }
-        stairHeightField.setText(preset.totalHeight().format(LengthUnit.METER, 2).replace(" m", "").replace('.', ','));
+        setLengthInput(stairHeightField, stairHeightUnit, preset.totalHeight(), LengthUnit.METER);
         stairStepsField.setText(Integer.toString(preset.stepCount()));
     }
 
@@ -3263,15 +3274,15 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         surfaceLayerNameField.setText(preset.name().replace("DWG-Referenz: ", "").replace("DWG-Block: ", ""));
-        surfaceLayerThicknessField.setText(formatValue(preset.thickness(), LengthUnit.CENTIMETER, 2));
-        surfaceTileWidthField.setText(formatValue(preset.tileWidth(), LengthUnit.CENTIMETER, 1));
-        surfaceTileHeightField.setText(formatValue(preset.tileHeight(), LengthUnit.CENTIMETER, 1));
+        setLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, preset.thickness(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, preset.tileWidth(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, preset.tileHeight(), LengthUnit.CENTIMETER);
         surfaceLayoutModeSelector.setValue(preset.layoutMode());
-        surfaceLayoutOffsetField.setText(formatValue(preset.offset(), LengthUnit.CENTIMETER, 1));
-        surfaceMinimumOffsetField.setText(formatValue(preset.minimumOffset(), LengthUnit.CENTIMETER, 1));
-        surfaceMinimumEdgeWidthField.setText(formatValue(preset.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1));
-        surfaceMinimumStartEndMarginField.setText(formatValue(preset.minimumStartEndMargin(), LengthUnit.CENTIMETER, 1));
-        surfaceJointWidthField.setText(formatValue(preset.jointWidth(), LengthUnit.MILLIMETER, 0));
+        setLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, preset.offset(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, preset.minimumOffset(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, preset.minimumEdgeWidth(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, preset.minimumStartEndMargin(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, preset.jointWidth(), LengthUnit.MILLIMETER);
         dwgBlockNameField.setText(extractDwgBlockName(preset.coveringSource()).orElse(""));
     }
 
@@ -3339,15 +3350,15 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         surfaceLayerNameField.setText(selectedLayer.name());
-        surfaceLayerThicknessField.setText(formatValue(selectedLayer.thickness(), LengthUnit.CENTIMETER, 2));
-        surfaceTileWidthField.setText(formatValue(selectedLayer.tileWidth(), LengthUnit.CENTIMETER, 1));
-        surfaceTileHeightField.setText(formatValue(selectedLayer.tileHeight(), LengthUnit.CENTIMETER, 1));
+        syncLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, selectedLayer.thickness(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, selectedLayer.tileWidth(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, selectedLayer.tileHeight(), LengthUnit.CENTIMETER);
         surfaceLayoutModeSelector.setValue(selectedLayer.layoutMode());
-        surfaceLayoutOffsetField.setText(formatValue(selectedLayer.layoutOffset(), LengthUnit.CENTIMETER, 1));
-        surfaceMinimumOffsetField.setText(formatValue(selectedLayer.minimumOffset(), LengthUnit.CENTIMETER, 1));
-        surfaceMinimumEdgeWidthField.setText(formatValue(selectedLayer.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1));
-        surfaceMinimumStartEndMarginField.setText(formatValue(selectedLayer.minimumStartEndMargin(), LengthUnit.CENTIMETER, 1));
-        surfaceJointWidthField.setText(formatValue(selectedLayer.jointWidth(), LengthUnit.MILLIMETER, 0));
+        syncLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, selectedLayer.layoutOffset(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, selectedLayer.minimumOffset(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, selectedLayer.minimumEdgeWidth(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, selectedLayer.minimumStartEndMargin(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, selectedLayer.jointWidth(), LengthUnit.MILLIMETER);
         surfaceLayerCoverageLabel.setText(describeSurfaceLayer(selectedLayer));
         updateActionButtons();
     }
@@ -4095,22 +4106,22 @@ public final class CadWorkbench extends BorderPane {
                     .filter(wall -> wall.id().toString().equals(selectedSelection.get().elementId()))
                     .findFirst()
                     .ifPresent(wall -> {
-                        wallThicknessField.setText(formatValue(wall.thickness(), LengthUnit.CENTIMETER, 1));
-                        wallHeightField.setText(formatValue(wall.height(), LengthUnit.METER, 2));
+                        syncLengthInput(wallThicknessField, wallThicknessUnit, wall.thickness(), LengthUnit.CENTIMETER);
+                        syncLengthInput(wallHeightField, wallHeightUnit, wall.height(), LengthUnit.METER);
                     });
             case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> activeLevel.get().rooms().stream()
                     .filter(room -> room.id().toString().equals(selectedSelection.get().elementId()))
                     .findFirst()
                     .ifPresent(room -> {
                         roomNameField.setText(room.name());
-                        roomHeightField.setText(formatValue(room.roomHeight(), LengthUnit.METER, 2));
-                        floorThicknessField.setText(formatValue(room.floorThickness(), LengthUnit.CENTIMETER, 1));
-                        ceilingThicknessField.setText(formatValue(room.ceilingThickness(), LengthUnit.MILLIMETER, 1));
+                        syncLengthInput(roomHeightField, roomHeightUnit, room.roomHeight(), LengthUnit.METER);
+                        syncLengthInput(floorThicknessField, floorThicknessUnit, room.floorThickness(), LengthUnit.CENTIMETER);
+                        syncLengthInput(ceilingThicknessField, ceilingThicknessUnit, room.ceilingThickness(), LengthUnit.MILLIMETER);
                         if (room.slopedCeilingProfile().isPresent()) {
                             SlopedCeilingProfile profile = room.slopedCeilingProfile().orElseThrow();
                             slopedCeilingModeSelector.setValue("Mit Dachschräge");
                             slopedCeilingSideSelector.setValue(profile.lowSide());
-                            kneeWallHeightField.setText(formatValue(profile.kneeWallHeight(), LengthUnit.METER, 2));
+                            syncLengthInput(kneeWallHeightField, kneeWallHeightUnit, profile.kneeWallHeight(), LengthUnit.METER);
                         } else {
                             slopedCeilingModeSelector.setValue("Ohne Dachschräge");
                         }
@@ -4119,23 +4130,23 @@ public final class CadWorkbench extends BorderPane {
                     .filter(door -> door.id().toString().equals(selectedSelection.get().elementId()))
                     .findFirst()
                     .ifPresent(door -> {
-                        doorWidthField.setText(formatValue(door.width(), LengthUnit.METER, 2));
-                        doorHeightField.setText(formatValue(door.height(), LengthUnit.METER, 2));
-                        thresholdField.setText(formatValue(door.thresholdHeight(), LengthUnit.CENTIMETER, 1));
+                        syncLengthInput(doorWidthField, doorWidthUnit, door.width(), LengthUnit.METER);
+                        syncLengthInput(doorHeightField, doorHeightUnit, door.height(), LengthUnit.METER);
+                        syncLengthInput(thresholdField, thresholdUnit, door.thresholdHeight(), LengthUnit.CENTIMETER);
                     });
             case WINDOW -> activeLevel.get().windows().stream()
                     .filter(window -> window.id().toString().equals(selectedSelection.get().elementId()))
                     .findFirst()
                     .ifPresent(window -> {
-                        windowWidthField.setText(formatValue(window.width(), LengthUnit.METER, 2));
-                        windowHeightField.setText(formatValue(window.windowHeight(), LengthUnit.METER, 2));
-                        sillHeightField.setText(formatValue(window.sillHeight(), LengthUnit.CENTIMETER, 1));
+                        syncLengthInput(windowWidthField, windowWidthUnit, window.width(), LengthUnit.METER);
+                        syncLengthInput(windowHeightField, windowHeightUnit, window.windowHeight(), LengthUnit.METER);
+                        syncLengthInput(sillHeightField, sillHeightUnit, window.sillHeight(), LengthUnit.CENTIMETER);
                     });
             case STAIR -> activeLevel.get().staircases().stream()
                     .filter(stair -> stair.id().toString().equals(selectedSelection.get().elementId()))
                     .findFirst()
                     .ifPresent(stair -> {
-                        stairHeightField.setText(formatValue(stair.totalHeight(), LengthUnit.METER, 2));
+                        syncLengthInput(stairHeightField, stairHeightUnit, stair.totalHeight(), LengthUnit.METER);
                         stairStepsField.setText(Integer.toString(stair.stepCount()));
                     });
             default -> {
@@ -4218,7 +4229,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void syncEndpointHeightInputFromSelection() {
-        selectedEndpointHeight().ifPresent(height -> endpointHeightField.setText(formatValue(height, LengthUnit.METER, 2)));
+        selectedEndpointHeight().ifPresent(height -> syncLengthInput(endpointHeightField, endpointHeightUnit, height, LengthUnit.METER));
     }
 
     private Optional<Length> selectedEndpointHeight() {
@@ -4241,6 +4252,29 @@ public final class CadWorkbench extends BorderPane {
         return length.format(unit, decimals)
                 .replace(" " + unit.symbol(), "")
                 .replace('.', ',');
+    }
+
+    private void setLengthInput(TextField field, ComboBox<LengthUnit> unitSelector, Length length, LengthUnit unit) {
+        updatingLengthInput = true;
+        try {
+            unitSelector.setValue(unit);
+            field.setText(formatValue(length, unit, LENGTH_INPUT_DECIMALS));
+        } finally {
+            updatingLengthInput = false;
+        }
+    }
+
+    private void syncLengthInput(TextField field, ComboBox<LengthUnit> unitSelector, Length length, LengthUnit fallbackUnit) {
+        LengthUnit unit = Optional.ofNullable(unitSelector.getValue()).orElse(fallbackUnit);
+        updatingLengthInput = true;
+        try {
+            if (unitSelector.getValue() == null) {
+                unitSelector.setValue(unit);
+            }
+            field.setText(formatValue(length, unit, LENGTH_INPUT_DECIMALS));
+        } finally {
+            updatingLengthInput = false;
+        }
     }
 
     private void rotateSelectedComponentsClockwise() {
@@ -4470,9 +4504,17 @@ public final class CadWorkbench extends BorderPane {
         render();
     }
 
+    public String automationFieldValue(String fieldName) {
+        return textFieldByName(fieldName).getText();
+    }
+
     public void automationSetUnit(String fieldName, String unitName) {
         unitSelectorByName(fieldName).setValue(LengthUnit.valueOf(unitName.trim().toUpperCase(Locale.ROOT)));
         render();
+    }
+
+    public String automationUnit(String fieldName) {
+        return unitSelectorByName(fieldName).getValue().name();
     }
 
     public void automationPlaceGuide(String orientationName, double worldMillimeters) {
@@ -4504,6 +4546,8 @@ public final class CadWorkbench extends BorderPane {
             case "applySelectionProperties" -> applyCurrentInputsToSelection();
             case "applyEndpointHeight" -> applyEndpointHeightToSelection();
             case "toggleSurfaceLayerVisibility" -> toggleSurfaceLayerVisibility();
+            case "addSurfaceLayer" -> addSurfaceLayer();
+            case "updateSurfaceLayer" -> updateSurfaceLayer();
             case "rotateSelectedComponentsClockwise", "rotateSelectedStairsClockwise" -> rotateSelectedComponentsClockwise();
             case "rotateSelectedComponentsCounterClockwise", "rotateSelectedStairsCounterClockwise" -> rotateSelectedComponentsCounterClockwise();
             case "exportProjectDxf" -> exportProjectAsDxf(requirePath(path, actionName));
