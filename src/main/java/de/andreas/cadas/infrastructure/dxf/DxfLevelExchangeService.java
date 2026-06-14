@@ -8,6 +8,7 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectMountingMode;
 import de.andreas.cadas.domain.model.RoomObjectShape;
 import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.SurfaceCutRestriction;
@@ -184,7 +185,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%s|%s|%s",
+                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%s|%s|%s|%s",
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
                     DxfMetadataCodec.encode(roomObject.name()),
@@ -198,7 +199,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     roomObject.rotationQuarterTurns(),
                     roomObject.cutsFloorCovering(),
                     roomObject.visible(),
-                    DxfMetadataCodec.encode(roomObject.source())
+                    DxfMetadataCodec.encode(roomObject.source()),
+                    roomObject.mountingMode().name()
             ));
         }
 
@@ -368,7 +370,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             Length.ofMillimeters(parseDouble(parts[9])),
                             Length.ofMillimeters(parseDouble(parts[10])),
                             Integer.parseInt(parts[11]),
-                            Boolean.parseBoolean(parts[12]),
+                            RoomObjectMountingMode.fromStoredValue(parts.length >= 16 ? parts[15] : null, Boolean.parseBoolean(parts[12])),
                             Boolean.parseBoolean(parts[13]),
                             DxfMetadataCodec.decode(parts[14], encodedFields)
                     ));

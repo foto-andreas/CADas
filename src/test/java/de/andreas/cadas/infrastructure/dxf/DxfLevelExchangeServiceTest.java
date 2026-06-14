@@ -12,6 +12,7 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectMountingMode;
 import de.andreas.cadas.domain.model.RoomObjectShape;
 import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
@@ -247,6 +248,7 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1, imported.roomObjects().size());
         assertEquals("Wandschrank", imported.roomObjects().getFirst().name());
         assertTrue(imported.roomObjects().getFirst().cutsFloorCovering());
+        assertEquals(RoomObjectMountingMode.CUTS_FLOOR_COVERING, imported.roomObjects().getFirst().mountingMode());
     }
 
     @Test

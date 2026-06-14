@@ -118,7 +118,7 @@ public final class SelectionTranslationService {
                 roomObject.depth(),
                 roomObject.height(),
                 roomObject.rotationQuarterTurns(),
-                roomObject.cutsFloorCovering(),
+                roomObject.mountingMode(),
                 roomObject.visible(),
                 roomObject.source()
         );

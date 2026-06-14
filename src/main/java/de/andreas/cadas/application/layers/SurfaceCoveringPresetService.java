@@ -1,5 +1,6 @@
 package de.andreas.cadas.application.layers;
 
+import de.andreas.cadas.application.dwg.DwgBlockDefinition;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.model.SurfaceCutRestriction;
@@ -7,6 +8,7 @@ import de.andreas.cadas.domain.model.SurfaceLayoutMode;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 public final class SurfaceCoveringPresetService {
 
@@ -129,5 +131,32 @@ public final class SurfaceCoveringPresetService {
                 SurfaceCutRestriction.fallback(),
                 path.toAbsolutePath() + "#" + normalizedBlockName
         );
+    }
+
+    public SurfaceCoveringPreset fromDwgBlock(DwgBlockDefinition block) {
+        double moduleWidth = Math.max(1.0, block.widthMillimeters());
+        double moduleHeight = Math.max(1.0, block.heightMillimeters());
+        double minimumEdge = Math.min(Math.min(moduleWidth, moduleHeight) / 4.0, 100.0);
+        return new SurfaceCoveringPreset(
+                "dwg-" + sanitizedId(block.sourceFile().getFileName().toString()) + "-" + sanitizedId(block.name()),
+                "DWG-Belag: " + block.name(),
+                Length.of(10, LengthUnit.MILLIMETER),
+                Length.ofMillimeters(moduleWidth),
+                Length.ofMillimeters(moduleHeight),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.zero(),
+                Length.ofMillimeters(minimumEdge),
+                Length.ofMillimeters(minimumEdge),
+                Length.zero(),
+                SurfaceCutRestriction.fallback(),
+                block.sourceReference()
+        );
+    }
+
+    private String sanitizedId(String value) {
+        String normalized = value == null ? "" : value.toLowerCase(Locale.GERMAN);
+        String result = normalized.replaceAll("[^\\p{IsAlphabetic}\\p{IsDigit}]+", "-").replaceAll("^-+|-+$", "");
+        return result.isBlank() ? "dwg" : result;
     }
 }

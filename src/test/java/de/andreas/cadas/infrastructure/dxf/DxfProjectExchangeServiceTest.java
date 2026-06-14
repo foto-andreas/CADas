@@ -13,6 +13,7 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectMountingMode;
 import de.andreas.cadas.domain.model.RoomObjectShape;
 import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.Roof;
@@ -257,16 +258,16 @@ class DxfProjectExchangeServiceTest {
         ));
         project.primaryLevel().addSurfaceLayerStack(egFloor);
         project.primaryLevel().addRoomObject(RoomObject.create(
-                "table-round",
-                "Tisch rund",
-                RoomObjectType.TABLE,
-                RoomObjectShape.CIRCLE,
+                "dwg-spiegel",
+                "DWG-Spiegel",
+                RoomObjectType.DWG_REFERENCE,
+                RoomObjectShape.RECTANGLE,
                 new PlanPoint(1500, 1500),
-                Length.of(110, LengthUnit.CENTIMETER),
-                Length.of(110, LengthUnit.CENTIMETER),
-                Length.of(75, LengthUnit.CENTIMETER),
-                false,
-                ""
+                Length.of(80, LengthUnit.CENTIMETER),
+                Length.of(5, LengthUnit.CENTIMETER),
+                Length.of(120, LengthUnit.CENTIMETER),
+                RoomObjectMountingMode.WALL_MOUNTED,
+                "Spiegel.dwg#Block"
         ));
 
         var og = project.createLevel("Obergeschoss");
@@ -311,7 +312,9 @@ class DxfProjectExchangeServiceTest {
         assertEquals(1.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().jointWidth().toMillimeters(), 0.001);
         assertEquals(SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().cutRestriction());
         assertEquals(1, importedEg.roomObjects().size());
-        assertEquals("Tisch rund", importedEg.roomObjects().getFirst().name());
+        assertEquals("DWG-Spiegel", importedEg.roomObjects().getFirst().name());
+        assertEquals(RoomObjectMountingMode.WALL_MOUNTED, importedEg.roomObjects().getFirst().mountingMode());
+        assertFalse(importedEg.roomObjects().getFirst().cutsFloorCovering());
         assertEquals(egRoom.id(), importedEg.rooms().getFirst().id(), "Raum-UUID muss im Rundlauf erhalten bleiben");
 
         var importedOg = imported.levels().get(1);

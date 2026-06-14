@@ -10,6 +10,7 @@ import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectMountingMode;
 import de.andreas.cadas.domain.model.RoomObjectShape;
 import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.Roof;
@@ -222,7 +223,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 Length.ofMillimeters(parseDouble(parts[10])),
                                 Length.ofMillimeters(parseDouble(parts[11])),
                                 Integer.parseInt(parts[12]),
-                                Boolean.parseBoolean(parts[13]),
+                                RoomObjectMountingMode.fromStoredValue(parts.length >= 17 ? parts[16] : null, Boolean.parseBoolean(parts[13])),
                                 Boolean.parseBoolean(parts[14]),
                                 DxfMetadataCodec.decode(parts[15], encodedFields)
                         ));
@@ -433,7 +434,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%s|%s|%s",
+                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%s|%s|%s|%s",
                     DxfMetadataCodec.encode(level.name()),
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
@@ -448,7 +449,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     roomObject.rotationQuarterTurns(),
                     roomObject.cutsFloorCovering(),
                     roomObject.visible(),
-                    DxfMetadataCodec.encode(roomObject.source())
+                    DxfMetadataCodec.encode(roomObject.source()),
+                    roomObject.mountingMode().name()
             ));
         }
     }

@@ -1,7 +1,10 @@
 package de.andreas.cadas.application.objects;
 
+import de.andreas.cadas.application.dwg.DwgBlockDefinition;
+import de.andreas.cadas.application.dwg.DwgLibraryAnalyzer;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
+import de.andreas.cadas.domain.model.RoomObjectMountingMode;
 import de.andreas.cadas.domain.model.RoomObjectShape;
 import de.andreas.cadas.domain.model.RoomObjectType;
 
@@ -17,13 +20,19 @@ import java.util.stream.Stream;
 public final class RoomObjectPresetService {
 
     private final Path objectDirectory;
+    private final DwgLibraryAnalyzer dwgLibraryAnalyzer;
 
     public RoomObjectPresetService() {
         this(defaultObjectDirectory());
     }
 
     public RoomObjectPresetService(Path objectDirectory) {
+        this(objectDirectory, new DwgLibraryAnalyzer());
+    }
+
+    public RoomObjectPresetService(Path objectDirectory, DwgLibraryAnalyzer dwgLibraryAnalyzer) {
         this.objectDirectory = Objects.requireNonNull(objectDirectory, "objectDirectory darf nicht null sein.");
+        this.dwgLibraryAnalyzer = Objects.requireNonNull(dwgLibraryAnalyzer, "dwgLibraryAnalyzer darf nicht null sein.");
     }
 
     public List<RoomObjectPreset> presets() {
@@ -53,11 +62,38 @@ public final class RoomObjectPresetService {
             return files
                     .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".dwg"))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
-                    .map(this::dwgPreset)
+                    .flatMap(path -> dwgPresets(path).stream())
                     .toList();
         } catch (IOException exception) {
             return List.of();
         }
+    }
+
+    public RoomObjectPreset fromDwgBlock(DwgBlockDefinition block, boolean cutsFloorCovering) {
+        return fromDwgBlock(block, RoomObjectMountingMode.fromCutsFloorCovering(cutsFloorCovering));
+    }
+
+    public RoomObjectPreset fromDwgBlock(DwgBlockDefinition block, RoomObjectMountingMode mountingMode) {
+        return new RoomObjectPreset(
+                "dwg-" + normalizedId(block.sourceFile().getFileName().toString()) + "-" + normalizedId(block.name()),
+                "DWG-Objekt: " + block.name(),
+                RoomObjectType.DWG_REFERENCE,
+                RoomObjectShape.RECTANGLE,
+                Length.ofMillimeters(Math.max(1.0, block.widthMillimeters())),
+                Length.ofMillimeters(Math.max(1.0, block.heightMillimeters())),
+                Length.of(100, LengthUnit.CENTIMETER),
+                mountingMode,
+                block.sourceReference()
+        );
+    }
+
+    private List<RoomObjectPreset> dwgPresets(Path path) {
+        var analysis = dwgLibraryAnalyzer.analyze(path);
+        List<RoomObjectPreset> blockPresets = analysis.blocks().stream()
+                .filter(DwgBlockDefinition::hasGeometry)
+                .map(block -> fromDwgBlock(block, false))
+                .toList();
+        return blockPresets.isEmpty() ? List.of(dwgPreset(path)) : blockPresets;
     }
 
     private RoomObjectPreset preset(String id, String name, RoomObjectType type, RoomObjectShape shape, double widthCentimeters, double depthCentimeters, double heightCentimeters, boolean cutsFloorCovering) {
@@ -77,7 +113,7 @@ public final class RoomObjectPresetService {
     private RoomObjectPreset dwgPreset(Path path) {
         String fileName = path.getFileName().toString();
         String baseName = fileName.substring(0, fileName.length() - 4);
-        String normalizedId = baseName.toLowerCase(Locale.GERMAN).replaceAll("[^\\p{IsAlphabetic}\\p{IsDigit}]+", "-").replaceAll("^-+|-+$", "");
+        String normalizedId = normalizedId(baseName);
         return new RoomObjectPreset(
                 "dwg-" + (normalizedId.isBlank() ? "objekt" : normalizedId),
                 "DWG-Objekt: " + baseName,
@@ -89,6 +125,10 @@ public final class RoomObjectPresetService {
                 false,
                 path.toAbsolutePath().normalize().toString()
         );
+    }
+
+    private String normalizedId(String value) {
+        return value.toLowerCase(Locale.GERMAN).replaceAll("[^\\p{IsAlphabetic}\\p{IsDigit}]+", "-").replaceAll("^-+|-+$", "");
     }
 
     private static Path defaultObjectDirectory() {
