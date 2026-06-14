@@ -1631,11 +1631,7 @@ public final class CadWorkbench extends BorderPane {
         if (wallLength <= 0.0) {
             return;
         }
-        List<WallSurfaceInterval> visibleIntervals = wallSurfaceOpeningService.visiblePlanIntervals(
-                activeLevel.get(),
-                wall,
-                wallSurfaceOpeningRenderClearanceMillimeters()
-        );
+        List<WallSurfaceInterval> visibleIntervals = wallSurfaceOpeningService.visiblePlanIntervals(activeLevel.get(), wall);
         if (visibleIntervals.isEmpty()) {
             return;
         }
@@ -1646,10 +1642,6 @@ public final class CadWorkbench extends BorderPane {
         }
         drawWallSurfaceJointsInPlan(graphics, wall, layer, centerOffset, visibleIntervals);
         graphics.restore();
-    }
-
-    private double wallSurfaceOpeningRenderClearanceMillimeters() {
-        return Math.max(2.0, Math.min(8.0, 1.0 / scale()));
     }
 
     private void fillWallSurfaceIntervalInPlan(
@@ -2123,6 +2115,8 @@ public final class CadWorkbench extends BorderPane {
                 drawOpeningElevation(graphics, openingStart, openingEnd, door.thresholdHeight().toMillimeters(), door.height().toMillimeters(), selected ? Color.web("#f08f3c") : Color.web("#d66b2d"));
                 continue;
             }
+            graphics.save();
+            graphics.setLineCap(javafx.scene.shape.StrokeLineCap.BUTT);
             graphics.setStroke(selected ? Color.web("#f08f3c") : Color.web("#d66b2d"));
             graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * (selected ? 0.72 : 0.55), 3.0));
             graphics.strokeLine(
@@ -2131,6 +2125,7 @@ public final class CadWorkbench extends BorderPane {
                     toScreenProjectedX(openingEnd, 0.0),
                     toScreenProjectedY(openingEnd, 0.0)
             );
+            graphics.restore();
         }
     }
 
@@ -2144,6 +2139,8 @@ public final class CadWorkbench extends BorderPane {
                 drawOpeningElevation(graphics, openingStart, openingEnd, window.sillHeight().toMillimeters(), window.windowHeight().toMillimeters(), selected ? Color.web("#7bc8eb") : Color.web("#4da8da"));
                 continue;
             }
+            graphics.save();
+            graphics.setLineCap(javafx.scene.shape.StrokeLineCap.BUTT);
             graphics.setStroke(selected ? Color.web("#7bc8eb") : Color.web("#4da8da"));
             graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * (selected ? 0.48 : 0.35), 3.0));
             graphics.strokeLine(
@@ -2152,6 +2149,7 @@ public final class CadWorkbench extends BorderPane {
                     toScreenProjectedX(openingEnd, 0.0),
                     toScreenProjectedY(openingEnd, 0.0)
             );
+            graphics.restore();
         }
     }
 
