@@ -170,3 +170,15 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Eigene Beläge über einen Button neben dem Namen als Presets unter `~/.config/CADas/Belag` speichern, beim Überschreiben nachfragen, beim Start wieder laden und DWG-Bibliotheken samt `.blocks`-Katalogen in dasselbe Konfig-Verzeichnis übernehmen.
 - [x] Zwischen übereinanderliegenden Auswahl-Treffern im Bearbeiten-Werkzeug mit `Alt` + Linksklick durchschalten.
 - [x] Beim Verschieben einer Wand die angrenzenden Endpunkte anderer Wände mitführen.
+
+- [x] DWG-Bibliothekslücken für Beläge und Objekte ehrlich dokumentieren: Bisher ist nur eine Referenz-/Preset-Verwaltung umgesetzt, weil im Projekt noch kein echter DWG-Parser mit Geometrie-, Block-, Einheiten- und Lizenzklärung integriert ist.
+
+## Offene DWG-Bibliotheksarbeiten
+
+- [ ] DWG-Parser oder saubere Konverter-Schicht auswählen, lizenzrechtlich prüfen und als Infrastrukturadapter kapseln.
+- [ ] DWG-Einheiten, Blockursprünge, Skalierung, Rotation, Layer, Handles und Blocknamen robust auslesen und testen.
+- [ ] DWG-Blöcke für Oberflächen-Presets nicht nur referenzieren, sondern Geometrie, reale Maße, Materialrichtung und sinnvolle Standardwerte ableiten.
+- [ ] DWG-Objekte aus `~/.config/CADas/Objekte` mit echter Blockgeometrie, Vorschau und Footprint importieren statt mit rechteckigem Standardmaß zu arbeiten.
+- [ ] Für importierte DWG-Objekte festlegen, ob sie Bodenbeläge ausschneiden, auf Belägen stehen oder wandgebunden montiert werden.
+- [ ] UI für DWG-Bibliotheken ergänzen: Blockauswahl mit Vorschau, Suchfeld, Maßeinheitenprüfung, Konfliktanzeige und verständliche Fehler bei nicht lesbaren Dateien.
+- [ ] DXF/DWG-Roundtrip-Tests mit kleinen, stabilen Testbibliotheken ergänzen, damit Referenzen, Blocknamen und Maße nicht still kaputtgehen.

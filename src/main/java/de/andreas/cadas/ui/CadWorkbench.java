@@ -502,13 +502,6 @@ public final class CadWorkbench extends BorderPane {
         objectsBox.selectedProperty().bindBidirectional(showRoomObjects);
         applyTooltip(objectsBox, "Blendet platzierte Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.");
 
-        Button resetViewButton = createActionButton(
-                "2D zentrieren",
-                null,
-                this::resetTwoDView,
-                "Setzt Zoom und Verschiebung der Zeichenfläche auf die Startansicht zurück."
-        );
-
         Button addLevelButton = createActionButton(
                 "Etage hinzufügen",
                 null,
@@ -533,8 +526,7 @@ public final class CadWorkbench extends BorderPane {
                 snapPointsBox,
                 new Separator(Orientation.VERTICAL),
                 dimensionsBox,
-                objectsBox,
-                resetViewButton
+                objectsBox
         );
     }
 
@@ -553,6 +545,11 @@ public final class CadWorkbench extends BorderPane {
         box.getChildren().add(viewButton("↓", this::rotateViewDown, "Dreht das Modell aus der aktuellen 2D-Ansicht nach unten."));
         box.getChildren().add(viewButton("←", this::rotateViewLeft, "Dreht das Modell aus der aktuellen 2D-Ansicht nach links."));
         box.getChildren().add(viewButton("→", this::rotateViewRight, "Dreht das Modell aus der aktuellen 2D-Ansicht nach rechts."));
+        box.getChildren().add(viewButton(
+                "2D zentrieren",
+                this::resetTwoDView,
+                "Setzt Zoom und Verschiebung der Zeichenfläche auf die Startansicht zurück."
+        ));
         return box;
     }
 
