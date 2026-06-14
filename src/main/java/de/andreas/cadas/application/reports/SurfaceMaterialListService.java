@@ -18,6 +18,7 @@ import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -34,17 +35,27 @@ public final class SurfaceMaterialListService {
 
     public SurfaceMaterialReport create(ProjectModel project) {
         Map<String, MaterialAccumulator> materials = new LinkedHashMap<>();
-        Map<String, RoomAccumulator> rooms = new LinkedHashMap<>();
         for (Level level : project.levels()) {
-            collectLevel(level, materials, rooms);
+            collectLevel(level, materials);
+        }
+        List<MaterialSummary> materialSummaries = materials.values().stream()
+                .map(MaterialAccumulator::toSummary)
+                .toList();
+        Map<String, RoomAccumulator> rooms = new LinkedHashMap<>();
+        for (MaterialSummary material : materialSummaries) {
+            for (MaterialRoomEntry entry : material.roomEntries()) {
+                String roomKey = entry.levelName() + "\u0000" + entry.roomName();
+                rooms.computeIfAbsent(roomKey, ignored -> new RoomAccumulator(entry.levelName(), entry.roomName()))
+                        .add(entry);
+            }
         }
         return new SurfaceMaterialReport(
-                materials.values().stream().map(MaterialAccumulator::toSummary).toList(),
+                materialSummaries,
                 rooms.values().stream().map(RoomAccumulator::toSummary).toList()
         );
     }
 
-    private void collectLevel(Level level, Map<String, MaterialAccumulator> materials, Map<String, RoomAccumulator> rooms) {
+    private void collectLevel(Level level, Map<String, MaterialAccumulator> materials) {
         for (SurfaceLayerStack stack : level.surfaceLayerStacks()) {
             for (SurfaceLayer layer : stack.layers()) {
                 if (!layer.visible()) {
@@ -52,7 +63,7 @@ public final class SurfaceMaterialListService {
                 }
                 for (SurfaceCoverage coverage : coverages(level, stack)) {
                     CoverageEstimate estimate = estimateCoverage(layer, coverage.rectangles());
-                    if (estimate.pieceCount() == 0) {
+                    if (estimate.placedPieceCount() == 0) {
                         continue;
                     }
                     String materialKey = materialKey(stack.surfaceType(), layer);
@@ -60,22 +71,13 @@ public final class SurfaceMaterialListService {
                             materialKey,
                             ignored -> new MaterialAccumulator(layer, stack.surfaceType())
                     );
-                    MaterialRoomEntry entry = new MaterialRoomEntry(
+                    PendingMaterialRoomEntry entry = new PendingMaterialRoomEntry(
                             coverage.levelName(),
                             coverage.roomName(),
                             coverage.surfaceDescription(),
-                            estimate.coveredAreaSquareMeters(),
-                            estimate.pieceCount(),
-                            estimate.requiredMaterialAreaSquareMeters(),
-                            estimate.fullPieceCount(),
-                            estimate.cutPieceCount(),
-                            estimate.cutCount(),
-                            estimate.complexityScore()
+                            estimate
                     );
-                    material.add(entry, estimate);
-                    String roomKey = coverage.levelName() + "\u0000" + coverage.roomName();
-                    rooms.computeIfAbsent(roomKey, ignored -> new RoomAccumulator(coverage.levelName(), coverage.roomName()))
-                            .add(estimate);
+                    material.add(entry);
                 }
             }
         }
@@ -231,15 +233,23 @@ public final class SurfaceMaterialListService {
     ) {
     }
 
+    private record PendingMaterialRoomEntry(
+            String levelName,
+            String roomName,
+            String surfaceDescription,
+            CoverageEstimate estimate
+    ) {
+    }
+
     private static final class CoverageAccumulator {
 
         private final SurfaceLayer layer;
-        private int pieceCount;
+        private final List<CutPiece> cutPieces = new ArrayList<>();
+        private int placedPieceCount;
         private int fullPieceCount;
         private int cutPieceCount;
         private int cutCount;
         private double coveredAreaSquareMillimeters;
-        private double requiredMaterialAreaSquareMillimeters;
         private double cutPenaltySum;
 
         private CoverageAccumulator(SurfaceLayer layer) {
@@ -273,14 +283,14 @@ public final class SurfaceMaterialListService {
             double height = placement.height().toMillimeters();
             boolean cutsWidth = width < tileWidth - EPSILON;
             boolean cutsHeight = height < tileHeight - EPSILON;
-            pieceCount++;
+            placedPieceCount++;
             coveredAreaSquareMillimeters += width * height;
-            requiredMaterialAreaSquareMillimeters += tileWidth * tileHeight;
             if (!cutsWidth && !cutsHeight) {
                 fullPieceCount++;
                 return;
             }
             cutPieceCount++;
+            cutPieces.add(new CutPiece(width, height));
             if (cutsWidth) {
                 cutCount++;
                 cutPenaltySum += 1.0 - clamp(height / tileHeight, 0.0, 1.0);
@@ -292,16 +302,198 @@ public final class SurfaceMaterialListService {
         }
 
         private CoverageEstimate toEstimate() {
-            double complexity = complexity(pieceCount, cutCount, cutPenaltySum);
+            double complexity = complexity(placedPieceCount, cutCount, cutPenaltySum);
             return new CoverageEstimate(
                     squareMeters(coveredAreaSquareMillimeters),
-                    pieceCount,
-                    squareMeters(requiredMaterialAreaSquareMillimeters),
+                    placedPieceCount,
                     fullPieceCount,
                     cutPieceCount,
                     cutCount,
                     cutPenaltySum,
+                    List.copyOf(cutPieces),
                     complexity
+            );
+        }
+    }
+
+    private record CutPiece(double widthMillimeters, double heightMillimeters) {
+
+        private double areaSquareMillimeters() {
+            return widthMillimeters * heightMillimeters;
+        }
+
+        private double longestSideMillimeters() {
+            return Math.max(widthMillimeters, heightMillimeters);
+        }
+    }
+
+    private record OwnedCutPiece(int ownerIndex, double widthMillimeters, double heightMillimeters) {
+
+        private double areaSquareMillimeters() {
+            return widthMillimeters * heightMillimeters;
+        }
+
+        private double longestSideMillimeters() {
+            return Math.max(widthMillimeters, heightMillimeters);
+        }
+    }
+
+    private record RestPiece(double widthMillimeters, double heightMillimeters) {
+
+        private double areaSquareMillimeters() {
+            return widthMillimeters * heightMillimeters;
+        }
+    }
+
+    private record FitCandidate(int restIndex, double widthMillimeters, double heightMillimeters, double wasteSquareMillimeters) {
+    }
+
+    private record MaterialCutOptimization(int requiredCutSheets, int[] requiredCutSheetsByOwner, List<RestPieceSummary> restPieces) {
+    }
+
+    private static final class MaterialCuttingOptimizer {
+
+        private MaterialCuttingOptimizer() {
+        }
+
+        private static MaterialCutOptimization optimize(
+                double sheetWidth,
+                double sheetHeight,
+                List<OwnedCutPiece> cutPieces,
+                boolean allowRotation,
+                int ownerCount
+        ) {
+            int[] requiredCutSheetsByOwner = new int[ownerCount];
+            if (cutPieces.isEmpty()) {
+                return new MaterialCutOptimization(0, requiredCutSheetsByOwner, List.of());
+            }
+            List<RestPiece> restPieces = new ArrayList<>();
+            int requiredCutSheets = 0;
+            List<OwnedCutPiece> orderedPieces = cutPieces.stream()
+                    .sorted(Comparator.<OwnedCutPiece>comparingDouble(OwnedCutPiece::areaSquareMillimeters).reversed()
+                            .thenComparing(Comparator.comparingDouble(OwnedCutPiece::longestSideMillimeters).reversed()))
+                    .toList();
+            for (OwnedCutPiece cutPiece : orderedPieces) {
+                FitCandidate fit = bestFit(restPieces, cutPiece, allowRotation);
+                if (fit == null) {
+                    restPieces.add(new RestPiece(sheetWidth, sheetHeight));
+                    requiredCutSheets++;
+                    requiredCutSheetsByOwner[cutPiece.ownerIndex()]++;
+                    fit = bestFit(restPieces, cutPiece, allowRotation);
+                }
+                if (fit == null) {
+                    throw new IllegalStateException("Zuschnitt passt nicht in das Materialformat.");
+                }
+                RestPiece source = restPieces.remove(fit.restIndex());
+                restPieces.addAll(splitRestPiece(source, fit.widthMillimeters(), fit.heightMillimeters()));
+            }
+            return new MaterialCutOptimization(requiredCutSheets, requiredCutSheetsByOwner, groupedRestPieces(restPieces));
+        }
+
+        private static FitCandidate bestFit(List<RestPiece> restPieces, OwnedCutPiece cutPiece, boolean allowRotation) {
+            FitCandidate best = null;
+            for (int index = 0; index < restPieces.size(); index++) {
+                RestPiece restPiece = restPieces.get(index);
+                best = betterFit(best, candidate(index, restPiece, cutPiece.widthMillimeters(), cutPiece.heightMillimeters()));
+                if (allowRotation && Math.abs(cutPiece.widthMillimeters() - cutPiece.heightMillimeters()) > EPSILON) {
+                    best = betterFit(best, candidate(index, restPiece, cutPiece.heightMillimeters(), cutPiece.widthMillimeters()));
+                }
+            }
+            return best;
+        }
+
+        private static FitCandidate candidate(int restIndex, RestPiece restPiece, double width, double height) {
+            if (width > restPiece.widthMillimeters() + EPSILON || height > restPiece.heightMillimeters() + EPSILON) {
+                return null;
+            }
+            return new FitCandidate(restIndex, width, height, restPiece.areaSquareMillimeters() - width * height);
+        }
+
+        private static FitCandidate betterFit(FitCandidate current, FitCandidate candidate) {
+            if (candidate == null) {
+                return current;
+            }
+            if (current == null) {
+                return candidate;
+            }
+            if (candidate.wasteSquareMillimeters() < current.wasteSquareMillimeters() - EPSILON) {
+                return candidate;
+            }
+            if (Math.abs(candidate.wasteSquareMillimeters() - current.wasteSquareMillimeters()) <= EPSILON
+                    && candidate.restIndex() < current.restIndex()) {
+                return candidate;
+            }
+            return current;
+        }
+
+        private static List<RestPiece> splitRestPiece(RestPiece source, double usedWidth, double usedHeight) {
+            List<RestPiece> verticalFirst = List.of(
+                    new RestPiece(source.widthMillimeters() - usedWidth, source.heightMillimeters()),
+                    new RestPiece(usedWidth, source.heightMillimeters() - usedHeight)
+            );
+            List<RestPiece> horizontalFirst = List.of(
+                    new RestPiece(source.widthMillimeters(), source.heightMillimeters() - usedHeight),
+                    new RestPiece(source.widthMillimeters() - usedWidth, usedHeight)
+            );
+            return usableRestPieces(score(verticalFirst) >= score(horizontalFirst) ? verticalFirst : horizontalFirst);
+        }
+
+        private static double score(List<RestPiece> restPieces) {
+            return restPieces.stream()
+                    .filter(MaterialCuttingOptimizer::isUsable)
+                    .mapToDouble(RestPiece::areaSquareMillimeters)
+                    .max()
+                    .orElse(0.0);
+        }
+
+        private static List<RestPiece> usableRestPieces(List<RestPiece> candidates) {
+            return candidates.stream()
+                    .filter(MaterialCuttingOptimizer::isUsable)
+                    .toList();
+        }
+
+        private static boolean isUsable(RestPiece restPiece) {
+            return restPiece.widthMillimeters() > EPSILON && restPiece.heightMillimeters() > EPSILON;
+        }
+
+        private static List<RestPieceSummary> groupedRestPieces(List<RestPiece> restPieces) {
+            Map<String, RestPieceAccumulator> groups = new LinkedHashMap<>();
+            restPieces.stream()
+                    .filter(MaterialCuttingOptimizer::isUsable)
+                    .sorted(Comparator.comparingDouble(RestPiece::areaSquareMillimeters).reversed())
+                    .forEach(restPiece -> groups.computeIfAbsent(restKey(restPiece), ignored -> new RestPieceAccumulator(restPiece))
+                            .add());
+            return groups.values().stream()
+                    .map(RestPieceAccumulator::toSummary)
+                    .toList();
+        }
+
+        private static String restKey(RestPiece restPiece) {
+            return Math.round(restPiece.widthMillimeters() * 1000.0)
+                    + "|"
+                    + Math.round(restPiece.heightMillimeters() * 1000.0);
+        }
+    }
+
+    private static final class RestPieceAccumulator {
+
+        private final RestPiece restPiece;
+        private int count;
+
+        private RestPieceAccumulator(RestPiece restPiece) {
+            this.restPiece = restPiece;
+        }
+
+        private void add() {
+            count++;
+        }
+
+        private RestPieceSummary toSummary() {
+            return new RestPieceSummary(
+                    count,
+                    restPiece.widthMillimeters(),
+                    restPiece.heightMillimeters(),
+                    squareMeters(count * restPiece.areaSquareMillimeters())
             );
         }
     }
@@ -317,12 +509,12 @@ public final class SurfaceMaterialListService {
 
     private record CoverageEstimate(
             double coveredAreaSquareMeters,
-            int pieceCount,
-            double requiredMaterialAreaSquareMeters,
+            int placedPieceCount,
             int fullPieceCount,
             int cutPieceCount,
             int cutCount,
             double cutPenaltySum,
+            List<CutPiece> cutPieces,
             double complexityScore
     ) {
     }
@@ -331,13 +523,12 @@ public final class SurfaceMaterialListService {
 
         private final SurfaceLayer layer;
         private final SurfaceType surfaceType;
-        private final List<MaterialRoomEntry> roomEntries = new ArrayList<>();
-        private int pieceCount;
+        private final List<PendingMaterialRoomEntry> pendingEntries = new ArrayList<>();
+        private int placedPieceCount;
         private int fullPieceCount;
         private int cutPieceCount;
         private int cutCount;
         private double coveredAreaSquareMeters;
-        private double requiredMaterialAreaSquareMeters;
         private double cutPenaltySum;
 
         private MaterialAccumulator(SurfaceLayer layer, SurfaceType surfaceType) {
@@ -345,31 +536,70 @@ public final class SurfaceMaterialListService {
             this.surfaceType = surfaceType;
         }
 
-        private void add(MaterialRoomEntry entry, CoverageEstimate estimate) {
-            roomEntries.add(entry);
-            pieceCount += estimate.pieceCount();
+        private void add(PendingMaterialRoomEntry entry) {
+            pendingEntries.add(entry);
+            CoverageEstimate estimate = entry.estimate();
+            placedPieceCount += estimate.placedPieceCount();
             fullPieceCount += estimate.fullPieceCount();
             cutPieceCount += estimate.cutPieceCount();
             cutCount += estimate.cutCount();
             coveredAreaSquareMeters += estimate.coveredAreaSquareMeters();
-            requiredMaterialAreaSquareMeters += estimate.requiredMaterialAreaSquareMeters();
             cutPenaltySum += estimate.cutPenaltySum();
         }
 
         private MaterialSummary toSummary() {
+            MaterialCutOptimization optimization = optimizeCutPieces();
+            double tileAreaSquareMillimeters = layer.tileWidth().toMillimeters() * layer.tileHeight().toMillimeters();
+            List<MaterialRoomEntry> roomEntries = new ArrayList<>();
+            for (int index = 0; index < pendingEntries.size(); index++) {
+                PendingMaterialRoomEntry pendingEntry = pendingEntries.get(index);
+                CoverageEstimate estimate = pendingEntry.estimate();
+                int requiredPieces = estimate.fullPieceCount() + optimization.requiredCutSheetsByOwner()[index];
+                roomEntries.add(new MaterialRoomEntry(
+                        pendingEntry.levelName(),
+                        pendingEntry.roomName(),
+                        pendingEntry.surfaceDescription(),
+                        estimate.coveredAreaSquareMeters(),
+                        requiredPieces,
+                        squareMeters(requiredPieces * tileAreaSquareMillimeters),
+                        estimate.fullPieceCount(),
+                        estimate.cutPieceCount(),
+                        estimate.cutCount(),
+                        estimate.complexityScore(),
+                        estimate.cutPenaltySum()
+                ));
+            }
+            int requiredPieces = fullPieceCount + optimization.requiredCutSheets();
             return new MaterialSummary(
                     layer.name(),
                     surfaceType,
                     layer.coveringSource().isBlank() ? surfaceType.toString() : surfaceType + ", Quelle: " + layer.coveringSource(),
                     values(layer),
                     coveredAreaSquareMeters,
-                    pieceCount,
-                    requiredMaterialAreaSquareMeters,
+                    requiredPieces,
+                    squareMeters(requiredPieces * tileAreaSquareMillimeters),
                     fullPieceCount,
                     cutPieceCount,
                     cutCount,
-                    complexity(pieceCount, cutCount, cutPenaltySum),
-                    List.copyOf(roomEntries)
+                    complexity(placedPieceCount, cutCount, cutPenaltySum),
+                    List.copyOf(roomEntries),
+                    optimization.restPieces()
+            );
+        }
+
+        private MaterialCutOptimization optimizeCutPieces() {
+            List<OwnedCutPiece> cutPieces = new ArrayList<>();
+            for (int index = 0; index < pendingEntries.size(); index++) {
+                for (CutPiece cutPiece : pendingEntries.get(index).estimate().cutPieces()) {
+                    cutPieces.add(new OwnedCutPiece(index, cutPiece.widthMillimeters(), cutPiece.heightMillimeters()));
+                }
+            }
+            return MaterialCuttingOptimizer.optimize(
+                    layer.tileWidth().toMillimeters(),
+                    layer.tileHeight().toMillimeters(),
+                    cutPieces,
+                    false,
+                    pendingEntries.size()
             );
         }
 
@@ -390,7 +620,8 @@ public final class SurfaceMaterialListService {
 
         private final String levelName;
         private final String roomName;
-        private int pieceCount;
+        private int requiredPieceCount;
+        private int placedPieceCount;
         private int cutCount;
         private double coveredAreaSquareMeters;
         private double cutPenaltySum;
@@ -400,11 +631,12 @@ public final class SurfaceMaterialListService {
             this.roomName = roomName;
         }
 
-        private void add(CoverageEstimate estimate) {
-            pieceCount += estimate.pieceCount();
-            cutCount += estimate.cutCount();
-            coveredAreaSquareMeters += estimate.coveredAreaSquareMeters();
-            cutPenaltySum += estimate.cutPenaltySum();
+        private void add(MaterialRoomEntry entry) {
+            requiredPieceCount += entry.requiredPieces();
+            placedPieceCount += entry.fullPieces() + entry.cutPieces();
+            cutCount += entry.cutCount();
+            coveredAreaSquareMeters += entry.coveredAreaSquareMeters();
+            cutPenaltySum += entry.cutPenaltySum();
         }
 
         private RoomComplexitySummary toSummary() {
@@ -412,9 +644,9 @@ public final class SurfaceMaterialListService {
                     levelName,
                     roomName,
                     coveredAreaSquareMeters,
-                    pieceCount,
+                    requiredPieceCount,
                     cutCount,
-                    complexity(pieceCount, cutCount, cutPenaltySum)
+                    complexity(placedPieceCount, cutCount, cutPenaltySum)
             );
         }
     }
@@ -472,6 +704,7 @@ public final class SurfaceMaterialListService {
                 markdown.append("* Vollstücke: ").append(material.fullPieces())
                         .append(", Zuschnitte: ").append(material.cutPieces())
                         .append(", notwendige Schnitte: ").append(material.cutCount()).append("\n\n");
+                appendRestPieces(markdown, material.restPieces());
                 markdown.append("| Raum/Fläche | Fläche | Stückzahl | Materialfläche | Schnitte | Komplexität |\n");
                 markdown.append("|---|---:|---:|---:|---:|---:|\n");
                 for (MaterialRoomEntry entry : material.roomEntries()) {
@@ -491,6 +724,28 @@ public final class SurfaceMaterialListService {
                 }
                 markdown.append('\n');
             }
+        }
+
+        private void appendRestPieces(StringBuilder markdown, List<RestPieceSummary> restPieces) {
+            if (restPieces.isEmpty()) {
+                markdown.append("* Reststücke: keine\n\n");
+                return;
+            }
+            markdown.append("* Reststücke: ").append(restPieces.stream().mapToInt(RestPieceSummary::count).sum()).append(" Stück\n\n");
+            markdown.append("| Anzahl | Breite | Höhe | Gesamtfläche |\n");
+            markdown.append("|---:|---:|---:|---:|\n");
+            for (RestPieceSummary restPiece : restPieces) {
+                markdown.append("| ")
+                        .append(restPiece.count())
+                        .append(" | ")
+                        .append(decimal(restPiece.widthMillimeters() / 10.0, 1)).append(" cm")
+                        .append(" | ")
+                        .append(decimal(restPiece.heightMillimeters() / 10.0, 1)).append(" cm")
+                        .append(" | ")
+                        .append(decimal(restPiece.totalAreaSquareMeters(), 2)).append(" m²")
+                        .append(" |\n");
+            }
+            markdown.append('\n');
         }
 
         private void appendRoomComplexities(StringBuilder markdown) {
@@ -525,7 +780,8 @@ public final class SurfaceMaterialListService {
             int cutPieces,
             int cutCount,
             double complexityScore,
-            List<MaterialRoomEntry> roomEntries
+            List<MaterialRoomEntry> roomEntries,
+            List<RestPieceSummary> restPieces
     ) {
     }
 
@@ -539,7 +795,16 @@ public final class SurfaceMaterialListService {
             int fullPieces,
             int cutPieces,
             int cutCount,
-            double complexityScore
+            double complexityScore,
+            double cutPenaltySum
+    ) {
+    }
+
+    public record RestPieceSummary(
+            int count,
+            double widthMillimeters,
+            double heightMillimeters,
+            double totalAreaSquareMeters
     ) {
     }
 

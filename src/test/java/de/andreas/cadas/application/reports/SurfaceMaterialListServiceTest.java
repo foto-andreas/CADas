@@ -72,10 +72,75 @@ class SurfaceMaterialListServiceTest {
 
         MaterialSummary material = report.materials().getFirst();
         assertEquals(1.1, material.coveredAreaSquareMeters(), 0.001);
-        assertEquals(6, material.requiredPieces());
-        assertEquals(1.5, material.requiredMaterialAreaSquareMeters(), 0.001);
+        assertEquals(5, material.requiredPieces());
+        assertEquals(1.25, material.requiredMaterialAreaSquareMeters(), 0.001);
         assertEquals(2, material.cutCount());
         assertTrue(report.roomComplexities().getFirst().complexityScore() > 10.0);
+    }
+
+    @Test
+    void verwendetReststueckeFuerWeitereZuschnitte() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Flur",
+                new PlanPoint(0, 0),
+                new PlanPoint(600, 1000),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        stack.addLayer(layer("Fliese", Length.of(50, LengthUnit.CENTIMETER), Length.of(50, LengthUnit.CENTIMETER)));
+        project.primaryLevel().addSurfaceLayerStack(stack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        MaterialSummary material = report.materials().getFirst();
+        assertEquals(0.6, material.coveredAreaSquareMeters(), 0.001);
+        assertEquals(3, material.requiredPieces());
+        assertEquals(0.75, material.requiredMaterialAreaSquareMeters(), 0.001);
+        assertEquals(2, material.fullPieces());
+        assertEquals(2, material.cutPieces());
+        assertEquals(2, material.cutCount());
+    }
+
+    @Test
+    void verwendetReststueckeUeberRaumgrenzenHinweg() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room flur = Room.rectangular(
+                "Flur",
+                new PlanPoint(0, 0),
+                new PlanPoint(600, 500),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        Room wc = Room.rectangular(
+                "WC",
+                new PlanPoint(1000, 0),
+                new PlanPoint(1600, 500),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(flur);
+        project.primaryLevel().addRoom(wc);
+        SurfaceLayerStack flurStack = new SurfaceLayerStack(SurfaceType.FLOOR, flur.id().toString());
+        flurStack.addLayer(layer("Fliese", Length.of(50, LengthUnit.CENTIMETER), Length.of(50, LengthUnit.CENTIMETER)));
+        SurfaceLayerStack wcStack = new SurfaceLayerStack(SurfaceType.FLOOR, wc.id().toString());
+        wcStack.addLayer(layer("Fliese", Length.of(50, LengthUnit.CENTIMETER), Length.of(50, LengthUnit.CENTIMETER)));
+        project.primaryLevel().addSurfaceLayerStack(flurStack);
+        project.primaryLevel().addSurfaceLayerStack(wcStack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        MaterialSummary material = report.materials().getFirst();
+        assertEquals(0.6, material.coveredAreaSquareMeters(), 0.001);
+        assertEquals(3, material.requiredPieces());
+        assertEquals(0.75, material.requiredMaterialAreaSquareMeters(), 0.001);
+        assertEquals(2, material.roomEntries().stream().mapToInt(entry -> entry.fullPieces()).sum());
+        assertEquals(2, material.roomEntries().stream().mapToInt(entry -> entry.cutPieces()).sum());
     }
 
     @Test
@@ -111,9 +176,10 @@ class SurfaceMaterialListServiceTest {
 
         MaterialSummary material = report.materials().getFirst();
         assertEquals(3.0, material.coveredAreaSquareMeters(), 0.001);
-        assertEquals(6, material.requiredPieces());
+        assertEquals(3, material.requiredPieces());
         assertTrue(material.cutCount() > 0);
         assertTrue(material.roomEntries().getFirst().surfaceDescription().contains("Innenwand"));
+        assertTrue(report.toMarkdown().contains("Reststücke"));
     }
 
     private SurfaceLayer layer(String name, Length tileWidth, Length tileHeight) {
