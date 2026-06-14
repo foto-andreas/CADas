@@ -419,6 +419,30 @@ class CadWorkbenchTest {
         Assertions.assertEquals(Length.of(92, LengthUnit.MILLIMETER), importedWall.thickness());
     }
 
+    @Test
+    void materiallisteWirdAlsMarkdownExportiertUndNormalisiertExtension() throws Exception {
+        Path projektDatei = erzeugeProjektMitInnenwandfliesenAlsDxf();
+        Path exportPfad = Files.createTempDirectory("cadas-materialliste-").resolve("material.md.md");
+        aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationInvoke("exportSurfaceMaterialReportMarkdown", exportPfad);
+            return null;
+        });
+
+        Path normalisierterPfad = exportPfad.getParent().resolve("material.md");
+        Assertions.assertTrue(Files.exists(normalisierterPfad));
+        String markdown = Files.readString(normalisierterPfad);
+        Assertions.assertTrue(markdown.contains("# Materialliste Beläge"));
+        Assertions.assertTrue(markdown.contains("Fliese"));
+        Assertions.assertTrue(markdown.contains("Komplexität pro Raum"));
+        Assertions.assertTrue(markdown.contains("Schnitte"));
+        Assertions.assertFalse(Files.exists(exportPfad));
+    }
+
     private Path erzeugeEinfachesProjektAlsDxf() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Testhaus", "Erdgeschoss");
         var level = project.primaryLevel();

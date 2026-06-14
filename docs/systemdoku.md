@@ -113,6 +113,8 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 * `UserSurfaceCoveringPresetLibrary` speichert eigene Belags-Presets unter `~/.config/CADas/Belag` als `.cadasbelag` und lädt sie beim Start in die Preset-Auswahl.
 * Registrierte `DWG`-Dateien werden in dasselbe Belagsverzeichnis übernommen und als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
 * Über optionale `.blocks`-Katalogdateien oder manuelle Eingabe lassen sich zusätzlich konkrete DWG-Blocknamen als Oberflächen-Presets registrieren.
+* `SurfaceMaterialListService` erzeugt aus den sichtbaren Belägen eine Materialliste mit Fläche, Stückzahl, Materialfläche, Schnitten und Raum-Komplexität. Boden- und Deckenflächen werden über die orthogonale Raumzerlegung bewertet; Wandbeläge nutzen die vorhandenen maximalen Wandrechtecke mit ausgesparten Türen, Fenstern und anstoßenden Innenwänden.
+* Die Raum-Komplexität steigt mit dem Schnittanteil und mit kurzen Schnittkanten. Schnittkanten werden getrennt gegen die jeweilige Vollplattenkante in Breite oder Höhe bewertet.
 
 ## Dateiformatstrategie
 

@@ -420,6 +420,22 @@ Eigene Beläge werden unter `~/.config/CADas/Belag` gespeichert und beim Start a
 * Existiert ein Preset mit gleichem Namen bereits, fragt CADas vor dem Überschreiben nach.
 * Geladene `DWG`-Bibliotheken werden ebenfalls in dieses Verzeichnis übernommen; vorhandene `.blocks`-Katalogdateien werden mitkopiert.
 
+### Materialliste für Beläge
+
+Über `Berichte` > `Materialliste Beläge anzeigen` öffnest du ein separates Fenster mit einer Markdown-Vorschau der aktuellen Belags-Materialliste.
+
+Die Liste enthält:
+
+* Beschreibung und Werte je Belagstyp
+* belegte Fläche und benötigte Stückzahl
+* Materialfläche auf Basis ganzer Platten oder Fliesen
+* Vollstücke, Zuschnitte und notwendige Schnittanzahl
+* eine Komplexität je Raum
+
+Die Komplexität steigt bei vielen Schnitten und kurzen Kanten. Lange Schnittkanten werden günstiger bewertet; eine Kante in voller Materiallänge ist am besten. Unterschiedliche Kantenlängen des Materials werden dabei getrennt gegen Breite und Höhe der Vollplatte bewertet.
+
+Über `Berichte` > `Materialliste Beläge als Markdown exportieren` speicherst du dieselbe Liste als `.md`-Datei.
+
 ### Treppe
 
 Mit dem Werkzeug `Treppe` ziehst du die rechteckige Grundfläche einer Treppe auf.

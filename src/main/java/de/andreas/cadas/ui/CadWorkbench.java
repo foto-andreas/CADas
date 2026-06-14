@@ -30,6 +30,7 @@ import de.andreas.cadas.application.parts.StairPreset;
 import de.andreas.cadas.application.parts.StandardPartLibrary;
 import de.andreas.cadas.application.parts.StandardPartLibraryService;
 import de.andreas.cadas.application.parts.WindowPreset;
+import de.andreas.cadas.application.reports.SurfaceMaterialListService;
 import de.andreas.cadas.application.room.AutoRoomGenerationService;
 import de.andreas.cadas.application.view.RenderableKind;
 import de.andreas.cadas.application.view.SelectionKey;
@@ -105,6 +106,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
@@ -118,14 +120,17 @@ import javafx.scene.input.PickResult;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.embed.swing.SwingFXUtils;
 
@@ -185,6 +190,7 @@ public final class CadWorkbench extends BorderPane {
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
+    private final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
@@ -710,7 +716,13 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("Nordpfeil anzeigen", showCompass)
         );
 
-        MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu);
+        Menu berichteMenu = new Menu("Berichte");
+        berichteMenu.getItems().addAll(
+                menuItem("Materialliste Beläge anzeigen", this::showSurfaceMaterialReportWindow, null),
+                menuItem("Materialliste Beläge als Markdown exportieren", this::exportSurfaceMaterialReportMarkdown, null)
+        );
+
+        MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu, berichteMenu);
         applyTooltip(menuBar, "Bietet Datei-, Bearbeitungs-, Ansichts- und Werkzeugfunktionen mit passenden Tastaturkürzeln an.");
         return menuBar;
     }
@@ -2931,7 +2943,8 @@ public final class CadWorkbench extends BorderPane {
 
     private void exportCurrentLevel() {
         FileChooser fileChooser = createDxfFileChooser();
-        fileChooser.setInitialFileName(activeLevel.get().name().replace(' ', '_') + ".dxf");
+        String levelName = exchangeFileNameService.stripRepeatedExtension(Path.of(activeLevel.get().name().replace(' ', '_')), ".dxf");
+        fileChooser.setInitialFileName(levelName);
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showSaveDialog(window);
         if (file == null) {
@@ -2952,7 +2965,8 @@ public final class CadWorkbench extends BorderPane {
 
     private void exportProjectAsDxf() {
         FileChooser fileChooser = createDxfFileChooser();
-        fileChooser.setInitialFileName(project.name().replace(' ', '_') + "_Gebaeude.dxf");
+        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".dxf");
+        fileChooser.setInitialFileName(projectName + "_Gebäude");
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showSaveDialog(window);
         if (file == null) {
@@ -2968,6 +2982,52 @@ public final class CadWorkbench extends BorderPane {
             draftLabel.setText("Gebäude-DXF exportiert: " + exportPath.getFileName());
         } catch (Exception exception) {
             draftLabel.setText("Gebäude-DXF-Export fehlgeschlagen: " + exception.getMessage());
+        }
+    }
+
+    private void showSurfaceMaterialReportWindow() {
+        String markdown = surfaceMaterialListService.create(project).toMarkdown();
+        TextArea reportText = new TextArea(markdown);
+        reportText.setEditable(false);
+        reportText.setWrapText(false);
+        reportText.setStyle("-fx-font-family: 'Menlo', 'Monaco', monospace; -fx-font-size: 12px;");
+        VBox.setVgrow(reportText, Priority.ALWAYS);
+        Button exportButton = new Button("Markdown exportieren");
+        exportButton.setOnAction(event -> exportSurfaceMaterialReportMarkdown());
+        applyTooltip(exportButton, "Exportiert genau diese Materialliste als Markdown-Datei.");
+        VBox container = new VBox(10.0, reportText, exportButton);
+        container.setPadding(new Insets(12));
+        Stage stage = new Stage();
+        stage.setTitle("Materialliste Beläge");
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        if (owner != null) {
+            stage.initOwner(owner);
+        }
+        stage.setScene(new Scene(container, 920, 680));
+        stage.show();
+    }
+
+    private void exportSurfaceMaterialReportMarkdown() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Materialliste als Markdown speichern");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Markdown-Dateien", "*.md"));
+        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".dxf");
+        fileChooser.setInitialFileName(projectName + "_Materialliste_Beläge");
+        Window window = getScene() != null ? getScene().getWindow() : null;
+        java.io.File file = fileChooser.showSaveDialog(window);
+        if (file == null) {
+            return;
+        }
+        exportSurfaceMaterialReportMarkdown(file.toPath());
+    }
+
+    private void exportSurfaceMaterialReportMarkdown(Path targetFile) {
+        try {
+            Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".md");
+            Files.writeString(exportPath, surfaceMaterialListService.create(project).toMarkdown());
+            draftLabel.setText("Materialliste exportiert: " + exportPath.getFileName());
+        } catch (Exception exception) {
+            draftLabel.setText("Materiallisten-Export fehlgeschlagen: " + exception.getMessage());
         }
     }
 
@@ -4554,6 +4614,7 @@ public final class CadWorkbench extends BorderPane {
             case "importProjectDxf" -> importProjectFromDxf(requirePath(path, actionName));
             case "exportLevelDxf" -> exportCurrentLevel(requirePath(path, actionName));
             case "importLevelDxf" -> importLevel(requirePath(path, actionName));
+            case "exportSurfaceMaterialReportMarkdown" -> exportSurfaceMaterialReportMarkdown(requirePath(path, actionName));
             case "importPartLibrary" -> importPartLibrary(requirePath(path, actionName));
             case "exportWorkbenchSnapshot" -> exportWorkbenchSnapshot(requirePath(path, actionName));
             case "exportThreeDSnapshot" -> {

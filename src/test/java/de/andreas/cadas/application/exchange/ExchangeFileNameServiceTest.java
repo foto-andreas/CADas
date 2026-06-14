@@ -20,6 +20,10 @@ class ExchangeFileNameServiceTest {
                 Path.of("Erdgeschoss.dxf"),
                 fileNameService.ensureSingleExtension(Path.of("Erdgeschoss"), ".dxf")
         );
+        assertEquals(
+                Path.of("Materialliste.md"),
+                fileNameService.ensureSingleExtension(Path.of("Materialliste.md.md"), ".md")
+        );
     }
 
     @Test
