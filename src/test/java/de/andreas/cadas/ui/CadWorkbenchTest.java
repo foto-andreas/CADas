@@ -303,6 +303,31 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void dreiDViewportAnsichtWechseltAusInnenansichtZurOrbitAnsicht() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetWorkspace("INTERIOR");
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot innen = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertTrue(innen.threeDCameraStatus().contains("3D Innenansicht:"));
+
+        WorkbenchAutomationSnapshot orbit = aufFxThread(() -> {
+            workbench.automationInvoke("threeDViewportReset", null);
+            return workbench.automationSnapshot();
+        });
+
+        Assertions.assertTrue(orbit.threeDCameraStatus().contains("3D Ansicht:"));
+        Assertions.assertFalse(orbit.threeDCameraStatus().contains("Innenansicht"));
+    }
+
+    @Test
     void einheitenwechselKonvertiertSichtbarenWertOhneLängenänderung() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

@@ -111,6 +111,7 @@ public final class ThreeDViewport extends BorderPane {
     private final Label sceneHintLabel = new Label("Die 3D-Ansicht wird gefüllt, sobald auf der aktiven Etage Wände, Räume oder Treppen vorhanden sind.");
     private final Map<String, BooleanProperty> levelVisibility = new LinkedHashMap<>();
     private final Consumer<SelectionKey> selectionConsumer;
+    private final Runnable orbitViewActivationConsumer;
 
     private ProjectModel currentProject;
     private CameraPose cameraPose = viewPreparation.defaultPose();
@@ -137,8 +138,9 @@ public final class ThreeDViewport extends BorderPane {
     private double dragStartInteriorEyeXMillimeters;
     private double dragStartInteriorEyeZMillimeters;
 
-    public ThreeDViewport(Consumer<SelectionKey> selectionConsumer) {
+    public ThreeDViewport(Consumer<SelectionKey> selectionConsumer, Runnable orbitViewActivationConsumer) {
         this.selectionConsumer = selectionConsumer;
+        this.orbitViewActivationConsumer = orbitViewActivationConsumer;
         configureCameras();
         configureScene();
         configureControls();
@@ -207,6 +209,7 @@ public final class ThreeDViewport extends BorderPane {
     public void applyViewPreset(ThreeDViewPreset viewPreset) {
         cameraMode = CameraMode.ORBIT;
         interiorTarget = null;
+        orbitViewActivationConsumer.run();
         cameraPose = viewPreparation.poseForAngles(
                 currentProjectionMode(),
                 viewPreset.cameraAzimuthDegrees(),
@@ -223,6 +226,7 @@ public final class ThreeDViewport extends BorderPane {
     public void resetToDefaultView() {
         cameraMode = CameraMode.ORBIT;
         interiorTarget = null;
+        orbitViewActivationConsumer.run();
         ProjectionMode projectionMode = currentProjectionMode();
         CameraPose defaultPose = viewPreparation.defaultPose();
         cameraPose = new CameraPose(

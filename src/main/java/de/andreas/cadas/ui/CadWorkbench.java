@@ -291,7 +291,7 @@ public final class CadWorkbench extends BorderPane {
     private final ObservableList<WindowPreset> availableWindowPresets = FXCollections.observableArrayList();
     private final ObservableList<StairPreset> availableStairPresets = FXCollections.observableArrayList();
     private final ObservableList<SurfaceCoveringPreset> availableSurfacePresets = FXCollections.observableArrayList();
-    private final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection);
+    private final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection, this::switchToThreeDWorkspaceFromViewport);
     private final ViewProjectionService projectionService = new ViewProjectionService();
     private final ProjectedModelBoundsService projectedBoundsService = new ProjectedModelBoundsService();
     private final UndoRedoStack<WorkbenchSnapshot> history = new UndoRedoStack<>();
@@ -340,6 +340,7 @@ public final class CadWorkbench extends BorderPane {
     private GuideOrientation pendingGuideOrientation;
     private double pendingGuideWorldMillimeters;
     private boolean threeDDirty = true;
+    private boolean keepViewportOrbitPoseOnNextThreeDActivation;
     private boolean historyCapturedForDrag;
     private PlanPoint selectionDragAnchor;
     private List<Wall> selectionDragBaseWalls = List.of();
@@ -412,7 +413,11 @@ public final class CadWorkbench extends BorderPane {
         activeWorkspaceMode.addListener((ignored, oldValue, newValue) -> {
             updateWorkspaceMode();
             if (newValue == WorkspaceMode.THREE_D) {
-                threeDViewport.activateOrbitView();
+                if (keepViewportOrbitPoseOnNextThreeDActivation) {
+                    keepViewportOrbitPoseOnNextThreeDActivation = false;
+                } else {
+                    threeDViewport.activateOrbitView();
+                }
                 refreshThreeDIfNeeded();
             } else if (newValue == WorkspaceMode.INTERIOR) {
                 if (!activateInteriorViewForCurrentRoom()) {
@@ -644,6 +649,14 @@ public final class CadWorkbench extends BorderPane {
         drawingArea.setManaged(showTwoD);
         threeDViewport.setVisible(!showTwoD);
         threeDViewport.setManaged(!showTwoD);
+    }
+
+    private void switchToThreeDWorkspaceFromViewport() {
+        if (activeWorkspaceMode.get() == WorkspaceMode.THREE_D) {
+            return;
+        }
+        keepViewportOrbitPoseOnNextThreeDActivation = true;
+        activeWorkspaceMode.set(WorkspaceMode.THREE_D);
     }
 
     private boolean activateInteriorViewForCurrentRoom() {
@@ -4735,6 +4748,10 @@ public final class CadWorkbench extends BorderPane {
             case "threeDReset" -> {
                 activeWorkspaceMode.set(WorkspaceMode.THREE_D);
                 updateWorkspaceMode();
+                refreshThreeDIfNeeded();
+                threeDViewport.resetToDefaultView();
+            }
+            case "threeDViewportReset" -> {
                 refreshThreeDIfNeeded();
                 threeDViewport.resetToDefaultView();
             }
