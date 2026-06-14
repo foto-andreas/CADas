@@ -1631,7 +1631,11 @@ public final class CadWorkbench extends BorderPane {
         if (wallLength <= 0.0) {
             return;
         }
-        List<WallSurfaceInterval> visibleIntervals = wallSurfaceOpeningService.visiblePlanIntervals(activeLevel.get(), wall);
+        List<WallSurfaceInterval> visibleIntervals = wallSurfaceOpeningService.visiblePlanIntervals(
+                activeLevel.get(),
+                wall,
+                wallSurfaceOpeningRenderClearanceMillimeters()
+        );
         if (visibleIntervals.isEmpty()) {
             return;
         }
@@ -1642,6 +1646,10 @@ public final class CadWorkbench extends BorderPane {
         }
         drawWallSurfaceJointsInPlan(graphics, wall, layer, centerOffset, visibleIntervals);
         graphics.restore();
+    }
+
+    private double wallSurfaceOpeningRenderClearanceMillimeters() {
+        return Math.max(2.0, Math.min(8.0, 1.0 / scale()));
     }
 
     private void fillWallSurfaceIntervalInPlan(

@@ -47,10 +47,15 @@ public final class WallSurfaceOpeningService {
     }
 
     public List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall) {
+        return visiblePlanIntervals(level, wall, 0.0);
+    }
+
+    public List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall, double openingEdgeClearanceMillimeters) {
         double wallLength = wall.axis().length().toMillimeters();
         if (wallLength <= EPSILON) {
             return List.of();
         }
+        double edgeClearance = Math.max(0.0, openingEdgeClearanceMillimeters);
         List<WallOpeningRectangle> openings = openingRectangles(level, wall);
         if (openings.isEmpty()) {
             return List.of(new WallSurfaceInterval(0.0, wallLength));
@@ -59,10 +64,11 @@ public final class WallSurfaceOpeningService {
         List<WallSurfaceInterval> intervals = new ArrayList<>();
         double cursor = 0.0;
         for (WallSurfaceInterval opening : mergedOpenings) {
-            if (opening.startMillimeters() - cursor > EPSILON) {
-                intervals.add(new WallSurfaceInterval(cursor, opening.startMillimeters()));
+            double intervalEnd = Math.max(cursor, opening.startMillimeters() - edgeClearance);
+            if (intervalEnd - cursor > EPSILON) {
+                intervals.add(new WallSurfaceInterval(cursor, intervalEnd));
             }
-            cursor = Math.max(cursor, opening.endMillimeters());
+            cursor = Math.max(cursor, Math.min(wallLength, opening.endMillimeters() + edgeClearance));
         }
         if (wallLength - cursor > EPSILON) {
             intervals.add(new WallSurfaceInterval(cursor, wallLength));

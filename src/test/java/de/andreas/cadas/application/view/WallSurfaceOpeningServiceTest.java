@@ -94,6 +94,39 @@ class WallSurfaceOpeningServiceTest {
         assertTrue(intervals.stream().anyMatch(interval -> intervalMatches(interval, 3400.0, 4000.0)));
     }
 
+    @Test
+    void draufsichtIntervalleMitSicherheitskanteHaltenAbstandZuÖffnungen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        level.addDoor(Door.create(
+                wall.id(),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(2.1, LengthUnit.METER),
+                Length.zero()
+        ));
+        level.addWindow(WindowElement.create(
+                wall.id(),
+                Length.of(2.4, LengthUnit.METER),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(1.2, LengthUnit.METER)
+        ));
+
+        List<WallSurfaceInterval> intervals = service.visiblePlanIntervals(level, wall, 5.0);
+
+        assertEquals(3, intervals.size());
+        assertTrue(intervals.stream().anyMatch(interval -> intervalMatches(interval, 0.0, 995.0)));
+        assertTrue(intervals.stream().anyMatch(interval -> intervalMatches(interval, 1905.0, 2395.0)));
+        assertTrue(intervals.stream().anyMatch(interval -> intervalMatches(interval, 3405.0, 4000.0)));
+    }
+
     private boolean rectangleMatches(WallSurfaceRectangle rectangle, double start, double end, double lower, double upper) {
         return Math.abs(rectangle.startMillimeters() - start) < 0.001
                 && Math.abs(rectangle.endMillimeters() - end) < 0.001
