@@ -14,11 +14,16 @@ import java.util.stream.Collectors;
 
 public final class SelectionTranslationService {
 
+    private static final double EPSILON = 0.001;
+
     public TranslationResult translate(Level level, Set<SelectionKey> selections, double deltaXMillimeters, double deltaYMillimeters) {
         Set<String> selectedWalls = selectedIds(selections, RenderableKind.WALL);
         Set<String> selectedStairs = selectedIds(selections, RenderableKind.STAIR);
+        List<PlanPoint> translatedWallEndpoints = selectedWallEndpoints(level, selectedWalls);
         List<Wall> translatedWalls = level.walls().stream()
-                .map(wall -> selectedWalls.contains(wall.id().toString()) ? translateWall(wall, deltaXMillimeters, deltaYMillimeters) : wall)
+                .map(wall -> selectedWalls.contains(wall.id().toString())
+                        ? translateWall(wall, deltaXMillimeters, deltaYMillimeters)
+                        : translateConnectedEndpoints(wall, translatedWallEndpoints, deltaXMillimeters, deltaYMillimeters))
                 .toList();
         List<Staircase> translatedStairs = level.staircases().stream()
                 .map(staircase -> selectedStairs.contains(staircase.id().toString()) ? translateStair(staircase, deltaXMillimeters, deltaYMillimeters) : staircase)
@@ -34,6 +39,13 @@ public final class SelectionTranslationService {
                 .collect(Collectors.toSet());
     }
 
+    private List<PlanPoint> selectedWallEndpoints(Level level, Set<String> selectedWalls) {
+        return level.walls().stream()
+                .filter(wall -> selectedWalls.contains(wall.id().toString()))
+                .flatMap(wall -> List.of(wall.axis().start(), wall.axis().end()).stream())
+                .toList();
+    }
+
     private Wall translateWall(Wall wall, double deltaXMillimeters, double deltaYMillimeters) {
         return new Wall(
                 wall.id(),
@@ -46,6 +58,35 @@ public final class SelectionTranslationService {
                 wall.startHeight(),
                 wall.endHeight()
         );
+    }
+
+    private Wall translateConnectedEndpoints(Wall wall, List<PlanPoint> translatedWallEndpoints, double deltaXMillimeters, double deltaYMillimeters) {
+        PlanPoint start = isConnectedToAny(wall.axis().start(), translatedWallEndpoints)
+                ? translatePoint(wall.axis().start(), deltaXMillimeters, deltaYMillimeters)
+                : wall.axis().start();
+        PlanPoint end = isConnectedToAny(wall.axis().end(), translatedWallEndpoints)
+                ? translatePoint(wall.axis().end(), deltaXMillimeters, deltaYMillimeters)
+                : wall.axis().end();
+        if (start == wall.axis().start() && end == wall.axis().end()) {
+            return wall;
+        }
+        return new Wall(
+                wall.id(),
+                new PlanSegment(start, end),
+                wall.thickness(),
+                wall.height(),
+                wall.startHeight(),
+                wall.endHeight()
+        );
+    }
+
+    private boolean isConnectedToAny(PlanPoint point, List<PlanPoint> endpoints) {
+        return endpoints.stream().anyMatch(endpoint -> samePoint(point, endpoint));
+    }
+
+    private boolean samePoint(PlanPoint first, PlanPoint second) {
+        return Math.abs(first.xMillimeters() - second.xMillimeters()) <= EPSILON
+                && Math.abs(first.yMillimeters() - second.yMillimeters()) <= EPSILON;
     }
 
     private Staircase translateStair(Staircase staircase, double deltaXMillimeters, double deltaYMillimeters) {

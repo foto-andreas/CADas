@@ -56,4 +56,49 @@ class SelectionTranslationServiceTest {
         assertEquals(820.0, result.staircases().getFirst().firstCorner().xMillimeters(), 0.001);
         assertEquals(320.0, result.staircases().getFirst().firstCorner().yMillimeters(), 0.001);
     }
+
+    @Test
+    void verschiebtAngrenzendeWandendenMitAusgewaehlterWand() {
+        Level level = new Level("Erdgeschoss");
+        Wall oben = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        Wall rechts = Wall.create(
+                new PlanSegment(new PlanPoint(4000, 0), new PlanPoint(4000, 3000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        Wall unten = Wall.create(
+                new PlanSegment(new PlanPoint(4000, 3000), new PlanPoint(0, 3000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        Wall links = Wall.create(
+                new PlanSegment(new PlanPoint(0, 3000), new PlanPoint(0, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(oben);
+        level.addWall(rechts);
+        level.addWall(unten);
+        level.addWall(links);
+
+        SelectionTranslationService.TranslationResult result = translationService.translate(
+                level,
+                Set.of(new SelectionKey(RenderableKind.WALL, level.name(), oben.id().toString())),
+                0.0,
+                500.0
+        );
+
+        assertEquals(500.0, result.walls().get(0).axis().start().yMillimeters(), 0.001);
+        assertEquals(500.0, result.walls().get(0).axis().end().yMillimeters(), 0.001);
+        assertEquals(500.0, result.walls().get(1).axis().start().yMillimeters(), 0.001);
+        assertEquals(3000.0, result.walls().get(1).axis().end().yMillimeters(), 0.001);
+        assertEquals(3000.0, result.walls().get(2).axis().start().yMillimeters(), 0.001);
+        assertEquals(3000.0, result.walls().get(2).axis().end().yMillimeters(), 0.001);
+        assertEquals(3000.0, result.walls().get(3).axis().start().yMillimeters(), 0.001);
+        assertEquals(500.0, result.walls().get(3).axis().end().yMillimeters(), 0.001);
+    }
 }
