@@ -34,13 +34,13 @@ public final class AutoRoomGenerationService {
         }
         List<DetectedRoom> loopRooms = detectRoomsFromWallLoops(level);
         if (!loopRooms.isEmpty()) {
-            return matchWithExistingRooms(level.rooms(), loopRooms, defaults, level.walls());
+            return matchWithExistingRooms(level, loopRooms, defaults);
         }
         List<WallRectangle> wallRectangles = wallRectangles(level);
         if (wallRectangles.size() == level.walls().size()) {
             List<DetectedRoom> detectedRooms = detectRooms(wallRectangles);
             if (!detectedRooms.isEmpty()) {
-                return matchWithExistingRooms(level.rooms(), detectedRooms, defaults, level.walls());
+                return matchWithExistingRooms(level, detectedRooms, defaults);
             }
         }
         return List.of();
@@ -433,13 +433,14 @@ public final class AutoRoomGenerationService {
         return Optional.of(new PlanPoint(intersectionX, intersectionY));
     }
 
-    private List<Room> matchWithExistingRooms(List<Room> existingRooms, List<DetectedRoom> detectedRooms, RoomDefaults defaults, List<Wall> walls) {
+    private List<Room> matchWithExistingRooms(Level level, List<DetectedRoom> detectedRooms, RoomDefaults defaults) {
+        List<Room> existingRooms = level.rooms();
         List<Room> updatedRooms = new ArrayList<>();
         Set<UUID> matchedIds = new HashSet<>();
         int roomIndex = 1;
         for (DetectedRoom detectedRoom : detectedRooms) {
             List<Length> vertexHeights = detectedRoom.vertexHeights().isEmpty()
-                    ? deriveVertexHeights(detectedRoom.outline(), walls, defaults.roomHeight())
+                    ? deriveVertexHeights(level, detectedRoom.outline(), defaults.roomHeight())
                     : detectedRoom.vertexHeights();
             Length derivedRoomHeight = Length.ofMillimeters(vertexHeights.stream().mapToDouble(Length::toMillimeters).max().orElse(defaults.roomHeight().toMillimeters()));
             Optional<Room> matchedRoom = existingRooms.stream()
@@ -485,7 +486,7 @@ public final class AutoRoomGenerationService {
         return vertexHeights.stream().anyMatch(length -> Math.abs(length.toMillimeters() - reference) > EPSILON);
     }
 
-    private List<Length> deriveVertexHeights(List<PlanPoint> outline, List<Wall> walls, Length defaultHeight) {
+    private List<Length> deriveVertexHeights(Level level, List<PlanPoint> outline, Length defaultHeight) {
         if (outline.isEmpty()) {
             return List.of();
         }
@@ -493,9 +494,11 @@ public final class AutoRoomGenerationService {
         for (PlanPoint point : outline) {
             double sum = 0.0;
             int count = 0;
-            for (Wall wall : walls) {
+            for (Wall wall : level.walls()) {
                 double distance = wall.axis().distanceTo(point).toMillimeters();
-                double tolerance = wall.thickness().toMillimeters() / 2.0 + 40.0;
+                double tolerance = wall.thickness().toMillimeters() / 2.0
+                        + surfaceLayerEffectService.maximumWallInteriorThicknessMillimeters(level, wall)
+                        + 40.0;
                 if (distance > tolerance) {
                     continue;
                 }

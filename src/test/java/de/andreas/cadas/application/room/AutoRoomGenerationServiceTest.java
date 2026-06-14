@@ -189,6 +189,42 @@ class AutoRoomGenerationServiceTest {
     }
 
     @Test
+    void leitetEckhoehenAuchBeiSichtbarenInnenwandlagenAb() {
+        Level level = new Level("Erdgeschoss");
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 0),
+                new PlanPoint(4000, 3000),
+                new PlanPoint(0, 3000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+        level.replaceWalls(List.of(
+                level.walls().get(0).withEndpointHeights(Length.of(3.2, LengthUnit.METER), Length.of(2.6, LengthUnit.METER)),
+                level.walls().get(1).withEndpointHeights(Length.of(2.6, LengthUnit.METER), Length.of(2.6, LengthUnit.METER)),
+                level.walls().get(2).withEndpointHeights(Length.of(2.6, LengthUnit.METER), Length.of(2.6, LengthUnit.METER)),
+                level.walls().get(3).withEndpointHeights(Length.of(2.6, LengthUnit.METER), Length.of(3.2, LengthUnit.METER))
+        ));
+        for (Wall wall : level.walls()) {
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, wall.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Dämmplatte",
+                    Length.of(8, LengthUnit.CENTIMETER),
+                    Length.of(120, LengthUnit.CENTIMETER),
+                    Length.of(60, LengthUnit.CENTIMETER),
+                    Length.zero()
+            ));
+            level.addSurfaceLayerStack(stack);
+        }
+
+        List<Room> rooms = service.synchronize(level, flatDefaults());
+
+        assertEquals(1, rooms.size());
+        Room room = rooms.getFirst();
+        assertTrue(room.hasVariableCeilingHeights());
+        assertTrue(room.maximumCeilingHeightMillimeters() > 3150.0);
+        assertTrue(room.minimumCeilingHeightMillimeters() < 2650.0);
+    }
+
+    @Test
     void summiertMehrereSichtbareWandlagenIterativUndIgnoriertVersteckte() {
         Level level = new Level("Erdgeschoss");
         addLoop(level, List.of(
@@ -276,6 +312,16 @@ class AutoRoomGenerationServiceTest {
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER),
                 new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.of(1.0, LengthUnit.METER))
+        );
+    }
+
+    private AutoRoomGenerationService.RoomDefaults flatDefaults() {
+        return new AutoRoomGenerationService.RoomDefaults(
+                "Raum",
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER),
+                null
         );
     }
 
