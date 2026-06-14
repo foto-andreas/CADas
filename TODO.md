@@ -162,3 +162,6 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Aktuell gibt es Fundamente unter den Wänden, der Boden ist leer und mit etwas Abstand unter dem Haus ist eine Ebene, die wie Fußboden aussieht.
 - [x] "Rückgängig" (ggf. auch "Wiederherstellen") ändert ungewollt Zoom und Position
 - [x] Ich glaube, der Raum-Eintrag in der Werkzeug-Combobox ist überflüssig. Eigentlich haben wir doch Räume nur als "Nebenprodukt" und nur zur Anzeige/Bemaßung. Erstellen durch Automatik wie jetzt und Anzeige ist ok. Aber man wird vermutlich keinen Raum direkt zeichnen wollen
+
+
+- [x] Eigene Beläge über einen Button neben dem Namen als Presets unter `~/.config/CADas/Belag` speichern, beim Überschreiben nachfragen, beim Start wieder laden und DWG-Bibliotheken samt `.blocks`-Katalogen in dasselbe Konfig-Verzeichnis übernehmen.

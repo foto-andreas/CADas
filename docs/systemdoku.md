@@ -110,7 +110,8 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 * Sichtbare Innen- und Außenwand-Beläge werden in der 2D-Grundrissansicht als Belagsstreifen, in Seitenansichten als Raster und in 3D mit Fugen auf der Wandoberfläche gerendert.
 * Türen und Fenster schneiden Wandbeläge aus. Die sichtbaren Belagsflächen werden als maximale Rechtecke zerlegt; das Kachelraster läuft über virtuelle Rechteckgrenzen hinweg und wird nur an echten Öffnungskanten geklippt.
 * Sichtbare Boden- und Deckenlagen verringern die lichte Raumhöhe und beeinflussen Volumen sowie 3D-Ableitung.
-* Registrierte `DWG`-Dateien werden als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
+* `UserSurfaceCoveringPresetLibrary` speichert eigene Belags-Presets unter `~/.config/CADas/Belag` als `.cadasbelag` und lädt sie beim Start in die Preset-Auswahl.
+* Registrierte `DWG`-Dateien werden in dasselbe Belagsverzeichnis übernommen und als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
 * Über optionale `.blocks`-Katalogdateien oder manuelle Eingabe lassen sich zusätzlich konkrete DWG-Blocknamen als Oberflächen-Presets registrieren.
 
 ## Dateiformatstrategie

@@ -21,6 +21,7 @@ import de.andreas.cadas.application.layers.SurfaceLayerConsistencyService;
 import de.andreas.cadas.application.layers.TileLayoutRequest;
 import de.andreas.cadas.application.layers.TileLayoutService;
 import de.andreas.cadas.application.layers.TilePlacement;
+import de.andreas.cadas.application.layers.UserSurfaceCoveringPresetLibrary;
 import de.andreas.cadas.application.layers.WallSurfaceSideService;
 import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
 import de.andreas.cadas.application.parts.DoorPreset;
@@ -61,6 +62,7 @@ import de.andreas.cadas.infrastructure.dxf.DxfLevelExchangeService;
 import de.andreas.cadas.infrastructure.dxf.DxfProjectExchangeService;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -180,6 +182,8 @@ public final class CadWorkbench extends BorderPane {
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
+    private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
+    private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
@@ -293,6 +297,7 @@ public final class CadWorkbench extends BorderPane {
     private final Button toggleSurfaceLayerVisibilityButton = new Button("Sichtbarkeit umschalten");
     private final Button moveSurfaceLayerUpButton = new Button("Nach oben");
     private final Button moveSurfaceLayerDownButton = new Button("Nach unten");
+    private final Button saveSurfacePresetButton = new Button("Speichern");
     private final Button addDwgBlockPresetButton = new Button("DWG-Block hinzufügen");
     private final ContextMenu selectionContextMenu = new ContextMenu();
     private final Label cadLibrarySummaryLabel = new Label("Keine externen CAD-Bibliotheken registriert.");
@@ -411,6 +416,7 @@ public final class CadWorkbench extends BorderPane {
             updateStatus();
         });
         configureActionButtons();
+        registerConfiguredDwgLibraries();
         registerBundledDwgLibraries();
     }
 
@@ -773,7 +779,7 @@ public final class CadWorkbench extends BorderPane {
                         surfaceLayerList,
                         surfaceLayerCoverageLabel,
                         new Separator(),
-                        propertyRow("Name", surfaceLayerNameField),
+                        propertyRow("Name", surfaceLayerNameField, saveSurfacePresetButton),
                         propertyRow("Dicke", surfaceLayerThicknessField, surfaceLayerThicknessUnit),
                         propertyRow("Modulbreite", surfaceTileWidthField, surfaceTileWidthUnit),
                         propertyRow("Modulhöhe", surfaceTileHeightField, surfaceTileHeightUnit),
@@ -839,6 +845,7 @@ public final class CadWorkbench extends BorderPane {
         toggleSurfaceLayerVisibilityButton.setOnAction(event -> toggleSurfaceLayerVisibility());
         moveSurfaceLayerUpButton.setOnAction(event -> moveSurfaceLayer(-1));
         moveSurfaceLayerDownButton.setOnAction(event -> moveSurfaceLayer(1));
+        saveSurfacePresetButton.setOnAction(event -> saveCurrentSurfacePreset());
         addDwgBlockPresetButton.setOnAction(event -> addDwgBlockPreset());
         rebuildSelectionContextMenu();
         applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
@@ -853,6 +860,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(toggleSurfaceLayerVisibilityButton, "Schaltet die Sichtbarkeit des markierten Belags um und passt Raumwirkung sowie 3D-Darstellung direkt an.");
         applyTooltip(moveSurfaceLayerUpButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach oben.");
         applyTooltip(moveSurfaceLayerDownButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach unten.");
+        applyTooltip(saveSurfacePresetButton, "Speichert die aktuell eingetragenen Belagswerte als eigenes Preset unter `~/.config/CADas/Belag`, fragt vor dem Überschreiben nach und fügt das Preset der Auswahl hinzu.");
         applyTooltip(addDwgBlockPresetButton, "Registriert für die aktuell ausgewählte DWG-Bibliothek einen konkreten Blocknamen als auswählbares Oberflächen-Preset.");
         applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf, die für spätere Teileverwendung vorgemerkt sind.");
     }
@@ -1048,7 +1056,8 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void initializeSurfaceLayerControls() {
-        availableSurfacePresets.setAll(new SurfaceCoveringPresetService().defaults());
+        availableSurfacePresets.setAll(surfaceCoveringPresetService.defaults());
+        loadUserSurfacePresets();
         surfacePresetSelector.setItems(availableSurfacePresets);
         if (!availableSurfacePresets.isEmpty()) {
             surfacePresetSelector.setValue(availableSurfacePresets.getFirst());
@@ -1070,13 +1079,29 @@ public final class CadWorkbench extends BorderPane {
 
     private void registerBundledDwgLibraries() {
         Path workspaceRoot = Path.of("").toAbsolutePath();
-        try {
-            Files.list(workspaceRoot)
+        try (var files = Files.list(workspaceRoot)) {
+            files
                     .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".dwg"))
                     .sorted()
-                    .forEach(this::registerDwgLibrary);
+                    .forEach(path -> registerDwgLibrary(path, false));
         } catch (IOException ignored) {
             // Fallback: keine automatische DWG-Registrierung möglich.
+        }
+    }
+
+    private void loadUserSurfacePresets() {
+        try {
+            userSurfacePresetLibrary.loadPresets().forEach(this::registerSurfacePreset);
+        } catch (RuntimeException | IOException exception) {
+            draftLabel.setText("Eigene Belagspresets konnten nicht geladen werden: " + exception.getMessage());
+        }
+    }
+
+    private void registerConfiguredDwgLibraries() {
+        try {
+            userSurfacePresetLibrary.loadCadLibraries().forEach(path -> registerDwgLibrary(path, false));
+        } catch (IOException exception) {
+            draftLabel.setText("Gespeicherte DWG-Bibliotheken konnten nicht geladen werden: " + exception.getMessage());
         }
     }
 
@@ -3037,7 +3062,7 @@ public final class CadWorkbench extends BorderPane {
     private void importPartLibrary(Path sourceFile) {
         String fileName = sourceFile.getFileName().toString();
         if (fileName.toLowerCase(Locale.ROOT).endsWith(".dwg")) {
-            registerDwgLibrary(sourceFile);
+            registerDwgLibrary(sourceFile, true);
             draftLabel.setText("DWG-Bibliothek geladen und für Ebenen verfügbar: " + fileName);
             return;
         }
@@ -3076,16 +3101,47 @@ public final class CadWorkbench extends BorderPane {
                 .orElse("Keine externen CAD-Bibliotheken registriert."));
     }
 
-    private void registerDwgLibrary(Path sourceFile) {
-        if (!cadLibraryReferences.contains(sourceFile)) {
-            cadLibraryReferences.add(sourceFile);
+    private void registerDwgLibrary(Path sourceFile, boolean askBeforeOverwrite) {
+        Path registeredFile = configuredCadLibraryPath(sourceFile, askBeforeOverwrite);
+        if (!cadLibraryReferences.contains(registeredFile)) {
+            cadLibraryReferences.add(registeredFile);
         }
-        SurfaceCoveringPreset dwgPreset = new SurfaceCoveringPresetService().fromDwg(sourceFile);
+        SurfaceCoveringPreset dwgPreset = surfaceCoveringPresetService.fromDwg(registeredFile);
         registerSurfacePreset(dwgPreset);
-        dwgBlockCatalogService.loadCatalog(sourceFile).forEach(blockName -> registerDwgBlockPreset(sourceFile, blockName));
+        dwgBlockCatalogService.loadCatalog(registeredFile).forEach(blockName -> registerDwgBlockPreset(registeredFile, blockName));
         updateCadLibrarySummary();
         if (surfacePresetSelector.getValue() == null) {
             surfacePresetSelector.setValue(dwgPreset);
+        }
+    }
+
+    private Path configuredCadLibraryPath(Path sourceFile, boolean askBeforeOverwrite) {
+        boolean overwrite = askBeforeOverwrite && shouldOverwriteConfiguredCadLibrary(sourceFile);
+        try {
+            return userSurfacePresetLibrary.copyCadLibrary(sourceFile, overwrite);
+        } catch (IOException exception) {
+            draftLabel.setText("DWG-Bibliothek konnte nicht in das Belagsverzeichnis übernommen werden: " + exception.getMessage());
+            return sourceFile.toAbsolutePath().normalize();
+        }
+    }
+
+    private boolean shouldOverwriteConfiguredCadLibrary(Path sourceFile) {
+        Path targetFile = userSurfacePresetLibrary.libraryDirectory().resolve(sourceFile.getFileName()).toAbsolutePath().normalize();
+        if (!Files.exists(targetFile) || isSameFile(sourceFile, targetFile)) {
+            return false;
+        }
+        return confirmOverwrite(
+                "DWG-Bibliothek überschreiben",
+                "Die DWG-Bibliothek `" + sourceFile.getFileName() + "` ist im Belagsverzeichnis bereits vorhanden.",
+                "Soll die vorhandene Datei durch die neu gewählte DWG ersetzt werden?"
+        );
+    }
+
+    private boolean isSameFile(Path first, Path second) {
+        try {
+            return Files.exists(first) && Files.exists(second) && Files.isSameFile(first, second);
+        } catch (IOException exception) {
+            return false;
         }
     }
 
@@ -3106,7 +3162,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private SurfaceCoveringPreset registerDwgBlockPreset(Path sourceFile, String blockName) {
-        SurfaceCoveringPreset preset = new SurfaceCoveringPresetService().fromDwgBlock(sourceFile, blockName);
+        SurfaceCoveringPreset preset = surfaceCoveringPresetService.fromDwgBlock(sourceFile, blockName);
         registerSurfacePreset(preset);
         return availableSurfacePresets.stream()
                 .filter(candidate -> candidate.coveringSource().equals(preset.coveringSource()))
@@ -3115,10 +3171,65 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void registerSurfacePreset(SurfaceCoveringPreset preset) {
-        boolean exists = availableSurfacePresets.stream().anyMatch(candidate -> candidate.coveringSource().equals(preset.coveringSource()));
-        if (!exists) {
-            availableSurfacePresets.add(preset);
+        for (int index = 0; index < availableSurfacePresets.size(); index++) {
+            if (availableSurfacePresets.get(index).coveringSource().equals(preset.coveringSource())) {
+                availableSurfacePresets.set(index, preset);
+                return;
+            }
         }
+        availableSurfacePresets.add(preset);
+    }
+
+    private void saveCurrentSurfacePreset() {
+        SurfaceCoveringPreset preset = currentSurfacePresetFromInputs();
+        boolean overwrite = false;
+        if (userSurfacePresetLibrary.containsPresetName(preset.name())) {
+            overwrite = confirmOverwrite(
+                    "Belagspreset überschreiben",
+                    "Der Belag `" + preset.name() + "` ist in der Benutzerbibliothek bereits vorhanden.",
+                    "Soll das vorhandene Preset durch die aktuell eingetragenen Werte ersetzt werden?"
+            );
+            if (!overwrite) {
+                draftLabel.setText("Belagspreset nicht gespeichert.");
+                return;
+            }
+        }
+        try {
+            SurfaceCoveringPreset savedPreset = userSurfacePresetLibrary.savePreset(preset, overwrite);
+            registerSurfacePreset(savedPreset);
+            surfacePresetSelector.setValue(savedPreset);
+            draftLabel.setText("Belagspreset gespeichert: " + savedPreset.name());
+        } catch (FileAlreadyExistsException exception) {
+            draftLabel.setText("Belagspreset existiert bereits und wurde nicht überschrieben.");
+        } catch (IOException exception) {
+            draftLabel.setText("Belagspreset konnte nicht gespeichert werden: " + exception.getMessage());
+        }
+    }
+
+    private SurfaceCoveringPreset currentSurfacePresetFromInputs() {
+        return new SurfaceCoveringPreset(
+                "",
+                currentSurfaceLayerName(),
+                currentSurfaceLayerThickness(),
+                currentSurfaceTileWidth(),
+                currentSurfaceTileHeight(),
+                currentSurfaceLayoutMode(),
+                currentSurfaceLayoutOffset(),
+                currentSurfaceMinimumOffset(),
+                currentSurfaceMinimumEdgeWidth(),
+                currentSurfaceMinimumStartEndMargin(),
+                currentSurfaceJointWidth(),
+                currentSurfaceCoveringSource()
+        );
+    }
+
+    private boolean confirmOverwrite(String title, String header, String content) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, content, ButtonType.CANCEL, ButtonType.OK);
+        alert.setTitle(title);
+        alert.setHeaderText(header);
+        return alert.showAndWait()
+                .filter(ButtonType.OK::equals)
+                .isPresent();
     }
 
     private void applyDoorPreset(DoorPreset preset) {
@@ -3449,6 +3560,10 @@ public final class CadWorkbench extends BorderPane {
             return extractDwgBlockName(coveringSource)
                     .map(blockName -> fileName + " → " + blockName)
                     .orElse(fileName);
+        }
+        if (coveringSource.toLowerCase(Locale.ROOT).endsWith(".cadasbelag")) {
+            String fileName = Path.of(coveringSource).getFileName().toString();
+            return "Eigenes Preset: " + fileName.substring(0, fileName.length() - ".cadasbelag".length());
         }
         return coveringSource;
     }

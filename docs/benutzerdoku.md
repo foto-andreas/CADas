@@ -347,6 +347,8 @@ Für geladene `DWG`-Bibliotheken gibt es jetzt zwei Wege, konkrete Blöcke als O
 * automatisch über eine optionale Katalogdatei neben der `DWG`
 * manuell über das Feld `DWG-Block` in der Ebenenverwaltung
 
+Beim Laden wird die `DWG` zusammen mit vorhandenen `.blocks`-Katalogen in `~/.config/CADas/Belag` übernommen. Dadurch bleiben die Referenzen auch dann stabil, wenn die ursprünglich ausgewählte Datei später verschoben wird.
+
 ### Automatischer Katalog
 
 Lege neben die Bibliothek eine Textdatei mit dem Namen `<dateiname>.blocks` oder `<basisname>.blocks`.
@@ -398,6 +400,7 @@ Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepfleg
 * Wähle den Flächentyp, zum Beispiel `WALL_INTERIOR`, `WALL_EXTERIOR`, `FLOOR` oder `CEILING`.
 * Wähle optional ein Preset wie `Fliese`, `Dämmplatte`, `Rigipsplatte`, `OSB-Platte`, `Tapete` oder eine registrierte `DWG-Referenz`.
 * Lege Name, Dicke, Platten- oder Fliesenmaß, Verlegeart, Mindestversatz und Mindestbreite fest.
+* `Speichern` neben dem Namen legt die aktuell eingetragenen Belagswerte als eigenes Preset ab.
 * `Ebene hinzufügen` legt den Belag auf der gewählten Fläche an.
 * `Ebene aktualisieren`, `ausblenden`, `nach oben` und `nach unten` ändern Bestand und Reihenfolge.
 
@@ -408,6 +411,14 @@ Für Anwender wichtig:
 * Sichtbare Boden- und Deckenlagen verändern die lichte Raumhöhe und damit das Volumen.
 * Die 3D-Ansicht zeigt diese Ebenen auf Wunsch als gestapelte Schichten an.
 * Registrierte `DWG`-Bibliotheken erscheinen zusätzlich als auswählbare Referenz-Presets für Ebenen.
+
+### Eigene Belagspresets
+
+Eigene Beläge werden unter `~/.config/CADas/Belag` gespeichert und beim Start automatisch in die Preset-Auswahl geladen.
+
+* Gespeichert werden Name, Schichtdicke, Modulmaß, Verlegemodus, Versatz, Mindestbreiten, Fugenbreite und Quelle.
+* Existiert ein Preset mit gleichem Namen bereits, fragt CADas vor dem Überschreiben nach.
+* Geladene `DWG`-Bibliotheken werden ebenfalls in dieses Verzeichnis übernommen; vorhandene `.blocks`-Katalogdateien werden mitkopiert.
 
 ### Treppe
 
@@ -718,7 +729,7 @@ Die Anwendung bringt Standard-Presets für:
 Aktuell gilt:
 
 * `.cadasparts` erweitert die auswählbaren Presets sofort.
-* `.dwg` wird registriert und in der Eigenschaftenleiste dokumentiert.
+* `.dwg` wird nach `~/.config/CADas/Belag` übernommen, registriert und in der Eigenschaftenleiste dokumentiert.
 * Konkrete `DWG`-Blöcke lassen sich über `.blocks`-Kataloge oder manuell als Oberflächen-Presets freischalten.
 
 ## Automatisierung für Tests
