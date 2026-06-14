@@ -7,6 +7,7 @@ import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
+import de.andreas.cadas.domain.model.RoomObject;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
@@ -29,6 +30,7 @@ public final class SelectionQueryService {
         selections.addAll(findWindowSelections(level, point, tolerance));
         selections.addAll(findStairSelections(level, point));
         selections.addAll(findWallSelections(level, point, tolerance));
+        selections.addAll(findRoomObjectSelections(level, point));
         selections.addAll(findRoomSelections(level, point));
         return List.copyOf(selections);
     }
@@ -67,6 +69,17 @@ public final class SelectionQueryService {
         return level.rooms().stream()
                 .filter(room -> containsPoint(room, point))
                 .map(room -> new SelectionKey(RenderableKind.ROOM_VOLUME, level.name(), room.id().toString()))
+                .toList();
+    }
+
+    private List<SelectionKey> findRoomObjectSelections(Level level, PlanPoint point) {
+        return level.roomObjects().stream()
+                .filter(RoomObject::visible)
+                .filter(roomObject -> point.xMillimeters() >= roomObject.minXMillimeters()
+                        && point.xMillimeters() <= roomObject.maxXMillimeters()
+                        && point.yMillimeters() >= roomObject.minYMillimeters()
+                        && point.yMillimeters() <= roomObject.maxYMillimeters())
+                .map(roomObject -> new SelectionKey(RenderableKind.ROOM_OBJECT, level.name(), roomObject.id().toString()))
                 .toList();
     }
 

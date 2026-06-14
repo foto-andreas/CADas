@@ -12,6 +12,9 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectShape;
+import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.Roof;
 import de.andreas.cadas.domain.model.RoofType;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
@@ -76,16 +79,60 @@ class ThreeDSceneModelBuilderTest {
                 Length.of(2.8, LengthUnit.METER),
                 14
         ));
+        level.addRoomObject(RoomObject.create(
+                "toilet",
+                "Toilette",
+                RoomObjectType.TOILET,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(2500, 1500),
+                Length.of(40, LengthUnit.CENTIMETER),
+                Length.of(70, LengthUnit.CENTIMETER),
+                Length.of(80, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ));
         project.defineRoof(new Roof(RoofType.SADDLE, Angle.ofDegrees(38), Length.of(45, LengthUnit.CENTIMETER), true));
 
         ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+        ThreeDSceneModel ohneObjekte = builder.build(project, Set.of("Erdgeschoss"), false, false, false);
 
         assertFalse(sceneModel.boxes().isEmpty());
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.WALL));
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.DOOR));
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.WINDOW));
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.STAIR));
+        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_OBJECT));
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOF));
+        assertFalse(ohneObjekte.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_OBJECT));
+    }
+
+    @Test
+    void rendertGedrehteRaumobjekteMitOriginalmaßenUndBoxDrehung() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addRoomObject(new RoomObject(
+                UUID.randomUUID(),
+                "toilet",
+                "Toilette",
+                RoomObjectType.TOILET,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(1000, 1200),
+                Length.of(40, LengthUnit.CENTIMETER),
+                Length.of(70, LengthUnit.CENTIMETER),
+                Length.of(80, LengthUnit.CENTIMETER),
+                1,
+                false,
+                true,
+                ""
+        ));
+
+        RenderableBox box = builder.build(project, Set.of("Erdgeschoss"), false).boxes().stream()
+                .filter(renderableBox -> renderableBox.kind() == RenderableKind.ROOM_OBJECT)
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(400.0, box.width(), 0.001);
+        assertEquals(700.0, box.depth(), 0.001);
+        assertEquals(90.0, box.rotationDegrees(), 0.001);
     }
 
     @Test

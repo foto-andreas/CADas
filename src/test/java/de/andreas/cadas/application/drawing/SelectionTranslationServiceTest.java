@@ -10,6 +10,9 @@ import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Level;
+import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectShape;
+import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
@@ -100,5 +103,33 @@ class SelectionTranslationServiceTest {
         assertEquals(3000.0, result.walls().get(2).axis().end().yMillimeters(), 0.001);
         assertEquals(3000.0, result.walls().get(3).axis().start().yMillimeters(), 0.001);
         assertEquals(500.0, result.walls().get(3).axis().end().yMillimeters(), 0.001);
+    }
+
+    @Test
+    void verschiebtAusgewaehlteRaumobjekte() {
+        Level level = new Level("Erdgeschoss");
+        RoomObject toilet = RoomObject.create(
+                "toilet",
+                "Toilette",
+                RoomObjectType.TOILET,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(500, 700),
+                Length.of(40, LengthUnit.CENTIMETER),
+                Length.of(70, LengthUnit.CENTIMETER),
+                Length.of(80, LengthUnit.CENTIMETER),
+                false,
+                ""
+        );
+        level.addRoomObject(toilet);
+
+        SelectionTranslationService.TranslationResult result = translationService.translate(
+                level,
+                Set.of(new SelectionKey(RenderableKind.ROOM_OBJECT, level.name(), toilet.id().toString())),
+                200.0,
+                -100.0
+        );
+
+        assertEquals(700.0, result.roomObjects().getFirst().center().xMillimeters(), 0.001);
+        assertEquals(600.0, result.roomObjects().getFirst().center().yMillimeters(), 0.001);
     }
 }

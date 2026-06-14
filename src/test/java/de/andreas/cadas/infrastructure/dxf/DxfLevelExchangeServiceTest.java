@@ -11,6 +11,9 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectShape;
+import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.SlopedCeilingProfile;
 import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
@@ -203,6 +206,18 @@ class DxfLevelExchangeServiceTest {
                 "Gipsputz"
         ));
         level.addSurfaceLayerStack(ceilingStack);
+        level.addRoomObject(RoomObject.create(
+                "wall-cabinet",
+                "Wandschrank",
+                RoomObjectType.WALL_CABINET,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(900, 800),
+                Length.of(80, LengthUnit.CENTIMETER),
+                Length.of(35, LengthUnit.CENTIMETER),
+                Length.of(200, LengthUnit.CENTIMETER),
+                true,
+                "Standard"
+        ));
 
         Path file = tempDir.resolve("oberflaechen.dxf");
         exchangeService.exportLevel(level, file);
@@ -229,6 +244,9 @@ class DxfLevelExchangeServiceTest {
         assertEquals("PutZ", importedCeiling.layers().getFirst().name());
         assertEquals(SurfaceLayoutMode.FIXED, importedCeiling.layers().getFirst().layoutMode());
         assertEquals(500.0, importedCeiling.layers().getFirst().layoutOffset().toMillimeters(), 0.001);
+        assertEquals(1, imported.roomObjects().size());
+        assertEquals("Wandschrank", imported.roomObjects().getFirst().name());
+        assertTrue(imported.roomObjects().getFirst().cutsFloorCovering());
     }
 
     @Test

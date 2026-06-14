@@ -7,6 +7,9 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectShape;
+import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
@@ -178,6 +181,27 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             ));
         }
 
+        for (RoomObject roomObject : level.roomObjects()) {
+            appendMetadataText(dxf, context, roomObject.center(), String.format(
+                    Locale.US,
+                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%s|%s|%s",
+                    roomObject.id(),
+                    DxfMetadataCodec.encode(roomObject.presetId()),
+                    DxfMetadataCodec.encode(roomObject.name()),
+                    roomObject.type().name(),
+                    roomObject.shape().name(),
+                    roomObject.center().xMillimeters(),
+                    roomObject.center().yMillimeters(),
+                    roomObject.width().toMillimeters(),
+                    roomObject.depth().toMillimeters(),
+                    roomObject.height().toMillimeters(),
+                    roomObject.rotationQuarterTurns(),
+                    roomObject.cutsFloorCovering(),
+                    roomObject.visible(),
+                    DxfMetadataCodec.encode(roomObject.source())
+            ));
+        }
+
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
@@ -333,6 +357,21 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             stack.addLayer(layer);
                         }
                     }
+                    case "OBJ" -> level.addRoomObject(new RoomObject(
+                            UUID.fromString(parts[1]),
+                            DxfMetadataCodec.decode(parts[2], encodedFields),
+                            DxfMetadataCodec.decode(parts[3], encodedFields),
+                            RoomObjectType.valueOf(parts[4]),
+                            RoomObjectShape.valueOf(parts[5]),
+                            new PlanPoint(parseDouble(parts[6]), parseDouble(parts[7])),
+                            Length.ofMillimeters(parseDouble(parts[8])),
+                            Length.ofMillimeters(parseDouble(parts[9])),
+                            Length.ofMillimeters(parseDouble(parts[10])),
+                            Integer.parseInt(parts[11]),
+                            Boolean.parseBoolean(parts[12]),
+                            Boolean.parseBoolean(parts[13]),
+                            DxfMetadataCodec.decode(parts[14], encodedFields)
+                    ));
                     default -> {
                     }
                 }

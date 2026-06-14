@@ -12,6 +12,9 @@ import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectShape;
+import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.SurfaceCutRestriction;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
@@ -156,6 +159,41 @@ class SurfaceMaterialListServiceTest {
         assertEquals(2, gerichtetesMaterial.requiredPieces());
         assertTrue(drehbaresMaterial.values().contains("frei"));
         assertTrue(gerichtetesMaterial.values().contains("Verlegerichtung"));
+    }
+
+    @Test
+    void spartBodenbelagUnterBodenaussparendenObjektenAus() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Abstellraum",
+                new PlanPoint(0, 0),
+                new PlanPoint(1000, 1000),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(room);
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "wall-cabinet",
+                "Wandschrank",
+                RoomObjectType.WALL_CABINET,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(250, 500),
+                Length.of(50, LengthUnit.CENTIMETER),
+                Length.of(100, LengthUnit.CENTIMETER),
+                Length.of(200, LengthUnit.CENTIMETER),
+                true,
+                ""
+        ));
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        stack.addLayer(layer("Fliese", Length.of(50, LengthUnit.CENTIMETER), Length.of(50, LengthUnit.CENTIMETER)));
+        project.primaryLevel().addSurfaceLayerStack(stack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        MaterialSummary material = report.materials().getFirst();
+        assertEquals(0.5, material.coveredAreaSquareMeters(), 0.001);
+        assertEquals(2, material.requiredPieces());
     }
 
     @Test

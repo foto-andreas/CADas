@@ -130,6 +130,7 @@ public final class ThreeDViewport extends BorderPane {
     private boolean sceneWasEmpty = true;
     private int lastRenderedBodyCount;
     private boolean surfaceRenderingMode;
+    private boolean roomObjectsVisible = true;
     private CameraMode cameraMode = CameraMode.ORBIT;
     private InteriorViewTarget interiorTarget;
     private double interiorFieldOfViewDegrees = INTERIOR_FOV_DEGREES;
@@ -178,7 +179,8 @@ public final class ThreeDViewport extends BorderPane {
                 project,
                 visibleLevels,
                 surfaceLayersCheckBox.isSelected(),
-                surfaceRenderingCheckBox.isSelected()
+                surfaceRenderingCheckBox.isSelected(),
+                roomObjectsVisible
         );
         rebuildScene(sceneModel);
         boolean isEmpty = sceneModel.boxes().isEmpty() && sceneModel.meshes().isEmpty();
@@ -201,6 +203,13 @@ public final class ThreeDViewport extends BorderPane {
 
     public void setSelectedSelections(Set<SelectionKey> selectedSelections) {
         this.selectedSelections = Set.copyOf(selectedSelections);
+        if (currentProject != null) {
+            refresh(currentProject);
+        }
+    }
+
+    public void setRoomObjectsVisible(boolean roomObjectsVisible) {
+        this.roomObjectsVisible = roomObjectsVisible;
         if (currentProject != null) {
             refresh(currentProject);
         }
@@ -785,6 +794,7 @@ public final class ThreeDViewport extends BorderPane {
             case "room-ceiling" -> Color.web("#d7d3c8");
             case "room-volume" -> Color.web("#d8c6aa");
             case "stair" -> Color.web("#7a6d60");
+            case "room-object" -> Color.web("#4e8174");
             case "roof" -> Color.web("#8e5f54");
             case "surface-layer" -> Color.web("#8e7b5e");
             case "joint" -> Color.web("#1a1510");

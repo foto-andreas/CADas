@@ -12,6 +12,9 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.RoomObject;
+import de.andreas.cadas.domain.model.RoomObjectShape;
+import de.andreas.cadas.domain.model.RoomObjectType;
 import de.andreas.cadas.domain.model.Roof;
 import de.andreas.cadas.domain.model.RoofType;
 import de.andreas.cadas.domain.model.StairType;
@@ -253,6 +256,18 @@ class DxfProjectExchangeServiceTest {
                 "Holz"
         ));
         project.primaryLevel().addSurfaceLayerStack(egFloor);
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "table-round",
+                "Tisch rund",
+                RoomObjectType.TABLE,
+                RoomObjectShape.CIRCLE,
+                new PlanPoint(1500, 1500),
+                Length.of(110, LengthUnit.CENTIMETER),
+                Length.of(110, LengthUnit.CENTIMETER),
+                Length.of(75, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ));
 
         var og = project.createLevel("Obergeschoss");
         og.addRoom(Room.rectangular(
@@ -295,6 +310,8 @@ class DxfProjectExchangeServiceTest {
         assertEquals("Parkett", importedEg.surfaceLayerStacks().getFirst().layers().getFirst().name());
         assertEquals(1.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().jointWidth().toMillimeters(), 0.001);
         assertEquals(SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().cutRestriction());
+        assertEquals(1, importedEg.roomObjects().size());
+        assertEquals("Tisch rund", importedEg.roomObjects().getFirst().name());
         assertEquals(egRoom.id(), importedEg.rooms().getFirst().id(), "Raum-UUID muss im Rundlauf erhalten bleiben");
 
         var importedOg = imported.levels().get(1);

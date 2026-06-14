@@ -5,6 +5,7 @@ import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Level;
+import de.andreas.cadas.domain.model.RoomObject;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
 
@@ -19,6 +20,7 @@ public final class SelectionTranslationService {
     public TranslationResult translate(Level level, Set<SelectionKey> selections, double deltaXMillimeters, double deltaYMillimeters) {
         Set<String> selectedWalls = selectedIds(selections, RenderableKind.WALL);
         Set<String> selectedStairs = selectedIds(selections, RenderableKind.STAIR);
+        Set<String> selectedRoomObjects = selectedIds(selections, RenderableKind.ROOM_OBJECT);
         List<PlanPoint> translatedWallEndpoints = selectedWallEndpoints(level, selectedWalls);
         List<Wall> translatedWalls = level.walls().stream()
                 .map(wall -> selectedWalls.contains(wall.id().toString())
@@ -28,8 +30,11 @@ public final class SelectionTranslationService {
         List<Staircase> translatedStairs = level.staircases().stream()
                 .map(staircase -> selectedStairs.contains(staircase.id().toString()) ? translateStair(staircase, deltaXMillimeters, deltaYMillimeters) : staircase)
                 .toList();
-        boolean changed = !selectedWalls.isEmpty() || !selectedStairs.isEmpty();
-        return new TranslationResult(translatedWalls, translatedStairs, changed);
+        List<RoomObject> translatedRoomObjects = level.roomObjects().stream()
+                .map(roomObject -> selectedRoomObjects.contains(roomObject.id().toString()) ? translateRoomObject(roomObject, deltaXMillimeters, deltaYMillimeters) : roomObject)
+                .toList();
+        boolean changed = !selectedWalls.isEmpty() || !selectedStairs.isEmpty() || !selectedRoomObjects.isEmpty();
+        return new TranslationResult(translatedWalls, translatedStairs, translatedRoomObjects, changed);
     }
 
     private Set<String> selectedIds(Set<SelectionKey> selections, RenderableKind kind) {
@@ -101,10 +106,28 @@ public final class SelectionTranslationService {
         );
     }
 
+    private RoomObject translateRoomObject(RoomObject roomObject, double deltaXMillimeters, double deltaYMillimeters) {
+        return new RoomObject(
+                roomObject.id(),
+                roomObject.presetId(),
+                roomObject.name(),
+                roomObject.type(),
+                roomObject.shape(),
+                translatePoint(roomObject.center(), deltaXMillimeters, deltaYMillimeters),
+                roomObject.width(),
+                roomObject.depth(),
+                roomObject.height(),
+                roomObject.rotationQuarterTurns(),
+                roomObject.cutsFloorCovering(),
+                roomObject.visible(),
+                roomObject.source()
+        );
+    }
+
     private PlanPoint translatePoint(PlanPoint point, double deltaXMillimeters, double deltaYMillimeters) {
         return new PlanPoint(point.xMillimeters() + deltaXMillimeters, point.yMillimeters() + deltaYMillimeters);
     }
 
-    public record TranslationResult(List<Wall> walls, List<Staircase> staircases, boolean changed) {
+    public record TranslationResult(List<Wall> walls, List<Staircase> staircases, List<RoomObject> roomObjects, boolean changed) {
     }
 }

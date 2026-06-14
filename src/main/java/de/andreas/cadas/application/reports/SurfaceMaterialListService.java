@@ -9,9 +9,11 @@ import de.andreas.cadas.application.room.OrthogonalPolygonDecompositionService;
 import de.andreas.cadas.application.view.WallSurfaceOpeningService;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
+import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.RoomObject;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceType;
@@ -97,13 +99,32 @@ public final class SurfaceMaterialListService {
             if (!matchesRoom(stack, room)) {
                 continue;
             }
-            List<SurfaceRectangle> rectangles = roomRectangles(room).stream()
-                    .map(rectangle -> new SurfaceRectangle(rectangle.width(), rectangle.height()))
-                    .toList();
+            List<SurfaceRectangle> rectangles = roomSurfaceRectangles(level, room, stack.surfaceType());
             String surface = stack.surfaceType() == SurfaceType.FLOOR ? "Boden" : "Decke";
             coverages.add(new SurfaceCoverage(level.name(), room.name(), surface, rectangles));
         }
         return coverages;
+    }
+
+    private List<SurfaceRectangle> roomSurfaceRectangles(Level level, Room room, SurfaceType surfaceType) {
+        List<SurfaceRectangle> rectangles = roomRectangles(room).stream()
+                .map(rectangle -> new SurfaceRectangle(rectangle.minX(), rectangle.minY(), rectangle.width(), rectangle.height()))
+                .toList();
+        if (surfaceType != SurfaceType.FLOOR) {
+            return rectangles;
+        }
+        for (RoomObject roomObject : level.roomObjects()) {
+            if (!roomObject.visible() || !roomObject.cutsFloorCovering() || !objectCenterInsideRoom(room, roomObject)) {
+                continue;
+            }
+            rectangles = subtractCutout(rectangles, new SurfaceRectangle(
+                    roomObject.minXMillimeters(),
+                    roomObject.minYMillimeters(),
+                    roomObject.footprintWidthMillimeters(),
+                    roomObject.footprintDepthMillimeters()
+            ));
+        }
+        return rectangles;
     }
 
     private List<SurfaceCoverage> wallCoverages(Level level, SurfaceLayerStack stack) {
@@ -142,7 +163,7 @@ public final class SurfaceMaterialListService {
 
     private SurfaceCoverage wallSideCoverage(Level level, SurfaceLayerStack stack, Wall wall, String roomName, double sideSign) {
         List<SurfaceRectangle> rectangles = wallSurfaceOpeningService.visibleRectangles(level, wall, sideSign).stream()
-                .map(rectangle -> new SurfaceRectangle(rectangle.widthMillimeters(), rectangle.heightMillimeters()))
+                .map(rectangle -> new SurfaceRectangle(0.0, 0.0, rectangle.widthMillimeters(), rectangle.heightMillimeters()))
                 .toList();
         String sideLabel = sideSign > 0.0 ? "+" : "-";
         return new SurfaceCoverage(
@@ -223,7 +244,68 @@ public final class SurfaceMaterialListService {
         return value.replace("|", "\\|").replace("\n", " ");
     }
 
-    private record SurfaceRectangle(double widthMillimeters, double heightMillimeters) {
+    private boolean objectCenterInsideRoom(Room room, RoomObject roomObject) {
+        return containsPoint(room, roomObject.center());
+    }
+
+    private List<SurfaceRectangle> subtractCutout(List<SurfaceRectangle> rectangles, SurfaceRectangle cutout) {
+        List<SurfaceRectangle> result = new ArrayList<>();
+        for (SurfaceRectangle rectangle : rectangles) {
+            result.addAll(subtractCutout(rectangle, cutout));
+        }
+        return result;
+    }
+
+    private List<SurfaceRectangle> subtractCutout(SurfaceRectangle rectangle, SurfaceRectangle cutout) {
+        double minX = Math.max(rectangle.minXMillimeters(), cutout.minXMillimeters());
+        double maxX = Math.min(rectangle.maxXMillimeters(), cutout.maxXMillimeters());
+        double minY = Math.max(rectangle.minYMillimeters(), cutout.minYMillimeters());
+        double maxY = Math.min(rectangle.maxYMillimeters(), cutout.maxYMillimeters());
+        if (maxX <= minX + EPSILON || maxY <= minY + EPSILON) {
+            return List.of(rectangle);
+        }
+        List<SurfaceRectangle> pieces = new ArrayList<>();
+        addRectangleIfUsable(pieces, rectangle.minXMillimeters(), rectangle.minYMillimeters(), rectangle.widthMillimeters(), minY - rectangle.minYMillimeters());
+        addRectangleIfUsable(pieces, rectangle.minXMillimeters(), maxY, rectangle.widthMillimeters(), rectangle.maxYMillimeters() - maxY);
+        addRectangleIfUsable(pieces, rectangle.minXMillimeters(), minY, minX - rectangle.minXMillimeters(), maxY - minY);
+        addRectangleIfUsable(pieces, maxX, minY, rectangle.maxXMillimeters() - maxX, maxY - minY);
+        return pieces;
+    }
+
+    private void addRectangleIfUsable(List<SurfaceRectangle> rectangles, double minX, double minY, double width, double height) {
+        if (width > EPSILON && height > EPSILON) {
+            rectangles.add(new SurfaceRectangle(minX, minY, width, height));
+        }
+    }
+
+    private boolean containsPoint(Room room, PlanPoint point) {
+        boolean inside = false;
+        int lastIndex = room.outline().size() - 1;
+        for (int currentIndex = 0; currentIndex < room.outline().size(); currentIndex++) {
+            PlanPoint current = room.outline().get(currentIndex);
+            PlanPoint previous = room.outline().get(lastIndex);
+            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
+                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
+                    * (point.yMillimeters() - current.yMillimeters())
+                    / (previous.yMillimeters() - current.yMillimeters())
+                    + current.xMillimeters();
+            if (intersects) {
+                inside = !inside;
+            }
+            lastIndex = currentIndex;
+        }
+        return inside;
+    }
+
+    private record SurfaceRectangle(double minXMillimeters, double minYMillimeters, double widthMillimeters, double heightMillimeters) {
+
+        private double maxXMillimeters() {
+            return minXMillimeters + widthMillimeters;
+        }
+
+        private double maxYMillimeters() {
+            return minYMillimeters + heightMillimeters;
+        }
     }
 
     private record SurfaceCoverage(

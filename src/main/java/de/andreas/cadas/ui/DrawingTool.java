@@ -5,7 +5,8 @@ public enum DrawingTool {
     WALL("Wand", false),
     STAIR("Treppe", false),
     DOOR("Tür", true),
-    WINDOW("Fenster", true);
+    WINDOW("Fenster", true),
+    OBJECT("Objekt", true);
 
     private final String label;
     private final boolean pointTool;

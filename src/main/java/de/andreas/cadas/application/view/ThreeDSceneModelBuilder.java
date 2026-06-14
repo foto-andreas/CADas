@@ -17,6 +17,7 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.RoomObject;
 import de.andreas.cadas.domain.model.Roof;
 import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
@@ -59,6 +60,10 @@ public final class ThreeDSceneModelBuilder {
     }
 
     public ThreeDSceneModel build(ProjectModel project, Set<String> visibleLevelNames, boolean renderSurfaceLayers, boolean surfaceRenderingMode) {
+        return build(project, visibleLevelNames, renderSurfaceLayers, surfaceRenderingMode, true);
+    }
+
+    public ThreeDSceneModel build(ProjectModel project, Set<String> visibleLevelNames, boolean renderSurfaceLayers, boolean surfaceRenderingMode, boolean renderRoomObjects) {
         List<RenderableBox> boxes = new ArrayList<>();
         meshes.clear();
         Map<String, Double> levelBaseHeights = computeLevelBaseHeights(project.levels());
@@ -81,6 +86,9 @@ public final class ThreeDSceneModelBuilder {
             boxes.addAll(buildDoors(level, wallBaseHeight));
             boxes.addAll(buildWindows(level, wallBaseHeight));
             boxes.addAll(buildStairs(level, wallBaseHeight));
+            if (renderRoomObjects) {
+                boxes.addAll(buildRoomObjects(level, wallBaseHeight));
+            }
         }
 
         project.roof().ifPresent(roof -> boxes.addAll(buildRoof(project, roof, levelBaseHeights, visibleLevelNames)));
@@ -99,6 +107,7 @@ public final class ThreeDSceneModelBuilder {
 
     private double estimateLevelHeight(Level level) {
         double wallHeight = level.walls().stream().mapToDouble(Wall::maximumHeightMillimeters).max().orElse(2750.0);
+        double objectHeight = level.roomObjects().stream().mapToDouble(roomObject -> roomObject.height().toMillimeters()).max().orElse(0.0);
         double roomHeight = level.rooms().stream()
                 .mapToDouble(room -> surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(level, room)
                         + room.floorThickness().toMillimeters()
@@ -108,7 +117,7 @@ public final class ThreeDSceneModelBuilder {
                 .max()
                 .orElse(0.0);
         double stairHeight = level.staircases().stream().mapToDouble(staircase -> staircase.totalHeight().toMillimeters()).max().orElse(0.0);
-        return Math.max(wallHeight, Math.max(roomHeight, stairHeight));
+        return Math.max(Math.max(wallHeight, objectHeight), Math.max(roomHeight, stairHeight));
     }
 
     private double maximumFloorThickness(Level level) {
@@ -1470,6 +1479,32 @@ public final class ThreeDSceneModelBuilder {
                 "stair",
                 1.0
         );
+    }
+
+    private List<RenderableBox> buildRoomObjects(Level level, double baseHeight) {
+        List<RenderableBox> boxes = new ArrayList<>();
+        for (RoomObject roomObject : level.roomObjects()) {
+            if (!roomObject.visible()) {
+                continue;
+            }
+            double height = Math.max(1.0, roomObject.height().toMillimeters());
+            boxes.add(new RenderableBox(
+                    new SelectionKey(RenderableKind.ROOM_OBJECT, level.name(), roomObject.id().toString()),
+                    level.name(),
+                    RenderableKind.ROOM_OBJECT,
+                    roomObject.center().xMillimeters(),
+                    baseHeight + height / 2.0,
+                    roomObject.center().yMillimeters(),
+                    roomObject.width().toMillimeters(),
+                    height,
+                    roomObject.depth().toMillimeters(),
+                    RotationAxis.Y,
+                    roomObject.rotationQuarterTurns() * 90.0,
+                    "room-object",
+                    0.78
+            ));
+        }
+        return boxes;
     }
 
     private List<RenderableBox> buildRoof(ProjectModel project, Roof roof, Map<String, Double> levelBaseHeights, Set<String> visibleLevelNames) {
