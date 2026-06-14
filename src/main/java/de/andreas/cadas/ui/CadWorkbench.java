@@ -30,6 +30,7 @@ import de.andreas.cadas.application.parts.StairPreset;
 import de.andreas.cadas.application.parts.StandardPartLibrary;
 import de.andreas.cadas.application.parts.StandardPartLibraryService;
 import de.andreas.cadas.application.parts.WindowPreset;
+import de.andreas.cadas.application.reports.MarkdownHtmlRenderer;
 import de.andreas.cadas.application.reports.SurfaceMaterialListService;
 import de.andreas.cadas.application.room.AutoRoomGenerationService;
 import de.andreas.cadas.application.view.RenderableKind;
@@ -107,7 +108,6 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
@@ -127,9 +127,11 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.print.PrinterJob;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.scene.web.WebView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -192,6 +194,7 @@ public final class CadWorkbench extends BorderPane {
     private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
     private final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
+    private final MarkdownHtmlRenderer markdownHtmlRenderer = new MarkdownHtmlRenderer();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
@@ -2993,15 +2996,18 @@ public final class CadWorkbench extends BorderPane {
 
     private void showSurfaceMaterialReportWindow() {
         String markdown = surfaceMaterialListService.create(project).toMarkdown();
-        TextArea reportText = new TextArea(markdown);
-        reportText.setEditable(false);
-        reportText.setWrapText(false);
-        reportText.setStyle("-fx-font-family: 'Menlo', 'Monaco', monospace; -fx-font-size: 12px;");
-        VBox.setVgrow(reportText, Priority.ALWAYS);
+        WebView reportView = new WebView();
+        reportView.getEngine().loadContent(markdownHtmlRenderer.renderDocument(markdown));
+        VBox.setVgrow(reportView, Priority.ALWAYS);
         Button exportButton = new Button("Markdown exportieren");
         exportButton.setOnAction(event -> exportSurfaceMaterialReportMarkdown());
         applyTooltip(exportButton, "Exportiert genau diese Materialliste als Markdown-Datei.");
-        VBox container = new VBox(10.0, reportText, exportButton);
+        Button printButton = new Button("Drucken");
+        printButton.setOnAction(event -> printSurfaceMaterialReport(reportView));
+        applyTooltip(printButton, "Druckt die gerenderte Materialliste so, wie sie in diesem Fenster angezeigt wird.");
+        HBox actions = new HBox(8.0, printButton, exportButton);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        VBox container = new VBox(10.0, reportView, actions);
         container.setPadding(new Insets(12));
         Stage stage = new Stage();
         stage.setTitle("Materialliste Beläge");
@@ -3011,6 +3017,22 @@ public final class CadWorkbench extends BorderPane {
         }
         stage.setScene(new Scene(container, 920, 680));
         stage.show();
+    }
+
+    private void printSurfaceMaterialReport(WebView reportView) {
+        PrinterJob printerJob = PrinterJob.createPrinterJob();
+        if (printerJob == null) {
+            draftLabel.setText("Kein Drucker verfügbar.");
+            return;
+        }
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        if (!printerJob.showPrintDialog(owner)) {
+            draftLabel.setText("Druck abgebrochen.");
+            return;
+        }
+        reportView.getEngine().print(printerJob);
+        printerJob.endJob();
+        draftLabel.setText("Materialliste an Drucker übergeben.");
     }
 
     private void exportSurfaceMaterialReportMarkdown() {

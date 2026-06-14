@@ -25,7 +25,7 @@ java {
 
 javafx {
     version = "25"
-    modules("javafx.controls", "javafx.swing")
+    modules("javafx.controls", "javafx.swing", "javafx.web")
 }
 
 application {
@@ -35,6 +35,9 @@ application {
 }
 
 dependencies {
+    implementation("org.commonmark:commonmark:0.24.0")
+    implementation("org.commonmark:commonmark-ext-gfm-tables:0.24.0")
+
     testImplementation(platform("org.junit:junit-bom:5.13.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
