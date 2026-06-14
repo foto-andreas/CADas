@@ -425,17 +425,18 @@ public final class ThreeDSceneModelBuilder {
                 continue;
             }
             if (room.hasVariableCeilingHeights()) {
-                boxes.addAll(buildSlopedRoomSlices(
-                        level,
+                addSlopedSurfaceMesh(
+                        new SelectionKey(RenderableKind.SURFACE_LAYER, level.name(), layer.id().toString()),
                         level.name(),
+                        RenderableKind.SURFACE_LAYER,
                         room,
                         rectangles,
-                        baseHeight + room.floorThickness().toMillimeters() - offsetFromCeiling - layer.thickness().toMillimeters() / 2.0,
+                        baseHeight + room.floorThickness().toMillimeters(),
+                        -(offsetFromCeiling + layer.thickness().toMillimeters()),
                         layer.thickness().toMillimeters(),
                         "surface-layer",
-                        SURFACE_LAYER_OPACITY,
-                        new SelectionKey(RenderableKind.SURFACE_LAYER, level.name(), layer.id().toString())
-                ));
+                        SURFACE_LAYER_OPACITY
+                );
             } else {
                 double layerBottomHeight = baseHeight + room.floorThickness().toMillimeters() + room.roomHeight().toMillimeters() - offsetFromCeiling;
                 addFlatSurfaceMesh(
@@ -501,6 +502,98 @@ public final class ThreeDSceneModelBuilder {
         ));
     }
 
+    private void addSlopedSurfaceMesh(
+            SelectionKey selectionKey,
+            String levelName,
+            RenderableKind kind,
+            Room room,
+            List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles,
+            double baseY,
+            double verticalOffsetY,
+            double height,
+            String materialKey,
+            double opacity
+    ) {
+        List<Float> vertexValues = new ArrayList<>();
+        for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
+            double x0 = rectangle.minX();
+            double x1 = rectangle.maxX();
+            double z0 = rectangle.minY();
+            double z1 = rectangle.maxY();
+            double y00 = room.ceilingHeightAt(new PlanPoint(x0, z0)) + verticalOffsetY;
+            double y10 = room.ceilingHeightAt(new PlanPoint(x1, z0)) + verticalOffsetY;
+            double y11 = room.ceilingHeightAt(new PlanPoint(x1, z1)) + verticalOffsetY;
+            double y01 = room.ceilingHeightAt(new PlanPoint(x0, z1)) + verticalOffsetY;
+            addTriangle(vertexValues, x0, y00, z0, x1, y10, z0, x1, y11, z1);
+            addTriangle(vertexValues, x0, y00, z0, x1, y11, z1, x0, y01, z1);
+        }
+        addMesh(selectionKey, levelName, kind, vertexValues, baseY, height, materialKey, opacity);
+    }
+
+    private void addMesh(
+            SelectionKey selectionKey,
+            String levelName,
+            RenderableKind kind,
+            List<Float> vertexValues,
+            double baseY,
+            double height,
+            String materialKey,
+            double opacity
+    ) {
+        if (vertexValues.isEmpty()) {
+            return;
+        }
+        float[] points = new float[vertexValues.size()];
+        for (int index = 0; index < vertexValues.size(); index++) {
+            points[index] = vertexValues.get(index);
+        }
+        meshes.add(new RenderableMesh(
+                selectionKey,
+                levelName,
+                kind,
+                points,
+                vertexValues.size() / 9,
+                baseY,
+                height,
+                materialKey,
+                opacity
+        ));
+    }
+
+    private void addTriangle(
+            List<Float> vertexValues,
+            double ax,
+            double ay,
+            double az,
+            double bx,
+            double by,
+            double bz,
+            double cx,
+            double cy,
+            double cz
+    ) {
+        vertexValues.add((float) ax);
+        vertexValues.add((float) ay);
+        vertexValues.add((float) az);
+        vertexValues.add((float) bx);
+        vertexValues.add((float) by);
+        vertexValues.add((float) bz);
+        vertexValues.add((float) cx);
+        vertexValues.add((float) cy);
+        vertexValues.add((float) cz);
+    }
+
+    private void addQuad(
+            List<Float> vertexValues,
+            MeshPoint first,
+            MeshPoint second,
+            MeshPoint third,
+            MeshPoint fourth
+    ) {
+        addTriangle(vertexValues, first.x(), first.y(), first.z(), second.x(), second.y(), second.z(), third.x(), third.y(), third.z());
+        addTriangle(vertexValues, first.x(), first.y(), first.z(), third.x(), third.y(), third.z(), fourth.x(), fourth.y(), fourth.z());
+    }
+
     private boolean matchesRoom(SurfaceLayerStack stack, Room room) {
         return stack.targetKey().equals(room.id().toString())
                 || stack.targetKey().equalsIgnoreCase(room.name())
@@ -536,17 +629,19 @@ public final class ThreeDSceneModelBuilder {
     }
 
     private List<RenderableBox> buildSlopedCeiling(Level level, Room room, double baseHeight, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles, boolean surfaceRenderingMode) {
-        return buildSlopedRoomSlices(
-                level,
+        addSlopedSurfaceMesh(
+                new SelectionKey(RenderableKind.ROOM_CEILING, level.name(), room.id().toString()),
                 level.name(),
+                RenderableKind.ROOM_CEILING,
                 room,
                 rectangles,
                 baseHeight + room.floorThickness().toMillimeters(),
+                0.0,
                 Math.max(0.1, room.ceilingThickness().toMillimeters()),
                 "room-ceiling",
-                surfaceRenderingMode ? 1.0 : 1.0,
-                new SelectionKey(RenderableKind.ROOM_CEILING, level.name(), room.id().toString())
+                surfaceRenderingMode ? 1.0 : 1.0
         );
+        return List.of();
     }
 
     private List<RenderableBox> buildSlopedRoomSlices(
@@ -682,11 +777,11 @@ public final class ThreeDSceneModelBuilder {
             }
             double centerOffset = cumulativeThickness + layer.thickness().toMillimeters() / 2.0;
             if (wallLayerSides.positiveSide()) {
-                visibleRectangles.forEach(rectangle -> boxes.add(wallSurfaceLayerBox(levelName, wall, layer, rectangle, baseHeight, centerOffset)));
+                visibleRectangles.forEach(rectangle -> wallSurfaceLayerBox(levelName, wall, layer, rectangle, baseHeight, centerOffset).ifPresent(boxes::add));
                 boxes.addAll(buildWallSurfaceJoints(levelName, wall, layer, visibleRectangles, baseHeight, cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0));
             }
             if (wallLayerSides.negativeSide()) {
-                visibleRectangles.forEach(rectangle -> boxes.add(wallSurfaceLayerBox(levelName, wall, layer, rectangle, baseHeight, -centerOffset)));
+                visibleRectangles.forEach(rectangle -> wallSurfaceLayerBox(levelName, wall, layer, rectangle, baseHeight, -centerOffset).ifPresent(boxes::add));
                 boxes.addAll(buildWallSurfaceJoints(levelName, wall, layer, visibleRectangles, baseHeight, -(cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0)));
             }
             cumulativeThickness += layer.thickness().toMillimeters();
@@ -694,7 +789,7 @@ public final class ThreeDSceneModelBuilder {
         return boxes;
     }
 
-    private RenderableBox wallSurfaceLayerBox(
+    private Optional<RenderableBox> wallSurfaceLayerBox(
             String levelName,
             Wall wall,
             SurfaceLayer layer,
@@ -702,6 +797,10 @@ public final class ThreeDSceneModelBuilder {
             double baseHeight,
             double perpendicularOffset
     ) {
+        if (wall.hasVariableTopHeight()) {
+            addWallSurfaceLayerMesh(levelName, wall, layer, rectangle, baseHeight, perpendicularOffset);
+            return Optional.empty();
+        }
         double localCenter = (rectangle.startMillimeters() + rectangle.endMillimeters()) / 2.0;
         PlanPoint wallPoint = wall.axis().pointAt(Length.ofMillimeters(localCenter));
         double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
@@ -711,7 +810,7 @@ public final class ThreeDSceneModelBuilder {
         double normalY = dx / length;
         double centerX = wallPoint.xMillimeters() + normalX * perpendicularOffset;
         double centerZ = wallPoint.yMillimeters() + normalY * perpendicularOffset;
-        return new RenderableBox(
+        return Optional.of(new RenderableBox(
                 new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
                 levelName,
                 RenderableKind.SURFACE_LAYER,
@@ -723,6 +822,53 @@ public final class ThreeDSceneModelBuilder {
                 layer.thickness().toMillimeters(),
                 RotationAxis.Y,
                 wall.axis().angle().degrees(),
+                "surface-layer",
+                SURFACE_LAYER_OPACITY
+        ));
+    }
+
+    private void addWallSurfaceLayerMesh(
+            String levelName,
+            Wall wall,
+            SurfaceLayer layer,
+            WallSurfaceRectangle rectangle,
+            double baseHeight,
+            double perpendicularOffset
+    ) {
+        double lowerHeight = rectangle.lowerHeightMillimeters();
+        double startTop = Math.max(lowerHeight, Math.min(rectangle.upperHeightMillimeters(), wall.heightAt(rectangle.startMillimeters())));
+        double endTop = Math.max(lowerHeight, Math.min(rectangle.upperHeightMillimeters(), wall.heightAt(rectangle.endMillimeters())));
+        if (startTop <= lowerHeight + 0.001 && endTop <= lowerHeight + 0.001) {
+            return;
+        }
+        double halfLayerThickness = layer.thickness().toMillimeters() / 2.0;
+        double sideSign = perpendicularOffset < 0.0 ? -1.0 : 1.0;
+        double innerOffset = perpendicularOffset - sideSign * halfLayerThickness;
+        double outerOffset = perpendicularOffset + sideSign * halfLayerThickness;
+
+        MeshPoint startInnerBottom = wallMeshPoint(wall, rectangle.startMillimeters(), innerOffset, lowerHeight);
+        MeshPoint startInnerTop = wallMeshPoint(wall, rectangle.startMillimeters(), innerOffset, startTop);
+        MeshPoint endInnerBottom = wallMeshPoint(wall, rectangle.endMillimeters(), innerOffset, lowerHeight);
+        MeshPoint endInnerTop = wallMeshPoint(wall, rectangle.endMillimeters(), innerOffset, endTop);
+        MeshPoint startOuterBottom = wallMeshPoint(wall, rectangle.startMillimeters(), outerOffset, lowerHeight);
+        MeshPoint startOuterTop = wallMeshPoint(wall, rectangle.startMillimeters(), outerOffset, startTop);
+        MeshPoint endOuterBottom = wallMeshPoint(wall, rectangle.endMillimeters(), outerOffset, lowerHeight);
+        MeshPoint endOuterTop = wallMeshPoint(wall, rectangle.endMillimeters(), outerOffset, endTop);
+
+        List<Float> vertexValues = new ArrayList<>();
+        addQuad(vertexValues, startInnerBottom, endInnerBottom, endInnerTop, startInnerTop);
+        addQuad(vertexValues, endOuterBottom, startOuterBottom, startOuterTop, endOuterTop);
+        addQuad(vertexValues, startInnerTop, endInnerTop, endOuterTop, startOuterTop);
+        addQuad(vertexValues, startOuterBottom, endOuterBottom, endInnerBottom, startInnerBottom);
+        addQuad(vertexValues, startOuterBottom, startInnerBottom, startInnerTop, startOuterTop);
+        addQuad(vertexValues, endInnerBottom, endOuterBottom, endOuterTop, endInnerTop);
+        addMesh(
+                new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
+                levelName,
+                RenderableKind.SURFACE_LAYER,
+                vertexValues,
+                baseHeight,
+                Math.max(startTop, endTop),
                 "surface-layer",
                 SURFACE_LAYER_OPACITY
         );
@@ -816,6 +962,7 @@ public final class ThreeDSceneModelBuilder {
             double clippedEndX = Math.min(localEndX, rectangle.endMillimeters());
             double clippedLowerY = Math.max(localLowerY, rectangle.lowerHeightMillimeters());
             double clippedUpperY = Math.min(localUpperY, rectangle.upperHeightMillimeters());
+            clippedUpperY = Math.min(clippedUpperY, wall.heightAt((clippedStartX + clippedEndX) / 2.0));
             if (clippedEndX - clippedStartX <= 0.001 || clippedUpperY - clippedLowerY <= 0.001) {
                 continue;
             }
@@ -925,19 +1072,8 @@ public final class ThreeDSceneModelBuilder {
             }
             return List.of(segmentToUniformBox(levelName, wall, startMillimeters, endMillimeters, baseHeight, heightMillimeters, materialKey, surfaceRenderingMode));
         }
-        List<RenderableBox> boxes = new ArrayList<>();
-        double segmentLength = Math.max(1.0, endMillimeters - startMillimeters);
-        int slices = Math.max(2, (int) Math.ceil(segmentLength / 400.0));
-        for (int index = 0; index < slices; index++) {
-            double sliceStart = startMillimeters + segmentLength * index / slices;
-            double sliceEnd = startMillimeters + segmentLength * (index + 1) / slices;
-            double heightMillimeters = Math.max(0.0, wall.heightAt((sliceStart + sliceEnd) / 2.0) - subtractBottomMillimeters);
-            if (heightMillimeters <= 0.0) {
-                continue;
-            }
-            boxes.add(segmentToUniformBox(levelName, wall, sliceStart, sliceEnd, baseHeight, heightMillimeters, materialKey, surfaceRenderingMode));
-        }
-        return boxes;
+        addWallSegmentMesh(levelName, wall, startMillimeters, endMillimeters, baseHeight, subtractBottomMillimeters, materialKey, surfaceRenderingMode ? 1.0 : 1.0);
+        return List.of();
     }
 
     private RenderableBox segmentToUniformBox(
@@ -969,6 +1105,65 @@ public final class ThreeDSceneModelBuilder {
                 wall.axis().angle().degrees(),
                 materialKey,
                 surfaceRenderingMode ? 1.0 : 1.0
+        );
+    }
+
+    private void addWallSegmentMesh(
+            String levelName,
+            Wall wall,
+            double startMillimeters,
+            double endMillimeters,
+            double baseHeight,
+            double subtractBottomMillimeters,
+            String materialKey,
+            double opacity
+    ) {
+        double startHeight = Math.max(0.0, wall.heightAt(startMillimeters) - subtractBottomMillimeters);
+        double endHeight = Math.max(0.0, wall.heightAt(endMillimeters) - subtractBottomMillimeters);
+        if (startHeight <= 0.001 && endHeight <= 0.001) {
+            return;
+        }
+        double halfThickness = wall.thickness().toMillimeters() / 2.0;
+        MeshPoint startLeftBottom = wallMeshPoint(wall, startMillimeters, -halfThickness, 0.0);
+        MeshPoint startLeftTop = wallMeshPoint(wall, startMillimeters, -halfThickness, startHeight);
+        MeshPoint startRightBottom = wallMeshPoint(wall, startMillimeters, halfThickness, 0.0);
+        MeshPoint startRightTop = wallMeshPoint(wall, startMillimeters, halfThickness, startHeight);
+        MeshPoint endLeftBottom = wallMeshPoint(wall, endMillimeters, -halfThickness, 0.0);
+        MeshPoint endLeftTop = wallMeshPoint(wall, endMillimeters, -halfThickness, endHeight);
+        MeshPoint endRightBottom = wallMeshPoint(wall, endMillimeters, halfThickness, 0.0);
+        MeshPoint endRightTop = wallMeshPoint(wall, endMillimeters, halfThickness, endHeight);
+
+        List<Float> vertexValues = new ArrayList<>();
+        addQuad(vertexValues, startLeftBottom, endLeftBottom, endLeftTop, startLeftTop);
+        addQuad(vertexValues, endRightBottom, startRightBottom, startRightTop, endRightTop);
+        addQuad(vertexValues, startLeftTop, endLeftTop, endRightTop, startRightTop);
+        addQuad(vertexValues, startRightBottom, endRightBottom, endLeftBottom, startLeftBottom);
+        addQuad(vertexValues, startRightBottom, startLeftBottom, startLeftTop, startRightTop);
+        addQuad(vertexValues, endLeftBottom, endRightBottom, endRightTop, endLeftTop);
+        addMesh(
+                new SelectionKey(RenderableKind.WALL, levelName, wall.id().toString()),
+                levelName,
+                RenderableKind.WALL,
+                vertexValues,
+                baseHeight,
+                Math.max(startHeight, endHeight),
+                materialKey,
+                opacity
+        );
+    }
+
+    private MeshPoint wallMeshPoint(Wall wall, double localDistance, double normalOffset, double height) {
+        double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
+        double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
+        double length = Math.max(1.0, Math.hypot(dx, dy));
+        double tangentX = dx / length;
+        double tangentY = dy / length;
+        double normalX = -tangentY;
+        double normalY = tangentX;
+        return new MeshPoint(
+                wall.axis().start().xMillimeters() + tangentX * localDistance + normalX * normalOffset,
+                height,
+                wall.axis().start().yMillimeters() + tangentY * localDistance + normalY * normalOffset
         );
     }
 
@@ -1275,5 +1470,8 @@ public final class ThreeDSceneModelBuilder {
     }
 
     private record Footprint(double minX, double maxX, double minZ, double maxZ) {
+    }
+
+    private record MeshPoint(double x, double y, double z) {
     }
 }

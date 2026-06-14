@@ -2,7 +2,6 @@ package de.andreas.cadas.application.view;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.andreas.cadas.domain.geometry.Angle;
@@ -159,7 +158,17 @@ class ThreeDSceneModelBuilderTest {
 
         assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_VOLUME));
         assertTrue(sceneModel.boxes().stream().filter(box -> box.kind() == RenderableKind.ROOM_VOLUME).count() > 1);
-        assertTrue(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.SURFACE_LAYER));
+        RenderableMesh ceilingMesh = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.ROOM_CEILING)
+                .findFirst()
+                .orElseThrow();
+        RenderableMesh ceilingLayerMesh = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(mesh -> mesh.selectionKey().elementId().equals(decke.layers().getFirst().id().toString()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(hasMeshHeightDifference(ceilingMesh, 1000.0));
+        assertTrue(hasMeshHeightDifference(ceilingLayerMesh, 1000.0));
     }
 
     @Test
@@ -456,6 +465,50 @@ class ThreeDSceneModelBuilderTest {
     }
 
     @Test
+    void passtWandbelagMeshAnSchrägeWandoberkanteAn() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = new Wall(
+                UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(3.2, LengthUnit.METER),
+                Length.of(3.2, LengthUnit.METER),
+                Length.of(2.6, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        Room room = Room.rectangular(
+                "Ausbau",
+                new PlanPoint(100, 100),
+                new PlanPoint(3900, 2500),
+                Length.of(3.2, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, WallSurfaceTargetKey.interior(wall.id(), room.id()));
+        SurfaceLayer layer = SurfaceLayer.create(
+                "Dämmplatte",
+                Length.of(8, LengthUnit.CENTIMETER),
+                Length.of(120, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.zero()
+        );
+        stack.addLayer(layer);
+        level.addSurfaceLayerStack(stack);
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Dachgeschoss"), true);
+
+        RenderableMesh surfaceMesh = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(mesh -> mesh.selectionKey().elementId().equals(layer.id().toString()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(hasMeshHeightBetween(surfaceMesh, 3150.0, 3250.0));
+        assertTrue(hasMeshHeightBetween(surfaceMesh, 2550.0, 2650.0));
+    }
+
+    @Test
     void flacheDeckenmeshBleibtBeiLRaeumenAusDerInneneckeHeraus() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         var level = project.primaryLevel();
@@ -556,6 +609,38 @@ class ThreeDSceneModelBuilderTest {
                 && localUpper > openingLower + 0.001;
     }
 
+    private boolean hasMeshHeightDifference(RenderableMesh mesh, double minimumDifference) {
+        return maximumMeshHeight(mesh) - minimumMeshHeight(mesh) > minimumDifference;
+    }
+
+    private double maximumMeshHeight(RenderableMesh mesh) {
+        double maximum = Double.NEGATIVE_INFINITY;
+        float[] points = mesh.points();
+        for (int index = 1; index < points.length; index += 3) {
+            maximum = Math.max(maximum, points[index]);
+        }
+        return maximum;
+    }
+
+    private double minimumMeshHeight(RenderableMesh mesh) {
+        double minimum = Double.POSITIVE_INFINITY;
+        float[] points = mesh.points();
+        for (int index = 1; index < points.length; index += 3) {
+            minimum = Math.min(minimum, points[index]);
+        }
+        return minimum;
+    }
+
+    private boolean hasMeshHeightBetween(RenderableMesh mesh, double minimum, double maximum) {
+        float[] points = mesh.points();
+        for (int index = 1; index < points.length; index += 3) {
+            if (points[index] >= minimum && points[index] <= maximum) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Test
     void zerlegtPolygonaleRaeumeInMehrere3dVolumenkoerper() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
@@ -618,18 +703,11 @@ class ThreeDSceneModelBuilderTest {
         ThreeDSceneModel sceneModel = builder.build(project, Set.of("Dachgeschoss"), false);
 
         assertTrue(sceneModel.boxes().stream().filter(box -> box.kind() == RenderableKind.ROOM_VOLUME).count() > 1);
-        assertNotEquals(
-                sceneModel.boxes().stream()
-                        .filter(box -> box.kind() == RenderableKind.WALL)
-                        .mapToDouble(RenderableBox::height)
-                        .min()
-                        .orElseThrow(),
-                sceneModel.boxes().stream()
-                        .filter(box -> box.kind() == RenderableKind.WALL)
-                        .mapToDouble(RenderableBox::height)
-                        .max()
-                        .orElseThrow(),
-                0.001
-        );
+        RenderableMesh wallMesh = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.WALL)
+                .findFirst()
+                .orElseThrow();
+        assertTrue(hasMeshHeightBetween(wallMesh, 2350.0, 2450.0));
+        assertTrue(hasMeshHeightBetween(wallMesh, 3050.0, 3150.0));
     }
 }
