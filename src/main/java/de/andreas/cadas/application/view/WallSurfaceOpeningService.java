@@ -4,6 +4,7 @@ import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
+import de.andreas.cadas.domain.geometry.PlanPoint;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,12 +16,23 @@ public final class WallSurfaceOpeningService {
     private static final double EPSILON = 0.001;
 
     public List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall) {
+        return visibleRectangles(level, wall, null);
+    }
+
+    public List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall, double sideSign) {
+        return visibleRectangles(level, wall, Double.valueOf(sideSign < 0.0 ? -1.0 : 1.0));
+    }
+
+    private List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall, Double sideSign) {
         double wallLength = wall.axis().length().toMillimeters();
         double wallHeight = wall.maximumHeightMillimeters();
         if (wallLength <= EPSILON || wallHeight <= EPSILON) {
             return List.of();
         }
         List<WallOpeningRectangle> openings = openingRectangles(level, wall);
+        if (sideSign != null) {
+            openings = withWallInterruptions(level, wall, sideSign, openings);
+        }
         if (openings.isEmpty()) {
             return List.of(new WallSurfaceRectangle(0.0, wallLength, 0.0, wallHeight));
         }
@@ -47,11 +59,22 @@ public final class WallSurfaceOpeningService {
     }
 
     public List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall) {
+        return visiblePlanIntervals(level, wall, null);
+    }
+
+    public List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall, double sideSign) {
+        return visiblePlanIntervals(level, wall, Double.valueOf(sideSign < 0.0 ? -1.0 : 1.0));
+    }
+
+    private List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall, Double sideSign) {
         double wallLength = wall.axis().length().toMillimeters();
         if (wallLength <= EPSILON) {
             return List.of();
         }
         List<WallOpeningRectangle> openings = openingRectangles(level, wall);
+        if (sideSign != null) {
+            openings = withWallInterruptions(level, wall, sideSign, openings);
+        }
         if (openings.isEmpty()) {
             return List.of(new WallSurfaceInterval(0.0, wallLength));
         }
@@ -92,6 +115,79 @@ public final class WallSurfaceOpeningService {
         openings.sort(Comparator.comparingDouble(WallOpeningRectangle::startMillimeters)
                 .thenComparingDouble(WallOpeningRectangle::lowerHeightMillimeters));
         return List.copyOf(openings);
+    }
+
+    private List<WallOpeningRectangle> withWallInterruptions(
+            Level level,
+            Wall wall,
+            double sideSign,
+            List<WallOpeningRectangle> openings
+    ) {
+        List<WallOpeningRectangle> allOpenings = new ArrayList<>(openings);
+        addWallInterruptions(allOpenings, level, wall, sideSign);
+        allOpenings.sort(Comparator.comparingDouble(WallOpeningRectangle::startMillimeters)
+                .thenComparingDouble(WallOpeningRectangle::lowerHeightMillimeters));
+        return List.copyOf(allOpenings);
+    }
+
+    private void addWallInterruptions(List<WallOpeningRectangle> openings, Level level, Wall wall, double sideSign) {
+        double wallLength = wall.axis().length().toMillimeters();
+        double wallHeight = wall.maximumHeightMillimeters();
+        double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
+        double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
+        double length = Math.max(EPSILON, Math.hypot(dx, dy));
+        double tangentX = dx / length;
+        double tangentY = dy / length;
+        double normalX = -tangentY;
+        double normalY = tangentX;
+        for (Wall candidate : level.walls()) {
+            if (candidate.id().equals(wall.id())) {
+                continue;
+            }
+            addWallInterruption(openings, wall, candidate, candidate.axis().start(), candidate.axis().end(), sideSign, tangentX, tangentY, normalX, normalY, wallLength, wallHeight);
+            addWallInterruption(openings, wall, candidate, candidate.axis().end(), candidate.axis().start(), sideSign, tangentX, tangentY, normalX, normalY, wallLength, wallHeight);
+        }
+    }
+
+    private void addWallInterruption(
+            List<WallOpeningRectangle> openings,
+            Wall wall,
+            Wall candidate,
+            PlanPoint touchPoint,
+            PlanPoint oppositePoint,
+            double sideSign,
+            double tangentX,
+            double tangentY,
+            double normalX,
+            double normalY,
+            double wallLength,
+            double wallHeight
+    ) {
+        if (wall.axis().distanceTo(touchPoint).toMillimeters() > EPSILON) {
+            return;
+        }
+        double localPosition = wall.axis().projectedLength(touchPoint).toMillimeters();
+        if (localPosition <= EPSILON || localPosition >= wallLength - EPSILON) {
+            return;
+        }
+        double candidateDx = oppositePoint.xMillimeters() - touchPoint.xMillimeters();
+        double candidateDy = oppositePoint.yMillimeters() - touchPoint.yMillimeters();
+        double candidateLength = Math.hypot(candidateDx, candidateDy);
+        if (candidateLength <= EPSILON) {
+            return;
+        }
+        double candidateTangentX = candidateDx / candidateLength;
+        double candidateTangentY = candidateDy / candidateLength;
+        double sideProjection = (candidateTangentX * normalX + candidateTangentY * normalY) * sideSign;
+        if (sideProjection <= EPSILON) {
+            return;
+        }
+        double sine = Math.abs(tangentX * candidateTangentY - tangentY * candidateTangentX);
+        if (sine <= EPSILON) {
+            return;
+        }
+        double halfWidth = candidate.thickness().toMillimeters() / 2.0 / sine;
+        addOpening(openings, localPosition - halfWidth, localPosition + halfWidth, 0.0, wallHeight, wallLength, wallHeight);
     }
 
     private void addOpening(

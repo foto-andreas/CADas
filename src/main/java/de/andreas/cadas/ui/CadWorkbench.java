@@ -1631,7 +1631,8 @@ public final class CadWorkbench extends BorderPane {
         if (wallLength <= 0.0) {
             return;
         }
-        List<WallSurfaceInterval> visibleIntervals = wallSurfaceOpeningService.visiblePlanIntervals(activeLevel.get(), wall);
+        double sideSign = centerOffset < 0.0 ? -1.0 : 1.0;
+        List<WallSurfaceInterval> visibleIntervals = wallSurfaceOpeningService.visiblePlanIntervals(activeLevel.get(), wall, sideSign);
         if (visibleIntervals.isEmpty()) {
             return;
         }
@@ -1741,19 +1742,24 @@ public final class CadWorkbench extends BorderPane {
         }
         for (SurfaceLayer layer : stack.layers()) {
             if (layer.visible()) {
-                drawWallSurfaceLayerInElevation(graphics, wall, layer);
+                if (sides.positiveSide()) {
+                    drawWallSurfaceLayerInElevation(graphics, wall, layer, 1.0);
+                }
+                if (sides.negativeSide()) {
+                    drawWallSurfaceLayerInElevation(graphics, wall, layer, -1.0);
+                }
             }
         }
     }
 
-    private void drawWallSurfaceLayerInElevation(GraphicsContext graphics, Wall wall, SurfaceLayer layer) {
+    private void drawWallSurfaceLayerInElevation(GraphicsContext graphics, Wall wall, SurfaceLayer layer, double sideSign) {
         double wallLength = wall.axis().length().toMillimeters();
         double startHorizontal = projectHorizontal(wall.axis().start(), 0.0);
         double endHorizontal = projectHorizontal(wall.axis().end(), 0.0);
         if (wallLength <= 0.0 || Math.abs(endHorizontal - startHorizontal) < 10.0) {
             return;
         }
-        List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(activeLevel.get(), wall);
+        List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(activeLevel.get(), wall, sideSign);
         if (visibleRectangles.isEmpty()) {
             return;
         }

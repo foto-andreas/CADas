@@ -509,6 +509,106 @@ class ThreeDSceneModelBuilderTest {
     }
 
     @Test
+    void unterbrichtWandbelagUndFugenAnEinbindenderInnenwand() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall exteriorWall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        Wall interiorWall = Wall.create(
+                new PlanSegment(new PlanPoint(2000, 0), new PlanPoint(2000, 1500)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(exteriorWall);
+        level.addWall(interiorWall);
+        Room room = Room.rectangular(
+                "Raum",
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 2500),
+                Length.of(2.8, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+        SurfaceLayerStack stack = addInteriorWallStack(level, exteriorWall, room);
+        SurfaceLayer layer = stack.layers().getFirst();
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), true);
+
+        List<RenderableBox> wallLayerBodies = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "surface-layer".equals(box.materialKey()))
+                .toList();
+        List<RenderableBox> wallJoints = sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "joint".equals(box.materialKey()))
+                .toList();
+        assertEquals(2, wallLayerBodies.size());
+        assertFalse(wallLayerBodies.stream().anyMatch(box -> overlapsX(box, 1900.0, 2100.0)));
+        assertFalse(wallJoints.stream().anyMatch(box -> overlapsX(box, 1900.0, 2100.0)));
+    }
+
+    @Test
+    void verlängertWandbelagMeshAnKonkaverInneneckeBisZumNachbarbelag() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
+        var level = project.primaryLevel();
+        Wall horizontal = new Wall(
+                UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(-2000, 0)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(3.2, LengthUnit.METER),
+                Length.of(3.2, LengthUnit.METER),
+                Length.of(2.6, LengthUnit.METER)
+        );
+        Wall vertical = Wall.create(
+                new PlanSegment(new PlanPoint(0, 1000), new PlanPoint(0, 0)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(3.2, LengthUnit.METER)
+        );
+        level.addWall(horizontal);
+        level.addWall(vertical);
+        Room room = new Room(
+                UUID.randomUUID(),
+                "Raum",
+                List.of(
+                        new PlanPoint(-2000, -1500),
+                        new PlanPoint(1500, -1500),
+                        new PlanPoint(1500, 1000),
+                        new PlanPoint(0, 1000),
+                        new PlanPoint(0, 0),
+                        new PlanPoint(-2000, 0)
+                ),
+                Length.of(3.2, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                null
+        );
+        level.addRoom(room);
+        SurfaceLayerStack horizontalStack = addInteriorWallStack(level, horizontal, room);
+        addInteriorWallStack(level, vertical, room);
+        SurfaceLayer layer = horizontalStack.layers().getFirst();
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Dachgeschoss"), true);
+
+        RenderableMesh surfaceMesh = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(mesh -> mesh.selectionKey().elementId().equals(layer.id().toString()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(maximumMeshX(surfaceMesh) > 100.0);
+        assertTrue(sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(layer.id().toString()))
+                .filter(box -> "joint".equals(box.materialKey()))
+                .anyMatch(box -> box.centerX() + box.width() / 2.0 > 100.0));
+    }
+
+    @Test
     void flacheDeckenmeshBleibtBeiLRaeumenAusDerInneneckeHeraus() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         var level = project.primaryLevel();
@@ -591,6 +691,19 @@ class ThreeDSceneModelBuilderTest {
         }
     }
 
+    private SurfaceLayerStack addInteriorWallStack(de.andreas.cadas.domain.model.Level level, Wall wall, Room room) {
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, WallSurfaceTargetKey.interior(wall.id(), room.id()));
+        stack.addLayer(SurfaceLayer.create(
+                "Dämmplatte",
+                Length.of(8, LengthUnit.CENTIMETER),
+                Length.of(120, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(2, LengthUnit.MILLIMETER)
+        ));
+        level.addSurfaceLayerStack(stack);
+        return stack;
+    }
+
     private boolean overlapsWallOpening(
             RenderableBox box,
             double baseHeight,
@@ -639,6 +752,20 @@ class ThreeDSceneModelBuilderTest {
             }
         }
         return false;
+    }
+
+    private boolean overlapsX(RenderableBox box, double minimumX, double maximumX) {
+        return box.centerX() - box.width() / 2.0 < maximumX - 0.001
+                && box.centerX() + box.width() / 2.0 > minimumX + 0.001;
+    }
+
+    private double maximumMeshX(RenderableMesh mesh) {
+        double maximum = Double.NEGATIVE_INFINITY;
+        float[] points = mesh.points();
+        for (int index = 0; index < points.length; index += 3) {
+            maximum = Math.max(maximum, points[index]);
+        }
+        return maximum;
     }
 
     @Test

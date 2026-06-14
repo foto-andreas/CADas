@@ -94,6 +94,33 @@ class WallSurfaceOpeningServiceTest {
         assertTrue(intervals.stream().anyMatch(interval -> intervalMatches(interval, 3400.0, 4000.0)));
     }
 
+    @Test
+    void draufsichtIntervalleUnterbrechenBelagAnEinbindenderInnenwandNurAufBetroffenerSeite() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall exteriorWall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        Wall interiorWall = Wall.create(
+                new PlanSegment(new PlanPoint(2000, 0), new PlanPoint(2000, 1500)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(exteriorWall);
+        level.addWall(interiorWall);
+
+        List<WallSurfaceInterval> interrupted = service.visiblePlanIntervals(level, exteriorWall, 1.0);
+        List<WallSurfaceInterval> unaffected = service.visiblePlanIntervals(level, exteriorWall, -1.0);
+
+        assertEquals(2, interrupted.size());
+        assertTrue(interrupted.stream().anyMatch(interval -> intervalMatches(interval, 0.0, 1900.0)));
+        assertTrue(interrupted.stream().anyMatch(interval -> intervalMatches(interval, 2100.0, 4000.0)));
+        assertEquals(1, unaffected.size());
+        assertTrue(unaffected.stream().anyMatch(interval -> intervalMatches(interval, 0.0, 4000.0)));
+    }
+
     private boolean rectangleMatches(WallSurfaceRectangle rectangle, double start, double end, double lower, double upper) {
         return Math.abs(rectangle.startMillimeters() - start) < 0.001
                 && Math.abs(rectangle.endMillimeters() - end) < 0.001

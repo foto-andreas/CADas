@@ -6,7 +6,9 @@ import de.andreas.cadas.application.layers.TileLayoutService;
 import de.andreas.cadas.application.layers.TilePlacement;
 import de.andreas.cadas.application.layers.WallSurfaceSideService;
 import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
+import de.andreas.cadas.application.view.WallSurfaceOpeningService.WallSurfaceInterval;
 import de.andreas.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle;
+import de.andreas.cadas.application.view.WallSurfacePlanGeometryService.WallSurfacePlanPolygon;
 import de.andreas.cadas.application.room.OrthogonalPolygonDecompositionService;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
@@ -48,6 +50,7 @@ public final class ThreeDSceneModelBuilder {
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
+    private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
     private final List<RenderableMesh> meshes = new ArrayList<>();
 
@@ -764,25 +767,26 @@ public final class ThreeDSceneModelBuilder {
 
     private List<RenderableBox> buildWallSurfaceLayerBoxes(Level level, String levelName, Wall wall, SurfaceLayerStack stack, double baseHeight) {
         List<RenderableBox> boxes = new ArrayList<>();
-        List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(level, wall);
-        if (visibleRectangles.isEmpty()) {
-            return boxes;
-        }
         double cumulativeThickness = wall.thickness().toMillimeters() / 2.0;
         WallSurfaceSideService.WallLayerSides wallLayerSides = wallSurfaceSideService.resolve(level, wall, stack.surfaceType(), stack.targetKey());
-        for (SurfaceLayer layer : stack.layers()) {
+        for (int layerIndex = 0; layerIndex < stack.layers().size(); layerIndex++) {
+            SurfaceLayer layer = stack.layers().get(layerIndex);
             if (!layer.visible()) {
                 cumulativeThickness += layer.thickness().toMillimeters();
                 continue;
             }
             double centerOffset = cumulativeThickness + layer.thickness().toMillimeters() / 2.0;
             if (wallLayerSides.positiveSide()) {
-                visibleRectangles.forEach(rectangle -> wallSurfaceLayerBox(levelName, wall, layer, rectangle, baseHeight, centerOffset).ifPresent(boxes::add));
-                boxes.addAll(buildWallSurfaceJoints(levelName, wall, layer, visibleRectangles, baseHeight, cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0));
+                int visibleLayerIndex = layerIndex;
+                List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(level, wall, 1.0);
+                visibleRectangles.forEach(rectangle -> wallSurfaceLayerBox(level, levelName, wall, stack, layer, visibleLayerIndex, rectangle, baseHeight, centerOffset).ifPresent(boxes::add));
+                boxes.addAll(buildWallSurfaceJoints(level, levelName, wall, stack, layer, visibleLayerIndex, visibleRectangles, baseHeight, cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0));
             }
             if (wallLayerSides.negativeSide()) {
-                visibleRectangles.forEach(rectangle -> wallSurfaceLayerBox(levelName, wall, layer, rectangle, baseHeight, -centerOffset).ifPresent(boxes::add));
-                boxes.addAll(buildWallSurfaceJoints(levelName, wall, layer, visibleRectangles, baseHeight, -(cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0)));
+                int visibleLayerIndex = layerIndex;
+                List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(level, wall, -1.0);
+                visibleRectangles.forEach(rectangle -> wallSurfaceLayerBox(level, levelName, wall, stack, layer, visibleLayerIndex, rectangle, baseHeight, -centerOffset).ifPresent(boxes::add));
+                boxes.addAll(buildWallSurfaceJoints(level, levelName, wall, stack, layer, visibleLayerIndex, visibleRectangles, baseHeight, -(cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0)));
             }
             cumulativeThickness += layer.thickness().toMillimeters();
         }
@@ -790,34 +794,39 @@ public final class ThreeDSceneModelBuilder {
     }
 
     private Optional<RenderableBox> wallSurfaceLayerBox(
+            Level level,
             String levelName,
             Wall wall,
+            SurfaceLayerStack stack,
             SurfaceLayer layer,
+            int layerIndex,
             WallSurfaceRectangle rectangle,
             double baseHeight,
             double perpendicularOffset
     ) {
+        WallSurfacePlanPolygon polygon = wallSurfacePlanGeometryService.surfacePolygon(
+                level,
+                wall,
+                stack,
+                layer,
+                layerIndex,
+                perpendicularOffset,
+                new WallSurfaceInterval(rectangle.startMillimeters(), rectangle.endMillimeters())
+        );
         if (wall.hasVariableTopHeight()) {
-            addWallSurfaceLayerMesh(levelName, wall, layer, rectangle, baseHeight, perpendicularOffset);
+            addWallSurfaceLayerMesh(levelName, wall, layer, rectangle, baseHeight, polygon);
             return Optional.empty();
         }
-        double localCenter = (rectangle.startMillimeters() + rectangle.endMillimeters()) / 2.0;
-        PlanPoint wallPoint = wall.axis().pointAt(Length.ofMillimeters(localCenter));
-        double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
-        double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
-        double length = Math.max(1.0, Math.hypot(dx, dy));
-        double normalX = -dy / length;
-        double normalY = dx / length;
-        double centerX = wallPoint.xMillimeters() + normalX * perpendicularOffset;
-        double centerZ = wallPoint.yMillimeters() + normalY * perpendicularOffset;
+        double width = polygon.points().get(0).distanceTo(polygon.points().get(1)).toMillimeters();
+        PlanPoint center = polygonCenter(polygon);
         return Optional.of(new RenderableBox(
                 new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
                 levelName,
                 RenderableKind.SURFACE_LAYER,
-                centerX,
+                center.xMillimeters(),
                 baseHeight + (rectangle.lowerHeightMillimeters() + rectangle.upperHeightMillimeters()) / 2.0,
-                centerZ,
-                rectangle.widthMillimeters(),
+                center.yMillimeters(),
+                width,
                 rectangle.heightMillimeters(),
                 layer.thickness().toMillimeters(),
                 RotationAxis.Y,
@@ -833,51 +842,85 @@ public final class ThreeDSceneModelBuilder {
             SurfaceLayer layer,
             WallSurfaceRectangle rectangle,
             double baseHeight,
-            double perpendicularOffset
+            WallSurfacePlanPolygon polygon
     ) {
         double lowerHeight = rectangle.lowerHeightMillimeters();
-        double startTop = Math.max(lowerHeight, Math.min(rectangle.upperHeightMillimeters(), wall.heightAt(rectangle.startMillimeters())));
-        double endTop = Math.max(lowerHeight, Math.min(rectangle.upperHeightMillimeters(), wall.heightAt(rectangle.endMillimeters())));
-        if (startTop <= lowerHeight + 0.001 && endTop <= lowerHeight + 0.001) {
+        PlanPoint startInnerPoint = polygon.points().get(0);
+        PlanPoint endInnerPoint = polygon.points().get(1);
+        PlanPoint endOuterPoint = polygon.points().get(2);
+        PlanPoint startOuterPoint = polygon.points().get(3);
+        double startInnerTop = wallSurfaceTopAt(wall, rectangle, startInnerPoint, lowerHeight);
+        double endInnerTop = wallSurfaceTopAt(wall, rectangle, endInnerPoint, lowerHeight);
+        double endOuterTop = wallSurfaceTopAt(wall, rectangle, endOuterPoint, lowerHeight);
+        double startOuterTop = wallSurfaceTopAt(wall, rectangle, startOuterPoint, lowerHeight);
+        double maximumTop = Math.max(Math.max(startInnerTop, endInnerTop), Math.max(startOuterTop, endOuterTop));
+        if (maximumTop <= lowerHeight + 0.001) {
             return;
         }
-        double halfLayerThickness = layer.thickness().toMillimeters() / 2.0;
-        double sideSign = perpendicularOffset < 0.0 ? -1.0 : 1.0;
-        double innerOffset = perpendicularOffset - sideSign * halfLayerThickness;
-        double outerOffset = perpendicularOffset + sideSign * halfLayerThickness;
-
-        MeshPoint startInnerBottom = wallMeshPoint(wall, rectangle.startMillimeters(), innerOffset, lowerHeight);
-        MeshPoint startInnerTop = wallMeshPoint(wall, rectangle.startMillimeters(), innerOffset, startTop);
-        MeshPoint endInnerBottom = wallMeshPoint(wall, rectangle.endMillimeters(), innerOffset, lowerHeight);
-        MeshPoint endInnerTop = wallMeshPoint(wall, rectangle.endMillimeters(), innerOffset, endTop);
-        MeshPoint startOuterBottom = wallMeshPoint(wall, rectangle.startMillimeters(), outerOffset, lowerHeight);
-        MeshPoint startOuterTop = wallMeshPoint(wall, rectangle.startMillimeters(), outerOffset, startTop);
-        MeshPoint endOuterBottom = wallMeshPoint(wall, rectangle.endMillimeters(), outerOffset, lowerHeight);
-        MeshPoint endOuterTop = wallMeshPoint(wall, rectangle.endMillimeters(), outerOffset, endTop);
+        MeshPoint startInnerBottom = meshPoint(startInnerPoint, lowerHeight);
+        MeshPoint startInnerTopPoint = meshPoint(startInnerPoint, startInnerTop);
+        MeshPoint endInnerBottom = meshPoint(endInnerPoint, lowerHeight);
+        MeshPoint endInnerTopPoint = meshPoint(endInnerPoint, endInnerTop);
+        MeshPoint startOuterBottom = meshPoint(startOuterPoint, lowerHeight);
+        MeshPoint startOuterTopPoint = meshPoint(startOuterPoint, startOuterTop);
+        MeshPoint endOuterBottom = meshPoint(endOuterPoint, lowerHeight);
+        MeshPoint endOuterTopPoint = meshPoint(endOuterPoint, endOuterTop);
 
         List<Float> vertexValues = new ArrayList<>();
-        addQuad(vertexValues, startInnerBottom, endInnerBottom, endInnerTop, startInnerTop);
-        addQuad(vertexValues, endOuterBottom, startOuterBottom, startOuterTop, endOuterTop);
-        addQuad(vertexValues, startInnerTop, endInnerTop, endOuterTop, startOuterTop);
+        addQuad(vertexValues, startInnerBottom, endInnerBottom, endInnerTopPoint, startInnerTopPoint);
+        addQuad(vertexValues, endOuterBottom, startOuterBottom, startOuterTopPoint, endOuterTopPoint);
+        addQuad(vertexValues, startInnerTopPoint, endInnerTopPoint, endOuterTopPoint, startOuterTopPoint);
         addQuad(vertexValues, startOuterBottom, endOuterBottom, endInnerBottom, startInnerBottom);
-        addQuad(vertexValues, startOuterBottom, startInnerBottom, startInnerTop, startOuterTop);
-        addQuad(vertexValues, endInnerBottom, endOuterBottom, endOuterTop, endInnerTop);
+        addQuad(vertexValues, startOuterBottom, startInnerBottom, startInnerTopPoint, startOuterTopPoint);
+        addQuad(vertexValues, endInnerBottom, endOuterBottom, endOuterTopPoint, endInnerTopPoint);
         addMesh(
                 new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
                 levelName,
                 RenderableKind.SURFACE_LAYER,
                 vertexValues,
                 baseHeight,
-                Math.max(startTop, endTop),
+                maximumTop,
                 "surface-layer",
                 SURFACE_LAYER_OPACITY
         );
     }
 
+    private PlanPoint polygonCenter(WallSurfacePlanPolygon polygon) {
+        double sumX = 0.0;
+        double sumY = 0.0;
+        for (PlanPoint point : polygon.points()) {
+            sumX += point.xMillimeters();
+            sumY += point.yMillimeters();
+        }
+        return new PlanPoint(sumX / polygon.points().size(), sumY / polygon.points().size());
+    }
+
+    private double wallSurfaceTopAt(Wall wall, WallSurfaceRectangle rectangle, PlanPoint point, double lowerHeight) {
+        double localDistance = localDistanceOnWall(wall, point);
+        return Math.max(lowerHeight, Math.min(rectangle.upperHeightMillimeters(), wall.heightAt(localDistance)));
+    }
+
+    private double localDistanceOnWall(Wall wall, PlanPoint point) {
+        double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
+        double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
+        double length = Math.max(1.0, Math.hypot(dx, dy));
+        double tangentX = dx / length;
+        double tangentY = dy / length;
+        return (point.xMillimeters() - wall.axis().start().xMillimeters()) * tangentX
+                + (point.yMillimeters() - wall.axis().start().yMillimeters()) * tangentY;
+    }
+
+    private MeshPoint meshPoint(PlanPoint point, double height) {
+        return new MeshPoint(point.xMillimeters(), height, point.yMillimeters());
+    }
+
     private List<RenderableBox> buildWallSurfaceJoints(
+            Level level,
             String levelName,
             Wall wall,
+            SurfaceLayerStack stack,
             SurfaceLayer layer,
+            int layerIndex,
             List<WallSurfaceRectangle> visibleRectangles,
             double baseHeight,
             double perpendicularOffset
@@ -912,9 +955,12 @@ public final class ThreeDSceneModelBuilder {
                     joints,
                     horizontalKeys,
                     "h",
+                    level,
                     levelName,
                     wall,
+                    stack,
                     layer,
+                    layerIndex,
                     visibleRectangles,
                     tileX,
                     tileX + tileWidth,
@@ -927,9 +973,12 @@ public final class ThreeDSceneModelBuilder {
                     joints,
                     verticalKeys,
                     "v",
+                    level,
                     levelName,
                     wall,
+                    stack,
                     layer,
+                    layerIndex,
                     visibleRectangles,
                     tileX + tileWidth - jointWidth,
                     tileX + tileWidth,
@@ -946,9 +995,12 @@ public final class ThreeDSceneModelBuilder {
             List<RenderableBox> joints,
             Set<String> keys,
             String prefix,
+            Level level,
             String levelName,
             Wall wall,
+            SurfaceLayerStack stack,
             SurfaceLayer layer,
+            int layerIndex,
             List<WallSurfaceRectangle> visibleRectangles,
             double localStartX,
             double localEndX,
@@ -966,12 +1018,25 @@ public final class ThreeDSceneModelBuilder {
             if (clippedEndX - clippedStartX <= 0.001 || clippedUpperY - clippedLowerY <= 0.001) {
                 continue;
             }
+            WallSurfaceInterval adjustedInterval = adjustedJointInterval(
+                    level,
+                    wall,
+                    stack,
+                    layer,
+                    layerIndex,
+                    perpendicularOffset,
+                    prefix,
+                    clippedStartX,
+                    clippedEndX
+            );
+            double jointStartX = adjustedInterval.startMillimeters();
+            double jointEndX = adjustedInterval.endMillimeters();
             String key = String.format(
                     java.util.Locale.US,
                     "%s:%.3f:%.3f:%.3f:%.3f",
                     prefix,
-                    clippedStartX,
-                    clippedEndX,
+                    jointStartX,
+                    jointEndX,
                     clippedLowerY,
                     clippedUpperY
             );
@@ -982,13 +1047,42 @@ public final class ThreeDSceneModelBuilder {
                     levelName,
                     wall,
                     layer,
-                    (clippedStartX + clippedEndX) / 2.0,
+                    (jointStartX + jointEndX) / 2.0,
                     baseHeight + (clippedLowerY + clippedUpperY) / 2.0,
-                    clippedEndX - clippedStartX,
+                    jointEndX - jointStartX,
                     clippedUpperY - clippedLowerY,
                     perpendicularOffset
             ));
         }
+    }
+
+    private WallSurfaceInterval adjustedJointInterval(
+            Level level,
+            Wall wall,
+            SurfaceLayerStack stack,
+            SurfaceLayer layer,
+            int layerIndex,
+            double perpendicularOffset,
+            String prefix,
+            double clippedStartX,
+            double clippedEndX
+    ) {
+        if (!"h".equals(prefix)) {
+            return new WallSurfaceInterval(clippedStartX, clippedEndX);
+        }
+        WallSurfacePlanPolygon polygon = wallSurfacePlanGeometryService.surfacePolygon(
+                level,
+                wall,
+                stack,
+                layer,
+                layerIndex,
+                perpendicularOffset,
+                new WallSurfaceInterval(clippedStartX, clippedEndX)
+        );
+        return new WallSurfaceInterval(
+                localDistanceOnWall(wall, polygon.points().get(0)),
+                localDistanceOnWall(wall, polygon.points().get(1))
+        );
     }
 
     private RenderableBox wallSurfaceJointBox(
@@ -1002,7 +1096,7 @@ public final class ThreeDSceneModelBuilder {
             double perpendicularOffset
     ) {
         double wallLength = wall.axis().length().toMillimeters();
-        PlanPoint wallPoint = wall.axis().pointAt(Length.ofMillimeters(Math.max(0.0, Math.min(localCenterX, wallLength))));
+        PlanPoint wallPoint = wall.axis().pointAt(Length.ofMillimeters(localCenterX));
         double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
         double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
         double length = Math.max(1.0, Math.hypot(dx, dy));
