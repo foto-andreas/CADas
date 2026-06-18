@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
+import javafx.scene.image.WritableImage;
 import javafx.scene.Scene;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -131,6 +132,37 @@ class CadWorkbenchTest {
         WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
         Assertions.assertEquals("TWO_D", snapshot.workspaceMode());
         Assertions.assertTrue(snapshot.statusText().contains("braucht einen Raum"));
+    }
+
+    @Test
+    void wandselektionBleibtInnerhalbDerBauteilkontur() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSelect("WALL", 0, false);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+        int middleX = (int) Math.round(snapshot.offsetX() + 2_000.0 * 0.1 * snapshot.zoom());
+        int minY = (int) image.getHeight();
+        int maxY = -1;
+        for (int y = 0; y < (int) image.getHeight(); y++) {
+            var color = image.getPixelReader().getColor(middleX, y);
+            if (color.getRed() > 0.75 && color.getGreen() > 0.35 && color.getGreen() < 0.65 && color.getBlue() < 0.3) {
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+            }
+        }
+
+        Assertions.assertTrue(maxY >= minY, "Selektionsfarbe wurde nicht gerendert.");
+        double erwarteteKonturbreite = 200.0 * 0.1 * snapshot.zoom();
+        Assertions.assertTrue(maxY - minY + 1 <= Math.ceil(erwarteteKonturbreite) + 2.0);
     }
 
     @Test

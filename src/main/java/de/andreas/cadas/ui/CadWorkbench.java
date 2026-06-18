@@ -1773,7 +1773,7 @@ public final class CadWorkbench extends BorderPane {
         for (Wall wall : activeLevel.get().walls()) {
             boolean selected = isSelected(RenderableKind.WALL, wall.id().toString());
             if (projectionService.isPlanView(activeView.get())) {
-                drawWall(graphics, wall.axis(), wall.thickness(), selected ? Color.web("#d97f2f") : Color.web("#274c77"), selected ? 1.18 : 1.0);
+                drawWall(graphics, wall.axis(), wall.thickness(), selected ? Color.web("#d97f2f") : Color.web("#274c77"), 1.0);
             } else {
                 drawWallElevation(graphics, wall, selected);
             }
@@ -2138,7 +2138,7 @@ public final class CadWorkbench extends BorderPane {
             graphics.setFill(selected ? Color.color(0.87, 0.58, 0.24, 0.30) : Color.color(0.77, 0.64, 0.45, 0.22));
             graphics.fillPolygon(xPoints, yPoints, xPoints.length);
             graphics.setStroke(selected ? Color.color(0.78, 0.42, 0.14, 0.96) : Color.color(0.55, 0.43, 0.25, 0.8));
-            graphics.setLineWidth(selected ? 2.8 : 2.0);
+            graphics.setLineWidth(2.0);
             graphics.strokePolygon(xPoints, yPoints, xPoints.length);
             if (showAreaVolume.get()) {
                 PlanPoint center = room.centerPoint();
@@ -2328,7 +2328,7 @@ public final class CadWorkbench extends BorderPane {
             graphics.save();
             graphics.setLineCap(javafx.scene.shape.StrokeLineCap.BUTT);
             graphics.setStroke(selected ? Color.web("#f08f3c") : Color.web("#d66b2d"));
-            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * (selected ? 0.72 : 0.55), 3.0));
+            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * 0.55, 3.0));
             graphics.strokeLine(
                     toScreenProjectedX(openingStart, 0.0),
                     toScreenProjectedY(openingStart, 0.0),
@@ -2352,7 +2352,7 @@ public final class CadWorkbench extends BorderPane {
             graphics.save();
             graphics.setLineCap(javafx.scene.shape.StrokeLineCap.BUTT);
             graphics.setStroke(selected ? Color.web("#7bc8eb") : Color.web("#4da8da"));
-            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * (selected ? 0.48 : 0.35), 3.0));
+            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * 0.35, 3.0));
             graphics.strokeLine(
                     toScreenProjectedX(openingStart, 0.0),
                     toScreenProjectedY(openingStart, 0.0),
@@ -2374,7 +2374,7 @@ public final class CadWorkbench extends BorderPane {
             boolean selected = isSelected(RenderableKind.ROOM_OBJECT, roomObject.id().toString());
             graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#356f62"));
             graphics.setFill(selected ? Color.color(0.85, 0.50, 0.18, 0.30) : Color.color(0.22, 0.44, 0.39, 0.22));
-            graphics.setLineWidth(selected ? 2.6 : 1.8);
+            graphics.setLineWidth(1.8);
             double width = roomObject.footprintWidthMillimeters();
             double depth = roomObject.footprintDepthMillimeters();
             if (projectionService.isPlanView(activeView.get())) {
@@ -2420,7 +2420,7 @@ public final class CadWorkbench extends BorderPane {
             boolean selected = isSelected(RenderableKind.STAIR, staircase.id().toString());
             graphics.setStroke(selected ? Color.web("#8a6848") : Color.web("#5e503f"));
             graphics.setFill(selected ? Color.color(0.63, 0.47, 0.27, 0.24) : Color.color(0.52, 0.46, 0.37, 0.16));
-            graphics.setLineWidth(selected ? 2.8 : 2.0);
+            graphics.setLineWidth(2.0);
             if (!projectionService.isPlanView(activeView.get())) {
                 drawStairElevation(graphics, staircase);
                 continue;
@@ -2570,7 +2570,7 @@ public final class CadWorkbench extends BorderPane {
         graphics.setFill(selected ? Color.color(0.85, 0.57, 0.22, 0.24) : Color.color(0.23, 0.39, 0.54, 0.18));
         graphics.fillPolygon(xPoints, yPoints, xPoints.length);
         graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#274c77"));
-        graphics.setLineWidth(selected ? 2.8 : 2.0);
+        graphics.setLineWidth(2.0);
         graphics.strokePolygon(xPoints, yPoints, xPoints.length);
     }
 
@@ -4971,6 +4971,11 @@ public final class CadWorkbench extends BorderPane {
         offsetY = newOffsetY;
         updateStatus();
         render();
+    }
+
+    public WritableImage automationDrawingSnapshot() {
+        ensureCanvasReady();
+        return drawingCanvas.snapshot(null, null);
     }
 
     public void automationRememberUndoState() {
