@@ -77,4 +77,53 @@ class WallEditingServiceTest {
         assertEquals(new PlanPoint(0, 80), selection.anchorPoint());
         assertTrue(selection.startWallIds().contains(walls.get(1).id()));
     }
+
+    @Test
+    void verschiebtRechteckeckenOrthogonalUndHaeltAnschluesseVerbunden() {
+        List<Wall> walls = List.of(
+                wall(0, 0, 4000, 0),
+                wall(4000, 0, 4000, 3000),
+                wall(4000, 3000, 0, 3000),
+                wall(0, 3000, 0, 0)
+        );
+        WallEndpointSelection selection = wallEditingService
+                .findConnectedEndpoint(walls, new PlanPoint(0, 0), Length.of(1, LengthUnit.MILLIMETER))
+                .orElseThrow();
+
+        List<Wall> updatedWalls = wallEditingService.moveEndpointGroup(walls, selection, new PlanPoint(300, 400), true);
+
+        assertEquals(new PlanPoint(300, 400), updatedWalls.get(0).axis().start());
+        assertEquals(new PlanPoint(4000, 400), updatedWalls.get(0).axis().end());
+        assertEquals(updatedWalls.get(0).axis().end(), updatedWalls.get(1).axis().start());
+        assertEquals(new PlanPoint(300, 3000), updatedWalls.get(2).axis().end());
+        assertEquals(updatedWalls.get(2).axis().end(), updatedWalls.get(3).axis().start());
+        assertTrue(updatedWalls.stream().allMatch(this::isOrthogonal));
+    }
+
+    @Test
+    void shiftFreigabeLaesstFreienWinkelZu() {
+        List<Wall> walls = List.of(wall(0, 0, 4000, 0));
+        WallEndpointSelection selection = wallEditingService
+                .findConnectedEndpoint(walls, new PlanPoint(0, 0), Length.of(1, LengthUnit.MILLIMETER))
+                .orElseThrow();
+
+        List<Wall> updatedWalls = wallEditingService.moveEndpointGroup(walls, selection, new PlanPoint(300, 400), false);
+
+        assertEquals(new PlanPoint(300, 400), updatedWalls.getFirst().axis().start());
+        assertTrue(!isOrthogonal(updatedWalls.getFirst()));
+    }
+
+    private Wall wall(double startX, double startY, double endX, double endY) {
+        return Wall.create(
+                new PlanSegment(new PlanPoint(startX, startY), new PlanPoint(endX, endY)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        );
+    }
+
+    private boolean isOrthogonal(Wall wall) {
+        double deltaX = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
+        double deltaY = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
+        return Math.abs(deltaX) < 0.001 || Math.abs(deltaY) < 0.001;
+    }
 }

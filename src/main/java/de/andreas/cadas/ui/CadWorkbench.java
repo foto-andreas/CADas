@@ -1536,7 +1536,12 @@ public final class CadWorkbench extends BorderPane {
                 }
                 DraftingConstraints constraints = currentConstraints(false);
                 PlanPoint snappedPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
-                activeLevel.get().replaceWalls(wallEditingService.moveEndpointGroup(activeLevel.get().walls(), selectedEndpointGroup, snappedPoint));
+                activeLevel.get().replaceWalls(wallEditingService.moveEndpointGroup(
+                        activeLevel.get().walls(),
+                        selectedEndpointGroup,
+                        snappedPoint,
+                        !event.isShiftDown()
+                ));
                 synchronizeRoomsFromWalls(activeLevel.get());
                 markThreeDDirty();
                 render();
