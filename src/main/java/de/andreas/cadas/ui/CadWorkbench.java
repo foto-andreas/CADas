@@ -1868,7 +1868,7 @@ public final class CadWorkbench extends BorderPane {
         for (Wall wall : activeLevel.get().walls()) {
             boolean selected = isSelected(RenderableKind.WALL, wall.id().toString());
             if (projectionService.isPlanView(activeView.get())) {
-                drawWall(graphics, wall.axis(), wall.thickness(), selected ? Color.web("#d97f2f") : Color.web("#274c77"), 1.0);
+                drawWall(graphics, wall.axis(), wall.thickness(), selected ? Color.web("#d97f2f") : CadColorPalette.WALL, 1.0);
             } else {
                 drawWallElevation(graphics, wall, selected);
             }
@@ -2499,7 +2499,7 @@ public final class CadWorkbench extends BorderPane {
             drawEditablePoint(
                     graphics,
                     entry.getKey(),
-                    active ? Color.web("#d97f2f") : Color.web("#274c77"),
+                    active ? Color.web("#d97f2f") : CadColorPalette.WALL,
                     active ? 0.68 : connected ? 0.42 : 0.18,
                     active ? 6.5 : 5.0
             );
@@ -2743,7 +2743,7 @@ public final class CadWorkbench extends BorderPane {
         double[] yPoints = {floorY, floorY, endTopY, startTopY};
         graphics.setFill(selected ? Color.color(0.85, 0.57, 0.22, 0.24) : Color.color(0.23, 0.39, 0.54, 0.18));
         graphics.fillPolygon(xPoints, yPoints, xPoints.length);
-        graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#274c77"));
+        graphics.setStroke(selected ? Color.web("#d97f2f") : CadColorPalette.WALL);
         graphics.setLineWidth(2.0);
         graphics.strokePolygon(xPoints, yPoints, xPoints.length);
     }
@@ -2918,7 +2918,7 @@ public final class CadWorkbench extends BorderPane {
         double directionLength = Math.max(1.0, Math.hypot(directionX, directionY));
         midX += -directionY / directionLength * normalOffset;
         midY += directionX / directionLength * normalOffset;
-        graphics.setFill(Color.web("#1d1b18"));
+        graphics.setFill(CadColorPalette.DIMENSION_TEXT);
         graphics.setFont(Font.font("Menlo", 12));
         graphics.fillText(text, midX + 8.0, midY - 8.0);
     }
