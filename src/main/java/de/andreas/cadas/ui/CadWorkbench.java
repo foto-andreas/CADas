@@ -460,6 +460,7 @@ public final class CadWorkbench extends BorderPane {
             updatePropertySectionVisibility();
             updateActionButtons();
             updateStatus();
+            render();
         });
         configureActionButtons();
         registerConfiguredDwgLibraries();
@@ -1683,6 +1684,7 @@ public final class CadWorkbench extends BorderPane {
         drawDoors(graphics);
         drawWindows(graphics);
         drawRoomObjects(graphics);
+        drawEditablePoints(graphics);
         if (previewSegment != null) {
             drawPreview(graphics);
         }
@@ -2361,6 +2363,59 @@ public final class CadWorkbench extends BorderPane {
             );
             graphics.restore();
         }
+    }
+
+    private void drawEditablePoints(GraphicsContext graphics) {
+        if (currentTool() != DrawingTool.EDIT || !projectionService.isPlanView(activeView.get())) {
+            return;
+        }
+        Map<PlanPoint, Integer> wallEndpointCounts = new LinkedHashMap<>();
+        for (Wall wall : activeLevel.get().walls()) {
+            wallEndpointCounts.merge(wall.axis().start(), 1, Integer::sum);
+            wallEndpointCounts.merge(wall.axis().end(), 1, Integer::sum);
+        }
+        for (Map.Entry<PlanPoint, Integer> entry : wallEndpointCounts.entrySet()) {
+            boolean connected = entry.getValue() > 1;
+            boolean active = selectedEndpointGroup != null && samePlanPoint(selectedEndpointGroup.anchorPoint(), entry.getKey());
+            drawEditablePoint(
+                    graphics,
+                    entry.getKey(),
+                    active ? Color.web("#d97f2f") : Color.web("#274c77"),
+                    active ? 0.68 : connected ? 0.42 : 0.18,
+                    active ? 6.5 : 5.0
+            );
+        }
+        for (Door door : activeLevel.get().doors()) {
+            Wall wall = activeLevel.get().findWall(door.wallId());
+            boolean selected = isSelected(RenderableKind.DOOR, door.id().toString());
+            drawOpeningEditablePoints(graphics, wall, door.offsetFromStart(), door.width(), Color.web("#d66b2d"), selected);
+        }
+        for (WindowElement window : activeLevel.get().windows()) {
+            Wall wall = activeLevel.get().findWall(window.wallId());
+            boolean selected = isSelected(RenderableKind.WINDOW, window.id().toString());
+            drawOpeningEditablePoints(graphics, wall, window.offsetFromStart(), window.width(), Color.web("#4da8da"), selected);
+        }
+    }
+
+    private void drawOpeningEditablePoints(GraphicsContext graphics, Wall wall, Length offset, Length width, Color color, boolean selected) {
+        drawEditablePoint(graphics, wall.axis().pointAt(offset), color, selected ? 0.52 : 0.24, selected ? 6.0 : 5.0);
+        drawEditablePoint(graphics, wall.axis().pointAt(offset.add(width)), color, selected ? 0.52 : 0.24, selected ? 6.0 : 5.0);
+    }
+
+    private void drawEditablePoint(GraphicsContext graphics, PlanPoint point, Color color, double fillOpacity, double radius) {
+        double centerX = toScreenProjectedX(point, 0.0);
+        double centerY = toScreenProjectedY(point, 0.0);
+        graphics.save();
+        graphics.setFill(Color.color(color.getRed(), color.getGreen(), color.getBlue(), fillOpacity));
+        graphics.setStroke(Color.web("#201c18"));
+        graphics.setLineWidth(1.2);
+        graphics.fillOval(centerX - radius, centerY - radius, radius * 2.0, radius * 2.0);
+        graphics.strokeOval(centerX - radius, centerY - radius, radius * 2.0, radius * 2.0);
+        graphics.restore();
+    }
+
+    private boolean samePlanPoint(PlanPoint first, PlanPoint second) {
+        return first.distanceTo(second).toMillimeters() < 0.001;
     }
 
     private void drawRoomObjects(GraphicsContext graphics) {

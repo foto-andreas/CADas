@@ -5,11 +5,13 @@ import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.ProjectModel;
+import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
 import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
+import de.andreas.cadas.domain.model.WindowElement;
 import de.andreas.cadas.infrastructure.dxf.DxfProjectExchangeService;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -163,6 +165,27 @@ class CadWorkbenchTest {
         Assertions.assertTrue(maxY >= minY, "Selektionsfarbe wurde nicht gerendert.");
         double erwarteteKonturbreite = 200.0 * 0.1 * snapshot.zoom();
         Assertions.assertTrue(maxY - minY + 1 <= Math.ceil(erwarteteKonturbreite) + 2.0);
+    }
+
+    @Test
+    void bearbeitenZeigtPickkreiseFuerWandTuerUndFenster() throws Exception {
+        Path projektDatei = erzeugeProjektMitPickpunktenAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+
+        assertPickkreis(image, snapshot, new PlanPoint(0, 0));
+        assertPickkreis(image, snapshot, new PlanPoint(1_000, 0));
+        assertPickkreis(image, snapshot, new PlanPoint(3_200, 0));
     }
 
     @Test
@@ -538,6 +561,32 @@ class CadWorkbenchTest {
         Path datei = Files.createTempFile("cadas-workbench-", ".dxf");
         new DxfProjectExchangeService().exportProject(project, datei);
         return datei;
+    }
+
+    private Path erzeugeProjektMitPickpunktenAlsDxf() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Pickpunkte", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = Wall.create(new PlanSegment(new PlanPoint(0, 0), new PlanPoint(5_000, 0)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER));
+        level.addWall(wall);
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(5_000, 0), new PlanPoint(5_000, 3_000)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addDoor(Door.create(wall.id(), Length.of(1, LengthUnit.METER), Length.of(1, LengthUnit.METER), Length.of(2.01, LengthUnit.METER), Length.zero()));
+        level.addWindow(WindowElement.create(wall.id(), Length.of(3.2, LengthUnit.METER), Length.of(1.2, LengthUnit.METER), Length.of(90, LengthUnit.CENTIMETER), Length.of(1.2, LengthUnit.METER)));
+        Path datei = Files.createTempFile("cadas-pickpunkte-", ".dxf");
+        new DxfProjectExchangeService().exportProject(project, datei);
+        return datei;
+    }
+
+    private void assertPickkreis(WritableImage image, WorkbenchAutomationSnapshot snapshot, PlanPoint point) {
+        int centerX = (int) Math.round(snapshot.offsetX() + point.xMillimeters() * 0.1 * snapshot.zoom());
+        int centerY = (int) Math.round(snapshot.offsetY() + point.yMillimeters() * 0.1 * snapshot.zoom());
+        boolean darkOutlineFound = false;
+        for (int x = Math.max(0, centerX - 7); x <= Math.min((int) image.getWidth() - 1, centerX + 7); x++) {
+            for (int y = Math.max(0, centerY - 7); y <= Math.min((int) image.getHeight() - 1, centerY + 7); y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                darkOutlineFound |= color.getRed() < 0.2 && color.getGreen() < 0.2 && color.getBlue() < 0.2;
+            }
+        }
+        Assertions.assertTrue(darkOutlineFound, "Kein Pickkreis bei " + point + " gefunden.");
     }
 
     private Path erzeugeProjektMitInnenwandfliesenAlsDxf() throws Exception {
