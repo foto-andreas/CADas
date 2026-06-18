@@ -208,6 +208,7 @@ public final class CadWorkbench extends BorderPane {
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final GuideDistanceService guideDistanceService = new GuideDistanceService();
+    private final TwoDZoomRange twoDZoomRange = new TwoDZoomRange();
     private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
     private final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
@@ -1410,7 +1411,7 @@ public final class CadWorkbench extends BorderPane {
         drawingCanvas.setOnScroll(event -> {
             double oldScale = scale();
             double zoomFactor = event.getDeltaY() > 0 ? 1.1 : 0.9;
-            zoom = clamp(zoom * zoomFactor, 0.25, 8.0);
+            zoom = twoDZoomRange.clamp(zoom * zoomFactor);
             double newScale = scale();
             offsetX = event.getX() - ((event.getX() - offsetX) / oldScale) * newScale;
             offsetY = event.getY() - ((event.getY() - offsetY) / oldScale) * newScale;
@@ -4674,7 +4675,7 @@ public final class CadWorkbench extends BorderPane {
             double availableWidth = Math.max(220.0, viewportWidth - horizontalPadding);
             double availableHeight = Math.max(180.0, viewportHeight - verticalPadding);
             double fitScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
-            zoom = clamp(fitScale / BASE_PIXELS_PER_MILLIMETER, 0.25, 8.0);
+            zoom = twoDZoomRange.clamp(fitScale / BASE_PIXELS_PER_MILLIMETER);
             offsetX = viewportWidth / 2.0 - bounds.centerHorizontalMillimeters() * scale();
             offsetY = viewportHeight / 2.0 - bounds.centerVerticalMillimeters() * scale();
         }, () -> {
@@ -5232,7 +5233,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     public void automationSetViewport(double zoomFactor, double newOffsetX, double newOffsetY) {
-        zoom = clamp(zoomFactor, 0.25, 8.0);
+        zoom = twoDZoomRange.clamp(zoomFactor);
         offsetX = newOffsetX;
         offsetY = newOffsetY;
         updateStatus();
