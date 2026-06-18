@@ -10,6 +10,7 @@ import de.andreas.cadas.application.drawing.SelectionQueryService;
 import de.andreas.cadas.application.drawing.SelectionTranslationService;
 import de.andreas.cadas.application.drawing.SnapService;
 import de.andreas.cadas.application.drawing.WallEditingService;
+import de.andreas.cadas.application.drawing.WallDimensionService;
 import de.andreas.cadas.application.drawing.WallEndpointSelection;
 import de.andreas.cadas.application.dwg.DwgBlockDefinition;
 import de.andreas.cadas.application.dwg.DwgConversionAvailability;
@@ -190,6 +191,7 @@ public final class CadWorkbench extends BorderPane {
     private final ExchangeFileNameService exchangeFileNameService = new ExchangeFileNameService();
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     private final WallEditingService wallEditingService = new WallEditingService();
+    private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final QuarterTurnRotationService quarterTurnRotationService = new QuarterTurnRotationService();
     private final SelectionTranslationService selectionTranslationService = new SelectionTranslationService();
     private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
@@ -1780,8 +1782,34 @@ public final class CadWorkbench extends BorderPane {
                 drawWallElevation(graphics, wall, selected);
             }
             if (showDimensions.get() && projectionService.isPlanView(activeView.get())) {
-                drawDimensionLabel(graphics, wall.axis(), wall.axis().length().format(LengthUnit.METER, 2));
+                if (selected) {
+                    drawSelectedWallDimensions(graphics, wall);
+                } else {
+                    drawDimensionLabel(graphics, wall.axis(), wall.axis().length().format(LengthUnit.METER, 2));
+                }
             }
+        }
+    }
+
+    private void drawSelectedWallDimensions(GraphicsContext graphics, Wall wall) {
+        WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(activeLevel.get(), wall);
+        double offset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0, 24.0);
+        for (WallDimensionService.SideDimension roomDimension : dimensions.roomDimensions()) {
+            drawDimensionLabel(
+                    graphics,
+                    wall.axis(),
+                    roomDimension.name() + ": Raummaß " + roomDimension.length().format(LengthUnit.METER, 2),
+                    offset * roomDimension.sideSign()
+            );
+        }
+        dimensions.exteriorDimension().ifPresent(exteriorDimension -> drawDimensionLabel(
+                graphics,
+                wall.axis(),
+                "Außenmaß " + exteriorDimension.length().format(LengthUnit.METER, 2),
+                offset * exteriorDimension.sideSign()
+        ));
+        if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
+            drawDimensionLabel(graphics, wall.axis(), "Achsmaß " + wall.axis().length().format(LengthUnit.METER, 2));
         }
     }
 
@@ -2788,8 +2816,17 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawDimensionLabel(GraphicsContext graphics, PlanSegment segment, String text) {
+        drawDimensionLabel(graphics, segment, text, 0.0);
+    }
+
+    private void drawDimensionLabel(GraphicsContext graphics, PlanSegment segment, String text, double normalOffset) {
         double midX = (toScreenProjectedX(segment.start(), 0.0) + toScreenProjectedX(segment.end(), 0.0)) / 2.0;
         double midY = (toScreenProjectedY(segment.start(), 0.0) + toScreenProjectedY(segment.end(), 0.0)) / 2.0;
+        double directionX = toScreenProjectedX(segment.end(), 0.0) - toScreenProjectedX(segment.start(), 0.0);
+        double directionY = toScreenProjectedY(segment.end(), 0.0) - toScreenProjectedY(segment.start(), 0.0);
+        double directionLength = Math.max(1.0, Math.hypot(directionX, directionY));
+        midX += -directionY / directionLength * normalOffset;
+        midY += directionX / directionLength * normalOffset;
         graphics.setFill(Color.web("#1d1b18"));
         graphics.setFont(Font.font("Menlo", 12));
         graphics.fillText(text, midX + 8.0, midY - 8.0);
