@@ -3411,21 +3411,12 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void removeNearestGuide(PlanPoint clickPoint) {
-        guideLines.stream()
-                .filter(guideLine -> guideDistance(guideLine, clickPoint) <= SNAP_TOLERANCE.toMillimeters())
-                .findFirst()
+        guideDistanceService.nearestGuide(guideLines, clickPoint, SNAP_TOLERANCE)
                 .ifPresent(guideLine -> {
                     rememberStateForUndo();
                     guideLines.remove(guideLine);
                 });
         render();
-    }
-
-    private double guideDistance(GuideLine guideLine, PlanPoint clickPoint) {
-        if (guideLine.orientation() == GuideOrientation.VERTICAL) {
-            return Math.abs(guideLine.worldMillimeters() - clickPoint.xMillimeters());
-        }
-        return Math.abs(guideLine.worldMillimeters() - clickPoint.yMillimeters());
     }
 
     private double guideWorldPositionFromHorizontalRuler(MouseEvent event) {

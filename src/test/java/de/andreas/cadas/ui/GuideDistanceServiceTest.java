@@ -2,6 +2,9 @@ package de.andreas.cadas.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import de.andreas.cadas.domain.geometry.Length;
+import de.andreas.cadas.domain.geometry.PlanPoint;
+
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -39,5 +42,20 @@ class GuideDistanceServiceTest {
         );
 
         assertEquals(List.of(), distances);
+    }
+
+    @Test
+    void waehltUnabhaengigVonDerReihenfolgeDenKleinstenNormalabstand() {
+        GuideLine weiterEntfernt = new GuideLine(GuideOrientation.VERTICAL, 0);
+        GuideLine amNaechsten = new GuideLine(GuideOrientation.VERTICAL, 100);
+        GuideLine horizontal = new GuideLine(GuideOrientation.HORIZONTAL, 1_000);
+
+        GuideLine result = service.nearestGuide(
+                List.of(weiterEntfernt, horizontal, amNaechsten),
+                new PlanPoint(70, 100),
+                Length.ofMillimeters(120)
+        ).orElseThrow();
+
+        assertEquals(amNaechsten, result);
     }
 }
