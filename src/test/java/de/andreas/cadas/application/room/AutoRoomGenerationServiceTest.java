@@ -45,6 +45,37 @@ class AutoRoomGenerationServiceTest {
     }
 
     @Test
+    void erkenntRaumTrotzGeringerZeichnungsungenauigkeit() {
+        Level level = new Level("Erdgeschoss");
+        level.addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 1.25), new PlanPoint(8_000, 0)),
+                Length.of(26, LengthUnit.CENTIMETER),
+                Length.of(2.6, LengthUnit.METER)
+        ));
+        level.addWall(Wall.create(
+                new PlanSegment(new PlanPoint(8_000.5, 0), new PlanPoint(8_000, 6_000)),
+                Length.of(26, LengthUnit.CENTIMETER),
+                Length.of(2.6, LengthUnit.METER)
+        ));
+        level.addWall(Wall.create(
+                new PlanSegment(new PlanPoint(8_000, 6_000), new PlanPoint(0, 5_990)),
+                Length.of(26, LengthUnit.CENTIMETER),
+                Length.of(2.6, LengthUnit.METER)
+        ));
+        level.addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 5_990), new PlanPoint(0, 1.25)),
+                Length.of(26, LengthUnit.CENTIMETER),
+                Length.of(2.6, LengthUnit.METER)
+        ));
+
+        List<Room> rooms = service.synchronize(level, defaults());
+
+        assertEquals(1, rooms.size());
+        assertEquals(7_740.25, rooms.getFirst().widthMillimeters(), 0.01);
+        assertEquals(5_734.38, rooms.getFirst().depthMillimeters(), 0.01);
+    }
+
+    @Test
     void leitetPolygonalenRaumAusLfoermigemWandzugAb() {
         Level level = new Level("Erdgeschoss");
         addLoop(level, List.of(

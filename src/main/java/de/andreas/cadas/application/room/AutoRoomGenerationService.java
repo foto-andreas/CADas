@@ -25,6 +25,7 @@ import java.util.UUID;
 public final class AutoRoomGenerationService {
 
     private static final double EPSILON = 0.001;
+    private static final double MAX_ORTHOGONAL_DEVIATION_RATIO = Math.tan(Math.toRadians(0.5));
     private static final double OUTER_MARGIN = 1_000.0;
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
@@ -52,23 +53,35 @@ public final class AutoRoomGenerationService {
             double deltaX = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
             double deltaY = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
             double halfThickness = wall.thickness().toMillimeters() / 2.0 + surfaceLayerEffectService.maximumWallInteriorThicknessMillimeters(level, wall);
-            if (Math.abs(deltaY) < EPSILON) {
+            if (isNearlyHorizontal(deltaX, deltaY)) {
+                double axisY = (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0;
                 rectangles.add(new WallRectangle(
                         Math.min(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()),
                         Math.max(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()),
-                        wall.axis().start().yMillimeters() - halfThickness,
-                        wall.axis().start().yMillimeters() + halfThickness
+                        axisY - halfThickness,
+                        axisY + halfThickness
                 ));
-            } else if (Math.abs(deltaX) < EPSILON) {
+            } else if (isNearlyVertical(deltaX, deltaY)) {
+                double axisX = (wall.axis().start().xMillimeters() + wall.axis().end().xMillimeters()) / 2.0;
                 rectangles.add(new WallRectangle(
-                        wall.axis().start().xMillimeters() - halfThickness,
-                        wall.axis().start().xMillimeters() + halfThickness,
+                        axisX - halfThickness,
+                        axisX + halfThickness,
                         Math.min(wall.axis().start().yMillimeters(), wall.axis().end().yMillimeters()),
                         Math.max(wall.axis().start().yMillimeters(), wall.axis().end().yMillimeters())
                 ));
             }
         }
         return rectangles;
+    }
+
+    private boolean isNearlyHorizontal(double deltaX, double deltaY) {
+        return Math.abs(deltaY) < EPSILON
+                || Math.abs(deltaX) > EPSILON && Math.abs(deltaY / deltaX) <= MAX_ORTHOGONAL_DEVIATION_RATIO;
+    }
+
+    private boolean isNearlyVertical(double deltaX, double deltaY) {
+        return Math.abs(deltaX) < EPSILON
+                || Math.abs(deltaY) > EPSILON && Math.abs(deltaX / deltaY) <= MAX_ORTHOGONAL_DEVIATION_RATIO;
     }
 
     private List<DetectedRoom> detectRooms(List<WallRectangle> wallRectangles) {
