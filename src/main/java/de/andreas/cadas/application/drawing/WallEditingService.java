@@ -6,6 +6,7 @@ import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Wall;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,15 +14,11 @@ import java.util.UUID;
 public final class WallEditingService {
 
     public Optional<WallEndpointSelection> findConnectedEndpoint(List<Wall> walls, PlanPoint clickPoint, Length tolerance) {
-        for (Wall wall : walls) {
-            if (wall.axis().start().distanceTo(clickPoint).compareTo(tolerance) <= 0) {
-                return Optional.of(selectionForPoint(walls, wall.axis().start()));
-            }
-            if (wall.axis().end().distanceTo(clickPoint).compareTo(tolerance) <= 0) {
-                return Optional.of(selectionForPoint(walls, wall.axis().end()));
-            }
-        }
-        return Optional.empty();
+        return walls.stream()
+                .flatMap(wall -> java.util.stream.Stream.of(wall.axis().start(), wall.axis().end()))
+                .filter(endpoint -> endpoint.distanceTo(clickPoint).compareTo(tolerance) <= 0)
+                .min(Comparator.comparingDouble(endpoint -> endpoint.distanceTo(clickPoint).toMillimeters()))
+                .map(endpoint -> selectionForPoint(walls, endpoint));
     }
 
     public List<Wall> moveEndpointGroup(List<Wall> walls, WallEndpointSelection selection, PlanPoint newPoint) {

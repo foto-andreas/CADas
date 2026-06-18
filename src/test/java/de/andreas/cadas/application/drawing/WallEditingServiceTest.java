@@ -62,4 +62,19 @@ class WallEditingServiceTest {
         assertEquals(60.0, updatedWalls.get(1).axis().start().xMillimeters(), 0.1);
         assertEquals(10.0, updatedWalls.get(1).axis().start().yMillimeters(), 0.1);
     }
+
+    @Test
+    void waehltVonNahenEndpunktenDenTatsaechlichAngeklickten() {
+        List<Wall> walls = List.of(
+                Wall.create(new PlanSegment(new PlanPoint(0, 0), new PlanPoint(1000, 0)), Length.of(17.5, LengthUnit.CENTIMETER), Length.of(2.75, LengthUnit.METER)),
+                Wall.create(new PlanSegment(new PlanPoint(0, 80), new PlanPoint(1000, 80)), Length.of(17.5, LengthUnit.CENTIMETER), Length.of(2.75, LengthUnit.METER))
+        );
+
+        WallEndpointSelection selection = wallEditingService
+                .findConnectedEndpoint(walls, new PlanPoint(4, 75), Length.of(12, LengthUnit.CENTIMETER))
+                .orElseThrow();
+
+        assertEquals(new PlanPoint(0, 80), selection.anchorPoint());
+        assertTrue(selection.startWallIds().contains(walls.get(1).id()));
+    }
 }
