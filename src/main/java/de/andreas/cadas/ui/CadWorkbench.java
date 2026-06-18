@@ -202,6 +202,7 @@ public final class CadWorkbench extends BorderPane {
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
+    private final GuideDistanceService guideDistanceService = new GuideDistanceService();
     private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
     private final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
@@ -223,6 +224,7 @@ public final class CadWorkbench extends BorderPane {
     private final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
     private final BooleanProperty showRoomObjects = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
+    private final BooleanProperty showGuideDistances = new SimpleBooleanProperty(true);
 
     private final Canvas drawingCanvas = new Canvas();
     private final Canvas horizontalRuler = new Canvas();
@@ -435,6 +437,7 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(showDimensions);
         registerRenderListener(showAreaVolume);
         registerRenderListener(showGuides);
+        registerRenderListener(showGuideDistances);
         showRoomObjects.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.setRoomObjectsVisible(newValue);
             markThreeDDirty();
@@ -511,6 +514,10 @@ public final class CadWorkbench extends BorderPane {
         snapPointsBox.selectedProperty().bindBidirectional(snapToEndpoints);
         applyTooltip(snapPointsBox, "Aktiviert das magnetische Einrasten auf vorhandene Linien-Endpunkte.");
 
+        CheckBox guideDistancesBox = new CheckBox("Hilfslinienabstände");
+        guideDistancesBox.selectedProperty().bindBidirectional(showGuideDistances);
+        applyTooltip(guideDistancesBox, "Zeigt beim Herausziehen einer Hilfslinie die Abstände zu allen vorhandenen parallelen Hilfslinien an.");
+
         CheckBox dimensionsBox = new CheckBox("Bemaßung");
         dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
         applyTooltip(dimensionsBox, "Blendet die Längenbeschriftung der gezeichneten Wände ein oder aus.");
@@ -541,6 +548,7 @@ public final class CadWorkbench extends BorderPane {
                 rasterBox,
                 snapRasterBox,
                 snapPointsBox,
+                guideDistancesBox,
                 new Separator(Orientation.VERTICAL),
                 dimensionsBox,
                 objectsBox
@@ -790,6 +798,7 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("Auf Raster einrasten", snapToGrid),
                 checkMenuItem("Auf Punkte einrasten", snapToEndpoints),
                 checkMenuItem("Hilfslinien anzeigen", showGuides),
+                checkMenuItem("Hilfslinienabstände anzeigen", showGuideDistances),
                 checkMenuItem("Bemaßung anzeigen", showDimensions),
                 checkMenuItem("Objekte anzeigen", showRoomObjects),
                 checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
@@ -1726,6 +1735,30 @@ public final class CadWorkbench extends BorderPane {
             } else {
                 double y = toScreenY(pendingGuideWorldMillimeters);
                 graphics.strokeLine(0, y, drawingCanvas.getWidth(), y);
+            }
+            drawGuideDistances(graphics);
+        }
+    }
+
+    private void drawGuideDistances(GraphicsContext graphics) {
+        if (!showGuideDistances.get()) {
+            return;
+        }
+        List<GuideDistanceService.GuideDistance> distances = guideDistanceService.distancesToParallelGuides(
+                guideLines,
+                pendingGuideOrientation,
+                pendingGuideWorldMillimeters
+        );
+        graphics.setFill(Color.color(0.35, 0.08, 0.08, 0.92));
+        graphics.setFont(Font.font("Menlo", 11));
+        for (int index = 0; index < distances.size(); index++) {
+            GuideDistanceService.GuideDistance distance = distances.get(index);
+            double midpoint = (pendingGuideWorldMillimeters + distance.guideWorldMillimeters()) / 2.0;
+            String text = distance.distance().format(LengthUnit.METER, 2);
+            if (pendingGuideOrientation == GuideOrientation.VERTICAL) {
+                graphics.fillText(text, toScreenX(midpoint) - 22.0, 20.0 + index % 4 * 16.0);
+            } else {
+                graphics.fillText(text, 10.0 + index % 3 * 76.0, toScreenY(midpoint) - 5.0);
             }
         }
     }
