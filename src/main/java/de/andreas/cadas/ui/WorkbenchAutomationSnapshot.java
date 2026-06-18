@@ -4,6 +4,7 @@ public record WorkbenchAutomationSnapshot(
         String projectName,
         String activeLevel,
         String activeView,
+        String workspaceMode,
         String activeTool,
         int wallCount,
         int roomCount,

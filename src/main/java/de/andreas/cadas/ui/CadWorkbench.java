@@ -452,10 +452,6 @@ public final class CadWorkbench extends BorderPane {
                 }
                 refreshThreeDIfNeeded();
             } else if (newValue == WorkspaceMode.INTERIOR) {
-                if (!activateInteriorViewForCurrentRoom()) {
-                    activeWorkspaceMode.set(WorkspaceMode.THREE_D);
-                    return;
-                }
                 refreshThreeDIfNeeded();
             }
             render();
@@ -619,7 +615,7 @@ public final class CadWorkbench extends BorderPane {
 
     private Button workspaceModeButton(WorkspaceMode workspaceMode) {
         Button button = new Button(workspaceMode.label());
-        button.setOnAction(event -> activeWorkspaceMode.set(workspaceMode));
+        button.setOnAction(event -> selectWorkspaceMode(workspaceMode, true));
         button.setStyle(workspaceModeButtonStyle(workspaceMode == activeWorkspaceMode.get()));
         activeWorkspaceMode.addListener((ignored, oldValue, newValue) ->
                 button.setStyle(workspaceModeButtonStyle(workspaceMode == newValue)));
@@ -705,6 +701,33 @@ public final class CadWorkbench extends BorderPane {
         return true;
     }
 
+    private void selectWorkspaceMode(WorkspaceMode workspaceMode, boolean showErrorDialog) {
+        if (workspaceMode == WorkspaceMode.INTERIOR && !activateInteriorViewForCurrentRoom()) {
+            if (showErrorDialog) {
+                showInteriorViewUnavailableError();
+            }
+            return;
+        }
+        activeWorkspaceMode.set(workspaceMode);
+        updateWorkspaceMode();
+        refreshThreeDIfNeeded();
+    }
+
+    private void showInteriorViewUnavailableError() {
+        Alert alert = new Alert(
+                Alert.AlertType.WARNING,
+                "Auf der aktiven Etage ist kein Raum vorhanden. Schließe zuerst einen Wandzug, damit CADas einen Raum ableiten kann.",
+                ButtonType.OK
+        );
+        alert.setTitle("Innenansicht nicht verfügbar");
+        alert.setHeaderText("Für die Innenansicht wird ein Raum benötigt.");
+        Window window = getScene() != null ? getScene().getWindow() : null;
+        if (window != null) {
+            alert.initOwner(window);
+        }
+        alert.showAndWait();
+    }
+
     private MenuBar buildMenuBar() {
         Menu dateiMenu = new Menu("Datei");
         dateiMenu.getItems().addAll(
@@ -729,9 +752,9 @@ public final class CadWorkbench extends BorderPane {
 
         Menu ansichtMenu = new Menu("Ansicht");
         ansichtMenu.getItems().addAll(
-                menuItem("2D-Arbeitsbereich", () -> activeWorkspaceMode.set(WorkspaceMode.TWO_D), null),
-                menuItem("3D-Arbeitsbereich", () -> activeWorkspaceMode.set(WorkspaceMode.THREE_D), null),
-                menuItem("3D-Innenansicht", () -> activeWorkspaceMode.set(WorkspaceMode.INTERIOR), null),
+                menuItem("2D-Arbeitsbereich", () -> selectWorkspaceMode(WorkspaceMode.TWO_D, true), null),
+                menuItem("3D-Arbeitsbereich", () -> selectWorkspaceMode(WorkspaceMode.THREE_D, true), null),
+                menuItem("3D-Innenansicht", () -> selectWorkspaceMode(WorkspaceMode.INTERIOR, true), null),
                 new SeparatorMenuItem()
         );
         for (ViewOrientation viewOrientation : ViewOrientation.values()) {
@@ -4917,6 +4940,7 @@ public final class CadWorkbench extends BorderPane {
                 project.name(),
                 activeLevel.get().name(),
                 activeView.get().name(),
+                activeWorkspaceMode.get().name(),
                 currentTool().name(),
                 activeLevel.get().walls().size(),
                 activeLevel.get().rooms().size(),
@@ -4972,9 +4996,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     public void automationSetWorkspace(String workspaceName) {
-        activeWorkspaceMode.set(WorkspaceMode.valueOf(workspaceName.trim().toUpperCase(Locale.ROOT)));
-        updateWorkspaceMode();
-        refreshThreeDIfNeeded();
+        selectWorkspaceMode(WorkspaceMode.valueOf(workspaceName.trim().toUpperCase(Locale.ROOT)), false);
     }
 
     public void automationSetSurfaceType(String surfaceTypeName) {

@@ -114,6 +114,26 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void innenansichtOhneRaumBleibtImAktivenArbeitsbereichUndMeldetDenGrund() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetWorkspace("INTERIOR");
+            return null;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertEquals("TWO_D", snapshot.workspaceMode());
+        Assertions.assertTrue(snapshot.statusText().contains("braucht einen Raum"));
+    }
+
+    @Test
     void belagsauswahlWechseltMitRaumUndWandSauberZwischenKontexten() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {
