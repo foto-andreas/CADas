@@ -13,6 +13,7 @@ import de.andreas.cadas.application.drawing.SelectionTranslationService;
 import de.andreas.cadas.application.drawing.SnapService;
 import de.andreas.cadas.application.drawing.WallEditingService;
 import de.andreas.cadas.application.drawing.WallDimensionService;
+import de.andreas.cadas.application.drawing.WallSnapService;
 import de.andreas.cadas.application.drawing.WallEndpointSelection;
 import de.andreas.cadas.application.dwg.DwgBlockDefinition;
 import de.andreas.cadas.application.dwg.DwgConversionAvailability;
@@ -190,6 +191,7 @@ public final class CadWorkbench extends BorderPane {
     private final DraftingService draftingService = new DraftingService();
     private final SnapService snapService = new SnapService();
     private final GuideSnapService guideSnapService = new GuideSnapService();
+    private final WallSnapService wallSnapService = new WallSnapService();
     private final SelectionQueryService selectionQueryService = new SelectionQueryService();
     private final ExchangeFileNameService exchangeFileNameService = new ExchangeFileNameService();
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
@@ -229,6 +231,7 @@ public final class CadWorkbench extends BorderPane {
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuideDistances = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToGuides = new SimpleBooleanProperty(true);
+    private final BooleanProperty snapToWalls = new SimpleBooleanProperty(true);
 
     private final Canvas drawingCanvas = new Canvas();
     private final Canvas horizontalRuler = new Canvas();
@@ -443,6 +446,7 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(showGuides);
         registerRenderListener(showGuideDistances);
         registerRenderListener(snapToGuides);
+        registerRenderListener(snapToWalls);
         showRoomObjects.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.setRoomObjectsVisible(newValue);
             markThreeDDirty();
@@ -527,6 +531,10 @@ public final class CadWorkbench extends BorderPane {
         snapGuidesBox.selectedProperty().bindBidirectional(snapToGuides);
         applyTooltip(snapGuidesBox, "Lässt Wände, Türen und Fenster mit Kanten oder Mittellinie magnetisch an sichtbaren Hilfslinien einrasten.");
 
+        CheckBox snapWallsBox = new CheckBox("Wand-Snap");
+        snapWallsBox.selectedProperty().bindBidirectional(snapToWalls);
+        applyTooltip(snapWallsBox, "Lässt neue oder verschobene Wände an Achsen, Außenkanten und Endkanten anderer Wände einrasten.");
+
         CheckBox dimensionsBox = new CheckBox("Bemaßung");
         dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
         applyTooltip(dimensionsBox, "Blendet die Längenbeschriftung der gezeichneten Wände ein oder aus.");
@@ -559,6 +567,7 @@ public final class CadWorkbench extends BorderPane {
                 snapPointsBox,
                 guideDistancesBox,
                 snapGuidesBox,
+                snapWallsBox,
                 new Separator(Orientation.VERTICAL),
                 dimensionsBox,
                 objectsBox
@@ -810,6 +819,7 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("Hilfslinien anzeigen", showGuides),
                 checkMenuItem("Hilfslinienabstände anzeigen", showGuideDistances),
                 checkMenuItem("An Hilfslinien einrasten", snapToGuides),
+                checkMenuItem("An anderen Wänden einrasten", snapToWalls),
                 checkMenuItem("Bemaßung anzeigen", showDimensions),
                 checkMenuItem("Objekte anzeigen", showRoomObjects),
                 checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
@@ -1555,7 +1565,16 @@ public final class CadWorkbench extends BorderPane {
                     historyCapturedForDrag = true;
                 }
                 DraftingConstraints constraints = currentConstraints(false);
-                PlanPoint snappedPoint = snapDrawingPoint(screenToWorld(event.getX(), event.getY()), constraints);
+                Set<UUID> endpointWallIds = java.util.stream.Stream.concat(
+                        selectedEndpointGroup.startWallIds().stream(),
+                        selectedEndpointGroup.endWallIds().stream()
+                ).collect(java.util.stream.Collectors.toSet());
+                PlanPoint snappedPoint = snapService.snap(
+                        screenToWorld(event.getX(), event.getY()),
+                        constraints,
+                        activeLevel.get().walls(),
+                        currentAlignmentSnapTargets(endpointWallIds)
+                );
                 activeLevel.get().replaceWalls(wallEditingService.moveEndpointGroup(
                         activeLevel.get().walls(),
                         selectedEndpointGroup,
@@ -1572,19 +1591,24 @@ public final class CadWorkbench extends BorderPane {
                     historyCapturedForDrag = true;
                 }
                 DraftingConstraints constraints = currentConstraints(false);
-                PlanPoint snappedPoint = snapDrawingPoint(screenToWorld(event.getX(), event.getY()), constraints);
+                PlanPoint snappedPoint = snapService.snap(
+                        screenToWorld(event.getX(), event.getY()),
+                        constraints,
+                        activeLevel.get().walls(),
+                        currentGuideSnapTargets()
+                );
                 double wallLength = openingDragWallAxis.length().toMillimeters();
                 double rawOffset = openingDragWallAxis.projectedLength(snappedPoint).toMillimeters() + openingDragOffsetDelta;
                 double clampedOffset = Math.max(0.0, Math.min(wallLength - openingDragWidth, rawOffset));
                 Wall openingWall = openingDragWall();
                 Length newOffset = snapToGuides.get()
                         ? guideSnapService.snapOpeningOffset(
-                        openingWall,
-                        Length.ofMillimeters(clampedOffset),
-                        Length.ofMillimeters(openingDragWidth),
-                        currentGuideSnapTargets(),
-                        SNAP_TOLERANCE
-                )
+                                openingWall,
+                                Length.ofMillimeters(clampedOffset),
+                                Length.ofMillimeters(openingDragWidth),
+                                currentGuideSnapTargets(),
+                                SNAP_TOLERANCE
+                        )
                         : Length.ofMillimeters(clampedOffset);
                 activeLevel.get().replaceDoors(activeLevel.get().doors().stream()
                         .map(door -> door.id().equals(openingDragId) ? door.withOffset(newOffset) : door)
@@ -1617,8 +1641,13 @@ public final class CadWorkbench extends BorderPane {
         DraftingConstraints constraints = currentConstraints(!event.isShiftDown());
         PlanPoint snappedPoint = snapDrawingPoint(screenToWorld(event.getX(), event.getY()), constraints);
         previewSegment = draftingService.createSegment(draftStart, snappedPoint, constraints);
-        if (snapToGuides.get() && constraints.manualLength().isEmpty() && constraints.manualAngle().isEmpty()) {
-            previewSegment = guideSnapService.snapWallSegment(previewSegment, currentWallThickness(), currentGuideSnapTargets(), SNAP_TOLERANCE);
+        if ((snapToGuides.get() || snapToWalls.get()) && constraints.manualLength().isEmpty() && constraints.manualAngle().isEmpty()) {
+            previewSegment = guideSnapService.snapWallSegment(
+                    previewSegment,
+                    currentWallThickness(),
+                    currentAlignmentSnapTargets(Set.of()),
+                    SNAP_TOLERANCE
+            );
             draftStart = previewSegment.start();
         }
         lastCursor = previewSegment.end();
@@ -3194,7 +3223,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private PlanPoint snapDrawingPoint(PlanPoint point, DraftingConstraints constraints) {
-        return snapService.snap(point, constraints, activeLevel.get().walls(), currentGuideSnapTargets());
+        GuideSnapTargets targets = currentTool() == DrawingTool.WALL || currentTool() == DrawingTool.EDIT
+                ? currentAlignmentSnapTargets(Set.of())
+                : currentGuideSnapTargets();
+        return snapService.snap(point, constraints, activeLevel.get().walls(), targets);
     }
 
     private GuideSnapTargets currentGuideSnapTargets() {
@@ -3210,6 +3242,17 @@ public final class CadWorkbench extends BorderPane {
                         .filter(guideLine -> guideLine.orientation() == GuideOrientation.HORIZONTAL)
                         .map(GuideLine::worldMillimeters)
                         .toList()
+        );
+    }
+
+    private GuideSnapTargets currentAlignmentSnapTargets(Set<UUID> excludedWallIds) {
+        GuideSnapTargets guideTargets = currentGuideSnapTargets();
+        GuideSnapTargets wallTargets = snapToWalls.get()
+                ? wallSnapService.targets(activeLevel.get().walls(), excludedWallIds)
+                : GuideSnapTargets.empty();
+        return new GuideSnapTargets(
+                java.util.stream.Stream.concat(guideTargets.verticalGuides().stream(), wallTargets.verticalGuides().stream()).distinct().toList(),
+                java.util.stream.Stream.concat(guideTargets.horizontalGuides().stream(), wallTargets.horizontalGuides().stream()).distinct().toList()
         );
     }
 
@@ -5118,16 +5161,17 @@ public final class CadWorkbench extends BorderPane {
     private void translateSelectedComponents(PlanPoint snappedPoint) {
         double deltaX = snappedPoint.xMillimeters() - selectionDragAnchor.xMillimeters();
         double deltaY = snappedPoint.yMillimeters() - selectionDragAnchor.yMillimeters();
-        if (snapToGuides.get()) {
+        if (snapToGuides.get() || snapToWalls.get()) {
             List<Wall> selectedWalls = selectionDragBaseWalls.stream()
                     .filter(wall -> selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.WALL
                             && selection.elementId().equals(wall.id().toString())))
                     .toList();
+            Set<UUID> selectedWallIds = selectedWalls.stream().map(Wall::id).collect(java.util.stream.Collectors.toSet());
             GuideSnapService.Translation translation = guideSnapService.snapWallTranslation(
                     selectedWalls,
                     deltaX,
                     deltaY,
-                    currentGuideSnapTargets(),
+                    currentAlignmentSnapTargets(selectedWallIds),
                     SNAP_TOLERANCE
             );
             deltaX = translation.deltaX();
