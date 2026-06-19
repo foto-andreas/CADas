@@ -2760,13 +2760,25 @@ public final class CadWorkbench extends BorderPane {
             boolean active = activeEdgeHandle != null
                     && activeEdgeHandle.kind() == handle.kind()
                     && activeEdgeHandle.elementId().equals(handle.elementId());
-            double size = active ? 11.0 : 8.0;
+            boolean isWallHandle = handle.kind() == EdgeResizeService.EdgeHandleKind.WALL_START
+                    || handle.kind() == EdgeResizeService.EdgeHandleKind.WALL_END;
+            double size = active ? (isWallHandle ? 14.0 : 11.0) : (isWallHandle ? 11.0 : 9.0);
             graphics.save();
             graphics.setFill(active ? Color.web("#d97f2f") : Color.web("#fffaf1"));
             graphics.setStroke(Color.web("#201c18"));
             graphics.setLineWidth(1.4);
-            graphics.fillRect(x - size / 2.0, y - size / 2.0, size, size);
-            graphics.strokeRect(x - size / 2.0, y - size / 2.0, size, size);
+            if (isWallHandle) {
+                double half = size / 2.0;
+                graphics.fillPolygon(
+                        new double[]{x, x + half, x, x - half},
+                        new double[]{y - half, y, y + half, y}, 4);
+                graphics.strokePolygon(
+                        new double[]{x, x + half, x, x - half},
+                        new double[]{y - half, y, y + half, y}, 4);
+            } else {
+                graphics.fillRect(x - size / 2.0, y - size / 2.0, size, size);
+                graphics.strokeRect(x - size / 2.0, y - size / 2.0, size, size);
+            }
             graphics.restore();
         }
     }

@@ -184,9 +184,22 @@ public final class ConstructionDrawingPdfService {
                 lines.add(new SpatialLine(startBottom.x(), startBottom.y(), startTop.x(), startTop.y(), false));
                 lines.add(new SpatialLine(endBottom.x(), endBottom.y(), endTop.x(), endTop.y(), false));
             }
-            baseHeight += maximumHeight(level);
+            baseHeight += estimateLevelHeight(level);
         }
         return lines;
+    }
+
+    private double estimateLevelHeight(Level level) {
+        double wallHeight = level.walls().stream().mapToDouble(Wall::maximumHeightMillimeters).max().orElse(2_750.0);
+        double objectHeight = level.roomObjects().stream().mapToDouble(roomObject -> roomObject.height().toMillimeters()).max().orElse(0.0);
+        double roomHeight = level.rooms().stream()
+                .mapToDouble(room -> room.maximumCeilingHeightMillimeters()
+                        + room.floorThickness().toMillimeters()
+                        + room.ceilingThickness().toMillimeters())
+                .max()
+                .orElse(0.0);
+        double stairHeight = level.staircases().stream().mapToDouble(staircase -> staircase.totalHeight().toMillimeters()).max().orElse(0.0);
+        return Math.max(Math.max(wallHeight, objectHeight), Math.max(roomHeight, stairHeight));
     }
 
     private SpatialPoint project(PlanPoint point, double z, double angle, boolean isometric) {
