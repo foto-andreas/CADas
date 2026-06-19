@@ -379,8 +379,8 @@ class CadWorkbenchTest {
             return null;
         });
 
-        Assertions.assertEquals("Gebäude-DXF-Import fehlgeschlagen", aufFxThread(workbench::automationLastErrorTitle));
-        Assertions.assertEquals("Gebäude-DXF-Import fehlgeschlagen", aufFxThread(workbench::automationLastErrorHeader));
+        Assertions.assertEquals("Gebäude-Laden fehlgeschlagen", aufFxThread(workbench::automationLastErrorTitle));
+        Assertions.assertEquals("Gebäude-Laden fehlgeschlagen", aufFxThread(workbench::automationLastErrorHeader));
         Assertions.assertTrue(aufFxThread(workbench::automationLastErrorContent).contains("gibt-es-nicht.dxf"));
         Assertions.assertTrue(aufFxThread(workbench::automationLastErrorStackTrace).contains("gibt-es-nicht.dxf"));
     }

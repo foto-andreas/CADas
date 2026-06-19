@@ -232,6 +232,7 @@ public final class CadWorkbench extends BorderPane {
     private final SelectionTranslationService selectionTranslationService = new SelectionTranslationService();
     private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
     private final ProjectExchangeService projectExchangeService = new DxfProjectExchangeService();
+    private Path lastProjectSavePath;
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
     private final SurfaceLayerConsistencyService surfaceLayerConsistencyService = new SurfaceLayerConsistencyService();
@@ -899,8 +900,9 @@ public final class CadWorkbench extends BorderPane {
         dateiMenu.getItems().addAll(
                 menuItem("Etage hinzufügen", this::createLevel, shortcutKey(KeyCode.N)),
                 menuItem("Projekt leeren", this::clearProject, shortcutKey(KeyCode.L)),
-                menuItem("Gebäude als DXF exportieren", this::exportProjectAsDxf, shortcutShiftKey(KeyCode.E)),
-                menuItem("Gebäude aus DXF importieren", this::importProjectFromDxf, shortcutShiftKey(KeyCode.I)),
+                menuItem("Gebäude laden", this::importProjectFromDxf, shortcutShiftKey(KeyCode.I)),
+                menuItem("Sichern", this::saveProject, shortcutKey(KeyCode.S)),
+                menuItem("Sichern als ...", this::saveProjectAs, shortcutShiftKey(KeyCode.S)),
                 menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutShiftKey(KeyCode.P)),
                 menuItem("Aktive Etage als DXF exportieren", this::exportCurrentLevel, null),
                 menuItem("DXF als neue Etage importieren", this::importLevel, null),
@@ -972,11 +974,10 @@ public final class CadWorkbench extends BorderPane {
         );
 
         Menu hilfeMenu = new Menu("Hilfe");
-        hilfeMenu.getItems().add(menuItem(
-                "Hilfe und Keymap",
-                this::showHelpWindow,
-                new KeyCodeCombination(KeyCode.F1)
-        ));
+        hilfeMenu.getItems().addAll(
+                menuItem("Benutzerdokumentation", this::showHelpWindow, new KeyCodeCombination(KeyCode.F1)),
+                menuItem("Keymap und Mausbedienung", this::showKeymapWindow, null)
+        );
 
         MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu, berichteMenu, hilfeMenu);
         applyTooltip(menuBar, "Bietet Datei-, Bearbeitungs-, Ansichts- und Werkzeugfunktionen mit passenden Tastaturkürzeln an.");
@@ -4278,25 +4279,38 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
-    private void exportProjectAsDxf() {
-        FileChooser fileChooser = createDxfFileChooser();
-        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".dxf");
-        fileChooser.setInitialFileName(projectName + "_Gebäude");
+    private void saveProject() {
+        if (lastProjectSavePath != null) {
+            exportProjectAsDxf(lastProjectSavePath);
+            return;
+        }
+        saveProjectAs();
+    }
+
+    private void saveProjectAs() {
+        FileChooser fileChooser = createCadasFileChooser();
+        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
+        fileChooser.setInitialFileName(projectName);
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showSaveDialog(window);
         if (file == null) {
             return;
         }
-        exportProjectAsDxf(file.toPath());
+        Path targetFile = file.toPath();
+        if (!targetFile.getFileName().toString().contains(".")) {
+            targetFile = exchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
+        }
+        exportProjectAsDxf(targetFile);
     }
 
     private void exportProjectAsDxf(Path targetFile) {
         try {
-            Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".dxf").toAbsolutePath().normalize();
+            Path exportPath = targetFile.toAbsolutePath().normalize();
             projectExchangeService.exportProject(project, exportPath);
+            lastProjectSavePath = exportPath;
             confirmExportWritten(exportPath);
         } catch (Exception exception) {
-            showOperationException("Gebäude-DXF-Export fehlgeschlagen", exception);
+            showOperationException("Gebäude-Sicherung fehlgeschlagen", exception);
         }
     }
 
@@ -4304,8 +4318,8 @@ public final class CadWorkbench extends BorderPane {
         if (Files.exists(exportPath) && Files.isRegularFile(exportPath)) {
             if (interactiveDialogsEnabled) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("DXF exportiert");
-                alert.setHeaderText("Die DXF-Datei wurde erfolgreich gespeichert.");
+                alert.setTitle("Gebäude gesichert");
+                alert.setHeaderText("Die Gebäude-Datei wurde erfolgreich gespeichert.");
                 alert.setContentText(exportPath.toString());
                 alert.getDialogPane().setPrefWidth(560);
                 Window owner = getScene() != null ? getScene().getWindow() : null;
@@ -4314,9 +4328,9 @@ public final class CadWorkbench extends BorderPane {
                 }
                 alert.showAndWait();
             }
-            draftLabel.setText("Gebäude-DXF exportiert: " + exportPath.getFileName());
+            draftLabel.setText("Gebäude gesichert: " + exportPath.getFileName());
         } else {
-            draftLabel.setText("DXF-Export konnte nicht verifiziert werden: " + exportPath);
+            draftLabel.setText("Sicherung konnte nicht verifiziert werden: " + exportPath);
         }
     }
 
@@ -4371,23 +4385,31 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void showHelpWindow() {
-        WebView helpView = new WebView();
-        helpView.getEngine().loadContent(markdownHtmlRenderer.renderDocument(helpContentService.createMarkdown()));
-        VBox.setVgrow(helpView, Priority.ALWAYS);
+        showMarkdownWindow(helpContentService.createMarkdown(), "CADas-Benutzerdokumentation", "Benutzerdokumentation", "Druckt die vollständige Benutzerdokumentation. Im Druckdialog kann auch ein PDF-Drucker gewählt werden.");
+    }
+
+    private void showKeymapWindow() {
+        showMarkdownWindow(helpContentService.createKeymapMarkdown(), "CADas-Keymap und Mausbedienung", "Keymap und Mausbedienung", "Druckt die Tastaturkürzel und Mausbedienung. Im Druckdialog kann auch ein PDF-Drucker gewählt werden.");
+    }
+
+    private void showMarkdownWindow(String markdown, String windowTitle, String documentName, String printTooltip) {
+        WebView view = new WebView();
+        view.getEngine().loadContent(markdownHtmlRenderer.renderDocument(markdown));
+        VBox.setVgrow(view, Priority.ALWAYS);
         Button printButton = new Button("Drucken");
-        printButton.setOnAction(event -> printWebView(helpView, "Hilfe und Keymap"));
-        applyTooltip(printButton, "Druckt die vollständige Hilfe und Keymap. Im Druckdialog kann auch ein PDF-Drucker gewählt werden.");
+        printButton.setOnAction(event -> printWebView(view, documentName));
+        applyTooltip(printButton, printTooltip);
         HBox actions = new HBox(8.0, printButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        VBox container = new VBox(10.0, helpView, actions);
+        VBox container = new VBox(10.0, view, actions);
         container.setPadding(new Insets(12));
         Stage stage = new Stage();
-        stage.setTitle("CADas-Hilfe und Keymap");
+        stage.setTitle(windowTitle);
         Window owner = getScene() != null ? getScene().getWindow() : null;
         if (owner != null) {
             stage.initOwner(owner);
         }
-        stage.setScene(new Scene(container, 920, 680));
+        stage.setScene(new Scene(container, 960, 760));
         stage.show();
     }
 
@@ -4462,7 +4484,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void importProjectFromDxf() {
-        FileChooser fileChooser = createDxfFileChooser();
+        FileChooser fileChooser = createCadasFileChooser();
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showOpenDialog(window);
         if (file == null) {
@@ -4474,7 +4496,7 @@ public final class CadWorkbench extends BorderPane {
     private void importProjectFromDxf(Path sourceFile) {
         try {
             rememberStateForUndo();
-            String projectName = exchangeFileNameService.stripRepeatedExtension(sourceFile, ".dxf");
+            String projectName = exchangeFileNameService.stripRepeatedExtension(sourceFile, ".cadas");
             ProjectModel importedProject = projectExchangeService.importProject(sourceFile, projectName);
             importedProject.levels().forEach(level -> level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults())));
             project.replaceWith(importedProject);
@@ -4484,10 +4506,20 @@ public final class CadWorkbench extends BorderPane {
             activateLevel(project.primaryLevel());
             markThreeDDirty();
             fitCurrentViewToContent();
-            draftLabel.setText("Gebäude-DXF importiert: " + sourceFile.getFileName());
+            lastProjectSavePath = sourceFile.toAbsolutePath().normalize();
+            draftLabel.setText("Gebäude geladen: " + sourceFile.getFileName());
         } catch (Exception exception) {
-            showOperationException("Gebäude-DXF-Import fehlgeschlagen", exception);
+            showOperationException("Gebäude-Laden fehlgeschlagen", exception);
         }
+    }
+
+    private FileChooser createCadasFileChooser() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("CADas-Gebäudedatei auswählen");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CADas-Gebäudedateien", "*.cadas"));
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("DXF-Dateien", "*.dxf"));
+        fileChooser.setInitialDirectory(Path.of(System.getProperty("user.home")).toFile());
+        return fileChooser;
     }
 
     private FileChooser createDxfFileChooser() {
