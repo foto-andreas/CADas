@@ -4443,7 +4443,7 @@ public final class CadWorkbench extends BorderPane {
         fileChooser.setTitle("Materialliste als Markdown speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Markdown-Dateien", "*.md"));
         String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName + "_Materialliste_Beläge");
+        fileChooser.setInitialFileName(projectName + "_Räume_und_Material");
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showSaveDialog(window);
         if (file == null) {
