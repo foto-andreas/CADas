@@ -43,12 +43,15 @@ public final class WallDimensionPlacementService {
             entries.add(new DimensionEntry(roomDimension, false));
         }
         dimensions.exteriorDimension().ifPresent(exteriorDimension -> entries.add(new DimensionEntry(exteriorDimension, true)));
-        entries.sort(Comparator
+        // Identische Maße (gleiche Länge, gleiche Position des Maßsegments) deduplizieren,
+        // damit nebeneinander liegende Räume mit identischem Raummaß nicht doppelt gezeichnet werden.
+        List<DimensionEntry> deduplicated = deduplicateEntries(entries);
+        deduplicated.sort(Comparator
                 .comparingDouble((DimensionEntry entry) -> entry.dimension().length().toMillimeters())
                 .thenComparing(DimensionEntry::exterior));
         List<PlacedDimension> placements = new ArrayList<>();
-        for (int index = 0; index < entries.size(); index++) {
-            DimensionEntry entry = entries.get(index);
+        for (int index = 0; index < deduplicated.size(); index++) {
+            DimensionEntry entry = deduplicated.get(index);
             placements.add(placeDimension(
                     wall,
                     entry.dimension(),
@@ -100,10 +103,13 @@ public final class WallDimensionPlacementService {
             double stepOffset,
             int stackIndex
     ) {
-        double dimensionDistance = signedNormalDistance(wall.axis(), dimension.dimensionSegment());
+        // Die Maßlinie liegt immer außerhalb der Gebäudehülle auf der Platzierungsseite.
+        // Der Normalenoffset wird rein über die Schichtung (baseOffset + stackIndex*stepOffset)
+        // berechnet, damit die Linie nie ins Gebäudeinnere rutscht, auch wenn das
+        // referenzierte Maßsegment auf der anderen Wandseite liegt.
         double lineDistanceFromAxis = outsideBoundaryDistance * renderFactor
                 + placementSideSign * (baseOffset + stackIndex * stepOffset);
-        double normalOffset = lineDistanceFromAxis - dimensionDistance * renderFactor;
+        double normalOffset = placementSideSign * (baseOffset + stackIndex * stepOffset);
         return new PlacedDimension(dimension, exterior, normalOffset, lineDistanceFromAxis, placementSideSign, stackIndex);
     }
 
@@ -219,6 +225,37 @@ public final class WallDimensionPlacementService {
             }
             return new PlanPoint(sumX / Math.max(1, points.size()), sumY / Math.max(1, points.size()));
         }
+    }
+
+    /**
+     * Entfernt Einträge mit identischem Maßsegment (gleiche Länge und gleiche
+     * Start-/Endpunkte), sodass nebeneinander liegende identische Maße nicht
+     * doppelt gezeichnet werden. Das Außenmaß hat dabei Vorrang vor Raummaßen
+     * mit identischem Segment.
+     */
+    private List<DimensionEntry> deduplicateEntries(List<DimensionEntry> entries) {
+        List<DimensionEntry> result = new ArrayList<>();
+        for (DimensionEntry entry : entries) {
+            boolean duplicate = result.stream().anyMatch(existing -> segmentsEqual(
+                    existing.dimension().dimensionSegment(),
+                    entry.dimension().dimensionSegment()
+            ) && existing.exterior() == entry.exterior());
+            if (!duplicate) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
+    private boolean segmentsEqual(PlanSegment first, PlanSegment second) {
+        return Math.abs(first.length().toMillimeters() - second.length().toMillimeters()) <= EPSILON
+                && pointsEqual(first.start(), second.start())
+                && pointsEqual(first.end(), second.end());
+    }
+
+    private boolean pointsEqual(PlanPoint first, PlanPoint second) {
+        return Math.abs(first.xMillimeters() - second.xMillimeters()) <= EPSILON
+                && Math.abs(first.yMillimeters() - second.yMillimeters()) <= EPSILON;
     }
 
     private record DimensionEntry(

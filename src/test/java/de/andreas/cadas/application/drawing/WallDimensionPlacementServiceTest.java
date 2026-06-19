@@ -127,6 +127,66 @@ class WallDimensionPlacementServiceTest {
         assertTrue(Math.abs(placements.get(1).lineDistanceFromAxis()) > Math.abs(placements.get(0).lineDistanceFromAxis()));
     }
 
+    @Test
+    void dedupliziertIdentischeMaßeAufDerGleichenWand() {
+        Level level = new Level("Erdgeschoss");
+        Wall wall = wall(0, 0, 4_000, 0, 200);
+        level.addWall(wall);
+        level.addRoom(Room.rectangular("Innen", new PlanPoint(100, 100), new PlanPoint(3_900, 500),
+                Length.of(2.6, LengthUnit.METER), Length.zero(), Length.zero()));
+        // Zwei Raummaße mit identischem Maßsegment (gleiche Start-/Endpunkte, gleiche Länge).
+        PlanSegment identisch = new PlanSegment(new PlanPoint(100, 100), new PlanPoint(1_000, 100));
+        WallDimensionService.WallDimensions dimensions = new WallDimensionService.WallDimensions(
+                List.of(
+                        new WallDimensionService.SideDimension("Küche", Length.ofMillimeters(900), 1.0, identisch),
+                        new WallDimensionService.SideDimension("Kochen", Length.ofMillimeters(900), 1.0, identisch)
+                ),
+                Optional.empty()
+        );
+
+        List<WallDimensionPlacementService.PlacedDimension> placements = placementService.place(
+                level, wall, dimensions, 1.0, 30.0, 10.0
+        );
+
+        assertEquals(1, placements.size(), "Identische Maße dürfen nicht doppelt auftreten");
+    }
+
+    @Test
+    void stapeltMaßlinienMitMindestabstandNebeneinander() {
+        Level level = new Level("Erdgeschoss");
+        Wall wall = wall(0, 0, 4_000, 0, 200);
+        level.addWall(wall);
+        level.addRoom(Room.rectangular("Innen", new PlanPoint(100, 100), new PlanPoint(3_900, 500),
+                Length.of(2.6, LengthUnit.METER), Length.zero(), Length.zero()));
+        // Zwei unterschiedliche Raummaße (verschiedene Länge) und ein Außenmaß.
+        WallDimensionService.WallDimensions dimensions = new WallDimensionService.WallDimensions(
+                List.of(
+                        new WallDimensionService.SideDimension("Küche", Length.ofMillimeters(900), 1.0,
+                                new PlanSegment(new PlanPoint(100, 100), new PlanPoint(1_000, 100))),
+                        new WallDimensionService.SideDimension("Wohnen", Length.ofMillimeters(1_850), 1.0,
+                                new PlanSegment(new PlanPoint(2_050, 100), new PlanPoint(3_900, 100)))
+                ),
+                Optional.of(new WallDimensionService.SideDimension("Außen", Length.ofMillimeters(4_200), -1.0,
+                        new PlanSegment(new PlanPoint(-100, -100), new PlanPoint(4_100, -100))))
+        );
+
+        List<WallDimensionPlacementService.PlacedDimension> placements = placementService.place(
+                level, wall, dimensions, 1.0, 30.0, 10.0
+        );
+
+        assertEquals(3, placements.size());
+        // Jede Maßlinie muss einen klar unterschiedlichen Abstand zur Achse haben,
+        // damit die Linien parallel zur Wand nicht aufeinanderfallen.
+        for (int i = 0; i < placements.size(); i++) {
+            for (int j = i + 1; j < placements.size(); j++) {
+                double abstand = Math.abs(placements.get(i).lineDistanceFromAxis() - placements.get(j).lineDistanceFromAxis());
+                assertTrue(abstand > 5.0, "Maßlinien müssen Mindestabstand haben, war " + abstand);
+            }
+        }
+        // Alle Maße müssen außerhalb des Gebäudes liegen (auf derselben Seite).
+        assertTrue(placements.stream().allMatch(p -> p.lineDistanceFromAxis() < 0.0));
+    }
+
     private List<Wall> addRectangle(Level level, double width, double height, double thickness) {
         List<Wall> walls = List.of(
                 wall(0, 0, width, 0, thickness),
