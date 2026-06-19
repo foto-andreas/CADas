@@ -67,10 +67,31 @@ val macOsPackagingSupported = providers.systemProperty("os.name")
 val jpackageExecutable = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(25)
 }.get().metadata.installationPath.asFile.resolve("bin/jpackage").absolutePath
+val jlinkExecutable = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(25)
+}.get().metadata.installationPath.asFile.resolve("bin/jlink").absolutePath
 
 val installLibDirectory = layout.buildDirectory.dir("install/CADas/lib").get().asFile
 val appImageOutputDirectory = layout.buildDirectory.dir("installer/macos/app-image").get().asFile
 val dmgOutputDirectory = layout.buildDirectory.dir("installer/macos/dmg").get().asFile
+// Laufzeitimage mit nur echten Modulen (JDK + JavaFX + modulare Drittabhängigkeiten), per jlink erzeugt.
+val runtimeImageDirectory = layout.buildDirectory.dir("installer/macos/runtime-image").get().asFile
+// Bereinigter Modulpfad für jlink: nur proper modules (echte Java-Module), sodass jlink keine
+// automatic modules vorfindet.
+val jlinkModulePath = layout.buildDirectory.dir("installer/macos/module-path").get().asFile
+
+// JARs ohne eigenes module-info.class dürfen nicht auf den jlink-Modulpfad.
+val automaticModuleJars = listOf(
+    "commons-logging-1.3.5.jar",
+    "fontbox-3.0.7.jar",
+    "pdfbox-3.0.7.jar",
+    "pdfbox-io-3.0.7.jar"
+)
+// JavaFX-Plugin legt jdk-jsobject als automatic module ins lib-Verzeichnis, obwohl das JDK
+// das proper module jdk.jsobject bereits mitbringt. Es wird ebenfalls auf den Classpath gelegt.
+val redundantJdkJars = listOf("jdk-jsobject-25.jar")
+// Alle JARs, die als Classpath (nicht als Modul) ins App-Image gelangen.
+val classpathJars = automaticModuleJars + redundantJdkJars
 
 fun normalizedAppVersion(): String {
     val numericParts = version.toString()
@@ -153,9 +174,13 @@ val commonJpackageArguments = listOf(
     "--app-version", normalizedAppVersion(),
     "--vendor", "Andreas",
     "--icon", file("src/main/resources/icons/CADas.icns").absolutePath,
+    "--runtime-image", runtimeImageDirectory.absolutePath,
+    // Vollständiges lib-Verzeichnis als Modulpfad fürs App-Image: proper modules und automatic modules.
+    // jlink verwendet stattdessen den bereinigten jlinkModulePath, der nur proper modules enthält.
     "--module-path", installLibDirectory.absolutePath,
     "--module", "de.andreas.cadas/de.andreas.cadas.CadLauncher",
-    "--java-options", "--enable-native-access=javafx.graphics,ALL-UNNAMED"
+    "--java-options", "--enable-native-access=javafx.graphics,ALL-UNNAMED",
+    "--java-options", "--add-modules=org.apache.pdfbox,org.apache.commons.logging"
 )
 
 val cleanMacOsAppImage by tasks.registering(Delete::class) {
@@ -164,6 +189,39 @@ val cleanMacOsAppImage by tasks.registering(Delete::class) {
 
 val cleanMacOsDmg by tasks.registering(Delete::class) {
     delete(dmgOutputDirectory)
+}
+
+// Bereinigter Modulpfad für jlink: kopiert nur proper modules (echte Java-Module) aus dem
+// lib-Verzeichnis, sodass jlink keine automatic modules vorfindet.
+val prepareJlinkModulePath by tasks.registering(Copy::class) {
+    from(installLibDirectory)
+    into(jlinkModulePath)
+    exclude { fileTreeElement -> classpathJars.any { it == fileTreeElement.name } }
+    mustRunAfter(tasks.installDist)
+    doFirst { jlinkModulePath.deleteRecursively() }
+}
+
+// Erzeugt das Laufzeitimage per jlink mit nur echten Modulen (JDK + JavaFX + commonmark).
+// Die nicht-modularen Drittabhängigkeiten bleiben außen vor und werden über --input als
+// Classpath ans App-Image angehängt.
+val jlinkRuntimeImage by tasks.register<Exec>("jlinkRuntimeImage") {
+    group = "distribution"
+    description = "Erzeugt das Java-Laufzeitimage für die macOS-Paketierung per jlink."
+    enabled = macOsPackagingSupported.get()
+    dependsOn(tasks.installDist, prepareJlinkModulePath)
+    executable = jlinkExecutable
+    inputs.dir(jlinkModulePath)
+    outputs.dir(runtimeImageDirectory)
+    args = listOf(
+        "--output", runtimeImageDirectory.absolutePath,
+        "--module-path", jlinkModulePath.absolutePath,
+        "--add-modules",
+        "de.andreas.cadas,javafx.controls,javafx.swing,javafx.web,org.commonmark,org.commonmark.ext.gfm.tables",
+        "--strip-native-commands",
+        "--no-header-files",
+        "--no-man-pages"
+    )
+    doFirst { runtimeImageDirectory.deleteRecursively() }
 }
 
 val renameMacOsAppImage by tasks.registering(RenamePackagedDirectoryTask::class) {
@@ -182,7 +240,7 @@ tasks.register<Exec>("packageMacOsAppImage") {
     group = "distribution"
     description = "Erstellt ein macOS-App-Image für CADas."
     enabled = macOsPackagingSupported.get()
-    dependsOn(tasks.installDist, cleanMacOsAppImage)
+    dependsOn(jlinkRuntimeImage, cleanMacOsAppImage)
     inputs.dir(installLibDirectory)
     outputs.dir(appImageOutputDirectory)
     executable = jpackageExecutable
@@ -197,7 +255,7 @@ tasks.register<Exec>("packageMacOsDmg") {
     group = "distribution"
     description = "Erstellt ein macOS-DMG-Installationspaket für CADas."
     enabled = macOsPackagingSupported.get()
-    dependsOn(tasks.installDist, cleanMacOsDmg)
+    dependsOn(jlinkRuntimeImage, cleanMacOsDmg)
     inputs.dir(installLibDirectory)
     outputs.dir(dmgOutputDirectory)
     executable = jpackageExecutable
