@@ -7,6 +7,7 @@ import de.andreas.cadas.application.drawing.GuideSnapService;
 import de.andreas.cadas.application.drawing.GuideSnapTargets;
 import de.andreas.cadas.application.exchange.ExchangeFileNameService;
 import de.andreas.cadas.application.history.UndoRedoStack;
+import de.andreas.cadas.application.help.HelpContentService;
 import de.andreas.cadas.application.drawing.OpeningPlacementService;
 import de.andreas.cadas.application.drawing.QuarterTurnRotationService;
 import de.andreas.cadas.application.drawing.SelectionQueryService;
@@ -217,6 +218,7 @@ public final class CadWorkbench extends BorderPane {
     private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
     private final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
+    private final HelpContentService helpContentService = new HelpContentService();
     private final MarkdownHtmlRenderer markdownHtmlRenderer = new MarkdownHtmlRenderer();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
@@ -429,6 +431,7 @@ public final class CadWorkbench extends BorderPane {
                         new KeyCodeCombination(KeyCode.ESCAPE),
                         this::clearSelection
                 );
+                newScene.getAccelerators().put(new KeyCodeCombination(KeyCode.F1), this::showHelpWindow);
                 newScene.addEventFilter(KeyEvent.KEY_PRESSED, this::updateModifierState);
                 newScene.addEventFilter(KeyEvent.KEY_RELEASED, this::updateModifierState);
             }
@@ -855,7 +858,14 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Materialliste Beläge als Markdown exportieren", this::exportSurfaceMaterialReportMarkdown, null)
         );
 
-        MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu, berichteMenu);
+        Menu hilfeMenu = new Menu("Hilfe");
+        hilfeMenu.getItems().add(menuItem(
+                "Hilfe und Keymap",
+                this::showHelpWindow,
+                new KeyCodeCombination(KeyCode.F1)
+        ));
+
+        MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu, berichteMenu, hilfeMenu);
         applyTooltip(menuBar, "Bietet Datei-, Bearbeitungs-, Ansichts- und Werkzeugfunktionen mit passenden Tastaturkürzeln an.");
         return menuBar;
     }
@@ -3726,7 +3736,32 @@ public final class CadWorkbench extends BorderPane {
         stage.show();
     }
 
+    private void showHelpWindow() {
+        WebView helpView = new WebView();
+        helpView.getEngine().loadContent(markdownHtmlRenderer.renderDocument(helpContentService.createMarkdown()));
+        VBox.setVgrow(helpView, Priority.ALWAYS);
+        Button printButton = new Button("Drucken");
+        printButton.setOnAction(event -> printWebView(helpView, "Hilfe und Keymap"));
+        applyTooltip(printButton, "Druckt die vollständige Hilfe und Keymap. Im Druckdialog kann auch ein PDF-Drucker gewählt werden.");
+        HBox actions = new HBox(8.0, printButton);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        VBox container = new VBox(10.0, helpView, actions);
+        container.setPadding(new Insets(12));
+        Stage stage = new Stage();
+        stage.setTitle("CADas-Hilfe und Keymap");
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        if (owner != null) {
+            stage.initOwner(owner);
+        }
+        stage.setScene(new Scene(container, 920, 680));
+        stage.show();
+    }
+
     private void printSurfaceMaterialReport(WebView reportView) {
+        printWebView(reportView, "Materialliste");
+    }
+
+    private void printWebView(WebView reportView, String documentName) {
         PrinterJob printerJob = PrinterJob.createPrinterJob();
         if (printerJob == null) {
             draftLabel.setText("Kein Drucker verfügbar.");
@@ -3739,7 +3774,7 @@ public final class CadWorkbench extends BorderPane {
         }
         reportView.getEngine().print(printerJob);
         printerJob.endJob();
-        draftLabel.setText("Materialliste an Drucker übergeben.");
+        draftLabel.setText(documentName + " an Drucker übergeben.");
     }
 
     private void exportSurfaceMaterialReportMarkdown() {
