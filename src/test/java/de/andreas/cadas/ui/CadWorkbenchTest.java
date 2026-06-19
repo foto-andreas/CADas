@@ -1,5 +1,6 @@
 package de.andreas.cadas.ui;
 
+import de.andreas.cadas.application.view.RenderableKind;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
@@ -85,6 +86,34 @@ class CadWorkbenchTest {
             Assertions.assertEquals("CENTIMETER", aufFxThread(() -> workbench.automationUnit(entry.getKey())), entry.getKey());
             Assertions.assertEquals(entry.getValue(), aufFxThread(() -> workbench.automationFieldValue(entry.getKey())), entry.getKey());
         }
+    }
+
+    @Test
+    void bodenklickSetztNeuenStandortDerInnenansicht() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Test", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 3_000),
+                Length.of(260, LengthUnit.CENTIMETER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        project.primaryLevel().addRoom(room);
+        ThreeDViewport viewport = aufFxThread(() -> new ThreeDViewport(ignored -> { }, () -> { }));
+
+        aufFxThread(() -> {
+            viewport.activateInteriorView(project, project.primaryLevel(), room);
+            Assertions.assertTrue(viewport.isInteriorFloorHit(RenderableKind.ROOM_FLOOR, 180.0));
+            Assertions.assertTrue(viewport.isInteriorFloorHit(RenderableKind.SURFACE_LAYER, 180.0));
+            Assertions.assertFalse(viewport.isInteriorFloorHit(RenderableKind.SURFACE_LAYER, 2_800.0));
+            viewport.automationSelectInteriorFloorPoint(1_000.0, 800.0);
+            return null;
+        });
+
+        PlanPoint eyePosition = aufFxThread(viewport::automationInteriorEyePosition);
+        Assertions.assertEquals(1_000.0, eyePosition.xMillimeters(), 0.001);
+        Assertions.assertEquals(800.0, eyePosition.yMillimeters(), 0.001);
     }
 
     @Test

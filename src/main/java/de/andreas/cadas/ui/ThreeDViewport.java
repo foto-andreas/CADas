@@ -3,6 +3,7 @@ package de.andreas.cadas.ui;
 import de.andreas.cadas.application.view.CameraPose;
 import de.andreas.cadas.application.view.ProjectionMode;
 import de.andreas.cadas.application.view.RenderableBox;
+import de.andreas.cadas.application.view.RenderableKind;
 import de.andreas.cadas.application.view.RenderableMesh;
 import de.andreas.cadas.application.view.RotationAxis;
 import de.andreas.cadas.application.view.SelectionKey;
@@ -34,6 +35,7 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
+import javafx.geometry.Point3D;
 import javafx.geometry.Pos;
 import javafx.scene.AmbientLight;
 import javafx.scene.Group;
@@ -50,6 +52,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -689,6 +692,14 @@ public final class ThreeDViewport extends BorderPane {
         centerCurrentView();
     }
 
+    public void automationSelectInteriorFloorPoint(double xMillimeters, double zMillimeters) {
+        selectInteriorFloorPoint(xMillimeters, zMillimeters);
+    }
+
+    public PlanPoint automationInteriorEyePosition() {
+        return new PlanPoint(interiorEyeXMillimeters, interiorEyeZMillimeters);
+    }
+
     public void setProjectionMode(ProjectionMode projectionMode) {
         projectionModeSelector.setValue(projectionMode);
         // setValue triggert den Listener, der fitCameraToScene automatisch ausführt.
@@ -767,12 +778,12 @@ public final class ThreeDViewport extends BorderPane {
         box.setOpacity(renderableBox.opacity());
         box.getTransforms().add(rotation(renderableBox.rotationAxis(), renderableBox.rotationDegrees()));
         box.setUserData(renderableBox.selectionKey());
-        box.setOnMouseClicked(event -> {
-            if (renderableBox.selectionKey() != null) {
-                selectionConsumer.accept(renderableBox.selectionKey());
-                event.consume();
-            }
-        });
+        box.setOnMouseClicked(event -> handleRenderedNodeClick(
+                box,
+                renderableBox.selectionKey(),
+                renderableBox.kind(),
+                event
+        ));
         return box;
     }
 
@@ -864,13 +875,60 @@ public final class ThreeDViewport extends BorderPane {
         meshView.setCullFace(CullFace.NONE);
         meshView.setOpacity(rm.opacity());
         meshView.setUserData(rm.selectionKey());
-        meshView.setOnMouseClicked(event -> {
-            if (rm.selectionKey() != null) {
-                selectionConsumer.accept(rm.selectionKey());
-                event.consume();
-            }
-        });
+        meshView.setOnMouseClicked(event -> handleRenderedNodeClick(
+                meshView,
+                rm.selectionKey(),
+                rm.kind(),
+                event
+        ));
         return meshView;
+    }
+
+    private void handleRenderedNodeClick(
+            Node node,
+            SelectionKey selectionKey,
+            RenderableKind kind,
+            MouseEvent event
+    ) {
+        Point3D pickedPoint = node.localToParent(event.getPickResult().getIntersectedPoint());
+        double pickedHeightMillimeters = -pickedPoint.getY() / WORLD_SCALE;
+        if (cameraMode == CameraMode.INTERIOR && isInteriorFloorHit(kind, pickedHeightMillimeters)) {
+            selectInteriorFloorPoint(
+                    pickedPoint.getX() / WORLD_SCALE,
+                    pickedPoint.getZ() / WORLD_SCALE
+            );
+            event.consume();
+            return;
+        }
+        if (selectionKey != null) {
+            selectionConsumer.accept(selectionKey);
+            event.consume();
+        }
+    }
+
+    boolean isInteriorFloorHit(RenderableKind kind, double pickedHeightMillimeters) {
+        if (kind == RenderableKind.ROOM_FLOOR) {
+            return true;
+        }
+        return kind == RenderableKind.SURFACE_LAYER
+                && interiorTarget != null
+                && pickedHeightMillimeters < interiorTarget.eyeYMillimeters() - 300.0;
+    }
+
+    private void selectInteriorFloorPoint(double xMillimeters, double zMillimeters) {
+        if (cameraMode != CameraMode.INTERIOR || interiorTarget == null) {
+            return;
+        }
+        PlanPoint bounded = boundedInteriorEyePosition(
+                interiorEyeXMillimeters,
+                interiorEyeZMillimeters,
+                xMillimeters,
+                zMillimeters
+        );
+        interiorEyeXMillimeters = bounded.xMillimeters();
+        interiorEyeZMillimeters = bounded.yMillimeters();
+        fitToSceneRequested = false;
+        updateCamera();
     }
 
     private void updateCamera() {
