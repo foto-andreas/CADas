@@ -19,8 +19,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ToolBar;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.Scene;
@@ -645,6 +648,46 @@ class CadWorkbenchTest {
             return workbench.automationSnapshot();
         });
         Assertions.assertEquals(orbitVorher.threeDCameraStatus(), orbitWieder.threeDCameraStatus());
+    }
+
+    @Test
+    void workbenchZeigtNurNochDieIsoBemaessungAlsOption() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            ToolBar settingsBar = (ToolBar) topArea.getChildren().get(1);
+
+            Assertions.assertTrue(settingsBar.getItems().stream()
+                    .filter(CheckBox.class::isInstance)
+                    .map(CheckBox.class::cast)
+                    .map(CheckBox::getText)
+                    .anyMatch("ISO-Bemaßung"::equals));
+            Assertions.assertFalse(settingsBar.getItems().stream()
+                    .filter(CheckBox.class::isInstance)
+                    .map(CheckBox.class::cast)
+                    .map(CheckBox::getText)
+                    .anyMatch("ISO 7519"::equals));
+
+            Menu optionenMenu = menuBar.getMenus().stream()
+                    .filter(menu -> "Optionen".equals(menu.getText()))
+                    .findFirst()
+                    .orElseThrow();
+            Assertions.assertTrue(optionenMenu.getItems().stream()
+                    .map(MenuItem::getText)
+                    .anyMatch("ISO-Bemaßung anzeigen"::equals));
+            Assertions.assertFalse(optionenMenu.getItems().stream()
+                    .map(MenuItem::getText)
+                    .anyMatch("Bemaßung nach DIN EN ISO 7519 | 2025-01"::equals));
+            return null;
+        });
     }
 
     @Test

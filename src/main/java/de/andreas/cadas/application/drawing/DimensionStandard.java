@@ -1,7 +1,6 @@
 package de.andreas.cadas.application.drawing;
 
 public enum DimensionStandard {
-    EXISTING("Bisherige Bemaßung"),
     DIN_EN_ISO_7519_2025_01("DIN EN ISO 7519 | 2025-01");
 
     private final String label;

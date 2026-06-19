@@ -247,7 +247,6 @@ public final class CadWorkbench extends BorderPane {
     private final BooleanProperty snapToEndpoints = new SimpleBooleanProperty(true);
     private final BooleanProperty showCompass = new SimpleBooleanProperty(true);
     private final BooleanProperty showDimensions = new SimpleBooleanProperty(true);
-    private final BooleanProperty useIsoDimensions = new SimpleBooleanProperty(false);
     private final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
     private final BooleanProperty showRoomObjects = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
@@ -495,7 +494,6 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(snapToEndpoints);
         registerRenderListener(showCompass);
         registerRenderListener(showDimensions);
-        registerRenderListener(useIsoDimensions);
         registerRenderListener(showAreaVolume);
         registerRenderListener(showGuides);
         registerRenderListener(showGuideDistances);
@@ -590,13 +588,9 @@ public final class CadWorkbench extends BorderPane {
         snapWallsBox.selectedProperty().bindBidirectional(snapToWalls);
         applyTooltip(snapWallsBox, "Lässt neue oder verschobene Wände an Achsen, Außenkanten und Endkanten anderer Wände einrasten.");
 
-        CheckBox dimensionsBox = new CheckBox("Bemaßung");
+        CheckBox dimensionsBox = new CheckBox("ISO-Bemaßung");
         dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
-        applyTooltip(dimensionsBox, "Blendet die Längenbeschriftung der gezeichneten Wände ein oder aus.");
-
-        CheckBox isoDimensionsBox = new CheckBox("ISO 7519");
-        isoDimensionsBox.selectedProperty().bindBidirectional(useIsoDimensions);
-        applyTooltip(isoDimensionsBox, "Schaltet die sichtbare Bemaßung zwischen der bisherigen Beschriftung und dem Darstellungsprofil DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien um.");
+        applyTooltip(dimensionsBox, "Blendet die ISO-Bemaßung nach DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien ein oder aus.");
 
         CheckBox objectsBox = new CheckBox("Objekte");
         objectsBox.selectedProperty().bindBidirectional(showRoomObjects);
@@ -629,7 +623,6 @@ public final class CadWorkbench extends BorderPane {
                 snapWallsBox,
                 new Separator(Orientation.VERTICAL),
                 dimensionsBox,
-                isoDimensionsBox,
                 objectsBox
         );
     }
@@ -882,8 +875,7 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("Hilfslinienabstände anzeigen", showGuideDistances),
                 checkMenuItem("An Hilfslinien einrasten", snapToGuides),
                 checkMenuItem("An anderen Wänden einrasten", snapToWalls),
-                checkMenuItem("Bemaßung anzeigen", showDimensions),
-                checkMenuItem("Bemaßung nach DIN EN ISO 7519 | 2025-01", useIsoDimensions),
+                checkMenuItem("ISO-Bemaßung anzeigen", showDimensions),
                 checkMenuItem("Objekte anzeigen", showRoomObjects),
                 checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
                 checkMenuItem("Nordpfeil anzeigen", showCompass)
@@ -3370,9 +3362,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private DimensionStandard currentDimensionStandard() {
-        return useIsoDimensions.get()
-                ? DimensionStandard.DIN_EN_ISO_7519_2025_01
-                : DimensionStandard.EXISTING;
+        return DimensionStandard.DIN_EN_ISO_7519_2025_01;
     }
 
     private void drawIsoDimensionLines(
