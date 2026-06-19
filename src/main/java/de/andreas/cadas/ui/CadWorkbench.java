@@ -368,6 +368,8 @@ public final class CadWorkbench extends BorderPane {
     private double panOriginX;
     private double panOriginY;
     private boolean panning;
+    private boolean panningMoved;
+    private SelectionKey pendingContextSelection;
     private boolean updatingLengthInput;
     private PlanPoint draftStart;
     private PlanSegment previewSegment;
@@ -1425,21 +1427,12 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
 
-        if (event.getButton() == MouseButton.SECONDARY && currentTool() == DrawingTool.EDIT) {
-            DraftingConstraints constraints = currentConstraints(false);
-            PlanPoint editPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
-            SelectionKey contextSelection = selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null);
-            if (contextSelection != null) {
-                if (!selectedSelections.contains(contextSelection)) {
-                    selectSingle(contextSelection);
-                }
-                selectionContextMenu.show(drawingCanvas, event.getScreenX(), event.getScreenY());
-                return;
-            }
-        }
-
         if (event.getButton() == MouseButton.SECONDARY || event.getButton() == MouseButton.MIDDLE) {
             panning = true;
+            panningMoved = false;
+            pendingContextSelection = event.getButton() == MouseButton.SECONDARY && currentTool() == DrawingTool.EDIT
+                    ? contextSelectionAt(event)
+                    : null;
             panStartX = event.getX();
             panStartY = event.getY();
             panOriginX = offsetX;
@@ -1553,6 +1546,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void handleMouseDragged(MouseEvent event) {
         if (panning) {
+            panningMoved |= Math.hypot(event.getX() - panStartX, event.getY() - panStartY) > 3.0;
             offsetX = panOriginX + (event.getX() - panStartX);
             offsetY = panOriginY + (event.getY() - panStartY);
             render();
@@ -1659,6 +1653,13 @@ public final class CadWorkbench extends BorderPane {
     private void handleMouseReleased(MouseEvent event) {
         if (panning) {
             panning = false;
+            if (!panningMoved && pendingContextSelection != null && event.getButton() == MouseButton.SECONDARY) {
+                if (!selectedSelections.contains(pendingContextSelection)) {
+                    selectSingle(pendingContextSelection);
+                }
+                selectionContextMenu.show(drawingCanvas, event.getScreenX(), event.getScreenY());
+            }
+            pendingContextSelection = null;
             return;
         }
 
@@ -1722,6 +1723,16 @@ public final class CadWorkbench extends BorderPane {
         draftStart = null;
         previewSegment = null;
         render();
+    }
+
+    private SelectionKey contextSelectionAt(MouseEvent event) {
+        DraftingConstraints constraints = currentConstraints(false);
+        PlanPoint editPoint = snapService.snap(
+                screenToWorld(event.getX(), event.getY()),
+                constraints,
+                activeLevel.get().walls()
+        );
+        return selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null);
     }
 
     private void resizeCanvases() {

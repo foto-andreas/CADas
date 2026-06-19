@@ -213,6 +213,32 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void verschiebtZweidimensionaleAnsichtAuchBeimZiehenAufRaum() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            return instanz;
+        });
+        WorkbenchAutomationSnapshot before = aufFxThread(workbench::automationSnapshot);
+        double roomX = before.offsetX() + 2_000.0 * 0.1 * before.zoom();
+        double roomY = before.offsetY() + 1_500.0 * 0.1 * before.zoom();
+
+        aufFxThread(() -> {
+            workbench.automationCanvasDrag(roomX, roomY, roomX + 90.0, roomY + 60.0, javafx.scene.input.MouseButton.SECONDARY, false, false, false);
+            return null;
+        });
+        WorkbenchAutomationSnapshot after = aufFxThread(workbench::automationSnapshot);
+
+        Assertions.assertEquals(before.offsetX() + 90.0, after.offsetX(), 0.001);
+        Assertions.assertEquals(before.offsetY() + 60.0, after.offsetY(), 0.001);
+    }
+
+    @Test
     void belagsauswahlWechseltMitRaumUndWandSauberZwischenKontexten() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {
