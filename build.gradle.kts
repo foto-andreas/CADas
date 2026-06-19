@@ -1,8 +1,10 @@
 import org.gradle.api.DefaultTask
 import org.gradle.api.provider.Property
+import org.gradle.process.ExecOperations
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import javax.inject.Inject
 
 plugins {
     application
@@ -143,6 +145,64 @@ abstract class RenamePackagedFileTask : DefaultTask() {
     }
 }
 
+abstract class PrepareModulePathTask : DefaultTask() {
+
+    @get:InputDirectory
+    abstract val sourceDirectory: DirectoryProperty
+
+    @get:Input
+    abstract val excludedJarNames: ListProperty<String>
+
+    @get:OutputDirectory
+    abstract val targetDirectory: DirectoryProperty
+
+    @TaskAction
+    fun prepare() {
+        val target = targetDirectory.get().asFile
+        target.deleteRecursively()
+        target.mkdirs()
+        val excluded = excludedJarNames.get().toSet()
+        sourceDirectory.get().asFile
+            .listFiles { file -> file.isFile && file.extension == "jar" && file.name !in excluded }
+            ?.forEach { file -> file.copyTo(target.resolve(file.name)) }
+    }
+}
+
+abstract class JlinkRuntimeImageTask : DefaultTask() {
+
+    @get:InputDirectory
+    abstract val modulePath: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputImage: DirectoryProperty
+
+    @get:Input
+    abstract val addModules: ListProperty<String>
+
+    @get:Input
+    abstract val jlinkToolExecutable: Property<String>
+
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    @TaskAction
+    fun runJlink() {
+        val outputDir = outputImage.get().asFile
+        outputDir.deleteRecursively()
+        execOperations.exec {
+            executable = jlinkToolExecutable.get()
+            args = listOf(
+                "--output", outputDir.absolutePath,
+                "--module-path", modulePath.get().asFile.absolutePath,
+                "--add-modules", addModules.get().joinToString(","),
+                "--strip-native-commands",
+                "--no-header-files",
+                "--no-man-pages"
+            )
+        }
+    }
+}
+
 abstract class RenamePackagedDirectoryTask : DefaultTask() {
 
     @get:OutputDirectory
@@ -193,35 +253,34 @@ val cleanMacOsDmg by tasks.registering(Delete::class) {
 
 // Bereinigter Modulpfad für jlink: kopiert nur proper modules (echte Java-Module) aus dem
 // lib-Verzeichnis, sodass jlink keine automatic modules vorfindet.
-val prepareJlinkModulePath by tasks.registering(Copy::class) {
-    from(installLibDirectory)
-    into(jlinkModulePath)
-    exclude { fileTreeElement -> classpathJars.any { it == fileTreeElement.name } }
+val prepareJlinkModulePath by tasks.registering(PrepareModulePathTask::class) {
+    sourceDirectory.set(installLibDirectory)
+    excludedJarNames.set(classpathJars)
+    targetDirectory.set(jlinkModulePath)
     mustRunAfter(tasks.installDist)
-    doFirst { jlinkModulePath.deleteRecursively() }
 }
 
 // Erzeugt das Laufzeitimage per jlink mit nur echten Modulen (JDK + JavaFX + commonmark).
-// Die nicht-modularen Drittabhängigkeiten bleiben außen vor und werden über --input als
-// Classpath ans App-Image angehängt.
-val jlinkRuntimeImage by tasks.register<Exec>("jlinkRuntimeImage") {
+// Die automatischen Module liegen später auf dem App-Modulpfad und werden per --add-modules
+// in den Laufzeit-Layer aufgenommen.
+val jlinkRuntimeImage by tasks.registering(JlinkRuntimeImageTask::class) {
     group = "distribution"
     description = "Erzeugt das Java-Laufzeitimage für die macOS-Paketierung per jlink."
     enabled = macOsPackagingSupported.get()
     dependsOn(tasks.installDist, prepareJlinkModulePath)
-    executable = jlinkExecutable
-    inputs.dir(jlinkModulePath)
-    outputs.dir(runtimeImageDirectory)
-    args = listOf(
-        "--output", runtimeImageDirectory.absolutePath,
-        "--module-path", jlinkModulePath.absolutePath,
-        "--add-modules",
-        "de.andreas.cadas,javafx.controls,javafx.swing,javafx.web,org.commonmark,org.commonmark.ext.gfm.tables",
-        "--strip-native-commands",
-        "--no-header-files",
-        "--no-man-pages"
+    modulePath.set(jlinkModulePath)
+    outputImage.set(runtimeImageDirectory)
+    addModules.set(
+        listOf(
+            "de.andreas.cadas",
+            "javafx.controls",
+            "javafx.swing",
+            "javafx.web",
+            "org.commonmark",
+            "org.commonmark.ext.gfm.tables"
+        )
     )
-    doFirst { runtimeImageDirectory.deleteRecursively() }
+    jlinkToolExecutable.set(jlinkExecutable)
 }
 
 val renameMacOsAppImage by tasks.registering(RenamePackagedDirectoryTask::class) {
