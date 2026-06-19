@@ -45,6 +45,7 @@ public final class ConstructionDrawingPdfService {
     private static final PDType1Font FONT_BOLD = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
     private static final float PDF_FONT_SIZE = 6.5f;
     private static final double PDF_TEXT_AWAY_DISTANCE = 4.0;
+    private static final double PDF_PARALLEL_TEXT_AWAY_DISTANCE = 8.0;
     private static final double PDF_DIMENSION_LINE_BLOCKING_PADDING = 2.0;
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
@@ -426,8 +427,11 @@ public final class ConstructionDrawingPdfService {
         double effectiveOffset = dimensionLineLayoutService.projectedNormalOffset(normalOffset, true, 24.0);
         double screenPlacementSign = Math.copySign(1.0, effectiveOffset);
         DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(x1, y1, x2, y2, effectiveOffset);
+        double textAwayDistance = dimensionLineLayoutService.isParallelToHorizontalText(x2 - x1, y2 - y1)
+                ? PDF_PARALLEL_TEXT_AWAY_DISTANCE
+                : PDF_TEXT_AWAY_DISTANCE;
         DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
-                layout, screenPlacementSign, PDF_TEXT_AWAY_DISTANCE
+                layout, screenPlacementSign, textAwayDistance
         );
         double textX = layout.textX() + away.deltaX();
         double textY = layout.textY() + away.deltaY();

@@ -2,12 +2,18 @@ package de.andreas.cadas.application.drawing;
 
 public final class DimensionLineLayoutService {
 
+    private static final double PARALLEL_ANGLE_TOLERANCE = Math.tan(Math.toRadians(5.0));
+
     public double projectedNormalOffset(double normalOffset, boolean mirrored, double minimumMagnitude) {
         if (minimumMagnitude < 0.0) {
             throw new IllegalArgumentException("minimumMagnitude darf nicht negativ sein.");
         }
         double projectedOffset = mirrored ? -normalOffset : normalOffset;
         return Math.copySign(Math.max(Math.abs(projectedOffset), minimumMagnitude), projectedOffset);
+    }
+
+    public boolean isParallelToHorizontalText(double directionX, double directionY) {
+        return Math.abs(directionY) <= Math.abs(directionX) * PARALLEL_ANGLE_TOLERANCE;
     }
 
     /**

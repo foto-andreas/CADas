@@ -3,6 +3,8 @@ package de.andreas.cadas.application.drawing;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DimensionLineLayoutServiceTest {
 
@@ -50,4 +52,12 @@ class DimensionLineLayoutServiceTest {
         assertEquals(24.0, service.projectedNormalOffset(-10.0, true, 24.0), 0.001);
     }
 
+    @Test
+    void erkenntZurHorizontalenMaßzahlParalleleMaßlinien() {
+        DimensionLineLayoutService service = new DimensionLineLayoutService();
+
+        assertTrue(service.isParallelToHorizontalText(100.0, 0.0));
+        assertTrue(service.isParallelToHorizontalText(-100.0, 5.0));
+        assertFalse(service.isParallelToHorizontalText(0.0, 100.0));
+    }
 }

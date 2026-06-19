@@ -207,6 +207,7 @@ public final class CadWorkbench extends BorderPane {
     private static final int LENGTH_INPUT_DECIMALS = 3;
     private static final Font DIMENSION_LABEL_FONT = Font.font("Menlo", 12);
     private static final double DIMENSION_TEXT_AWAY_DISTANCE = 8.0;
+    private static final double DIMENSION_PARALLEL_TEXT_AWAY_DISTANCE = 14.0;
     private static final double DIMENSION_TEXT_PADDING = 6.0;
     private static final double DIMENSION_LINE_BLOCKING_PADDING = 4.0;
 
@@ -2331,9 +2332,12 @@ public final class CadWorkbench extends BorderPane {
         );
         double screenPlacementSign = Math.copySign(1.0, effectiveOffset);
         DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(startX, startY, endX, endY, effectiveOffset);
+        double textAwayDistance = dimensionLineLayoutService.isParallelToHorizontalText(directionX, directionY)
+                ? DIMENSION_PARALLEL_TEXT_AWAY_DISTANCE
+                : DIMENSION_TEXT_AWAY_DISTANCE;
         // Text von der Maßlinie weg verschieben (in Bildschirm-Normalenrichtung der Platzierungsseite).
         DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
-                layout, screenPlacementSign, DIMENSION_TEXT_AWAY_DISTANCE
+                layout, screenPlacementSign, textAwayDistance
         );
         Text textMeasure = new Text(pendingLabel.text());
         textMeasure.setFont(DIMENSION_LABEL_FONT);
