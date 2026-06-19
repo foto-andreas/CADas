@@ -431,7 +431,9 @@ public final class CadWorkbench extends BorderPane {
     private double lastMouseY;
     private boolean altPressed;
     private boolean spacePressed;
-    private boolean errorDialogsEnabled = true;
+    // Steuert alle blockierenden UI-Dialoge (Fehler-, Bestätigungs-, Erfolgs- und Eingabedialoge).
+    // Wird durch die Automatisierung deaktiviert, damit Tests nicht an Dialogen hängen bleiben.
+    private boolean interactiveDialogsEnabled = true;
     private boolean applicationExitRequested;
     private Runnable applicationExitAction = Platform::exit;
     private UiErrorDialogs.ErrorPresentation lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
@@ -439,6 +441,9 @@ public final class CadWorkbench extends BorderPane {
     public CadWorkbench() {
         setPadding(new Insets(12));
         setStyle("-fx-background-color: linear-gradient(to bottom, #f6f1e8, #ece5d8);");
+        if (automationActive()) {
+            interactiveDialogsEnabled = false;
+        }
 
         configureControls();
         configureLayout();
@@ -802,6 +807,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void showInteriorViewUnavailableError() {
+        draftLabel.setText("Innenansicht nicht verfügbar: Es wird ein Raum benötigt.");
+        if (!interactiveDialogsEnabled) {
+            return;
+        }
         Alert alert = new Alert(
                 Alert.AlertType.WARNING,
                 "Auf der aktiven Etage ist kein Raum vorhanden. Schließe zuerst einen Wandzug, damit CADas einen Raum ableiten kann.",
@@ -1256,7 +1265,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void showErrorDialog(String title, String header, String content, Throwable throwable) {
         lastErrorDialog = UiErrorDialogs.fromThrowable(title, header, content, throwable);
-        UiErrorDialogs.show(lastErrorDialog, currentWindow(), errorDialogsEnabled);
+        UiErrorDialogs.show(lastErrorDialog, currentWindow(), interactiveDialogsEnabled);
     }
 
     private Window currentWindow() {
@@ -1606,8 +1615,8 @@ public final class CadWorkbench extends BorderPane {
                 render();
                 return;
             }
-            DraftingConstraints constraints = currentConstraints(false);
-            PlanPoint editPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
+            // Für die Selektion wird der reine Klickpunkt verwendet, nicht das gerasterte Ergebnis.
+            PlanPoint editPoint = rawEditPoint;
             selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, SNAP_TOLERANCE).orElse(null);
             selectionDragAnchor = null;
             selectionDragBaseWalls = List.of();
@@ -1945,12 +1954,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private SelectionKey contextSelectionAt(MouseEvent event) {
-        DraftingConstraints constraints = currentConstraints(false);
-        PlanPoint editPoint = snapService.snap(
-                screenToWorld(event.getX(), event.getY()),
-                constraints,
-                activeLevel.get().walls()
-        );
+        PlanPoint editPoint = screenToWorld(event.getX(), event.getY());
         return selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null);
     }
 
@@ -3768,25 +3772,31 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void createLevel() {
-        TextInputDialog dialog = new TextInputDialog("Etage " + (availableLevels.size() + 1));
-        dialog.setTitle("Neue Etage");
-        dialog.setHeaderText("Neue Etage anlegen");
-        dialog.setContentText("Name der Etage:");
-        dialog.getDialogPane().setPrefWidth(420);
-        Window owner = getScene() != null ? getScene().getWindow() : null;
-        if (owner != null) {
-            dialog.initOwner(owner);
+        String levelName = "";
+        if (interactiveDialogsEnabled) {
+            TextInputDialog dialog = new TextInputDialog("Etage " + (availableLevels.size() + 1));
+            dialog.setTitle("Neue Etage");
+            dialog.setHeaderText("Neue Etage anlegen");
+            dialog.setContentText("Name der Etage:");
+            dialog.getDialogPane().setPrefWidth(420);
+            Window owner = getScene() != null ? getScene().getWindow() : null;
+            if (owner != null) {
+                dialog.initOwner(owner);
+            }
+            levelName = dialog.showAndWait()
+                    .map(String::trim)
+                    .filter(name -> !name.isBlank())
+                    .orElse(null);
         }
-        dialog.showAndWait()
-                .map(String::trim)
-                .filter(name -> !name.isBlank())
-                .ifPresent(levelName -> {
-                    rememberStateForUndo();
-                    Level level = project.createLevel(levelName);
-                    availableLevels.add(level);
-                    activateLevel(level);
-                    fitCurrentViewToContent();
-                });
+        if (levelName == null) {
+            return;
+        }
+        String finalLevelName = levelName.isBlank() ? "Etage " + (availableLevels.size() + 1) : levelName;
+        rememberStateForUndo();
+        Level level = project.createLevel(finalLevelName);
+        availableLevels.add(level);
+        activateLevel(level);
+        fitCurrentViewToContent();
     }
 
     private DrawingTool currentTool() {
@@ -4064,16 +4074,18 @@ public final class CadWorkbench extends BorderPane {
 
     private void confirmExportWritten(Path exportPath) {
         if (Files.exists(exportPath) && Files.isRegularFile(exportPath)) {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("DXF exportiert");
-            alert.setHeaderText("Die DXF-Datei wurde erfolgreich gespeichert.");
-            alert.setContentText(exportPath.toString());
-            alert.getDialogPane().setPrefWidth(560);
-            Window owner = getScene() != null ? getScene().getWindow() : null;
-            if (owner != null) {
-                alert.initOwner(owner);
+            if (interactiveDialogsEnabled) {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("DXF exportiert");
+                alert.setHeaderText("Die DXF-Datei wurde erfolgreich gespeichert.");
+                alert.setContentText(exportPath.toString());
+                alert.getDialogPane().setPrefWidth(560);
+                Window owner = getScene() != null ? getScene().getWindow() : null;
+                if (owner != null) {
+                    alert.initOwner(owner);
+                }
+                alert.showAndWait();
             }
-            alert.showAndWait();
             draftLabel.setText("Gebäude-DXF exportiert: " + exportPath.getFileName());
         } else {
             draftLabel.setText("DXF-Export konnte nicht verifiziert werden: " + exportPath);
@@ -4157,7 +4169,7 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         Window owner = getScene() != null ? getScene().getWindow() : null;
-        if (!printerJob.showPrintDialog(owner)) {
+        if (interactiveDialogsEnabled && !printerJob.showPrintDialog(owner)) {
             draftLabel.setText("Druck abgebrochen.");
             return;
         }
@@ -4657,6 +4669,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private boolean confirmOverwrite(String title, String header, String content) {
+        if (!interactiveDialogsEnabled) {
+            // In der Automatisierung Overwrite ohne Nachfrage bestätigen, damit Aktionen nicht hängen.
+            return true;
+        }
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION, content, ButtonType.CANCEL, ButtonType.OK);
         alert.setTitle(title);
         alert.setHeaderText(header);
@@ -5257,6 +5273,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void showSurfaceLayerError(String header, String content) {
+        draftLabel.setText(header + ": " + content);
+        if (!interactiveDialogsEnabled) {
+            return;
+        }
         Alert alert = new Alert(Alert.AlertType.ERROR, content, ButtonType.OK);
         alert.setTitle("Belag");
         alert.setHeaderText(header);
@@ -5347,39 +5367,43 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void clearProject() {
-        Alert alert = new Alert(
-                Alert.AlertType.CONFIRMATION,
-                "Alle Etagen, Bauteile, Hilfslinien und Dachinformationen des aktuellen Projekts werden entfernt. Dieser Schritt kann über Rückgängig wiederhergestellt werden, solange der Verlauf erhalten bleibt.",
-                ButtonType.OK,
-                ButtonType.CANCEL
-        );
-        alert.setTitle("Projekt leeren");
-        alert.setHeaderText("Projekt wirklich leeren?");
-        alert.getDialogPane().setPrefWidth(520);
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        if (window != null) {
-            alert.initOwner(window);
+        if (interactiveDialogsEnabled) {
+            Alert alert = new Alert(
+                    Alert.AlertType.CONFIRMATION,
+                    "Alle Etagen, Bauteile, Hilfslinien und Dachinformationen des aktuellen Projekts werden entfernt. Dieser Schritt kann über Rückgängig wiederhergestellt werden, solange der Verlauf erhalten bleibt.",
+                    ButtonType.OK,
+                    ButtonType.CANCEL
+            );
+            alert.setTitle("Projekt leeren");
+            alert.setHeaderText("Projekt wirklich leeren?");
+            alert.getDialogPane().setPrefWidth(520);
+            Window window = getScene() != null ? getScene().getWindow() : null;
+            if (window != null) {
+                alert.initOwner(window);
+            }
+            boolean bestaetigt = alert.showAndWait()
+                    .filter(ButtonType.OK::equals)
+                    .isPresent();
+            if (!bestaetigt) {
+                return;
+            }
         }
-        alert.showAndWait()
-                .filter(ButtonType.OK::equals)
-                .ifPresent(ignored -> {
-                    rememberStateForUndo();
-                    Level level = project.resetToSingleLevel("Erdgeschoss");
-                    availableLevels.setAll(project.levels());
-                    guideLines.clear();
-                    clearSelectionsInternal();
-                    selectedEndpointGroup = null;
-                    openingDragId = null;
-                    openingDragWallAxis = null;
-                    openingDragWidth = 0;
-                    openingDragOffsetDelta = 0;
-                    draftStart = null;
-                    previewSegment = null;
-                    pendingGuideOrientation = null;
-                    activateLevel(level);
-                    fitCurrentViewToContent();
-                    draftLabel.setText("Projekt geleert.");
-                });
+        rememberStateForUndo();
+        Level level = project.resetToSingleLevel("Erdgeschoss");
+        availableLevels.setAll(project.levels());
+        guideLines.clear();
+        clearSelectionsInternal();
+        selectedEndpointGroup = null;
+        openingDragId = null;
+        openingDragWallAxis = null;
+        openingDragWidth = 0;
+        openingDragOffsetDelta = 0;
+        draftStart = null;
+        previewSegment = null;
+        pendingGuideOrientation = null;
+        activateLevel(level);
+        fitCurrentViewToContent();
+        draftLabel.setText("Projekt geleert.");
     }
 
     private void undo() {
@@ -6145,8 +6169,14 @@ public final class CadWorkbench extends BorderPane {
                 .toList();
     }
 
+    // Erkennt Automatisierungs- bzw. Testumgebungen, in denen blockierende Dialoge vermieden werden müssen.
+    static boolean automationActive() {
+        return Boolean.parseBoolean(System.getProperty("cadas.automation.enabled", "false"))
+                || "1".equals(System.getenv("CADAS_AUTOMATION"));
+    }
+
     public void automationSetErrorDialogsEnabled(boolean enabled) {
-        errorDialogsEnabled = enabled;
+        interactiveDialogsEnabled = enabled;
     }
 
     public void automationClearLastError() {

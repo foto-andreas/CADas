@@ -47,6 +47,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // Tests laufen ohne interaktiven Anwender; blockierende Dialoge würden die Automation aufhalten.
+    systemProperty("cadas.automation.enabled", "true")
     finalizedBy(tasks.jacocoTestReport)
 }
 

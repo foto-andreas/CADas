@@ -831,6 +831,36 @@ class CadWorkbenchTest {
         Assertions.assertFalse(Files.exists(exportPfad));
     }
 
+    @Test
+    void selektiertMitReinemKlickpunktStattRasterpunkt() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetErrorDialogsEnabled(false);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetViewport(1.0, 240.0, 160.0);
+            workbench.automationSetTool("WALL");
+            workbench.automationSetUnit("grid", "MILLIMETER");
+            workbench.automationSetField("grid", "10");
+            workbench.automationCanvasDrag(240, 175, 340, 175, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            workbench.automationSetTool("EDIT");
+            workbench.automationSetUnit("grid", "MILLIMETER");
+            workbench.automationSetField("grid", "500");
+            // Klick auf Weltkoordinate (500, 180): ohne Raster-Snap trifft er die Wandachse bei y = 150,
+            // mit Raster-Snap würde der Punkt auf y = 0 geschnappt und die Wand verfehlen.
+            workbench.automationCanvasClick(290, 178, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            return null;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertEquals(1, snapshot.selectionCount());
+    }
+
     private Path erzeugeEinfachesProjektAlsDxf() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Testhaus", "Erdgeschoss");
         var level = project.primaryLevel();

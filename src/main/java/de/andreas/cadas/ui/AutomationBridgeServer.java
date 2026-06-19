@@ -40,6 +40,7 @@ public final class AutomationBridgeServer {
             AutomationBridgeServer bridge = new AutomationBridgeServer(workbench, server);
             bridge.registerContexts();
             server.start();
+            workbench.automationSetErrorDialogsEnabled(false);
             workbench.automationSetStatusText("Automatisierungszugriff aktiv auf http://127.0.0.1:" + port);
             return Optional.of(bridge);
         } catch (IOException exception) {
