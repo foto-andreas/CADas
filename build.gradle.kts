@@ -58,6 +58,9 @@ tasks.test {
     useJUnitPlatform()
     // Tests laufen ohne interaktiven Anwender; blockierende Dialoge würden die Automation aufhalten.
     systemProperty("cadas.automation.enabled", "true")
+    // Unterdrückt die Native-Access-Warnung des JavaFX-Glass-Nativelibrary-Laders,
+    // der im Test-Klassenpfad als unbenanntes Modul läuft.
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     finalizedBy(tasks.jacocoTestReport)
 }
 
