@@ -7,6 +7,7 @@ import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
+import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.domain.model.WindowElement;
 
@@ -46,6 +47,10 @@ public final class EdgeResizeService {
                     handles.add(new EdgeHandle(EdgeHandleKind.WINDOW_START, window.id(), wall.id(), wall.axis().pointAt(window.offsetFromStart())));
                     handles.add(new EdgeHandle(EdgeHandleKind.WINDOW_END, window.id(), wall.id(), wall.axis().pointAt(window.offsetFromStart().add(window.width()))));
                 });
+                case STAIR -> level.staircases().stream().filter(staircase -> staircase.id().equals(id)).findFirst().ifPresent(staircase -> {
+                    handles.add(new EdgeHandle(EdgeHandleKind.STAIR_FIRST_CORNER, staircase.id(), staircase.id(), staircase.firstCorner()));
+                    handles.add(new EdgeHandle(EdgeHandleKind.STAIR_OPPOSITE_CORNER, staircase.id(), staircase.id(), staircase.oppositeCorner()));
+                });
                 default -> {
                 }
             }
@@ -58,6 +63,7 @@ public final class EdgeResizeService {
             case WALL_START, WALL_END -> resizeWall(level, handle, targetPoint);
             case DOOR_START, DOOR_END -> resizeDoor(level, handle, targetPoint);
             case WINDOW_START, WINDOW_END -> resizeWindow(level, handle, targetPoint);
+            case STAIR_FIRST_CORNER, STAIR_OPPOSITE_CORNER -> resizeStaircase(level, handle, targetPoint);
         };
     }
 
@@ -93,7 +99,7 @@ public final class EdgeResizeService {
         List<WindowElement> windows = level.windows().stream()
                 .map(window -> window.wallId().equals(wall.id()) ? window.withOffset(Length.ofMillimeters(window.offsetFromStart().toMillimeters() - startShift)) : window)
                 .toList();
-        return new ResizeResult(walls, doors, windows);
+        return new ResizeResult(walls, doors, windows, level.staircases());
     }
 
     private ResizeResult resizeDoor(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -105,7 +111,7 @@ public final class EdgeResizeService {
         Door resized = handle.kind() == EdgeHandleKind.DOOR_START
                 ? new Door(door.id(), door.wallId(), Length.ofMillimeters(Math.min(target, end - MINIMUM_LENGTH)), Length.ofMillimeters(end - Math.min(target, end - MINIMUM_LENGTH)), door.height(), door.thresholdHeight())
                 : new Door(door.id(), door.wallId(), door.offsetFromStart(), Length.ofMillimeters(Math.max(target, start + MINIMUM_LENGTH) - start), door.height(), door.thresholdHeight());
-        return new ResizeResult(level.walls(), level.doors().stream().map(candidate -> candidate.id().equals(door.id()) ? resized : candidate).toList(), level.windows());
+        return new ResizeResult(level.walls(), level.doors().stream().map(candidate -> candidate.id().equals(door.id()) ? resized : candidate).toList(), level.windows(), level.staircases());
     }
 
     private ResizeResult resizeWindow(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -117,7 +123,39 @@ public final class EdgeResizeService {
         WindowElement resized = handle.kind() == EdgeHandleKind.WINDOW_START
                 ? new WindowElement(window.id(), window.wallId(), Length.ofMillimeters(Math.min(target, end - MINIMUM_LENGTH)), Length.ofMillimeters(end - Math.min(target, end - MINIMUM_LENGTH)), window.sillHeight(), window.windowHeight())
                 : new WindowElement(window.id(), window.wallId(), window.offsetFromStart(), Length.ofMillimeters(Math.max(target, start + MINIMUM_LENGTH) - start), window.sillHeight(), window.windowHeight());
-        return new ResizeResult(level.walls(), level.doors(), level.windows().stream().map(candidate -> candidate.id().equals(window.id()) ? resized : candidate).toList());
+        return new ResizeResult(level.walls(), level.doors(), level.windows().stream().map(candidate -> candidate.id().equals(window.id()) ? resized : candidate).toList(), level.staircases());
+    }
+
+    private ResizeResult resizeStaircase(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+        Staircase staircase = level.staircases().stream().filter(candidate -> candidate.id().equals(handle.elementId())).findFirst().orElseThrow();
+        double minSize = 100.0;
+        boolean draggingFirstCorner = handle.kind() == EdgeHandleKind.STAIR_FIRST_CORNER;
+        PlanPoint fixedCorner = draggingFirstCorner ? staircase.oppositeCorner() : staircase.firstCorner();
+        PlanPoint draggedCorner = draggingFirstCorner ? staircase.firstCorner() : staircase.oppositeCorner();
+        double minX = Math.min(fixedCorner.xMillimeters(), draggedCorner.xMillimeters());
+        double maxX = Math.max(fixedCorner.xMillimeters(), draggedCorner.xMillimeters());
+        double minY = Math.min(fixedCorner.yMillimeters(), draggedCorner.yMillimeters());
+        double maxY = Math.max(fixedCorner.yMillimeters(), draggedCorner.yMillimeters());
+        double clampedX;
+        double clampedY;
+        if (draggingFirstCorner) {
+            clampedX = fixedCorner.xMillimeters() >= draggedCorner.xMillimeters()
+                    ? Math.min(targetPoint.xMillimeters(), fixedCorner.xMillimeters() - minSize)
+                    : Math.max(targetPoint.xMillimeters(), fixedCorner.xMillimeters() + minSize);
+            clampedY = fixedCorner.yMillimeters() >= draggedCorner.yMillimeters()
+                    ? Math.min(targetPoint.yMillimeters(), fixedCorner.yMillimeters() - minSize)
+                    : Math.max(targetPoint.yMillimeters(), fixedCorner.yMillimeters() + minSize);
+        } else {
+            clampedX = Math.max(targetPoint.xMillimeters(), minX + minSize);
+            clampedY = Math.max(targetPoint.yMillimeters(), minY + minSize);
+        }
+        clampedX = Math.min(clampedX, maxX + 10_000_000.0);
+        clampedY = Math.min(clampedY, maxY + 10_000_000.0);
+        PlanPoint clampedTarget = new PlanPoint(clampedX, clampedY);
+        Staircase resized = draggingFirstCorner
+                ? new Staircase(staircase.id(), staircase.stairType(), clampedTarget, staircase.oppositeCorner(), staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth())
+                : new Staircase(staircase.id(), staircase.stairType(), staircase.firstCorner(), clampedTarget, staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth());
+        return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases().stream().map(candidate -> candidate.id().equals(staircase.id()) ? resized : candidate).toList());
     }
 
     private Optional<Double> minimumOpeningOffset(Level level, Wall wall) {
@@ -170,17 +208,20 @@ public final class EdgeResizeService {
         DOOR_START,
         DOOR_END,
         WINDOW_START,
-        WINDOW_END
+        WINDOW_END,
+        STAIR_FIRST_CORNER,
+        STAIR_OPPOSITE_CORNER
     }
 
     public record EdgeHandle(EdgeHandleKind kind, UUID elementId, UUID hostWallId, PlanPoint position) {
     }
 
-    public record ResizeResult(List<Wall> walls, List<Door> doors, List<WindowElement> windows) {
+    public record ResizeResult(List<Wall> walls, List<Door> doors, List<WindowElement> windows, List<Staircase> staircases) {
         public ResizeResult {
             walls = List.copyOf(walls);
             doors = List.copyOf(doors);
             windows = List.copyOf(windows);
+            staircases = List.copyOf(staircases);
         }
     }
 }

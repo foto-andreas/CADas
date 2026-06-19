@@ -418,6 +418,7 @@ public final class CadWorkbench extends BorderPane {
     private List<Wall> edgeResizeBaseWalls = List.of();
     private List<Door> edgeResizeBaseDoors = List.of();
     private List<WindowElement> edgeResizeBaseWindows = List.of();
+    private List<Staircase> edgeResizeBaseStaircases = List.of();
     private double lastMouseX;
     private double lastMouseY;
     private boolean altPressed;
@@ -1549,6 +1550,7 @@ public final class CadWorkbench extends BorderPane {
                 edgeResizeBaseWalls = List.copyOf(activeLevel.get().walls());
                 edgeResizeBaseDoors = List.copyOf(activeLevel.get().doors());
                 edgeResizeBaseWindows = List.copyOf(activeLevel.get().windows());
+                edgeResizeBaseStaircases = List.copyOf(activeLevel.get().staircases());
                 selectedEndpointGroup = null;
                 selectionDragAnchor = null;
                 openingDragId = null;
@@ -1670,12 +1672,15 @@ public final class CadWorkbench extends BorderPane {
                 baseLevel.replaceWalls(edgeResizeBaseWalls);
                 baseLevel.replaceDoors(edgeResizeBaseDoors);
                 baseLevel.replaceWindows(edgeResizeBaseWindows);
-                Set<UUID> excludedWallIds = Set.of(activeEdgeHandle.hostWallId());
-                List<Wall> snapWalls = edgeResizeBaseWalls.stream()
-                        .filter(wall -> activeEdgeHandle.kind() != EdgeResizeService.EdgeHandleKind.WALL_START
-                                && activeEdgeHandle.kind() != EdgeResizeService.EdgeHandleKind.WALL_END
-                                || !wall.id().equals(activeEdgeHandle.hostWallId()))
-                        .toList();
+                baseLevel.replaceStaircases(edgeResizeBaseStaircases);
+                boolean isWallHandle = activeEdgeHandle.kind() == EdgeResizeService.EdgeHandleKind.WALL_START
+                        || activeEdgeHandle.kind() == EdgeResizeService.EdgeHandleKind.WALL_END;
+                Set<UUID> excludedWallIds = isWallHandle ? Set.of(activeEdgeHandle.hostWallId()) : Set.of();
+                List<Wall> snapWalls = isWallHandle
+                        ? edgeResizeBaseWalls.stream()
+                                .filter(wall -> !wall.id().equals(activeEdgeHandle.hostWallId()))
+                                .toList()
+                        : edgeResizeBaseWalls;
                 PlanPoint snappedPoint = snapService.snap(
                         screenToWorld(event.getX(), event.getY()),
                         currentConstraints(false),
@@ -1686,6 +1691,7 @@ public final class CadWorkbench extends BorderPane {
                 activeLevel.get().replaceWalls(result.walls());
                 activeLevel.get().replaceDoors(result.doors());
                 activeLevel.get().replaceWindows(result.windows());
+                activeLevel.get().replaceStaircases(result.staircases());
                 synchronizeRoomsFromWalls(activeLevel.get());
                 markThreeDDirty();
                 render();
@@ -1806,6 +1812,7 @@ public final class CadWorkbench extends BorderPane {
             edgeResizeBaseWalls = List.of();
             edgeResizeBaseDoors = List.of();
             edgeResizeBaseWindows = List.of();
+            edgeResizeBaseStaircases = List.of();
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -1938,7 +1945,12 @@ public final class CadWorkbench extends BorderPane {
                 Length.ofMillimeters(8.0 / scale())
         );
         if (handle.isPresent()) {
-            Wall wall = activeLevel.get().findWall(handle.orElseThrow().hostWallId());
+            EdgeResizeService.EdgeHandle edgeHandle = handle.orElseThrow();
+            if (edgeHandle.kind() == EdgeResizeService.EdgeHandleKind.STAIR_FIRST_CORNER
+                    || edgeHandle.kind() == EdgeResizeService.EdgeHandleKind.STAIR_OPPOSITE_CORNER) {
+                return PointerCursorService.PointerTarget.RESIZE_CORNER;
+            }
+            Wall wall = activeLevel.get().findWall(edgeHandle.hostWallId());
             double deltaX = Math.abs(wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters());
             double deltaY = Math.abs(wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters());
             return deltaX >= deltaY

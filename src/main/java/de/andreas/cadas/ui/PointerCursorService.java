@@ -15,6 +15,9 @@ final class PointerCursorService {
         if (context.target() == PointerTarget.VERTICAL_EDGE) {
             return CursorType.VERTICAL_RESIZE;
         }
+        if (context.target() == PointerTarget.RESIZE_CORNER) {
+            return CursorType.MOVE;
+        }
         if (context.tool() == DrawingTool.EDIT) {
             return switch (context.target()) {
                 case ENDPOINT -> CursorType.MOVE;
@@ -30,7 +33,8 @@ final class PointerCursorService {
         ELEMENT,
         ENDPOINT,
         HORIZONTAL_EDGE,
-        VERTICAL_EDGE
+        VERTICAL_EDGE,
+        RESIZE_CORNER
     }
 
     enum CursorType {
