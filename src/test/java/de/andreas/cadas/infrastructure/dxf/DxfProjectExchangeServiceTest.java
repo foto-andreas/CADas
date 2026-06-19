@@ -122,6 +122,25 @@ class DxfProjectExchangeServiceTest {
     }
 
     @Test
+    void schreibtExportierteDxfDateiAufDiePlatte() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(5_000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        ));
+        Path file = tempDir.resolve("export-auf-platte.dxf");
+
+        exchangeService.exportProject(project, file);
+
+        assertTrue(Files.exists(file), "DXF-Datei wurde nicht auf die Platte geschrieben.");
+        assertTrue(Files.size(file) > 0, "DXF-Datei ist leer.");
+        String content = Files.readString(file);
+        assertTrue(content.contains("EOF"), "DXF-Datei enthält kein EOF.");
+        assertTrue(content.contains("PROJECT|Haus"), "DXF-Datei enthält keine Projekt-Metadaten.");
+    }
+
+    @Test
     void importiertAlteGebaeudeOeffnungenOhneObjektIds() throws Exception {
         java.util.UUID wallId = java.util.UUID.randomUUID();
         Path file = tempDir.resolve("alte-gebaeude-oeffnungen.dxf");
