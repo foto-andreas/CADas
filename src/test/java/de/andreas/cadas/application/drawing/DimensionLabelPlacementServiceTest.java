@@ -73,6 +73,16 @@ class DimensionLabelPlacementServiceTest {
         assertTrue(placements.getFirst().usedNormalOffset() > 100.0);
     }
 
+    @Test
+    void behältVonFachlichIdentischenMaßenNurDieKürzesteAbleitung() {
+        KeyedLabel weit = new KeyedLabel("gleich", 200.0);
+        KeyedLabel nah = new KeyedLabel("gleich", 100.0);
+
+        List<KeyedLabel> deduplicated = service.deduplicate(List.of(weit, nah));
+
+        assertEquals(1, deduplicated.size());
+        assertEquals(nah, deduplicated.getFirst());
+    }
 
     private static void assertFalse(boolean condition) {
         org.junit.jupiter.api.Assertions.assertFalse(condition);
@@ -150,4 +160,27 @@ class DimensionLabelPlacementServiceTest {
     ) implements DimensionLabelPlacementService.PlacedLabel {
     }
 
+    private record KeyedLabel(String deduplicationKey, double initialNormalOffset)
+            implements DimensionLabelPlacementService.PendingLabel {
+
+        @Override
+        public String text() {
+            return "Maß";
+        }
+
+        @Override
+        public double lineDistanceFromAxis() {
+            return initialNormalOffset;
+        }
+
+        @Override
+        public double outwardStep() {
+            return 10.0;
+        }
+
+        @Override
+        public double dimensionLengthMillimeters() {
+            return 1_000.0;
+        }
+    }
 }

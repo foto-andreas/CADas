@@ -10,12 +10,14 @@ import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.infrastructure.dxf.DxfProjectExchangeService;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,6 +33,8 @@ class P28DimensionPlacementTest {
     private Level level;
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService placementService = new WallDimensionPlacementService();
+    private final DimensionLabelService dimensionLabelService = new DimensionLabelService();
+    private final DimensionLabelPlacementService labelPlacementService = new DimensionLabelPlacementService();
 
     @BeforeAll
     void ladeBeispieldatei() throws Exception {
@@ -99,6 +103,51 @@ class P28DimensionPlacementTest {
         }
     }
 
+    @Test
+    void dedupliziertWandübergreifendDieBekanntenRaummaße() {
+        List<P28PendingDimension> pending = new ArrayList<>();
+        for (Wall wall : level.walls()) {
+            WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(level, wall);
+            for (WallDimensionPlacementService.PlacedDimension placement : placementService.place(
+                    level, wall, dimensions, 1.0, 30.0, 16.0)) {
+                double length = placement.dimension().length().toMillimeters();
+                if (!placement.exterior() && istBekanntesDoppelmaß(length)) {
+                    pending.add(new P28PendingDimension(
+                            placement.dimension().name(),
+                            placement.normalOffset(),
+                            placement.lineDistanceFromAxis(),
+                            length,
+                            dimensionLabelService.deduplicationKey(placement.dimension(), false)
+                    ));
+                }
+            }
+        }
+
+        assertEquals(3, anzahl(pending, 4_620.0));
+        assertEquals(2, anzahl(pending, 2_430.0));
+        assertEquals(2, anzahl(pending, 3_400.0));
+        assertEquals(2, anzahl(pending, 3_420.0));
+
+        List<P28PendingDimension> deduplicated = labelPlacementService.deduplicate(pending);
+        assertEquals(1, anzahl(deduplicated, 4_620.0));
+        assertEquals(1, anzahl(deduplicated, 2_430.0));
+        assertEquals(1, anzahl(deduplicated, 3_400.0));
+        assertEquals(1, anzahl(deduplicated, 3_420.0));
+    }
+
+    private boolean istBekanntesDoppelmaß(double length) {
+        return Math.abs(length - 4_620.0) < 1.0
+                || Math.abs(length - 2_430.0) < 1.0
+                || Math.abs(length - 3_400.0) < 1.0
+                || Math.abs(length - 3_420.0) < 1.0;
+    }
+
+    private long anzahl(List<P28PendingDimension> dimensions, double length) {
+        return dimensions.stream()
+                .filter(dimension -> Math.abs(dimension.dimensionLengthMillimeters() - length) < 1.0)
+                .count();
+    }
+
     private PlanSegment verschoben(PlanSegment segment, double normalOffset) {
         double dx = segment.end().xMillimeters() - segment.start().xMillimeters();
         double dy = segment.end().yMillimeters() - segment.start().yMillimeters();
@@ -164,6 +213,20 @@ class P28DimensionPlacementTest {
     private boolean punkteEqual(PlanPoint a, PlanPoint b) {
         return Math.abs(a.xMillimeters() - b.xMillimeters()) < 0.001
                 && Math.abs(a.yMillimeters() - b.yMillimeters()) < 0.001;
+    }
+
+    private record P28PendingDimension(
+            String text,
+            double initialNormalOffset,
+            double lineDistanceFromAxis,
+            double dimensionLengthMillimeters,
+            String deduplicationKey
+    ) implements DimensionLabelPlacementService.PendingLabel {
+
+        @Override
+        public double outwardStep() {
+            return 16.0;
+        }
     }
 
 }

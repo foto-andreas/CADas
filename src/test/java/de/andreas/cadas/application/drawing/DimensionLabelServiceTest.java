@@ -60,6 +60,37 @@ class DimensionLabelServiceTest {
         assertTrue(service.formatMeters(900).contains("0,90 m"));
     }
 
+    @Test
+    void dedupliziertGleicheRaumdimensionAufParallelenWänden() {
+        WallDimensionService.SideDimension first = new WallDimensionService.SideDimension(
+                "Küche", Length.ofMillimeters(900), -1.0,
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(900, 0)), "Raum:1"
+        );
+        WallDimensionService.SideDimension opposite = new WallDimensionService.SideDimension(
+                "Küche", Length.ofMillimeters(900), 1.0,
+                new PlanSegment(new PlanPoint(900, 500), new PlanPoint(0, 500)), "Raum:1"
+        );
+
+        assertEquals(service.deduplicationKey(first, false), service.deduplicationKey(opposite, false));
+    }
+
+    @Test
+    void behältGleicheLängeInSenkrechterRichtungAlsEigenesMaß() {
+        WallDimensionService.SideDimension horizontal = new WallDimensionService.SideDimension(
+                "Quadrat", Length.ofMillimeters(900), -1.0,
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(900, 0)), "Raum:1"
+        );
+        WallDimensionService.SideDimension vertical = new WallDimensionService.SideDimension(
+                "Quadrat", Length.ofMillimeters(900), 1.0,
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(0, 900)), "Raum:1"
+        );
+
+        org.junit.jupiter.api.Assertions.assertNotEquals(
+                service.deduplicationKey(horizontal, false),
+                service.deduplicationKey(vertical, false)
+        );
+    }
+
     private WallDimensionService.SideDimension sideDimension(String name, double millimeters) {
         return new WallDimensionService.SideDimension(
                 name,

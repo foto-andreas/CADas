@@ -63,7 +63,7 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Die 3D-Ansicht dreht immer um die Modellmitte, nutzt kamerabezogenes Panning und startet standardmäßig in einer orthografischen räumlichen Kontrollansicht.
 * Oberflächen-Ebenen können wahlweise als gestapelte 3D-Schichten oder im Oberflächenrendering ohne transparente Raumkörper visualisiert werden.
 * Registrierte `DWG`-Bibliotheken können zusätzlich konkrete Blocknamen als Oberflächen-Presets führen, entweder über begleitende `.blocks`-Katalogdateien oder über manuelle Eingabe in der Workbench.
-* Automatische Bemaßungen liegen vollständig außerhalb des Gebäudes. Die Platzierungsseite folgt dem nächsten Schnitt der Wandnormalen mit der Außenkante einer Außenwand; kleinere Maße werden zuerst und größere Maße mit wachsendem Außenabstand angeordnet. Jede gesetzte Bemaßung ergänzt Sperrflächen gegen Überdeckungen. Diese Regeln gelten identisch für die 2D-Ansicht und die PDF-Bauzeichnung.
+* Automatische Bemaßungen liegen vollständig außerhalb des Gebäudes. Die Platzierungsseite folgt dem nächsten Schnitt der Wandnormalen mit der Außenkante einer Außenwand; kleinere Maße werden zuerst und größere Maße mit wachsendem Außenabstand angeordnet. Jede gesetzte Bemaßung ergänzt Sperrflächen gegen Überdeckungen. Fachlich identische Raummaße aus parallelen Wänden erscheinen nur einmal. Diese Regeln gelten identisch für die 2D-Ansicht und die PDF-Bauzeichnung.
 
 ## Empfohlene Umsetzungsreihenfolge
 1. Technisches Grundgerüst, Architektur, Tests und Qualitätswerkzeuge.

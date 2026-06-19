@@ -2292,7 +2292,8 @@ public final class CadWorkbench extends BorderPane {
                     placement.normalOffset(),
                     placement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, placement.normalOffset()),
-                    dimension.length().toMillimeters()
+                    dimension.length().toMillimeters(),
+                    dimensionLabelService.deduplicationKey(dimension, placement.exterior())
             ));
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
@@ -2308,7 +2309,8 @@ public final class CadWorkbench extends BorderPane {
                     axisPlacement.normalOffset(),
                     axisPlacement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, axisPlacement.normalOffset()),
-                    wall.axis().length().toMillimeters()
+                    wall.axis().length().toMillimeters(),
+                    ""
             ));
         }
     }
@@ -6585,7 +6587,8 @@ public final class CadWorkbench extends BorderPane {
             double normalOffset,
             double lineDistanceFromAxis,
             double outwardStep,
-            double dimensionLengthMillimeters
+            double dimensionLengthMillimeters,
+            String deduplicationKey
     ) implements DimensionLabelPlacementService.PendingLabel {
         @Override
         public double initialNormalOffset() {

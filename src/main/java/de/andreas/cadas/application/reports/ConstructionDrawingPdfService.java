@@ -320,7 +320,8 @@ public final class ConstructionDrawingPdfService {
                     placement.normalOffset(),
                     placement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, placement.normalOffset()),
-                    dimension.length().toMillimeters()
+                    dimension.length().toMillimeters(),
+                    dimensionLabelService.deduplicationKey(dimension, placement.exterior())
             ));
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
@@ -333,7 +334,8 @@ public final class ConstructionDrawingPdfService {
                     axis.normalOffset(),
                     axis.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, axis.normalOffset()),
-                    wall.axis().length().toMillimeters()
+                    wall.axis().length().toMillimeters(),
+                    ""
             ));
         }
     }
@@ -462,7 +464,8 @@ public final class ConstructionDrawingPdfService {
             double normalOffset,
             double lineDistanceFromAxis,
             double outwardStep,
-            double dimensionLengthMillimeters
+            double dimensionLengthMillimeters,
+            String deduplicationKey
     ) implements DimensionLabelPlacementService.PendingLabel {
         @Override
         public double initialNormalOffset() {

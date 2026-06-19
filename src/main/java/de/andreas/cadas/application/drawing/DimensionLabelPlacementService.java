@@ -36,7 +36,7 @@ public final class DimensionLabelPlacementService {
         Objects.requireNonNull(pending, "pending darf nicht null sein.");
         Objects.requireNonNull(seedBlockers, "seedBlockers darf nicht null sein.");
         Objects.requireNonNull(layoutForOffset, "layoutForOffset darf nicht null sein.");
-        List<L> sorted = new ArrayList<>(pending);
+        List<L> sorted = new ArrayList<>(deduplicate(pending));
         sorted.sort(Comparator
                 .comparingDouble(L::dimensionLengthMillimeters)
                 .thenComparingDouble(label -> Math.abs(label.lineDistanceFromAxis()))
@@ -58,6 +58,45 @@ public final class DimensionLabelPlacementService {
             placements.add(placed);
         }
         return List.copyOf(placements);
+    }
+
+    public <L extends PendingLabel> List<L> deduplicate(List<L> pending) {
+        Objects.requireNonNull(pending, "pending darf nicht null sein.");
+        List<L> result = new ArrayList<>();
+        for (L candidate : pending) {
+            String key = candidate.deduplicationKey();
+            if (key == null || key.isBlank()) {
+                result.add(candidate);
+                continue;
+            }
+            int existingIndex = indexOfKey(result, key);
+            if (existingIndex < 0) {
+                result.add(candidate);
+            } else if (isPreferred(candidate, result.get(existingIndex))) {
+                result.set(existingIndex, candidate);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private <L extends PendingLabel> int indexOfKey(List<L> labels, String key) {
+        for (int index = 0; index < labels.size(); index++) {
+            if (key.equals(labels.get(index).deduplicationKey())) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private boolean isPreferred(PendingLabel candidate, PendingLabel existing) {
+        int offsetComparison = Double.compare(
+                Math.abs(candidate.initialNormalOffset()),
+                Math.abs(existing.initialNormalOffset())
+        );
+        if (offsetComparison != 0) {
+            return offsetComparison < 0;
+        }
+        return Math.abs(candidate.lineDistanceFromAxis()) < Math.abs(existing.lineDistanceFromAxis());
     }
 
     private boolean overlapsAny(List<TextBlockingBox> candidates, List<TextBlockingBox> blockers) {
@@ -82,6 +121,11 @@ public final class DimensionLabelPlacementService {
 
         /** Länge des Maßes in Millimetern (für Sortierung klein-vor-groß). */
         double dimensionLengthMillimeters();
+
+        /** Fachlicher Schlüssel; leer bedeutet, dass das Maß nicht dedupliziert wird. */
+        default String deduplicationKey() {
+            return "";
+        }
 
     }
 

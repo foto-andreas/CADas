@@ -25,6 +25,21 @@ public final class DimensionLabelService {
         return label(dimension.name(), dimension.length(), exterior, options);
     }
 
+    public String deduplicationKey(WallDimensionService.SideDimension dimension, boolean exterior) {
+        if (exterior) {
+            return "";
+        }
+        double deltaX = dimension.dimensionSegment().end().xMillimeters()
+                - dimension.dimensionSegment().start().xMillimeters();
+        double deltaY = dimension.dimensionSegment().end().yMillimeters()
+                - dimension.dimensionSegment().start().yMillimeters();
+        double angle = Math.toDegrees(Math.atan2(deltaY, deltaX));
+        double normalizedAngle = (angle % 180.0 + 180.0) % 180.0;
+        long roundedLength = Math.round(dimension.length().toMillimeters() * 1_000.0);
+        long roundedAngle = Math.round(normalizedAngle * 1_000.0);
+        return dimension.sourceKey() + "|" + roundedLength + "|" + roundedAngle;
+    }
+
     /**
      * Baut den Maßtext für eine beliebige Längenangabe (z. B. Achsmaß).
      *

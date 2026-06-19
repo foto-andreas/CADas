@@ -56,7 +56,8 @@ public final class WallDimensionService {
                         room.name(),
                         segment.length(),
                         sides.positiveSide() ? 1.0 : -1.0,
-                        segment
+                        segment,
+                        "Raum:" + room.id()
                 ));
     }
 
@@ -72,7 +73,7 @@ public final class WallDimensionService {
         }
         double sideSign = sides.positiveSide() && !sides.negativeSide() ? 1.0 : -1.0;
         PlanSegment segment = exteriorSegment(level, wall, sideSign);
-        return Optional.of(new SideDimension("Außen", segment.length(), sideSign, segment));
+        return Optional.of(new SideDimension("Außen", segment.length(), sideSign, segment, "Wand:" + wall.id()));
     }
 
     private PlanSegment exteriorSegment(Level level, Wall wall, double sideSign) {
@@ -211,14 +212,19 @@ public final class WallDimensionService {
     private record Direction(double x, double y) {
     }
 
-    public record SideDimension(String name, Length length, double sideSign, PlanSegment dimensionSegment) {
+    public record SideDimension(String name, Length length, double sideSign, PlanSegment dimensionSegment, String sourceKey) {
         public SideDimension {
             Objects.requireNonNull(name, "name darf nicht null sein.");
             Objects.requireNonNull(length, "length darf nicht null sein.");
             Objects.requireNonNull(dimensionSegment, "dimensionSegment darf nicht null sein.");
+            Objects.requireNonNull(sourceKey, "sourceKey darf nicht null sein.");
             if (sideSign != -1.0 && sideSign != 1.0) {
                 throw new IllegalArgumentException("sideSign muss -1 oder 1 sein.");
             }
+        }
+
+        public SideDimension(String name, Length length, double sideSign, PlanSegment dimensionSegment) {
+            this(name, length, sideSign, dimensionSegment, name);
         }
     }
 
