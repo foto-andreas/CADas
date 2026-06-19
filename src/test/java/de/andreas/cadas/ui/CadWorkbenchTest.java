@@ -275,6 +275,25 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void mauszeigerZeigtHandleUndSondertastenaktion() throws Exception {
+        Path projektDatei = erzeugeProjektMitPickpunktenAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("DOOR", 0, false);
+            return instanz;
+        });
+        PlanPoint handle = aufFxThread(() -> workbench.automationEdgeHandleScreenPoints().getFirst());
+
+        Assertions.assertEquals("H_RESIZE", aufFxThread(() -> workbench.automationCursorAt(handle.xMillimeters(), handle.yMillimeters(), false, false)));
+        Assertions.assertEquals("OPEN_HAND", aufFxThread(() -> workbench.automationCursorAt(handle.xMillimeters(), handle.yMillimeters(), false, true)));
+    }
+
+    @Test
     void belagsauswahlWechseltMitRaumUndWandSauberZwischenKontexten() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {

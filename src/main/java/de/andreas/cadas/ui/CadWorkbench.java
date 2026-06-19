@@ -129,6 +129,7 @@ import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.PickResult;
@@ -140,6 +141,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.Node;
+import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.print.PrinterJob;
 import javafx.scene.paint.Color;
@@ -210,6 +212,7 @@ public final class CadWorkbench extends BorderPane {
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final GuideDistanceService guideDistanceService = new GuideDistanceService();
+    private final PointerCursorService pointerCursorService = new PointerCursorService();
     private final TwoDZoomRange twoDZoomRange = new TwoDZoomRange();
     private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
@@ -395,6 +398,10 @@ public final class CadWorkbench extends BorderPane {
     private List<Wall> edgeResizeBaseWalls = List.of();
     private List<Door> edgeResizeBaseDoors = List.of();
     private List<WindowElement> edgeResizeBaseWindows = List.of();
+    private double lastMouseX;
+    private double lastMouseY;
+    private boolean altPressed;
+    private boolean spacePressed;
 
     public CadWorkbench() {
         setPadding(new Insets(12));
@@ -418,6 +425,8 @@ public final class CadWorkbench extends BorderPane {
                         new KeyCodeCombination(KeyCode.ESCAPE),
                         this::clearSelection
                 );
+                newScene.addEventFilter(KeyEvent.KEY_PRESSED, this::updateModifierState);
+                newScene.addEventFilter(KeyEvent.KEY_RELEASED, this::updateModifierState);
             }
         });
         updatePropertySectionVisibility();
@@ -483,6 +492,7 @@ public final class CadWorkbench extends BorderPane {
             updatePropertySectionVisibility();
             updateActionButtons();
             updateStatus();
+            updateMouseCursor();
             render();
         });
         configureActionButtons();
@@ -1409,13 +1419,18 @@ public final class CadWorkbench extends BorderPane {
         verticalRuler.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> finishGuideDrag(GuideOrientation.VERTICAL, guideWorldPositionFromVerticalRuler(event)));
 
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
+            lastMouseX = event.getX();
+            lastMouseY = event.getY();
             lastCursor = screenToWorld(event.getX(), event.getY());
+            altPressed = event.isAltDown();
+            updateMouseCursor();
             updateStatus();
             render();
         });
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_PRESSED, this::handleMousePressed);
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, this::handleMouseDragged);
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_RELEASED, this::handleMouseReleased);
+        drawingCanvas.addEventHandler(MouseEvent.MOUSE_EXITED, event -> drawingCanvas.setCursor(Cursor.DEFAULT));
         drawingCanvas.setOnScroll(event -> {
             double oldScale = scale();
             double zoomFactor = event.getDeltaY() > 0 ? 1.1 : 0.9;
@@ -1433,7 +1448,9 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
 
-        if (event.getButton() == MouseButton.SECONDARY || event.getButton() == MouseButton.MIDDLE) {
+        if (event.getButton() == MouseButton.SECONDARY
+                || event.getButton() == MouseButton.MIDDLE
+                || event.getButton() == MouseButton.PRIMARY && spacePressed) {
             panning = true;
             panningMoved = false;
             pendingContextSelection = event.getButton() == MouseButton.SECONDARY && currentTool() == DrawingTool.EDIT
@@ -1443,6 +1460,7 @@ public final class CadWorkbench extends BorderPane {
             panStartY = event.getY();
             panOriginX = offsetX;
             panOriginY = offsetY;
+            updateMouseCursor();
             return;
         }
 
@@ -1575,6 +1593,7 @@ public final class CadWorkbench extends BorderPane {
             offsetX = panOriginX + (event.getX() - panStartX);
             offsetY = panOriginY + (event.getY() - panStartY);
             render();
+            updateMouseCursor();
             return;
         }
 
@@ -1715,6 +1734,7 @@ public final class CadWorkbench extends BorderPane {
                 selectionContextMenu.show(drawingCanvas, event.getScreenX(), event.getScreenY());
             }
             pendingContextSelection = null;
+            updateMouseCursor();
             return;
         }
 
@@ -1800,6 +1820,62 @@ public final class CadWorkbench extends BorderPane {
                 activeLevel.get().walls()
         );
         return selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null);
+    }
+
+    private void updateModifierState(KeyEvent event) {
+        altPressed = event.isAltDown();
+        if (event.getCode() == KeyCode.SPACE) {
+            spacePressed = event.getEventType() == KeyEvent.KEY_PRESSED;
+        }
+        updateMouseCursor();
+    }
+
+    private void updateMouseCursor() {
+        PointerCursorService.PointerTarget target = pointerTargetAtLastPosition();
+        PointerCursorService.CursorType cursorType = pointerCursorService.cursor(new PointerCursorService.PointerContext(
+                currentTool(),
+                target,
+                panning,
+                spacePressed,
+                altPressed
+        ));
+        drawingCanvas.setCursor(switch (cursorType) {
+            case DEFAULT -> Cursor.DEFAULT;
+            case CROSSHAIR -> Cursor.CROSSHAIR;
+            case HAND -> Cursor.HAND;
+            case OPEN_HAND -> Cursor.OPEN_HAND;
+            case CLOSED_HAND -> Cursor.CLOSED_HAND;
+            case MOVE -> Cursor.MOVE;
+            case HORIZONTAL_RESIZE -> Cursor.H_RESIZE;
+            case VERTICAL_RESIZE -> Cursor.V_RESIZE;
+        });
+    }
+
+    private PointerCursorService.PointerTarget pointerTargetAtLastPosition() {
+        PlanPoint point = screenToWorld(lastMouseX, lastMouseY);
+        Optional<EdgeResizeService.EdgeHandle> handle = edgeResizeService.findHandle(
+                activeLevel.get(),
+                Set.copyOf(selectedSelections),
+                point,
+                Length.ofMillimeters(8.0 / scale())
+        );
+        if (handle.isPresent()) {
+            Wall wall = activeLevel.get().findWall(handle.orElseThrow().hostWallId());
+            double deltaX = Math.abs(wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters());
+            double deltaY = Math.abs(wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters());
+            return deltaX >= deltaY
+                    ? PointerCursorService.PointerTarget.HORIZONTAL_EDGE
+                    : PointerCursorService.PointerTarget.VERTICAL_EDGE;
+        }
+        if (currentTool() == DrawingTool.EDIT
+                && wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), point, Length.ofMillimeters(8.0 / scale())).isPresent()) {
+            return PointerCursorService.PointerTarget.ENDPOINT;
+        }
+        if (currentTool() == DrawingTool.EDIT
+                && selectionQueryService.findSelection(activeLevel.get(), point, Length.ofMillimeters(8.0 / scale())).isPresent()) {
+            return PointerCursorService.PointerTarget.ELEMENT;
+        }
+        return PointerCursorService.PointerTarget.EMPTY;
     }
 
     private void resizeCanvases() {
@@ -4979,6 +5055,7 @@ public final class CadWorkbench extends BorderPane {
         rebuildSelectionContextMenu();
         updatePropertySectionVisibility();
         updateActionButtons();
+        updateMouseCursor();
     }
 
     private void rebuildSelectionContextMenu() {
@@ -5519,6 +5596,23 @@ public final class CadWorkbench extends BorderPane {
                 )
                 .map(handle -> handle.kind().name())
                 .orElse("");
+    }
+
+    public String automationCursorAt(double x, double y, boolean altDown, boolean spaceDown) {
+        lastMouseX = x;
+        lastMouseY = y;
+        altPressed = altDown;
+        spacePressed = spaceDown;
+        updateMouseCursor();
+        Cursor cursor = drawingCanvas.getCursor();
+        if (cursor == Cursor.H_RESIZE) return "H_RESIZE";
+        if (cursor == Cursor.V_RESIZE) return "V_RESIZE";
+        if (cursor == Cursor.OPEN_HAND) return "OPEN_HAND";
+        if (cursor == Cursor.CLOSED_HAND) return "CLOSED_HAND";
+        if (cursor == Cursor.MOVE) return "MOVE";
+        if (cursor == Cursor.HAND) return "HAND";
+        if (cursor == Cursor.CROSSHAIR) return "CROSSHAIR";
+        return "DEFAULT";
     }
 
     public List<PlanPoint> automationEdgeHandleScreenPoints() {
