@@ -2,6 +2,14 @@ package de.andreas.cadas.application.drawing;
 
 public final class DimensionLineLayoutService {
 
+    public double projectedNormalOffset(double normalOffset, boolean mirrored, double minimumMagnitude) {
+        if (minimumMagnitude < 0.0) {
+            throw new IllegalArgumentException("minimumMagnitude darf nicht negativ sein.");
+        }
+        double projectedOffset = mirrored ? -normalOffset : normalOffset;
+        return Math.copySign(Math.max(Math.abs(projectedOffset), minimumMagnitude), projectedOffset);
+    }
+
     /**
      * Legt Maß-/Hilfs-/Begrenzungslinien sowie den Textmittelpunkt an.
      *

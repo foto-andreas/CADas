@@ -33,4 +33,21 @@ class DimensionLineLayoutServiceTest {
         assertEquals(0.0, deltaNeg.deltaX(), 0.001);
         assertEquals(-8.0, deltaNeg.deltaY(), 0.001);
     }
+
+    @Test
+    void erhältDieNormalenrichtungInDerDraufsicht() {
+        DimensionLineLayoutService service = new DimensionLineLayoutService();
+
+        assertEquals(30.0, service.projectedNormalOffset(30.0, false, 24.0), 0.001);
+        assertEquals(-30.0, service.projectedNormalOffset(-30.0, false, 24.0), 0.001);
+    }
+
+    @Test
+    void spiegeltDieNormalenrichtungFürPdfUndUntersicht() {
+        DimensionLineLayoutService service = new DimensionLineLayoutService();
+
+        assertEquals(-30.0, service.projectedNormalOffset(30.0, true, 24.0), 0.001);
+        assertEquals(24.0, service.projectedNormalOffset(-10.0, true, 24.0), 0.001);
+    }
+
 }

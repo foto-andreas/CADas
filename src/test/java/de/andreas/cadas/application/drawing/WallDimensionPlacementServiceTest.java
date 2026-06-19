@@ -23,7 +23,7 @@ class WallDimensionPlacementServiceTest {
     private final WallDimensionPlacementService placementService = new WallDimensionPlacementService();
 
     @Test
-    void ziehtInnenUndAussenmassEinerAussenwandGemeinsamNachAussen() {
+    void ziehtInnenUndAußenmaßEinerAußenwandGemeinsamNachAußen() {
         Level level = new Level("Erdgeschoss");
         Wall wall = addRectangle(level, 4_000, 3_000, 200).getFirst();
         synchronizeRooms(level);
@@ -53,7 +53,7 @@ class WallDimensionPlacementServiceTest {
     }
 
     @Test
-    void stapeltMehrereRaummaßeEinerAussenwandAufDerGemeinsamenAussenseite() {
+    void stapeltMehrereRaummaßeEinerAußenwandAufDerGemeinsamenAußenseite() {
         Level level = new Level("Erdgeschoss");
         Wall wall = wall(0, 0, 4_000, 0, 200);
         level.addWall(wall);
@@ -125,6 +125,82 @@ class WallDimensionPlacementServiceTest {
         assertTrue(Math.signum(placements.get(0).lineDistanceFromAxis()) == Math.signum(placements.get(1).lineDistanceFromAxis()));
         assertTrue(Math.abs(placements.get(0).lineDistanceFromAxis()) > 1_900.0);
         assertTrue(Math.abs(placements.get(1).lineDistanceFromAxis()) > Math.abs(placements.get(0).lineDistanceFromAxis()));
+    }
+
+    @Test
+    void verwendetBeiKonkaverGebäudehülleDenNächstenNormalenschnitt() {
+        Level level = new Level("Erdgeschoss");
+        List<Wall> exteriorWalls = List.of(
+                wall(0, 0, 10_000, 0, 200),
+                wall(10_000, 0, 10_000, 4_000, 200),
+                wall(10_000, 4_000, 4_000, 4_000, 200),
+                wall(4_000, 4_000, 4_000, 10_000, 200),
+                wall(4_000, 10_000, 0, 10_000, 200),
+                wall(0, 10_000, 0, 0, 200)
+        );
+        exteriorWalls.forEach(level::addWall);
+        level.addRoom(new Room(
+                java.util.UUID.randomUUID(),
+                "L-Raum",
+                List.of(
+                        new PlanPoint(100, 100),
+                        new PlanPoint(9_900, 100),
+                        new PlanPoint(9_900, 3_900),
+                        new PlanPoint(3_900, 3_900),
+                        new PlanPoint(3_900, 9_900),
+                        new PlanPoint(100, 9_900)
+                ),
+                Length.of(2.6, LengthUnit.METER),
+                Length.zero(),
+                Length.zero(),
+                null
+        ));
+        Wall interiorWall = wall(3_000, 6_000, 3_000, 8_000, 100);
+        level.addWall(interiorWall);
+        WallDimensionService.SideDimension dimension = new WallDimensionService.SideDimension(
+                "Innen",
+                Length.ofMillimeters(2_000),
+                1.0,
+                interiorWall.axis()
+        );
+
+        WallDimensionPlacementService.PlacedDimension placement = placementService.place(
+                level,
+                interiorWall,
+                new WallDimensionService.WallDimensions(List.of(dimension), Optional.empty()),
+                1.0,
+                30.0,
+                10.0
+        ).getFirst();
+
+        assertEquals(-1_130.0, placement.lineDistanceFromAxis(), 0.001);
+        assertEquals(-1.0, placement.placementSideSign());
+    }
+
+    @Test
+    void berücksichtigtDieRichtungDesMaßsegmentsBeimNormalenoffset() {
+        Level level = new Level("Erdgeschoss");
+        Wall wall = addRectangle(level, 4_000, 3_000, 200).getFirst();
+        synchronizeRooms(level);
+        PlanSegment reversedSegment = new PlanSegment(new PlanPoint(3_900, 100), new PlanPoint(100, 100));
+        WallDimensionService.SideDimension dimension = new WallDimensionService.SideDimension(
+                "Innen",
+                Length.ofMillimeters(3_800),
+                1.0,
+                reversedSegment
+        );
+
+        WallDimensionPlacementService.PlacedDimension placement = placementService.place(
+                level,
+                wall,
+                new WallDimensionService.WallDimensions(List.of(dimension), Optional.empty()),
+                1.0,
+                30.0,
+                10.0
+        ).getFirst();
+
+        assertEquals(-130.0, placement.lineDistanceFromAxis(), 0.001);
+        assertEquals(230.0, placement.normalOffset(), 0.001);
     }
 
     @Test

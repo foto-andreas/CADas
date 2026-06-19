@@ -45,6 +45,7 @@ public final class ConstructionDrawingPdfService {
     private static final PDType1Font FONT_BOLD = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
     private static final float PDF_FONT_SIZE = 6.5f;
     private static final double PDF_TEXT_AWAY_DISTANCE = 4.0;
+    private static final double PDF_DIMENSION_LINE_BLOCKING_PADDING = 2.0;
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
     private final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
@@ -75,11 +76,8 @@ public final class ConstructionDrawingPdfService {
     }
 
     private void addPlanPage(PDDocument document, ProjectModel project, Level level, ConstructionDrawingOptions options) throws IOException {
-        Bounds bounds = levelBounds(level).expanded(400.0);
-        int scale = chooseScale(bounds.width(), bounds.height(), PAGE_WIDTH - 2 * MARGIN, PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT);
-        try (PageCanvas canvas = addPage(document, project.name(), "2D-Grundriss – " + level.name(), "M 1:" + scale)) {
-            Viewport viewport = new Viewport(MARGIN, MARGIN + TITLE_HEIGHT, PAGE_WIDTH - 2 * MARGIN,
-                    PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT, bounds, scale);
+        Viewport viewport = planViewport(level, options);
+        try (PageCanvas canvas = addPage(document, project.name(), "2D-Grundriss – " + level.name(), "M 1:" + viewport.scale())) {
             for (Room room : level.rooms()) {
                 drawPolygon(canvas, viewport, room.outline(), new Color(225, 231, 221), 0.45f);
             }
@@ -301,7 +299,7 @@ public final class ConstructionDrawingPdfService {
         List<PdfPlacedDimension> placed = dimensionLabelPlacementService.place(
                 pending,
                 seedBlockers,
-                (label, offset) -> layoutPdfDimension(canvas, viewport, label, offset)
+                (label, offset) -> layoutPdfDimension(viewport, label, offset)
         );
         for (PdfPlacedDimension dim : placed) {
             drawPdfDimensionLine(canvas, dim);
@@ -310,7 +308,7 @@ public final class ConstructionDrawingPdfService {
 
     private void appendPdfWallDimensions(List<PdfPendingDimension> pending, Level level, Wall wall, Viewport viewport, DimensionLabelOptions options) {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(level, wall);
-        double baseOffset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
+        double baseOffset = pdfDimensionBaseOffset(wall, viewport.factor());
         double stepOffset = 16.0;
         for (WallDimensionPlacementService.PlacedDimension placement : wallDimensionPlacementService.place(
                 level, wall, dimensions, viewport.factor(), baseOffset, stepOffset
@@ -321,9 +319,8 @@ public final class ConstructionDrawingPdfService {
                     dimensionLabelService.label(dimension, placement.exterior(), options),
                     placement.normalOffset(),
                     placement.lineDistanceFromAxis(),
-                    placement.placementSideSign() * stepOffset,
-                    dimension.length().toMillimeters(),
-                    placement.placementSideSign()
+                    Math.copySign(stepOffset, placement.normalOffset()),
+                    dimension.length().toMillimeters()
             ));
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
@@ -335,24 +332,97 @@ public final class ConstructionDrawingPdfService {
                     dimensionLabelService.label("Achsmaß", wall.axis().length(), false, options),
                     axis.normalOffset(),
                     axis.lineDistanceFromAxis(),
-                    axis.placementSideSign() * stepOffset,
-                    wall.axis().length().toMillimeters(),
-                    axis.placementSideSign()
+                    Math.copySign(stepOffset, axis.normalOffset()),
+                    wall.axis().length().toMillimeters()
             ));
         }
     }
 
-    private PdfPlacedDimension layoutPdfDimension(PageCanvas canvas, Viewport viewport, PdfPendingDimension pending, double normalOffset) {
+    private Viewport planViewport(Level level, ConstructionDrawingOptions options) {
+        Bounds buildingBounds = levelBounds(level).expanded(400.0);
+        double availableWidth = PAGE_WIDTH - 2 * MARGIN;
+        double availableHeight = PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT;
+        int initialScale = chooseScale(buildingBounds.width(), buildingBounds.height(), availableWidth, availableHeight);
+        if (!options.showDimensions()) {
+            return centeredViewport(buildingBounds, initialScale);
+        }
+        Viewport lastViewport = centeredViewport(buildingBounds, initialScale);
+        for (int scale : STANDARD_SCALES) {
+            if (scale < initialScale) {
+                continue;
+            }
+            Viewport viewport = centeredViewport(buildingBounds, scale);
+            List<PdfPendingDimension> pending = new ArrayList<>();
+            for (Wall wall : level.walls()) {
+                appendPdfWallDimensions(pending, level, wall, viewport, options.dimensionLabelOptions());
+            }
+            List<PdfPlacedDimension> placed = dimensionLabelPlacementService.place(
+                    pending,
+                    List.of(),
+                    (label, offset) -> layoutPdfDimension(viewport, label, offset)
+            );
+            ScreenBounds screenBounds = screenBounds(level, viewport, placed);
+            lastViewport = translatedToPage(viewport, screenBounds);
+            if (screenBounds.width() <= availableWidth && screenBounds.height() <= availableHeight) {
+                return lastViewport;
+            }
+        }
+        return lastViewport;
+    }
+
+    private Viewport centeredViewport(Bounds bounds, int scale) {
+        return new Viewport(
+                MARGIN,
+                MARGIN + TITLE_HEIGHT,
+                PAGE_WIDTH - 2 * MARGIN,
+                PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT,
+                bounds,
+                scale
+        );
+    }
+
+    private ScreenBounds screenBounds(Level level, Viewport viewport, List<PdfPlacedDimension> dimensions) {
+        Bounds modelBounds = levelBounds(level);
+        double minimumX = viewport.x(modelBounds.minX());
+        double maximumX = viewport.x(modelBounds.maxX());
+        double minimumY = viewport.y(modelBounds.maxY());
+        double maximumY = viewport.y(modelBounds.minY());
+        for (PdfPlacedDimension dimension : dimensions) {
+            for (TextBlockingBox box : dimension.blockingBoxes()) {
+                minimumX = Math.min(minimumX, box.minX());
+                minimumY = Math.min(minimumY, box.minY());
+                maximumX = Math.max(maximumX, box.maxX());
+                maximumY = Math.max(maximumY, box.maxY());
+            }
+        }
+        return new ScreenBounds(minimumX, minimumY, maximumX, maximumY);
+    }
+
+    private Viewport translatedToPage(Viewport viewport, ScreenBounds screenBounds) {
+        double targetCenterX = PAGE_WIDTH / 2.0;
+        double targetCenterY = MARGIN + TITLE_HEIGHT + (PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT) / 2.0;
+        return new Viewport(
+                viewport.x() + targetCenterX - screenBounds.centerX(),
+                viewport.y() + targetCenterY - screenBounds.centerY(),
+                viewport.width(),
+                viewport.height(),
+                viewport.bounds(),
+                viewport.scale()
+        );
+    }
+
+    private double pdfDimensionBaseOffset(Wall wall, double factor) {
+        return Math.max(wall.thickness().toMillimeters() * factor / 2.0 + 10.0, 18.0);
+    }
+
+    private PdfPlacedDimension layoutPdfDimension(Viewport viewport, PdfPendingDimension pending, double normalOffset) {
         PlanSegment segment = pending.segment();
         double x1 = viewport.x(segment.start().xMillimeters());
         double y1 = viewport.y(segment.start().yMillimeters());
         double x2 = viewport.x(segment.end().xMillimeters());
         double y2 = viewport.y(segment.end().yMillimeters());
-        // placementSideSign bezieht sich auf Modellkoordinaten. viewport.y invertiert y,
-        // daher muss das Vorzeichen für die Bildschirm-/PDF-Normalenrichtung invertiert werden,
-        // damit die Maßlinie außerhalb des Gebäudes landet.
-        double screenPlacementSign = -pending.placementSideSign();
-        double effectiveOffset = screenPlacementSign * Math.max(Math.abs(normalOffset), 24.0);
+        double effectiveOffset = dimensionLineLayoutService.projectedNormalOffset(normalOffset, true, 24.0);
+        double screenPlacementSign = Math.copySign(1.0, effectiveOffset);
         DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(x1, y1, x2, y2, effectiveOffset);
         DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
                 layout, screenPlacementSign, PDF_TEXT_AWAY_DISTANCE
@@ -392,8 +462,7 @@ public final class ConstructionDrawingPdfService {
             double normalOffset,
             double lineDistanceFromAxis,
             double outwardStep,
-            double dimensionLengthMillimeters,
-            double placementSideSign
+            double dimensionLengthMillimeters
     ) implements DimensionLabelPlacementService.PendingLabel {
         @Override
         public double initialNormalOffset() {
@@ -410,6 +479,20 @@ public final class ConstructionDrawingPdfService {
             double textY,
             TextBlockingBox blockingBox
     ) implements DimensionLabelPlacementService.PlacedLabel {
+
+        @Override
+        public List<TextBlockingBox> blockingBoxes() {
+            return List.of(
+                    blockingBox,
+                    TextBlockingBox.aroundLine(
+                            layout.lineStartX(),
+                            layout.lineStartY(),
+                            layout.lineEndX(),
+                            layout.lineEndY(),
+                            PDF_DIMENSION_LINE_BLOCKING_PADDING
+                    )
+            );
+        }
     }
 
     private void drawOverallDimension(PageCanvas canvas, double x1, double y1, double x2, double y2, String text) throws IOException {
@@ -512,6 +595,25 @@ public final class ConstructionDrawingPdfService {
 
         Bounds expanded(double margin) {
             return new Bounds(minX - margin, minY - margin, maxX + margin, maxY + margin);
+        }
+
+    }
+
+    private record ScreenBounds(double minX, double minY, double maxX, double maxY) {
+        double width() {
+            return maxX - minX;
+        }
+
+        double height() {
+            return maxY - minY;
+        }
+
+        double centerX() {
+            return (minX + maxX) / 2.0;
+        }
+
+        double centerY() {
+            return (minY + maxY) / 2.0;
         }
     }
 

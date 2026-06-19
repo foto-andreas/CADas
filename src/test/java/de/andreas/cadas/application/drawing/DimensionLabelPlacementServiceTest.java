@@ -24,6 +24,17 @@ class DimensionLabelPlacementServiceTest {
     }
 
     @Test
+    void platziertKleinereMaßeVorGrößerenMaßen() {
+        FakeLabel kurz = new FakeLabel("kurz", 200, 900);
+        FakeLabel lang = new FakeLabel("lang", 100, 2_000);
+
+        List<FakePlacement> placements = service.place(List.of(lang, kurz), List.of(), FakeLabel::layout);
+
+        assertEquals("kurz", placements.get(0).pending().text);
+        assertEquals("lang", placements.get(1).pending().text);
+    }
+
+    @Test
     void weichtAufRaumtextSeedBlockerNachAußenAus() {
         // Seed-Blocker überdeckt die Ausgangsplatzierung des Maßes (x=150, y=50, 10x10).
         TextBlockingBox roomBlocker = new TextBlockingBox(145, 45, 20, 20);
@@ -47,6 +58,21 @@ class DimensionLabelPlacementServiceTest {
         // Beide Sperrflächen dürfen sich nicht überdecken.
         assertFalse(placements.get(0).blockingBox.overlaps(placements.get(1).blockingBox));
     }
+
+    @Test
+    void berücksichtigtAlleSperrflächenEinerGesetztenBemaßung() {
+        MultiBlockLabel label = new MultiBlockLabel(100.0);
+        TextBlockingBox lineBlocker = new TextBlockingBox(145, 45, 20, 20);
+
+        List<MultiBlockPlacement> placements = service.place(
+                List.of(label),
+                List.of(lineBlocker),
+                MultiBlockLabel::layout
+        );
+
+        assertTrue(placements.getFirst().usedNormalOffset() > 100.0);
+    }
+
 
     private static void assertFalse(boolean condition) {
         org.junit.jupiter.api.Assertions.assertFalse(condition);
@@ -82,4 +108,46 @@ class DimensionLabelPlacementServiceTest {
 
     private record FakePlacement(FakeLabel pending, double usedNormalOffset, TextBlockingBox blockingBox) implements DimensionLabelPlacementService.PlacedLabel {
     }
+
+    private record MultiBlockLabel(double startOffset) implements DimensionLabelPlacementService.PendingLabel {
+
+        @Override
+        public String text() {
+            return "Maß";
+        }
+
+        @Override
+        public double initialNormalOffset() {
+            return startOffset;
+        }
+
+        @Override
+        public double lineDistanceFromAxis() {
+            return startOffset;
+        }
+
+        @Override
+        public double outwardStep() {
+            return 10.0;
+        }
+
+        @Override
+        public double dimensionLengthMillimeters() {
+            return 1_000.0;
+        }
+
+        MultiBlockPlacement layout(double normalOffset) {
+            TextBlockingBox text = new TextBlockingBox(normalOffset, 0, 10, 10);
+            TextBlockingBox line = new TextBlockingBox(normalOffset + 50, 50, 10, 10);
+            return new MultiBlockPlacement(normalOffset, text, List.of(text, line));
+        }
+    }
+
+    private record MultiBlockPlacement(
+            double usedNormalOffset,
+            TextBlockingBox blockingBox,
+            List<TextBlockingBox> blockingBoxes
+    ) implements DimensionLabelPlacementService.PlacedLabel {
+    }
+
 }

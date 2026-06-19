@@ -208,6 +208,7 @@ public final class CadWorkbench extends BorderPane {
     private static final Font DIMENSION_LABEL_FONT = Font.font("Menlo", 12);
     private static final double DIMENSION_TEXT_AWAY_DISTANCE = 8.0;
     private static final double DIMENSION_TEXT_PADDING = 6.0;
+    private static final double DIMENSION_LINE_BLOCKING_PADDING = 4.0;
 
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
@@ -2290,9 +2291,8 @@ public final class CadWorkbench extends BorderPane {
                     dimensionLabelService.label(dimension, placement.exterior(), options),
                     placement.normalOffset(),
                     placement.lineDistanceFromAxis(),
-                    placement.placementSideSign() * stepOffset,
-                    dimension.length().toMillimeters(),
-                    placement.placementSideSign()
+                    Math.copySign(stepOffset, placement.normalOffset()),
+                    dimension.length().toMillimeters()
             ));
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
@@ -2307,9 +2307,8 @@ public final class CadWorkbench extends BorderPane {
                     dimensionLabelService.label("Achsmaß", wall.axis().length(), false, options),
                     axisPlacement.normalOffset(),
                     axisPlacement.lineDistanceFromAxis(),
-                    axisPlacement.placementSideSign() * stepOffset,
-                    wall.axis().length().toMillimeters(),
-                    axisPlacement.placementSideSign()
+                    Math.copySign(stepOffset, axisPlacement.normalOffset()),
+                    wall.axis().length().toMillimeters()
             ));
         }
     }
@@ -2323,12 +2322,12 @@ public final class CadWorkbench extends BorderPane {
         double directionX = endX - startX;
         double directionY = endY - startY;
         double directionLength = Math.max(1.0, Math.hypot(directionX, directionY));
-        // Der placementSideSign bezieht sich auf Modellkoordinaten. In Bildschirmkoordinaten
-        // ist die y-Achse invertiert (toScreenProjectedY kehrt y um). Daher muss das Vorzeichen
-        // für die Bildschirm-Normalenrichtung invertiert werden, damit die Maßlinie wirklich
-        // außerhalb des Gebäudes landet und nicht im Rauminneren.
-        double screenPlacementSign = -pendingLabel.placementSideSign();
-        double effectiveOffset = screenPlacementSign * Math.max(Math.abs(normalOffset), 24.0);
+        double effectiveOffset = dimensionLineLayoutService.projectedNormalOffset(
+                normalOffset,
+                activeView.get() != ViewOrientation.TOP,
+                24.0
+        );
+        double screenPlacementSign = Math.copySign(1.0, effectiveOffset);
         DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(startX, startY, endX, endY, effectiveOffset);
         // Text von der Maßlinie weg verschieben (in Bildschirm-Normalenrichtung der Platzierungsseite).
         DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
@@ -6586,8 +6585,7 @@ public final class CadWorkbench extends BorderPane {
             double normalOffset,
             double lineDistanceFromAxis,
             double outwardStep,
-            double dimensionLengthMillimeters,
-            double placementSideSign
+            double dimensionLengthMillimeters
     ) implements DimensionLabelPlacementService.PendingLabel {
         @Override
         public double initialNormalOffset() {
@@ -6605,6 +6603,20 @@ public final class CadWorkbench extends BorderPane {
             double baselineY,
             TextBlockingBox blockingBox
     ) implements DimensionLabelPlacementService.PlacedLabel {
+
+        @Override
+        public List<TextBlockingBox> blockingBoxes() {
+            return List.of(
+                    blockingBox,
+                    TextBlockingBox.aroundLine(
+                            layout.lineStartX(),
+                            layout.lineStartY(),
+                            layout.lineEndX(),
+                            layout.lineEndY(),
+                            DIMENSION_LINE_BLOCKING_PADDING
+                    )
+            );
+        }
     }
 
     private record SurfaceSelectionContext(SurfaceType surfaceType, List<String> targetKeys, String label, String hint) {

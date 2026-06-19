@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Rechteckige Sperrfläche für die kollisionsfreie Platzierung von Maß- und Raumtexten.
+ * Rechteckige Sperrfläche für die kollisionsfreie Platzierung von Bemaßungen und Raumtexten.
  *
  * <p>Wird sowohl in der 2D-Ansicht als auch im Bauzeichnung-PDF verwendet, damit
  * beide Renderpfade dieselbe Überdeckungslogik nutzen.</p>
@@ -48,5 +48,19 @@ public record TextBlockingBox(double minX, double minY, double width, double hei
         Objects.requireNonNull(candidate, "candidate darf nicht null sein.");
         Objects.requireNonNull(existing, "existing darf nicht null sein.");
         return existing.stream().anyMatch(candidate::overlaps);
+    }
+
+    public static TextBlockingBox aroundLine(double startX, double startY, double endX, double endY, double padding) {
+        if (padding < 0.0) {
+            throw new IllegalArgumentException("padding darf nicht negativ sein.");
+        }
+        double minimumX = Math.min(startX, endX) - padding;
+        double minimumY = Math.min(startY, endY) - padding;
+        return new TextBlockingBox(
+                minimumX,
+                minimumY,
+                Math.abs(endX - startX) + padding * 2.0,
+                Math.abs(endY - startY) + padding * 2.0
+        );
     }
 }

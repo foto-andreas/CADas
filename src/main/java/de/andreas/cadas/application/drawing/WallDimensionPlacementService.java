@@ -1,9 +1,12 @@
 package de.andreas.cadas.application.drawing;
 
+import de.andreas.cadas.application.layers.SurfaceLayerEffectService;
+import de.andreas.cadas.application.layers.WallSurfaceSideService;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
 
 import java.util.ArrayList;
@@ -14,6 +17,8 @@ import java.util.Objects;
 public final class WallDimensionPlacementService {
 
     private static final double EPSILON = 0.001;
+    private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
+    private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
     public List<PlacedDimension> place(
             Level level,
@@ -35,9 +40,6 @@ public final class WallDimensionPlacementService {
         if (stepOffset < 0.0) {
             throw new IllegalArgumentException("stepOffset darf nicht negativ sein.");
         }
-        Envelope envelope = envelope(level, wall);
-        double placementSideSign = resolvePlacementSideSign(wall, dimensions, envelope);
-        double outsideBoundaryDistance = envelope.boundaryDistance(wall.axis(), placementSideSign);
         List<DimensionEntry> entries = new ArrayList<>();
         for (WallDimensionService.SideDimension roomDimension : dimensions.roomDimensions()) {
             entries.add(new DimensionEntry(roomDimension, false));
@@ -49,6 +51,13 @@ public final class WallDimensionPlacementService {
         deduplicated.sort(Comparator
                 .comparingDouble((DimensionEntry entry) -> entry.dimension().length().toMillimeters())
                 .thenComparing(DimensionEntry::exterior));
+        BoundaryPlacement boundaryPlacement = boundaryPlacement(
+                level,
+                wall,
+                deduplicated.stream().map(entry -> entry.dimension().dimensionSegment()).toList()
+        );
+        double placementSideSign = boundaryPlacement.sideSign();
+        double outsideBoundaryDistance = boundaryPlacement.distanceFromAxis();
         List<PlacedDimension> placements = new ArrayList<>();
         for (int index = 0; index < deduplicated.size(); index++) {
             DimensionEntry entry = deduplicated.get(index);
@@ -81,13 +90,9 @@ public final class WallDimensionPlacementService {
         if (baseOffset < 0.0) {
             throw new IllegalArgumentException("baseOffset darf nicht negativ sein.");
         }
-        Envelope envelope = envelope(level, wall);
-        double placementSideSign = resolvePlacementSideSign(
-                wall,
-                new WallDimensionService.WallDimensions(List.of(), java.util.Optional.empty()),
-                envelope
-        );
-        double outsideBoundaryDistance = envelope.boundaryDistance(wall.axis(), placementSideSign);
+        BoundaryPlacement boundaryPlacement = boundaryPlacement(level, wall, List.of(wall.axis()));
+        double placementSideSign = boundaryPlacement.sideSign();
+        double outsideBoundaryDistance = boundaryPlacement.distanceFromAxis();
         double targetLineDistance = outsideBoundaryDistance * renderFactor + placementSideSign * baseOffset;
         return new PlacedDimension(null, false, targetLineDistance, targetLineDistance, placementSideSign, 0);
     }
@@ -111,33 +116,190 @@ public final class WallDimensionPlacementService {
         // (das auf der Innen- oder Außenseite der Wand liegt). Dieser Wert kann
         // betragsmäßig groß sein, wenn das Segment weit von der Außenseite entfernt liegt.
         double dimensionDistance = signedNormalDistance(wall.axis(), dimension.dimensionSegment());
-        double normalOffset = lineDistanceFromAxis - dimensionDistance * renderFactor;
+        double orientationSign = orientationSign(wall.axis(), dimension.dimensionSegment());
+        double normalOffset = (lineDistanceFromAxis - dimensionDistance * renderFactor) * orientationSign;
         return new PlacedDimension(dimension, exterior, normalOffset, lineDistanceFromAxis, placementSideSign, stackIndex);
     }
 
-    private double resolvePlacementSideSign(
-            Wall wall,
-            WallDimensionService.WallDimensions dimensions,
-            Envelope envelope
+    private BoundaryPlacement boundaryPlacement(Level level, Wall wall, List<PlanSegment> measuredSegments) {
+        PlanPoint origin = midpoint(wall.axis());
+        Direction normal = normal(wall.axis());
+        Double nearestDistance = null;
+        for (PlanSegment exteriorEdge : exteriorEdges(level)) {
+            Double distance = intersectionDistance(origin, normal, exteriorEdge);
+            if (distance != null && Math.abs(distance) > EPSILON
+                    && (nearestDistance == null || Math.abs(distance) < Math.abs(nearestDistance))) {
+                nearestDistance = distance;
+            }
+        }
+        if (nearestDistance != null) {
+            double sideSign = Math.copySign(1.0, nearestDistance);
+            double clearedDistance = occupiedBoundaryDistance(level, wall.axis(), measuredSegments, sideSign, nearestDistance);
+            return new BoundaryPlacement(clearedDistance, sideSign);
+        }
+        Envelope envelope = envelope(level, wall);
+        double positiveDistance = envelope.boundaryDistance(wall.axis(), 1.0);
+        double negativeDistance = envelope.boundaryDistance(wall.axis(), -1.0);
+        return Math.abs(positiveDistance) < Math.abs(negativeDistance)
+                ? new BoundaryPlacement(positiveDistance, 1.0)
+                : new BoundaryPlacement(negativeDistance, -1.0);
+    }
+
+    private double occupiedBoundaryDistance(
+            Level level,
+            PlanSegment wallAxis,
+            List<PlanSegment> measuredSegments,
+            double sideSign,
+            double initialDistance
     ) {
-        // Die Platzierungsseite wird grundsätzlich geometrisch über die Gebäudehülle
-        // bestimmt, damit Maße — insbesondere das Außenmaß — immer außerhalb des
-        // Gebäudes landen. Die sideSign aus WallDimensionService ist dafür nicht
-        // verlässlich, weil sie auf der fehleranfälligen Wandseiten-Klassifikation
-        // basiert und das Außenmaß sonst ins Gebäudeinnere gelegt werden kann.
-        double positiveDistance = Math.abs(envelope.boundaryDistance(wall.axis(), 1.0));
-        double negativeDistance = Math.abs(envelope.boundaryDistance(wall.axis(), -1.0));
-        if (Math.abs(positiveDistance - negativeDistance) > EPSILON) {
-            // Die Gebäudeaußenseite liegt dort, wo die Hülle am nächsten an der
-            // Wandachse ist (betraglich kleinere Ausdehnung = Wand ist nah an
-            // der Außenkante).
-            return positiveDistance < negativeDistance ? 1.0 : -1.0;
+        Direction axisDirection = direction(wallAxis);
+        double minimumProjection = measuredSegments.stream()
+                .flatMap(segment -> java.util.stream.Stream.of(segment.start(), segment.end()))
+                .mapToDouble(point -> projection(wallAxis.start(), point, axisDirection))
+                .min()
+                .orElse(0.0);
+        double maximumProjection = measuredSegments.stream()
+                .flatMap(segment -> java.util.stream.Stream.of(segment.start(), segment.end()))
+                .mapToDouble(point -> projection(wallAxis.start(), point, axisDirection))
+                .max()
+                .orElse(wallAxis.length().toMillimeters());
+        double boundaryDistance = initialDistance;
+        for (Wall buildingWall : level.walls()) {
+            List<PlanPoint> outline = wallOutline(buildingWall);
+            for (int index = 0; index < outline.size(); index++) {
+                PlanPoint start = outline.get(index);
+                PlanPoint end = outline.get((index + 1) % outline.size());
+                for (PlanPoint candidate : clippedEdgePoints(
+                        wallAxis,
+                        axisDirection,
+                        start,
+                        end,
+                        minimumProjection,
+                        maximumProjection
+                )) {
+                    double distance = signedNormalDistance(wallAxis, candidate);
+                    boundaryDistance = sideSign > 0.0
+                            ? Math.max(boundaryDistance, distance)
+                            : Math.min(boundaryDistance, distance);
+                }
+            }
         }
-        double centerDistance = signedNormalDistance(wall.axis(), envelope.centerPoint());
-        if (Math.abs(centerDistance) > EPSILON) {
-            return centerDistance > 0.0 ? -1.0 : 1.0;
+        return boundaryDistance;
+    }
+
+    private List<PlanPoint> clippedEdgePoints(
+            PlanSegment wallAxis,
+            Direction axisDirection,
+            PlanPoint start,
+            PlanPoint end,
+            double minimumProjection,
+            double maximumProjection
+    ) {
+        double startProjection = projection(wallAxis.start(), start, axisDirection);
+        double endProjection = projection(wallAxis.start(), end, axisDirection);
+        List<PlanPoint> points = new ArrayList<>();
+        if (within(startProjection, minimumProjection, maximumProjection)) {
+            points.add(start);
         }
-        return -1.0;
+        if (within(endProjection, minimumProjection, maximumProjection)) {
+            points.add(end);
+        }
+        double projectionDelta = endProjection - startProjection;
+        if (Math.abs(projectionDelta) <= EPSILON) {
+            return points;
+        }
+        for (double boundary : new double[]{minimumProjection, maximumProjection}) {
+            double ratio = (boundary - startProjection) / projectionDelta;
+            if (ratio > EPSILON && ratio < 1.0 - EPSILON) {
+                points.add(interpolate(start, end, ratio));
+            }
+        }
+        return points;
+    }
+
+    private boolean within(double value, double minimum, double maximum) {
+        return value >= minimum - EPSILON && value <= maximum + EPSILON;
+    }
+
+    private PlanPoint interpolate(PlanPoint start, PlanPoint end, double ratio) {
+        return new PlanPoint(
+                start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
+                start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
+        );
+    }
+
+    private double projection(PlanPoint origin, PlanPoint point, Direction direction) {
+        return (point.xMillimeters() - origin.xMillimeters()) * direction.x()
+                + (point.yMillimeters() - origin.yMillimeters()) * direction.y();
+    }
+
+    private List<PlanPoint> wallOutline(Wall wall) {
+        Direction direction = direction(wall.axis());
+        Direction normal = normal(wall.axis());
+        double halfThickness = wall.thickness().toMillimeters() / 2.0;
+        PlanPoint extendedStart = offsetPoint(wall.axis().start(), direction.x(), direction.y(), -halfThickness);
+        PlanPoint extendedEnd = offsetPoint(wall.axis().end(), direction.x(), direction.y(), halfThickness);
+        return List.of(
+                offsetPoint(extendedStart, normal.x(), normal.y(), halfThickness),
+                offsetPoint(extendedEnd, normal.x(), normal.y(), halfThickness),
+                offsetPoint(extendedEnd, normal.x(), normal.y(), -halfThickness),
+                offsetPoint(extendedStart, normal.x(), normal.y(), -halfThickness)
+        );
+    }
+
+    private List<PlanSegment> exteriorEdges(Level level) {
+        List<PlanSegment> edges = new ArrayList<>();
+        for (Wall wall : level.walls()) {
+            WallSurfaceSideService.WallLayerSides sides = wallSurfaceSideService.resolve(
+                    level,
+                    wall,
+                    SurfaceType.WALL_EXTERIOR,
+                    wall.id().toString()
+            );
+            if (sides.positiveSide() == sides.negativeSide()) {
+                continue;
+            }
+            double sideSign = sides.positiveSide() ? 1.0 : -1.0;
+            double offset = wall.thickness().toMillimeters() / 2.0
+                    + surfaceLayerEffectService.wallExteriorThicknessMillimeters(level, wall);
+            edges.add(shiftedSegment(wall.axis(), offset, sideSign));
+        }
+        return edges;
+    }
+
+    private PlanSegment shiftedSegment(PlanSegment segment, double offset, double sideSign) {
+        Direction normal = normal(segment);
+        return new PlanSegment(
+                offsetPoint(segment.start(), normal.x(), normal.y(), offset * sideSign),
+                offsetPoint(segment.end(), normal.x(), normal.y(), offset * sideSign)
+        );
+    }
+
+    private Double intersectionDistance(PlanPoint origin, Direction rayDirection, PlanSegment segment) {
+        double segmentX = segment.end().xMillimeters() - segment.start().xMillimeters();
+        double segmentY = segment.end().yMillimeters() - segment.start().yMillimeters();
+        double denominator = cross(rayDirection.x(), rayDirection.y(), segmentX, segmentY);
+        if (Math.abs(denominator) <= EPSILON) {
+            return null;
+        }
+        double originToStartX = segment.start().xMillimeters() - origin.xMillimeters();
+        double originToStartY = segment.start().yMillimeters() - origin.yMillimeters();
+        double segmentRatio = cross(originToStartX, originToStartY, rayDirection.x(), rayDirection.y()) / denominator;
+        if (segmentRatio < -EPSILON || segmentRatio > 1.0 + EPSILON) {
+            return null;
+        }
+        return cross(originToStartX, originToStartY, segmentX, segmentY) / denominator;
+    }
+
+    private double cross(double firstX, double firstY, double secondX, double secondY) {
+        return firstX * secondY - firstY * secondX;
+    }
+
+    private double orientationSign(PlanSegment wallAxis, PlanSegment dimensionSegment) {
+        Direction wallDirection = direction(wallAxis);
+        Direction dimensionDirection = direction(dimensionSegment);
+        double dotProduct = wallDirection.x() * dimensionDirection.x() + wallDirection.y() * dimensionDirection.y();
+        return dotProduct < 0.0 ? -1.0 : 1.0;
     }
 
     private static double signedNormalDistance(PlanSegment axis, PlanSegment segment) {
@@ -166,7 +328,15 @@ public final class WallDimensionPlacementService {
         );
     }
 
+    private static Direction normal(PlanSegment segment) {
+        Direction direction = direction(segment);
+        return new Direction(-direction.y(), direction.x());
+    }
+
     private record Direction(double x, double y) {
+    }
+
+    private record BoundaryPlacement(double distanceFromAxis, double sideSign) {
     }
 
     private static Envelope envelope(Level level, Wall wall) {
@@ -218,15 +388,6 @@ public final class WallDimensionPlacementService {
             return Double.isFinite(distance) ? distance : 0.0;
         }
 
-        private PlanPoint centerPoint() {
-            double sumX = 0.0;
-            double sumY = 0.0;
-            for (PlanPoint point : points) {
-                sumX += point.xMillimeters();
-                sumY += point.yMillimeters();
-            }
-            return new PlanPoint(sumX / Math.max(1, points.size()), sumY / Math.max(1, points.size()));
-        }
     }
 
     /**
@@ -283,13 +444,5 @@ public final class WallDimensionPlacementService {
             }
         }
 
-        /**
-         * Liefert den Abstandsbetrag der Maßlinie von der Wandachse in Modellkoordinaten.
-         * Renderer nutzen {@link #placementSideSign()} um die Richtung in ihren
-         * jeweiligen Koordinatensystemen korrekt zu interpretieren.
-         */
-        public double offsetMagnitude() {
-            return Math.abs(normalOffset);
-        }
     }
 }

@@ -5,22 +5,20 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 /**
  * Kollisionsfreie Platzierung von Maßtexten anhand rechteckiger Sperrflächen.
  *
- * <p>Der Algorithmus sortiert alle Maße nach Abstand zur Wandachse (innen vor außen)
- * und danach nach Länge. Für jedes Maß wird anhand der Ausgangsplatzierung eine
- * {@link TextBlockingBox} berechnet; bei Überdeckung mit einer bereits gesetzten
- * Sperrfläche wird das Maß schrittweise weiter nach außen verschoben, bis es frei liegt.</p>
+ * <p>Der Algorithmus sortiert alle Maße nach Länge und danach nach Abstand zur
+ * Wandachse. Bei Überdeckung mit einer bereits gesetzten Sperrfläche wird das Maß
+ * schrittweise weiter nach außen verschoben, bis alle Sperrflächen frei liegen.</p>
  *
  * <p>Raumtexte in Raummitte werden als vorab gesetzte Sperrflächen übergeben,
  * damit Maße die Raumtexte nicht überdecken.</p>
  */
 public final class DimensionLabelPlacementService {
 
-    private static final int MAX_OUTWARD_STEPS = 128;
+    private static final double MINIMUM_OUTWARD_STEP = 0.001;
 
     /**
      * Platzier-Algorithmus für eine Menge von Maß-Labels.
@@ -40,24 +38,30 @@ public final class DimensionLabelPlacementService {
         Objects.requireNonNull(layoutForOffset, "layoutForOffset darf nicht null sein.");
         List<L> sorted = new ArrayList<>(pending);
         sorted.sort(Comparator
-                .comparingDouble((L label) -> Math.abs(label.lineDistanceFromAxis()))
-                .thenComparingDouble(L::dimensionLengthMillimeters)
+                .comparingDouble(L::dimensionLengthMillimeters)
+                .thenComparingDouble(label -> Math.abs(label.lineDistanceFromAxis()))
                 .thenComparing(L::text));
         List<R> placements = new ArrayList<>();
         List<TextBlockingBox> blockers = new ArrayList<>(seedBlockers);
         for (L label : sorted) {
             double normalOffset = label.initialNormalOffset();
-            R placed = layoutForOffset.apply(label, normalOffset);
-            int steps = 0;
-            while (TextBlockingBox.overlapsAny(placed.blockingBox(), blockers) && steps < MAX_OUTWARD_STEPS) {
-                normalOffset += label.outwardStep();
-                placed = layoutForOffset.apply(label, normalOffset);
-                steps++;
+            double outwardStep = label.outwardStep();
+            if (Math.abs(outwardStep) < MINIMUM_OUTWARD_STEP) {
+                throw new IllegalArgumentException("outwardStep muss von null verschieden sein.");
             }
-            blockers.add(placed.blockingBox());
+            R placed = layoutForOffset.apply(label, normalOffset);
+            while (overlapsAny(placed.blockingBoxes(), blockers)) {
+                normalOffset += outwardStep;
+                placed = layoutForOffset.apply(label, normalOffset);
+            }
+            blockers.addAll(placed.blockingBoxes());
             placements.add(placed);
         }
         return List.copyOf(placements);
+    }
+
+    private boolean overlapsAny(List<TextBlockingBox> candidates, List<TextBlockingBox> blockers) {
+        return candidates.stream().anyMatch(candidate -> TextBlockingBox.overlapsAny(candidate, blockers));
     }
 
     /**
@@ -78,6 +82,7 @@ public final class DimensionLabelPlacementService {
 
         /** Länge des Maßes in Millimetern (für Sortierung klein-vor-groß). */
         double dimensionLengthMillimeters();
+
     }
 
     /**
@@ -86,5 +91,10 @@ public final class DimensionLabelPlacementService {
     public interface PlacedLabel {
         /** Sperrfläche des platzierten Textes. */
         TextBlockingBox blockingBox();
+
+        /** Alle Sperrflächen der Bemaßung einschließlich Maßlinie. */
+        default List<TextBlockingBox> blockingBoxes() {
+            return List.of(blockingBox());
+        }
     }
 }
