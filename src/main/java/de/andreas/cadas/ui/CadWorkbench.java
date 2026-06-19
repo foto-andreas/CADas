@@ -233,6 +233,7 @@ public final class CadWorkbench extends BorderPane {
     private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
     private final ProjectExchangeService projectExchangeService = new DxfProjectExchangeService();
     private Path lastProjectSavePath;
+    private Path lastLevelSavePath;
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
     private final SurfaceLayerConsistencyService surfaceLayerConsistencyService = new SurfaceLayerConsistencyService();
@@ -900,12 +901,13 @@ public final class CadWorkbench extends BorderPane {
         dateiMenu.getItems().addAll(
                 menuItem("Etage hinzufügen", this::createLevel, shortcutKey(KeyCode.N)),
                 menuItem("Projekt leeren", this::clearProject, shortcutKey(KeyCode.L)),
-                menuItem("Gebäude laden", this::importProjectFromDxf, shortcutShiftKey(KeyCode.I)),
+                menuItem("Laden", this::importProjectFromDxf, shortcutShiftKey(KeyCode.I)),
                 menuItem("Sichern", this::saveProject, shortcutKey(KeyCode.S)),
                 menuItem("Sichern als ...", this::saveProjectAs, shortcutShiftKey(KeyCode.S)),
+                menuItem("Etage laden", this::importLevel, null),
+                menuItem("Etage sichern", this::saveCurrentLevel, null),
+                menuItem("Etage sichern als ...", this::saveCurrentLevelAs, null),
                 menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutShiftKey(KeyCode.P)),
-                menuItem("Aktive Etage als DXF exportieren", this::exportCurrentLevel, null),
-                menuItem("DXF als neue Etage importieren", this::importLevel, null),
                 menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
                 menuItem("Beenden", this::requestApplicationExit, shortcutKey(KeyCode.Q))
         );
@@ -4257,26 +4259,52 @@ public final class CadWorkbench extends BorderPane {
         return axis + "=" + String.format(Locale.GERMAN, "%.2f m", worldMillimeters / 1000.0);
     }
 
-    private void exportCurrentLevel() {
-        FileChooser fileChooser = createDxfFileChooser();
-        String levelName = exchangeFileNameService.stripRepeatedExtension(Path.of(activeLevel.get().name().replace(' ', '_')), ".dxf");
+    private void saveCurrentLevel() {
+        if (lastLevelSavePath != null) {
+            saveCurrentLevelTo(lastLevelSavePath);
+            return;
+        }
+        saveCurrentLevelAs();
+    }
+
+    private void saveCurrentLevelAs() {
+        FileChooser fileChooser = createCadasFileChooser();
+        String levelName = exchangeFileNameService.stripRepeatedExtension(Path.of(activeLevel.get().name().replace(' ', '_')), ".cadas");
         fileChooser.setInitialFileName(levelName);
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showSaveDialog(window);
         if (file == null) {
             return;
         }
-        exportCurrentLevel(file.toPath());
+        Path targetFile = file.toPath();
+        if (!targetFile.getFileName().toString().contains(".")) {
+            targetFile = exchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
+        }
+        String newLevelName = exchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
+        if (!newLevelName.isBlank() && !newLevelName.equals(activeLevel.get().name())) {
+            rememberStateForUndo();
+            project.renameLevel(activeLevel.get(), newLevelName);
+            int index = availableLevels.indexOf(activeLevel.get());
+            if (index >= 0) {
+                availableLevels.set(index, activeLevel.get());
+            }
+        }
+        saveCurrentLevelTo(targetFile);
+    }
+
+    private void saveCurrentLevelTo(Path targetFile) {
+        try {
+            Path exportPath = targetFile.toAbsolutePath().normalize();
+            levelExchangeService.exportLevel(activeLevel.get(), exportPath);
+            lastLevelSavePath = exportPath;
+            draftLabel.setText("Etage gesichert: " + exportPath.getFileName());
+        } catch (Exception exception) {
+            showOperationException("Etagen-Sicherung fehlgeschlagen", exception);
+        }
     }
 
     private void exportCurrentLevel(Path targetFile) {
-        try {
-            Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".dxf").toAbsolutePath().normalize();
-            levelExchangeService.exportLevel(activeLevel.get(), exportPath);
-            confirmExportWritten(exportPath);
-        } catch (Exception exception) {
-            showOperationException("DXF-Export fehlgeschlagen", exception);
-        }
+        saveCurrentLevelTo(targetFile);
     }
 
     private void saveProject() {
@@ -4463,7 +4491,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void importLevel() {
-        FileChooser fileChooser = createDxfFileChooser();
+        FileChooser fileChooser = createCadasFileChooser();
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showOpenDialog(window);
         if (file == null) {
@@ -4475,16 +4503,17 @@ public final class CadWorkbench extends BorderPane {
     private void importLevel(Path sourceFile) {
         try {
             rememberStateForUndo();
-            String levelName = uniqueLevelName(exchangeFileNameService.stripRepeatedExtension(sourceFile, ".dxf"));
+            String levelName = uniqueLevelName(exchangeFileNameService.stripRepeatedExtension(sourceFile, ".cadas"));
             Level importedLevel = levelExchangeService.importLevel(sourceFile, levelName);
             importedLevel.replaceRooms(autoRoomGenerationService.synchronize(importedLevel, currentRoomDefaults()));
             project.addLevel(importedLevel);
             availableLevels.add(importedLevel);
             activateLevel(importedLevel);
             fitCurrentViewToContent();
-            draftLabel.setText("DXF importiert: " + sourceFile.getFileName());
+            lastLevelSavePath = sourceFile.toAbsolutePath().normalize();
+            draftLabel.setText("Etage geladen: " + sourceFile.getFileName());
         } catch (Exception exception) {
-            showOperationException("DXF-Import fehlgeschlagen", exception);
+            showOperationException("Etagen-Laden fehlgeschlagen", exception);
         }
     }
 
@@ -4522,14 +4551,6 @@ public final class CadWorkbench extends BorderPane {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("CADas-Gebäudedatei auswählen");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CADas-Gebäudedateien", "*.cadas"));
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("DXF-Dateien", "*.dxf"));
-        fileChooser.setInitialDirectory(Path.of(System.getProperty("user.home")).toFile());
-        return fileChooser;
-    }
-
-    private FileChooser createDxfFileChooser() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("DXF-Datei auswählen");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("DXF-Dateien", "*.dxf"));
         fileChooser.setInitialDirectory(Path.of(System.getProperty("user.home")).toFile());
         return fileChooser;
