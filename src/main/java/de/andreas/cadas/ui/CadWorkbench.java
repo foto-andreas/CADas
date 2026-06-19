@@ -377,6 +377,10 @@ public final class CadWorkbench extends BorderPane {
     private final Button redoButton = new Button("Wiederherstellen");
     private final Button deleteSelectionButton = new Button("Auswahl löschen");
     private final Button clearSelectionButton = new Button("Auswahl aufheben");
+    private Button addLevelButton;
+    private Button renameLevelButton;
+    private Button moveLevelUpButton;
+    private Button moveLevelDownButton;
     private final Button applySelectionPropertiesButton = new Button("Werte auf Auswahl anwenden");
     private final Button applyEndpointHeightButton = new Button("Eckhöhe anwenden");
     private final Button addSurfaceLayerButton = new Button("Ebene hinzufügen");
@@ -648,6 +652,31 @@ public final class CadWorkbench extends BorderPane {
                 this::createLevel,
                 "Legt eine neue Etage für den aktuellen Grundriss an und wechselt direkt in diese Etage."
         );
+        this.addLevelButton = addLevelButton;
+
+        Button renameLevelButton = createActionButton(
+                "Etage umbenennen",
+                null,
+                this::renameCurrentLevel,
+                "Benennt die aktuell ausgewählte Etage um. Der Name muss innerhalb des Projekts eindeutig sein."
+        );
+        this.renameLevelButton = renameLevelButton;
+
+        Button moveLevelUpButton = createActionButton(
+                "Etage hoch",
+                null,
+                this::moveCurrentLevelUp,
+                "Verschiebt die aktuell ausgewählte Etage eine Position nach oben in der Etagenreihenfolge."
+        );
+        this.moveLevelUpButton = moveLevelUpButton;
+
+        Button moveLevelDownButton = createActionButton(
+                "Etage runter",
+                null,
+                this::moveCurrentLevelDown,
+                "Verschiebt die aktuell ausgewählte Etage eine Position nach unten in der Etagenreihenfolge."
+        );
+        this.moveLevelDownButton = moveLevelDownButton;
 
         settingsBarStyling();
         return new ToolBar(
@@ -655,6 +684,9 @@ public final class CadWorkbench extends BorderPane {
                 new Separator(Orientation.VERTICAL),
                 labelledNode("Etage", levelSelector),
                 addLevelButton,
+                renameLevelButton,
+                moveLevelUpButton,
+                moveLevelDownButton,
                 new Separator(Orientation.VERTICAL),
                 undoButton,
                 redoButton,
@@ -1238,6 +1270,19 @@ public final class CadWorkbench extends BorderPane {
         clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
         applySelectionPropertiesButton.setDisable(!hasSelection);
         applyEndpointHeightButton.setDisable(selectedEndpointGroup == null);
+        int currentIndex = availableLevels.indexOf(activeLevel.get());
+        if (addLevelButton != null) {
+            addLevelButton.setDisable(false);
+        }
+        if (renameLevelButton != null) {
+            renameLevelButton.setDisable(activeLevel.get() == null);
+        }
+        if (moveLevelUpButton != null) {
+            moveLevelUpButton.setDisable(currentIndex < 0 || currentIndex >= availableLevels.size() - 1);
+        }
+        if (moveLevelDownButton != null) {
+            moveLevelDownButton.setDisable(currentIndex <= 0);
+        }
         boolean hasSurfaceTarget = currentSurfaceSelectionContext().isPresent();
         boolean hasSurfaceSelection = selectedSurfaceLayer().isPresent();
         addSurfaceLayerButton.setDisable(!hasSurfaceTarget);
@@ -3889,6 +3934,97 @@ public final class CadWorkbench extends BorderPane {
         availableLevels.add(level);
         activateLevel(level);
         fitCurrentViewToContent();
+    }
+
+    private void renameCurrentLevel() {
+        Level current = activeLevel.get();
+        if (current == null) {
+            return;
+        }
+        String newName = current.name();
+        if (interactiveDialogsEnabled) {
+            TextInputDialog dialog = new TextInputDialog(current.name());
+            dialog.setTitle("Etage umbenennen");
+            dialog.setHeaderText("Aktuelle Etage umbenennen");
+            dialog.setContentText("Neuer Name der Etage:");
+            dialog.getDialogPane().setPrefWidth(420);
+            Window owner = getScene() != null ? getScene().getWindow() : null;
+            if (owner != null) {
+                dialog.initOwner(owner);
+            }
+            newName = dialog.showAndWait()
+                    .map(String::trim)
+                    .filter(name -> !name.isBlank())
+                    .orElse(null);
+        }
+        if (newName == null) {
+            return;
+        }
+        if (newName.equals(current.name())) {
+            return;
+        }
+        rememberStateForUndo();
+        try {
+            project.renameLevel(current, newName);
+        } catch (IllegalArgumentException exception) {
+            UiErrorDialogs.show(
+                    UiErrorDialogs.fromThrowable(
+                            "Etage konnte nicht umbenannt werden",
+                            "Der Name ist ungültig oder bereits vergeben.",
+                            exception.getMessage(),
+                            exception
+                    ),
+                    currentWindow(),
+                    interactiveDialogsEnabled
+            );
+            return;
+        }
+        int index = availableLevels.indexOf(current);
+        if (index >= 0) {
+            availableLevels.set(index, current);
+        }
+        activateLevel(current);
+    }
+
+    private void moveCurrentLevelUp() {
+        moveCurrentLevel(-1);
+    }
+
+    private void moveCurrentLevelDown() {
+        moveCurrentLevel(1);
+    }
+
+    private void moveCurrentLevel(int direction) {
+        Level current = activeLevel.get();
+        if (current == null) {
+            return;
+        }
+        int currentIndex = availableLevels.indexOf(current);
+        if (currentIndex < 0) {
+            return;
+        }
+        int newIndex = currentIndex + direction;
+        if (newIndex < 0 || newIndex >= availableLevels.size()) {
+            return;
+        }
+        rememberStateForUndo();
+        try {
+            project.moveLevel(current, newIndex);
+        } catch (IndexOutOfBoundsException exception) {
+            UiErrorDialogs.show(
+                    UiErrorDialogs.fromThrowable(
+                            "Etage konnte nicht verschoben werden",
+                            "Der neue Etage-Index liegt außerhalb des gültigen Bereichs.",
+                            exception.getMessage(),
+                            exception
+                    ),
+                    currentWindow(),
+                    interactiveDialogsEnabled
+            );
+            return;
+        }
+        availableLevels.setAll(project.levels());
+        activateLevel(current);
     }
 
     private DrawingTool currentTool() {

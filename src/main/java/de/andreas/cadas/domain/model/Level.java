@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public final class Level {
 
-    private final String name;
+    private String name;
     private final List<Wall> walls = new ArrayList<>();
     private final List<Room> rooms = new ArrayList<>();
     private final List<Door> doors = new ArrayList<>();
@@ -23,6 +23,13 @@ public final class Level {
 
     public String name() {
         return name;
+    }
+
+    public void rename(String newName) {
+        this.name = Objects.requireNonNull(newName, "newName darf nicht null sein.").trim();
+        if (this.name.isEmpty()) {
+            throw new IllegalArgumentException("Etage darf nicht leer benannt werden.");
+        }
     }
 
     public List<Wall> walls() {

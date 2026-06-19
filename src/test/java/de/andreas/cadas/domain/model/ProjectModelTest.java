@@ -3,6 +3,8 @@ package de.andreas.cadas.domain.model;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.andreas.cadas.domain.geometry.Angle;
 import de.andreas.cadas.domain.geometry.Length;
@@ -87,5 +89,75 @@ class ProjectModelTest {
 
         assertEquals("Neu", model.name());
         assertEquals("Import", model.primaryLevel().name());
+    }
+
+    @Test
+    void etageKannUmbenanntWerden() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+
+        model.renameLevel(model.primaryLevel(), "Keller");
+
+        assertEquals("Keller", model.primaryLevel().name());
+    }
+
+    @Test
+    void etagennameDarfNichtLeerSein() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+
+        assertThrows(IllegalArgumentException.class, () -> model.renameLevel(model.primaryLevel(), "  "));
+    }
+
+    @Test
+    void etagennameMussEindeutigSein() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        model.createLevel("Obergeschoss");
+
+        assertThrows(IllegalArgumentException.class, () -> model.renameLevel(model.primaryLevel(), "Obergeschoss"));
+    }
+
+    @Test
+    void etageKannNachObenVerschobenWerden() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Level obergeschoss = model.createLevel("Obergeschoss");
+        Level dachgeschoss = model.createLevel("Dachgeschoss");
+
+        model.moveLevelUp(obergeschoss);
+
+        assertEquals("Erdgeschoss", model.levels().get(0).name());
+        assertEquals("Dachgeschoss", model.levels().get(1).name());
+        assertEquals("Obergeschoss", model.levels().get(2).name());
+    }
+
+    @Test
+    void etageKannNachUntenVerschobenWerden() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Level obergeschoss = model.createLevel("Obergeschoss");
+        Level dachgeschoss = model.createLevel("Dachgeschoss");
+
+        model.moveLevelDown(dachgeschoss);
+
+        assertEquals("Erdgeschoss", model.levels().get(0).name());
+        assertEquals("Dachgeschoss", model.levels().get(1).name());
+        assertEquals("Obergeschoss", model.levels().get(2).name());
+    }
+
+    @Test
+    void ersteEtageKannNichtNachUntenVerschobenWerden() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        model.createLevel("Obergeschoss");
+
+        model.moveLevelDown(model.primaryLevel());
+
+        assertEquals("Erdgeschoss", model.levels().get(0).name());
+    }
+
+    @Test
+    void letzteEtageKannNichtNachObenVerschobenWerden() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Level obergeschoss = model.createLevel("Obergeschoss");
+
+        model.moveLevelUp(obergeschoss);
+
+        assertTrue(model.levels().indexOf(obergeschoss) == model.levels().size() - 1);
     }
 }
