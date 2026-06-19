@@ -2,6 +2,8 @@ package de.andreas.cadas.ui;
 
 import de.andreas.cadas.application.drawing.DraftingConstraints;
 import de.andreas.cadas.application.drawing.DraftingService;
+import de.andreas.cadas.application.drawing.DimensionLineLayoutService;
+import de.andreas.cadas.application.drawing.DimensionStandard;
 import de.andreas.cadas.application.drawing.EdgeResizeService;
 import de.andreas.cadas.application.drawing.GuideSnapService;
 import de.andreas.cadas.application.drawing.GuideSnapTargets;
@@ -202,6 +204,7 @@ public final class CadWorkbench extends BorderPane {
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     private final WallEditingService wallEditingService = new WallEditingService();
     private final WallDimensionService wallDimensionService = new WallDimensionService();
+    private final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
     private final QuarterTurnRotationService quarterTurnRotationService = new QuarterTurnRotationService();
     private final SelectionTranslationService selectionTranslationService = new SelectionTranslationService();
     private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
@@ -234,6 +237,7 @@ public final class CadWorkbench extends BorderPane {
     private final BooleanProperty snapToEndpoints = new SimpleBooleanProperty(true);
     private final BooleanProperty showCompass = new SimpleBooleanProperty(true);
     private final BooleanProperty showDimensions = new SimpleBooleanProperty(true);
+    private final BooleanProperty useIsoDimensions = new SimpleBooleanProperty(false);
     private final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
     private final BooleanProperty showRoomObjects = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
@@ -467,6 +471,7 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(snapToEndpoints);
         registerRenderListener(showCompass);
         registerRenderListener(showDimensions);
+        registerRenderListener(useIsoDimensions);
         registerRenderListener(showAreaVolume);
         registerRenderListener(showGuides);
         registerRenderListener(showGuideDistances);
@@ -565,6 +570,10 @@ public final class CadWorkbench extends BorderPane {
         dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
         applyTooltip(dimensionsBox, "Blendet die Längenbeschriftung der gezeichneten Wände ein oder aus.");
 
+        CheckBox isoDimensionsBox = new CheckBox("ISO 7519");
+        isoDimensionsBox.selectedProperty().bindBidirectional(useIsoDimensions);
+        applyTooltip(isoDimensionsBox, "Schaltet die sichtbare Bemaßung zwischen der bisherigen Beschriftung und dem Darstellungsprofil DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien um.");
+
         CheckBox objectsBox = new CheckBox("Objekte");
         objectsBox.selectedProperty().bindBidirectional(showRoomObjects);
         applyTooltip(objectsBox, "Blendet platzierte Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.");
@@ -596,6 +605,7 @@ public final class CadWorkbench extends BorderPane {
                 snapWallsBox,
                 new Separator(Orientation.VERTICAL),
                 dimensionsBox,
+                isoDimensionsBox,
                 objectsBox
         );
     }
@@ -847,6 +857,7 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("An Hilfslinien einrasten", snapToGuides),
                 checkMenuItem("An anderen Wänden einrasten", snapToWalls),
                 checkMenuItem("Bemaßung anzeigen", showDimensions),
+                checkMenuItem("Bemaßung nach DIN EN ISO 7519 | 2025-01", useIsoDimensions),
                 checkMenuItem("Objekte anzeigen", showRoomObjects),
                 checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
                 checkMenuItem("Nordpfeil anzeigen", showCompass)
@@ -3123,16 +3134,53 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawDimensionLabel(GraphicsContext graphics, PlanSegment segment, String text, double normalOffset) {
-        double midX = (toScreenProjectedX(segment.start(), 0.0) + toScreenProjectedX(segment.end(), 0.0)) / 2.0;
-        double midY = (toScreenProjectedY(segment.start(), 0.0) + toScreenProjectedY(segment.end(), 0.0)) / 2.0;
-        double directionX = toScreenProjectedX(segment.end(), 0.0) - toScreenProjectedX(segment.start(), 0.0);
-        double directionY = toScreenProjectedY(segment.end(), 0.0) - toScreenProjectedY(segment.start(), 0.0);
+        double startX = toScreenProjectedX(segment.start(), 0.0);
+        double startY = toScreenProjectedY(segment.start(), 0.0);
+        double endX = toScreenProjectedX(segment.end(), 0.0);
+        double endY = toScreenProjectedY(segment.end(), 0.0);
+        double midX = (startX + endX) / 2.0;
+        double midY = (startY + endY) / 2.0;
+        double directionX = endX - startX;
+        double directionY = endY - startY;
         double directionLength = Math.max(1.0, Math.hypot(directionX, directionY));
-        midX += -directionY / directionLength * normalOffset;
-        midY += directionX / directionLength * normalOffset;
+        if (currentDimensionStandard() == DimensionStandard.DIN_EN_ISO_7519_2025_01) {
+            double isoOffset = Math.abs(normalOffset) < 0.001 ? 24.0 : normalOffset;
+            var layout = dimensionLineLayoutService.layout(startX, startY, endX, endY, isoOffset);
+            drawIsoDimensionLines(graphics, layout, directionX / directionLength, directionY / directionLength);
+            midX = layout.textX();
+            midY = layout.textY();
+        } else {
+            midX += -directionY / directionLength * normalOffset;
+            midY += directionX / directionLength * normalOffset;
+        }
         graphics.setFill(CadColorPalette.DIMENSION_TEXT);
         graphics.setFont(Font.font("Menlo", 12));
         graphics.fillText(text, midX + 8.0, midY - 8.0);
+    }
+
+    private DimensionStandard currentDimensionStandard() {
+        return useIsoDimensions.get()
+                ? DimensionStandard.DIN_EN_ISO_7519_2025_01
+                : DimensionStandard.EXISTING;
+    }
+
+    private void drawIsoDimensionLines(
+            GraphicsContext graphics,
+            DimensionLineLayoutService.DimensionLineLayout layout,
+            double directionX,
+            double directionY
+    ) {
+        graphics.save();
+        graphics.setStroke(CadColorPalette.DIMENSION_TEXT);
+        graphics.setLineWidth(0.8);
+        graphics.strokeLine(layout.firstExtensionStartX(), layout.firstExtensionStartY(), layout.firstExtensionEndX(), layout.firstExtensionEndY());
+        graphics.strokeLine(layout.secondExtensionStartX(), layout.secondExtensionStartY(), layout.secondExtensionEndX(), layout.secondExtensionEndY());
+        graphics.strokeLine(layout.lineStartX(), layout.lineStartY(), layout.lineEndX(), layout.lineEndY());
+        double tickX = (directionX - directionY) * 4.0;
+        double tickY = (directionY + directionX) * 4.0;
+        graphics.strokeLine(layout.lineStartX() - tickX, layout.lineStartY() - tickY, layout.lineStartX() + tickX, layout.lineStartY() + tickY);
+        graphics.strokeLine(layout.lineEndX() - tickX, layout.lineEndY() - tickY, layout.lineEndX() + tickX, layout.lineEndY() + tickY);
+        graphics.restore();
     }
 
     private void drawViewOverlay(GraphicsContext graphics) {
