@@ -168,7 +168,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 new PlanPoint(parseDouble(parts[6]), parseDouble(parts[7])),
                                 Length.ofMillimeters(parseDouble(parts[8])),
                                 Integer.parseInt(parts[9]),
-                                Integer.parseInt(parts[10])
+                                Integer.parseInt(parts[10]),
+                                Length.ofMillimeters(parts.length >= 12 ? parseDouble(parts[11]) : 0),
+                                Length.ofMillimeters(parts.length >= 13 ? parseDouble(parts[12]) : 0)
                         ));
                     }
                     case "ROOF" -> importedRoof = new Roof(
@@ -387,7 +389,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (Staircase staircase : level.staircases()) {
             appendMetadataText(dxf, context, staircase.firstCorner(), String.format(
                     Locale.US,
-                    "STAIR|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d",
+                    "STAIR|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d|%.3f|%.3f",
                     DxfMetadataCodec.encode(level.name()),
                     staircase.id(),
                     staircase.stairType().name(),
@@ -397,7 +399,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     staircase.oppositeCorner().yMillimeters(),
                     staircase.totalHeight().toMillimeters(),
                     staircase.stepCount(),
-                    staircase.rotationQuarterTurns()
+                    staircase.rotationQuarterTurns(),
+                    staircase.startLandingWidth().toMillimeters(),
+                    staircase.endLandingWidth().toMillimeters()
             ));
         }
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {

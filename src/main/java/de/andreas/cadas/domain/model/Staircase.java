@@ -13,7 +13,9 @@ public record Staircase(
         PlanPoint oppositeCorner,
         Length totalHeight,
         int stepCount,
-        int rotationQuarterTurns
+        int rotationQuarterTurns,
+        Length startLandingWidth,
+        Length endLandingWidth
 ) {
 
     public Staircase {
@@ -22,12 +24,39 @@ public record Staircase(
         Objects.requireNonNull(firstCorner, "firstCorner darf nicht null sein.");
         Objects.requireNonNull(oppositeCorner, "oppositeCorner darf nicht null sein.");
         Objects.requireNonNull(totalHeight, "totalHeight darf nicht null sein.");
+        Objects.requireNonNull(startLandingWidth, "startLandingWidth darf nicht null sein.");
+        Objects.requireNonNull(endLandingWidth, "endLandingWidth darf nicht null sein.");
         if (stepCount <= 0) {
             throw new IllegalArgumentException("stepCount muss größer als 0 sein.");
         }
         if (rotationQuarterTurns < 0 || rotationQuarterTurns > 3) {
             throw new IllegalArgumentException("rotationQuarterTurns muss zwischen 0 und 3 liegen.");
         }
+        if (startLandingWidth.toMillimeters() < 0 || endLandingWidth.toMillimeters() < 0) {
+            throw new IllegalArgumentException("Absatzbreiten dürfen nicht negativ sein.");
+        }
+        double runLength = Math.abs(oppositeCorner.yMillimeters() - firstCorner.yMillimeters());
+        if (startLandingWidth.toMillimeters() + endLandingWidth.toMillimeters() >= runLength) {
+            throw new IllegalArgumentException("Zwischen den Absätzen muss Platz für mindestens eine Stufe bleiben.");
+        }
+        int configuredLandingCount = (startLandingWidth.toMillimeters() > 0 ? 1 : 0)
+                + (endLandingWidth.toMillimeters() > 0 ? 1 : 0);
+        if (stepCount <= configuredLandingCount) {
+            throw new IllegalArgumentException("Die Stufenanzahl muss die Absätze und mindestens eine Stufe enthalten.");
+        }
+    }
+
+    public Staircase(
+            UUID id,
+            StairType stairType,
+            PlanPoint firstCorner,
+            PlanPoint oppositeCorner,
+            Length totalHeight,
+            int stepCount,
+            int rotationQuarterTurns
+    ) {
+        this(id, stairType, firstCorner, oppositeCorner, totalHeight, stepCount, rotationQuarterTurns,
+                Length.ofMillimeters(0), Length.ofMillimeters(0));
     }
 
     public static Staircase create(
@@ -38,6 +67,19 @@ public record Staircase(
             int stepCount
     ) {
         return new Staircase(UUID.randomUUID(), stairType, firstCorner, oppositeCorner, totalHeight, stepCount, 0);
+    }
+
+    public static Staircase create(
+            StairType stairType,
+            PlanPoint firstCorner,
+            PlanPoint oppositeCorner,
+            Length totalHeight,
+            int stepCount,
+            Length startLandingWidth,
+            Length endLandingWidth
+    ) {
+        return new Staircase(UUID.randomUUID(), stairType, firstCorner, oppositeCorner, totalHeight, stepCount, 0,
+                startLandingWidth, endLandingWidth);
     }
 
     public double minX() {
@@ -64,6 +106,21 @@ public record Staircase(
         return maxY() - minY();
     }
 
+    public int landingCount() {
+        int count = 0;
+        if (startLandingWidth.toMillimeters() > 0) {
+            count++;
+        }
+        if (endLandingWidth.toMillimeters() > 0) {
+            count++;
+        }
+        return count;
+    }
+
+    public int regularStepCount() {
+        return stepCount - landingCount();
+    }
+
     public PlanPoint pointAtLocalPosition(double localX, double localY) {
         double width = widthMillimeters();
         double height = heightMillimeters();
@@ -84,10 +141,12 @@ public record Staircase(
     }
 
     public Staircase rotateClockwise() {
-        return new Staircase(id, stairType, firstCorner, oppositeCorner, totalHeight, stepCount, (rotationQuarterTurns + 1) % 4);
+        return new Staircase(id, stairType, firstCorner, oppositeCorner, totalHeight, stepCount,
+                (rotationQuarterTurns + 1) % 4, startLandingWidth, endLandingWidth);
     }
 
     public Staircase rotateCounterClockwise() {
-        return new Staircase(id, stairType, firstCorner, oppositeCorner, totalHeight, stepCount, (rotationQuarterTurns + 3) % 4);
+        return new Staircase(id, stairType, firstCorner, oppositeCorner, totalHeight, stepCount,
+                (rotationQuarterTurns + 3) % 4, startLandingWidth, endLandingWidth);
     }
 }

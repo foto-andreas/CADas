@@ -102,7 +102,9 @@ public final class SelectionTranslationService {
                 translatePoint(staircase.oppositeCorner(), deltaXMillimeters, deltaYMillimeters),
                 staircase.totalHeight(),
                 staircase.stepCount(),
-                staircase.rotationQuarterTurns()
+                staircase.rotationQuarterTurns(),
+                staircase.startLandingWidth(),
+                staircase.endLandingWidth()
         );
     }
 

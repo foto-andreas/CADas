@@ -80,7 +80,9 @@ class DxfLevelExchangeServiceTest {
                 new PlanPoint(2200, 4200),
                 Length.of(2.9, LengthUnit.METER),
                 18,
-                1
+                1,
+                Length.of(80, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER)
         ));
 
         Path file = tempDir.resolve("grundriss.dxf");
@@ -98,6 +100,8 @@ class DxfLevelExchangeServiceTest {
         assertEquals(14.0, imported.rooms().getFirst().areaSquareMeters(), 0.001);
         assertEquals(StairType.SWITCHBACK, imported.staircases().getFirst().stairType());
         assertEquals(1, imported.staircases().getFirst().rotationQuarterTurns());
+        assertEquals(800, imported.staircases().getFirst().startLandingWidth().toMillimeters(), 0.001);
+        assertEquals(600, imported.staircases().getFirst().endLandingWidth().toMillimeters(), 0.001);
     }
 
     @Test

@@ -2,6 +2,7 @@ package de.andreas.cadas.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
@@ -10,6 +11,35 @@ import de.andreas.cadas.domain.geometry.PlanPoint;
 import org.junit.jupiter.api.Test;
 
 class StaircaseTest {
+
+    @Test
+    void zähltKonfigurierteAbsätzeAlsStufen() {
+        Staircase staircase = Staircase.create(
+                StairType.STRAIGHT,
+                new PlanPoint(0, 0),
+                new PlanPoint(1_000, 4_000),
+                Length.ofMillimeters(2_800),
+                16,
+                Length.ofMillimeters(800),
+                Length.ofMillimeters(600)
+        );
+
+        assertEquals(2, staircase.landingCount());
+        assertEquals(14, staircase.regularStepCount());
+    }
+
+    @Test
+    void weistAbsätzeOhnePlatzFürStufenZurück() {
+        assertThrows(IllegalArgumentException.class, () -> Staircase.create(
+                StairType.STRAIGHT,
+                new PlanPoint(0, 0),
+                new PlanPoint(1_000, 1_400),
+                Length.ofMillimeters(2_800),
+                2,
+                Length.ofMillimeters(800),
+                Length.ofMillimeters(600)
+        ));
+    }
 
     @Test
     void erzeugtTreppenMitGeometrieUndStufenanzahl() {

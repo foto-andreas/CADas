@@ -82,7 +82,9 @@ class DxfProjectExchangeServiceTest {
                 new PlanPoint(2400, 4200),
                 Length.of(2.9, LengthUnit.METER),
                 18,
-                0
+                0,
+                Length.of(75, LengthUnit.CENTIMETER),
+                Length.of(50, LengthUnit.CENTIMETER)
         ));
         var og = project.createLevel("Obergeschoss");
         og.addRoom(Room.rectangular(
@@ -103,6 +105,8 @@ class DxfProjectExchangeServiceTest {
         assertEquals("Haus", imported.name());
         assertTrue(imported.roof().isPresent());
         assertEquals(1, imported.primaryLevel().staircases().size());
+        assertEquals(750, imported.primaryLevel().staircases().getFirst().startLandingWidth().toMillimeters(), 0.001);
+        assertEquals(500, imported.primaryLevel().staircases().getFirst().endLandingWidth().toMillimeters(), 0.001);
         assertEquals(door.id(), imported.primaryLevel().doors().getFirst().id());
         assertEquals(window.id(), imported.primaryLevel().windows().getFirst().id());
         assertEquals("Obergeschoss", imported.levels().get(1).name());

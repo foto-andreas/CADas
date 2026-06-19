@@ -169,7 +169,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             );
             appendMetadataText(dxf, context, staircase.firstCorner(), String.format(
                     Locale.US,
-                    "STAIR|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d",
+                    "STAIR|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d|%.3f|%.3f",
                     staircase.id(),
                     staircase.stairType().name(),
                     staircase.firstCorner().xMillimeters(),
@@ -178,7 +178,9 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     staircase.oppositeCorner().yMillimeters(),
                     staircase.totalHeight().toMillimeters(),
                     staircase.stepCount(),
-                    staircase.rotationQuarterTurns()
+                    staircase.rotationQuarterTurns(),
+                    staircase.startLandingWidth().toMillimeters(),
+                    staircase.endLandingWidth().toMillimeters()
             ));
         }
 
@@ -327,7 +329,9 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             new PlanPoint(parseDouble(parts[5]), parseDouble(parts[6])),
                             Length.ofMillimeters(parseDouble(parts[7])),
                             Integer.parseInt(parts[8]),
-                            Integer.parseInt(parts[9])
+                            Integer.parseInt(parts[9]),
+                            Length.ofMillimeters(parts.length >= 11 ? parseDouble(parts[10]) : 0),
+                            Length.ofMillimeters(parts.length >= 12 ? parseDouble(parts[11]) : 0)
                     ));
                     case "SLS" -> {
                         SurfaceLayerStack stack = new SurfaceLayerStack(

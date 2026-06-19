@@ -289,6 +289,10 @@ public final class CadWorkbench extends BorderPane {
     private final TextField stairHeightField = new TextField("2,80");
     private final ComboBox<LengthUnit> stairHeightUnit = new ComboBox<>();
     private final TextField stairStepsField = new TextField("16");
+    private final TextField stairStartLandingField = new TextField("0");
+    private final ComboBox<LengthUnit> stairStartLandingUnit = new ComboBox<>();
+    private final TextField stairEndLandingField = new TextField("0");
+    private final ComboBox<LengthUnit> stairEndLandingUnit = new ComboBox<>();
     private final ComboBox<SurfaceType> surfaceTypeSelector = new ComboBox<>();
     private final ComboBox<SurfaceCoveringPreset> surfacePresetSelector = new ComboBox<>();
     private final ListView<String> surfaceLayerList = new ListView<>();
@@ -915,7 +919,9 @@ public final class CadWorkbench extends BorderPane {
                         "Treppe",
                         propertyRow("Preset", stairPresetSelector),
                         propertyRow("Höhe", stairHeightField, stairHeightUnit),
-                        propertyRow("Stufen", stairStepsField)
+                        propertyRow("Stufen inkl. Absätze", stairStepsField),
+                        propertyRow("Absatz Anfang", stairStartLandingField, stairStartLandingUnit),
+                        propertyRow("Absatz Ende", stairEndLandingField, stairEndLandingUnit)
                 ),
                 createPropertySection(
                         "Objekt",
@@ -1196,6 +1202,8 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(windowHeightField, windowHeightUnit, LengthUnit.METER);
         initializeUnitSelector(sillHeightField, sillHeightUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(stairHeightField, stairHeightUnit, LengthUnit.METER);
+        initializeUnitSelector(stairStartLandingField, stairStartLandingUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(stairEndLandingField, stairEndLandingUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceLayerThicknessField, surfaceLayerThicknessUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceTileWidthField, surfaceTileWidthUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceTileHeightField, surfaceTileHeightUnit, LengthUnit.CENTIMETER);
@@ -1360,7 +1368,11 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(stairPresetSelector, "Wählt eine Standardtreppe aus der internen Teilebibliothek und übernimmt Typ, Höhe und Stufenanzahl.");
         applyTooltip(stairHeightField, "Legt die Gesamthöhe der nächsten Treppe fest.");
         applyTooltip(stairHeightUnit, "Bestimmt die Einheit für die Treppenhöhe.");
-        applyTooltip(stairStepsField, "Legt die Stufenanzahl der nächsten Treppe fest.");
+        applyTooltip(stairStepsField, "Legt die gesamte Stufenanzahl fest. Konfigurierte Anfangs- und Endabsätze zählen jeweils als eine Stufe mit.");
+        applyTooltip(stairStartLandingField, "Legt die Tiefe des ebenen Absatzes am Anfang der Treppe in Laufrichtung fest. Null deaktiviert den Absatz.");
+        applyTooltip(stairStartLandingUnit, "Bestimmt die Einheit für die Tiefe des Anfangsabsatzes.");
+        applyTooltip(stairEndLandingField, "Legt die Tiefe des ebenen Absatzes am Ende der Treppe in Laufrichtung fest. Null deaktiviert den Absatz.");
+        applyTooltip(stairEndLandingUnit, "Bestimmt die Einheit für die Tiefe des Endabsatzes.");
         applyTooltip(roomObjectPresetSelector, "Wählt ein Raumobjekt zum Platzieren aus. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
         applyTooltip(surfaceTypeSelector, "Zeigt nur die Belagstypen an, die zur aktuellen Auswahl passen. Raum allein erlaubt Boden oder Decke, Raum plus Wand erlaubt Innenwand, Wand allein erlaubt Außenwand.");
         applyTooltip(surfacePresetSelector, "Wählt einen Beispielbelag oder eine DWG-Referenz aus und übernimmt deren Standardwerte in die Ebenenfelder.");
@@ -1800,7 +1812,9 @@ public final class CadWorkbench extends BorderPane {
                         previewSegment.start(),
                         previewSegment.end(),
                         currentStairHeight(),
-                        currentStairSteps()
+                        currentStairSteps(),
+                        currentStairStartLanding(),
+                        currentStairEndLanding()
                 );
                 activeLevel.get().addStaircase(staircase);
                 selectSingle(new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), staircase.id().toString()));
@@ -2787,9 +2801,20 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawStraightStairTreads(GraphicsContext graphics, Staircase staircase) {
-        double stepHeight = staircase.heightMillimeters() / staircase.stepCount();
-        for (int step = 1; step < staircase.stepCount(); step++) {
-            strokeLocalLine(graphics, staircase, 0, stepHeight * step, staircase.widthMillimeters(), stepHeight * step);
+        double startLanding = staircase.startLandingWidth().toMillimeters();
+        double endLanding = staircase.endLandingWidth().toMillimeters();
+        double runLength = staircase.heightMillimeters() - startLanding - endLanding;
+        double stepDepth = runLength / staircase.regularStepCount();
+        if (startLanding > 0) {
+            strokeLocalLine(graphics, staircase, 0, startLanding, staircase.widthMillimeters(), startLanding);
+        }
+        for (int step = 1; step < staircase.regularStepCount(); step++) {
+            double localY = startLanding + stepDepth * step;
+            strokeLocalLine(graphics, staircase, 0, localY, staircase.widthMillimeters(), localY);
+        }
+        if (endLanding > 0) {
+            double localY = staircase.heightMillimeters() - endLanding;
+            strokeLocalLine(graphics, staircase, 0, localY, staircase.widthMillimeters(), localY);
         }
     }
 
@@ -3314,6 +3339,14 @@ public final class CadWorkbench extends BorderPane {
         } catch (NumberFormatException ignored) {
             return 16;
         }
+    }
+
+    private Length currentStairStartLanding() {
+        return parseLength(stairStartLandingField, stairStartLandingUnit.getValue()).orElse(Length.ofMillimeters(0));
+    }
+
+    private Length currentStairEndLanding() {
+        return parseLength(stairEndLandingField, stairEndLandingUnit.getValue()).orElse(Length.ofMillimeters(0));
     }
 
     private Optional<Length> parseLength(TextField field, LengthUnit unit) {
@@ -5154,6 +5187,8 @@ public final class CadWorkbench extends BorderPane {
                     .ifPresent(stair -> {
                         syncLengthInput(stairHeightField, stairHeightUnit, stair.totalHeight(), LengthUnit.METER);
                         stairStepsField.setText(Integer.toString(stair.stepCount()));
+                        syncLengthInput(stairStartLandingField, stairStartLandingUnit, stair.startLandingWidth(), LengthUnit.CENTIMETER);
+                        syncLengthInput(stairEndLandingField, stairEndLandingUnit, stair.endLandingWidth(), LengthUnit.CENTIMETER);
                     });
             default -> {
             }
@@ -5195,7 +5230,7 @@ public final class CadWorkbench extends BorderPane {
                     .toList());
             case STAIR -> activeLevel.get().replaceStaircases(activeLevel.get().staircases().stream()
                     .map(stair -> selectedIds().contains(stair.id().toString())
-                            ? new Staircase(stair.id(), stair.stairType(), stair.firstCorner(), stair.oppositeCorner(), currentStairHeight(), currentStairSteps(), stair.rotationQuarterTurns())
+                            ? new Staircase(stair.id(), stair.stairType(), stair.firstCorner(), stair.oppositeCorner(), currentStairHeight(), currentStairSteps(), stair.rotationQuarterTurns(), currentStairStartLanding(), currentStairEndLanding())
                             : stair)
                     .toList());
             default -> {
@@ -5845,6 +5880,8 @@ public final class CadWorkbench extends BorderPane {
             case "sillHeight" -> sillHeightField;
             case "stairHeight" -> stairHeightField;
             case "stairSteps" -> stairStepsField;
+            case "stairStartLanding" -> stairStartLandingField;
+            case "stairEndLanding" -> stairEndLandingField;
             default -> throw new IllegalArgumentException("Eingabefeld `" + fieldName + "` ist unbekannt.");
         };
     }
@@ -5856,6 +5893,8 @@ public final class CadWorkbench extends BorderPane {
             case "wallThickness" -> wallThicknessUnit;
             case "wallHeight" -> wallHeightUnit;
             case "endpointHeight" -> endpointHeightUnit;
+            case "stairStartLanding" -> stairStartLandingUnit;
+            case "stairEndLanding" -> stairEndLandingUnit;
             case "surfaceLayerThickness" -> surfaceLayerThicknessUnit;
             case "surfaceTileWidth" -> surfaceTileWidthUnit;
             case "surfaceTileHeight" -> surfaceTileHeightUnit;
