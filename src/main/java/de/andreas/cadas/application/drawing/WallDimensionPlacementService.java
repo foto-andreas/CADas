@@ -112,12 +112,17 @@ public final class WallDimensionPlacementService {
             WallDimensionService.WallDimensions dimensions,
             Envelope envelope
     ) {
-        if (dimensions.exteriorDimension().isPresent()) {
-            return dimensions.exteriorDimension().orElseThrow().sideSign();
-        }
+        // Die Platzierungsseite wird grundsätzlich geometrisch über die Gebäudehülle
+        // bestimmt, damit Maße — insbesondere das Außenmaß — immer außerhalb des
+        // Gebäudes landen. Die sideSign aus WallDimensionService ist dafür nicht
+        // verlässlich, weil sie auf der fehleranfälligen Wandseiten-Klassifikation
+        // basiert und das Außenmaß sonst ins Gebäudeinnere gelegt werden kann.
         double positiveDistance = Math.abs(envelope.boundaryDistance(wall.axis(), 1.0));
         double negativeDistance = Math.abs(envelope.boundaryDistance(wall.axis(), -1.0));
         if (Math.abs(positiveDistance - negativeDistance) > EPSILON) {
+            // Die Gebäudeaußenseite liegt dort, wo die Hülle am nächsten an der
+            // Wandachse ist (betraglich kleinere Ausdehnung = Wand ist nah an
+            // der Außenkante).
             return positiveDistance < negativeDistance ? 1.0 : -1.0;
         }
         double centerDistance = signedNormalDistance(wall.axis(), envelope.centerPoint());

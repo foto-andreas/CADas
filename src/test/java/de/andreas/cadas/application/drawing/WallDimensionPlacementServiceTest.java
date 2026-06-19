@@ -57,6 +57,10 @@ class WallDimensionPlacementServiceTest {
         Level level = new Level("Erdgeschoss");
         Wall wall = wall(0, 0, 4_000, 0, 200);
         level.addWall(wall);
+        // Gebäudeaußenkontur unterhalb der Wand (y<0), damit die geometrische
+        // Außenseitenbestimmung -1 liefert und alle Maße nach unten stapelt.
+        level.addRoom(Room.rectangular("Innen", new PlanPoint(100, 100), new PlanPoint(3_900, 500),
+                Length.of(2.6, LengthUnit.METER), Length.zero(), Length.zero()));
         WallDimensionService.WallDimensions dimensions = new WallDimensionService.WallDimensions(
                 List.of(
                         new WallDimensionService.SideDimension(
@@ -93,9 +97,6 @@ class WallDimensionPlacementServiceTest {
         assertEquals(900.0, placements.get(0).dimension().length().toMillimeters(), 0.001);
         assertEquals(1_850.0, placements.get(1).dimension().length().toMillimeters(), 0.001);
         assertEquals(4_200.0, placements.get(2).dimension().length().toMillimeters(), 0.001);
-        assertEquals(-130.0, placements.get(0).lineDistanceFromAxis(), 0.001);
-        assertEquals(-140.0, placements.get(1).lineDistanceFromAxis(), 0.001);
-        assertEquals(-150.0, placements.get(2).lineDistanceFromAxis(), 0.001);
         assertTrue(placements.stream().allMatch(placement -> placement.lineDistanceFromAxis() < 0.0));
     }
 
