@@ -239,6 +239,42 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void tuerKantenHandleVerschiebtGenauDieGezogeneKanteMitRasterSnap() throws Exception {
+        Path projektDatei = erzeugeProjektMitPickpunktenAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("DOOR", 0, false);
+            return instanz;
+        });
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        PlanPoint startHandle = aufFxThread(() -> workbench.automationEdgeHandleScreenPoints().getFirst());
+        double targetX = startHandle.xMillimeters() + 250.0 * 0.1 * snapshot.zoom();
+
+        aufFxThread(() -> {
+            Assertions.assertEquals("DOOR_START", workbench.automationEdgeHandleAtScreen(startHandle.xMillimeters(), startHandle.yMillimeters()));
+            workbench.automationCanvasPress(startHandle.xMillimeters(), startHandle.yMillimeters(), javafx.scene.input.MouseButton.PRIMARY);
+            Assertions.assertEquals("DOOR_START", workbench.automationActiveEdgeHandle());
+            workbench.automationCanvasDragTo(targetX, startHandle.yMillimeters(), javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(targetX, startHandle.yMillimeters(), javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+        Path exportDatei = Files.createTempFile("cadas-handle-", ".dxf");
+        aufFxThread(() -> {
+            workbench.automationInvoke("exportProjectDxf", exportDatei);
+            return null;
+        });
+        Door door = new DxfProjectExchangeService().importProject(exportDatei, "Handle").primaryLevel().doors().getFirst();
+
+        Assertions.assertEquals(1_250.0, door.offsetFromStart().toMillimeters(), 0.001);
+        Assertions.assertEquals(750.0, door.width().toMillimeters(), 0.001);
+    }
+
+    @Test
     void belagsauswahlWechseltMitRaumUndWandSauberZwischenKontexten() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {

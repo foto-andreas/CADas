@@ -2,6 +2,7 @@ package de.andreas.cadas.ui;
 
 import de.andreas.cadas.application.drawing.DraftingConstraints;
 import de.andreas.cadas.application.drawing.DraftingService;
+import de.andreas.cadas.application.drawing.EdgeResizeService;
 import de.andreas.cadas.application.drawing.GuideSnapService;
 import de.andreas.cadas.application.drawing.GuideSnapTargets;
 import de.andreas.cadas.application.exchange.ExchangeFileNameService;
@@ -189,6 +190,7 @@ public final class CadWorkbench extends BorderPane {
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     private final DraftingService draftingService = new DraftingService();
+    private final EdgeResizeService edgeResizeService = new EdgeResizeService();
     private final SnapService snapService = new SnapService();
     private final GuideSnapService guideSnapService = new GuideSnapService();
     private final WallSnapService wallSnapService = new WallSnapService();
@@ -389,6 +391,10 @@ public final class CadWorkbench extends BorderPane {
     private PlanSegment openingDragWallAxis;
     private double openingDragWidth;
     private double openingDragOffsetDelta;
+    private EdgeResizeService.EdgeHandle activeEdgeHandle;
+    private List<Wall> edgeResizeBaseWalls = List.of();
+    private List<Door> edgeResizeBaseDoors = List.of();
+    private List<WindowElement> edgeResizeBaseWindows = List.of();
 
     public CadWorkbench() {
         setPadding(new Insets(12));
@@ -1451,6 +1457,25 @@ public final class CadWorkbench extends BorderPane {
         }
 
         if (currentTool() == DrawingTool.EDIT) {
+            PlanPoint rawEditPoint = screenToWorld(event.getX(), event.getY());
+            activeEdgeHandle = edgeResizeService.findHandle(
+                    activeLevel.get(),
+                    Set.copyOf(selectedSelections),
+                    rawEditPoint,
+                    Length.ofMillimeters(8.0 / scale())
+            ).orElse(null);
+            if (activeEdgeHandle != null) {
+                edgeResizeBaseWalls = List.copyOf(activeLevel.get().walls());
+                edgeResizeBaseDoors = List.copyOf(activeLevel.get().doors());
+                edgeResizeBaseWindows = List.copyOf(activeLevel.get().windows());
+                selectedEndpointGroup = null;
+                selectionDragAnchor = null;
+                openingDragId = null;
+                historyCapturedForDrag = false;
+                draftLabel.setText("Kanten-Handle ausgewählt: Ziehen verlängert oder kürzt das Bauteil entlang seiner Wandachse.");
+                render();
+                return;
+            }
             DraftingConstraints constraints = currentConstraints(false);
             PlanPoint editPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
             selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, SNAP_TOLERANCE).orElse(null);
@@ -1554,6 +1579,36 @@ public final class CadWorkbench extends BorderPane {
         }
 
         if (draftStart == null) {
+            if (activeEdgeHandle != null) {
+                if (!historyCapturedForDrag) {
+                    rememberStateForUndo();
+                    historyCapturedForDrag = true;
+                }
+                Level baseLevel = new Level(activeLevel.get().name());
+                baseLevel.replaceWalls(edgeResizeBaseWalls);
+                baseLevel.replaceDoors(edgeResizeBaseDoors);
+                baseLevel.replaceWindows(edgeResizeBaseWindows);
+                Set<UUID> excludedWallIds = Set.of(activeEdgeHandle.hostWallId());
+                List<Wall> snapWalls = edgeResizeBaseWalls.stream()
+                        .filter(wall -> activeEdgeHandle.kind() != EdgeResizeService.EdgeHandleKind.WALL_START
+                                && activeEdgeHandle.kind() != EdgeResizeService.EdgeHandleKind.WALL_END
+                                || !wall.id().equals(activeEdgeHandle.hostWallId()))
+                        .toList();
+                PlanPoint snappedPoint = snapService.snap(
+                        screenToWorld(event.getX(), event.getY()),
+                        currentConstraints(false),
+                        snapWalls,
+                        currentAlignmentSnapTargets(excludedWallIds)
+                );
+                EdgeResizeService.ResizeResult result = edgeResizeService.resize(baseLevel, activeEdgeHandle, snappedPoint);
+                activeLevel.get().replaceWalls(result.walls());
+                activeLevel.get().replaceDoors(result.doors());
+                activeLevel.get().replaceWindows(result.windows());
+                synchronizeRoomsFromWalls(activeLevel.get());
+                markThreeDDirty();
+                render();
+                return;
+            }
             if (selectedEndpointGroup != null) {
                 if (!historyCapturedForDrag) {
                     rememberStateForUndo();
@@ -1663,6 +1718,18 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
 
+        if (activeEdgeHandle != null) {
+            activeEdgeHandle = null;
+            edgeResizeBaseWalls = List.of();
+            edgeResizeBaseDoors = List.of();
+            edgeResizeBaseWindows = List.of();
+            historyCapturedForDrag = false;
+            updatePropertySectionVisibility();
+            updateActionButtons();
+            render();
+            return;
+        }
+
         if (selectedEndpointGroup != null) {
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
@@ -1766,6 +1833,7 @@ public final class CadWorkbench extends BorderPane {
         drawWindows(graphics);
         drawRoomObjects(graphics);
         drawEditablePoints(graphics);
+        drawEdgeResizeHandles(graphics);
         if (previewSegment != null) {
             drawPreview(graphics);
         }
@@ -2525,6 +2593,27 @@ public final class CadWorkbench extends BorderPane {
             Wall wall = activeLevel.get().findWall(window.wallId());
             boolean selected = isSelected(RenderableKind.WINDOW, window.id().toString());
             drawOpeningEditablePoints(graphics, wall, window.offsetFromStart(), window.width(), Color.web("#4da8da"), selected);
+        }
+    }
+
+    private void drawEdgeResizeHandles(GraphicsContext graphics) {
+        if (currentTool() != DrawingTool.EDIT || !projectionService.isPlanView(activeView.get())) {
+            return;
+        }
+        for (EdgeResizeService.EdgeHandle handle : edgeResizeService.handles(activeLevel.get(), Set.copyOf(selectedSelections))) {
+            double x = toScreenProjectedX(handle.position(), 0.0);
+            double y = toScreenProjectedY(handle.position(), 0.0);
+            boolean active = activeEdgeHandle != null
+                    && activeEdgeHandle.kind() == handle.kind()
+                    && activeEdgeHandle.elementId().equals(handle.elementId());
+            double size = active ? 11.0 : 8.0;
+            graphics.save();
+            graphics.setFill(active ? Color.web("#d97f2f") : Color.web("#fffaf1"));
+            graphics.setStroke(Color.web("#201c18"));
+            graphics.setLineWidth(1.4);
+            graphics.fillRect(x - size / 2.0, y - size / 2.0, size, size);
+            graphics.strokeRect(x - size / 2.0, y - size / 2.0, size, size);
+            graphics.restore();
         }
     }
 
@@ -5402,6 +5491,43 @@ public final class CadWorkbench extends BorderPane {
         drawingCanvas.fireEvent(mouseEvent(MouseEvent.MOUSE_PRESSED, fromX, fromY, button, shiftDown, shortcutDown, altDown, false));
         drawingCanvas.fireEvent(mouseEvent(MouseEvent.MOUSE_DRAGGED, toX, toY, button, shiftDown, shortcutDown, altDown, true));
         drawingCanvas.fireEvent(mouseEvent(MouseEvent.MOUSE_RELEASED, toX, toY, button, shiftDown, shortcutDown, altDown, false));
+    }
+
+    public void automationCanvasPress(double x, double y, MouseButton button) {
+        ensureCanvasReady();
+        handleMousePressed(mouseEvent(MouseEvent.MOUSE_PRESSED, x, y, button, false, false, false, true));
+    }
+
+    public void automationCanvasDragTo(double x, double y, MouseButton button) {
+        handleMouseDragged(mouseEvent(MouseEvent.MOUSE_DRAGGED, x, y, button, false, false, false, true));
+    }
+
+    public void automationCanvasRelease(double x, double y, MouseButton button) {
+        handleMouseReleased(mouseEvent(MouseEvent.MOUSE_RELEASED, x, y, button, false, false, false, false));
+    }
+
+    public String automationActiveEdgeHandle() {
+        return activeEdgeHandle == null ? "" : activeEdgeHandle.kind().name();
+    }
+
+    public String automationEdgeHandleAtScreen(double x, double y) {
+        return edgeResizeService.findHandle(
+                        activeLevel.get(),
+                        Set.copyOf(selectedSelections),
+                        screenToWorld(x, y),
+                        Length.ofMillimeters(8.0 / scale())
+                )
+                .map(handle -> handle.kind().name())
+                .orElse("");
+    }
+
+    public List<PlanPoint> automationEdgeHandleScreenPoints() {
+        return edgeResizeService.handles(activeLevel.get(), Set.copyOf(selectedSelections)).stream()
+                .map(handle -> new PlanPoint(
+                        toScreenProjectedX(handle.position(), 0.0),
+                        toScreenProjectedY(handle.position(), 0.0)
+                ))
+                .toList();
     }
 
     public WorkbenchAutomationSnapshot automationInvoke(String actionName, Path path) {
