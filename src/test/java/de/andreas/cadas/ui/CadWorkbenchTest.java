@@ -607,6 +607,47 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void arbeitsbereicheStellenVorherigeOrbitUndInnenansichtWiederHer() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetWorkspace("THREE_D");
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot orbitVorher = aufFxThread(() -> {
+            workbench.automationInvoke("threeDOrbitRight", null);
+            workbench.automationInvoke("threeDPanRight", null);
+            return workbench.automationSnapshot();
+        });
+
+        WorkbenchAutomationSnapshot innenVorher = aufFxThread(() -> {
+            workbench.automationSetWorkspace("INTERIOR");
+            workbench.automationInvoke("threeDPanUp", null);
+            workbench.automationInvoke("threeDZoomIn", null);
+            workbench.automationInvoke("threeDOrbitRight", null);
+            return workbench.automationSnapshot();
+        });
+
+        WorkbenchAutomationSnapshot innenWieder = aufFxThread(() -> {
+            workbench.automationSetWorkspace("TWO_D");
+            workbench.automationSetWorkspace("INTERIOR");
+            return workbench.automationSnapshot();
+        });
+        Assertions.assertEquals(innenVorher.threeDCameraStatus(), innenWieder.threeDCameraStatus());
+
+        WorkbenchAutomationSnapshot orbitWieder = aufFxThread(() -> {
+            workbench.automationSetWorkspace("THREE_D");
+            return workbench.automationSnapshot();
+        });
+        Assertions.assertEquals(orbitVorher.threeDCameraStatus(), orbitWieder.threeDCameraStatus());
+    }
+
+    @Test
     void einheitenwechselKonvertiertSichtbarenWertOhneLängenänderung() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

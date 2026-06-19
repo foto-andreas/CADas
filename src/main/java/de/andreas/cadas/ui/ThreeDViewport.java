@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
@@ -133,11 +134,14 @@ public final class ThreeDViewport extends BorderPane {
     private boolean roomObjectsVisible = true;
     private CameraMode cameraMode = CameraMode.ORBIT;
     private InteriorViewTarget interiorTarget;
+    private UUID interiorRoomId;
     private double interiorFieldOfViewDegrees = INTERIOR_FOV_DEGREES;
     private double interiorEyeXMillimeters;
     private double interiorEyeZMillimeters;
     private double dragStartInteriorEyeXMillimeters;
     private double dragStartInteriorEyeZMillimeters;
+    private CameraPose rememberedOrbitCameraPose;
+    private InteriorViewState rememberedInteriorViewState;
 
     public ThreeDViewport(Consumer<SelectionKey> selectionConsumer, Runnable orbitViewActivationConsumer) {
         this.selectionConsumer = selectionConsumer;
@@ -216,14 +220,17 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void applyViewPreset(ThreeDViewPreset viewPreset) {
+        rememberCurrentViewState();
         cameraMode = CameraMode.ORBIT;
         interiorTarget = null;
+        interiorRoomId = null;
         orbitViewActivationConsumer.run();
         cameraPose = viewPreparation.poseForAngles(
                 currentProjectionMode(),
                 viewPreset.cameraAzimuthDegrees(),
                 viewPreset.cameraElevationDegrees()
         );
+        rememberedOrbitCameraPose = cameraPose;
         fitToSceneRequested = true;
         if (currentProject != null) {
             refresh(currentProject);
@@ -233,8 +240,10 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void resetToDefaultView() {
+        rememberCurrentViewState();
         cameraMode = CameraMode.ORBIT;
         interiorTarget = null;
+        interiorRoomId = null;
         orbitViewActivationConsumer.run();
         ProjectionMode projectionMode = currentProjectionMode();
         CameraPose defaultPose = viewPreparation.defaultPose();
@@ -247,6 +256,7 @@ public final class ThreeDViewport extends BorderPane {
                 0.0,
                 0.0
         );
+        rememberedOrbitCameraPose = cameraPose;
         fitToSceneRequested = true;
         if (currentProject != null) {
             refresh(currentProject);
@@ -283,9 +293,18 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void activateOrbitView() {
+        rememberCurrentViewState();
         cameraMode = CameraMode.ORBIT;
         interiorTarget = null;
-        fitToSceneRequested = true;
+        interiorRoomId = null;
+        if (rememberedOrbitCameraPose != null) {
+            cameraPose = rememberedOrbitCameraPose;
+            projectionModeSelector.setValue(cameraPose.projectionMode());
+            cameraPose = rememberedOrbitCameraPose;
+            fitToSceneRequested = false;
+        } else {
+            fitToSceneRequested = true;
+        }
         if (currentProject != null) {
             refresh(currentProject);
             return;
@@ -295,9 +314,11 @@ public final class ThreeDViewport extends BorderPane {
 
     public void activateInteriorView(ProjectModel project, Level level, Room room) {
         currentProject = project;
+        rememberCurrentViewState();
         interiorTarget = interiorViewService.targetFor(project, level, room);
+        interiorRoomId = room.id();
         cameraMode = CameraMode.INTERIOR;
-        resetInteriorPose();
+        restoreOrResetInteriorPose(level.name(), room.id());
         projectionModeSelector.setValue(ProjectionMode.PERSPECTIVE);
         surfaceRenderingCheckBox.setSelected(true);
         fitToSceneRequested = false;
@@ -1030,6 +1051,39 @@ public final class ThreeDViewport extends BorderPane {
         );
     }
 
+    private void rememberCurrentViewState() {
+        if (cameraMode == CameraMode.INTERIOR) {
+            rememberInteriorViewState();
+            return;
+        }
+        rememberedOrbitCameraPose = cameraPose;
+    }
+
+    private void rememberInteriorViewState() {
+        if (interiorTarget == null || interiorRoomId == null) {
+            return;
+        }
+        rememberedInteriorViewState = new InteriorViewState(
+                interiorTarget.levelName(),
+                interiorRoomId,
+                cameraPose,
+                interiorEyeXMillimeters,
+                interiorEyeZMillimeters,
+                interiorFieldOfViewDegrees
+        );
+    }
+
+    private void restoreOrResetInteriorPose(String levelName, UUID roomId) {
+        if (rememberedInteriorViewState != null && rememberedInteriorViewState.matches(levelName, roomId)) {
+            interiorFieldOfViewDegrees = rememberedInteriorViewState.fieldOfViewDegrees();
+            interiorEyeXMillimeters = rememberedInteriorViewState.eyeXMillimeters();
+            interiorEyeZMillimeters = rememberedInteriorViewState.eyeZMillimeters();
+            cameraPose = rememberedInteriorViewState.cameraPose();
+            return;
+        }
+        resetInteriorPose();
+    }
+
     private void applyTooltip(Node node, String text) {
         Tooltip tooltip = new Tooltip(text);
         tooltip.setWrapText(true);
@@ -1149,5 +1203,18 @@ public final class ThreeDViewport extends BorderPane {
     private enum CameraMode {
         ORBIT,
         INTERIOR
+    }
+
+    private record InteriorViewState(
+            String levelName,
+            UUID roomId,
+            CameraPose cameraPose,
+            double eyeXMillimeters,
+            double eyeZMillimeters,
+            double fieldOfViewDegrees
+    ) {
+        private boolean matches(String targetLevelName, UUID targetRoomId) {
+            return levelName.equals(targetLevelName) && roomId.equals(targetRoomId);
+        }
     }
 }
