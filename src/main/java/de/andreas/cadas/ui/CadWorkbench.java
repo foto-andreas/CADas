@@ -89,6 +89,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -2105,19 +2106,19 @@ public final class CadWorkbench extends BorderPane {
                 drawWallElevation(graphics, wall, selected);
             }
             if (showDimensions.get() && projectionService.isPlanView(activeView.get())) {
-                if (selected) {
-                    drawSelectedWallDimensions(graphics, wall);
-                } else {
-                    drawDimensionLabel(graphics, wall.axis(), wall.axis().length().format(LengthUnit.METER, 2));
-                }
+                drawWallDimensions(graphics, wall);
             }
         }
     }
 
-    private void drawSelectedWallDimensions(GraphicsContext graphics, Wall wall) {
+    private void drawWallDimensions(GraphicsContext graphics, Wall wall) {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(activeLevel.get(), wall);
-        double offset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0, 24.0);
+        double baseOffset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0, 24.0);
+        Map<Double, Integer> sideCounters = new HashMap<>();
         for (WallDimensionService.SideDimension roomDimension : dimensions.roomDimensions()) {
+            int index = sideCounters.getOrDefault(roomDimension.sideSign(), 0);
+            double offset = baseOffset + index * 20.0;
+            sideCounters.put(roomDimension.sideSign(), index + 1);
             drawDimensionLabel(
                     graphics,
                     wall.axis(),
@@ -2125,14 +2126,20 @@ public final class CadWorkbench extends BorderPane {
                     offset * roomDimension.sideSign()
             );
         }
-        dimensions.exteriorDimension().ifPresent(exteriorDimension -> drawDimensionLabel(
-                graphics,
-                wall.axis(),
-                "Außenmaß " + exteriorDimension.length().format(LengthUnit.METER, 2),
-                offset * exteriorDimension.sideSign()
-        ));
+        dimensions.exteriorDimension().ifPresent(exteriorDimension -> {
+            int index = sideCounters.getOrDefault(exteriorDimension.sideSign(), 0);
+            double offset = baseOffset + index * 20.0;
+            sideCounters.put(exteriorDimension.sideSign(), index + 1);
+            drawDimensionLabel(
+                    graphics,
+                    wall.axis(),
+                    "Außenmaß " + exteriorDimension.length().format(LengthUnit.METER, 2),
+                    offset * exteriorDimension.sideSign()
+            );
+        });
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
-            drawDimensionLabel(graphics, wall.axis(), "Achsmaß " + wall.axis().length().format(LengthUnit.METER, 2));
+            double offset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0, 24.0);
+            drawDimensionLabel(graphics, wall.axis(), "Achsmaß " + wall.axis().length().format(LengthUnit.METER, 2), offset);
         }
     }
 
