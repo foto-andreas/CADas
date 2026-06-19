@@ -559,6 +559,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void configureLayout() {
         MenuBar menuBar = buildMenuBar();
+        menuBar.setUseSystemMenuBar(true);
         ToolBar settingsBar = buildSettingsBar();
         HBox viewBar = buildViewBar();
         VBox topArea = new VBox(8.0, menuBar, settingsBar, viewBar);
