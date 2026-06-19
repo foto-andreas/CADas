@@ -318,9 +318,13 @@ val stageDmgContent by tasks.registering(DefaultTask::class) {
     doLast {
         dmgStagingDirectory.deleteRecursively()
         dmgStagingDirectory.mkdirs()
-        // App-Image hineinkopieren.
-        val appDir = macOsAppImageForDmg.resolve("CADas.app")
-        appDir.copyRecursively(dmgStagingDirectory.resolve("CADas.app"))
+        // App-Image mit erhaltenen Dateirechten kopieren (cp -pR), damit die
+        // ausführbare MacOS/CADas-Binärdatei ihr Execute-Bit behält.
+        ProcessBuilder("cp", "-pR",
+            macOsAppImageForDmg.resolve("CADas.app").absolutePath,
+            dmgStagingDirectory.resolve("CADas.app").absolutePath)
+            .redirectErrorStream(true).start().waitFor()
+            .let { if (it != 0) error("Kopieren des App-Images fehlgeschlagen (Exit $it).") }
         // /Applications-Link anlegen.
         val link = dmgStagingDirectory.resolve("Applications")
         Files.createSymbolicLink(link.toPath(), Paths.get("/Applications"))
