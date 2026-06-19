@@ -512,6 +512,7 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(snapToEndpoints);
         registerRenderListener(showCompass);
         registerRenderListener(showDimensions);
+        registerRenderListener(dimensionTextStyle);
         registerRenderListener(showAreaVolume);
         registerRenderListener(showGuides);
         registerRenderListener(showGuideDistances);
@@ -610,7 +611,7 @@ public final class CadWorkbench extends BorderPane {
         dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
         applyTooltip(dimensionsBox, "Blendet die ISO-Bemaßung nach DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien ein oder aus.");
 
-        CheckBox dimensionTextPartsBox = new CheckBox("Maßtexte voll");
+        CheckBox dimensionTextPartsBox = new CheckBox("Erweiterte Maßtexte");
         dimensionTextPartsBox.selectedProperty().addListener((obs, wasFull, isFull) ->
                 dimensionTextStyle.set(Boolean.TRUE.equals(isFull) ? DimensionTextStyle.FULL : DimensionTextStyle.LENGTH_ONLY));
         dimensionTextStyle.addListener((obs, oldStyle, newStyle) ->
@@ -909,7 +910,7 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("An Hilfslinien einrasten", snapToGuides),
                 checkMenuItem("An anderen Wänden einrasten", snapToWalls),
                 checkMenuItem("ISO-Bemaßung anzeigen", showDimensions),
-                checkMenuItem("Maßtexte voll anzeigen", dimensionTextStyle, DimensionTextStyle.FULL, DimensionTextStyle.LENGTH_ONLY),
+                checkMenuItem("Erweiterte Maßtexte anzeigen", dimensionTextStyle, DimensionTextStyle.FULL, DimensionTextStyle.LENGTH_ONLY),
                 checkMenuItem("Objekte anzeigen", showRoomObjects),
                 checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
                 checkMenuItem("Nordpfeil anzeigen", showCompass)
@@ -917,8 +918,8 @@ public final class CadWorkbench extends BorderPane {
 
         Menu berichteMenu = new Menu("Berichte");
         berichteMenu.getItems().addAll(
-                menuItem("Materialliste Beläge anzeigen", this::showSurfaceMaterialReportWindow, null),
-                menuItem("Materialliste Beläge als Markdown exportieren", this::exportSurfaceMaterialReportMarkdown, null)
+                menuItem("Räume und Materialien anzeigen", this::showSurfaceMaterialReportWindow, null),
+                menuItem("Räume und Materialien als MD exportieren", this::exportSurfaceMaterialReportMarkdown, null)
         );
 
         Menu hilfeMenu = new Menu("Hilfe");
@@ -1542,6 +1543,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void registerRenderListener(BooleanProperty property) {
+        property.addListener((ignored, oldValue, newValue) -> render());
+    }
+
+    private <T> void registerRenderListener(ObjectProperty<T> property) {
         property.addListener((ignored, oldValue, newValue) -> render());
     }
 
@@ -4162,7 +4167,7 @@ public final class CadWorkbench extends BorderPane {
         VBox container = new VBox(10.0, reportView, actions);
         container.setPadding(new Insets(12));
         Stage stage = new Stage();
-        stage.setTitle("Materialliste Beläge");
+        stage.setTitle("Räume und Materialien");
         Window owner = getScene() != null ? getScene().getWindow() : null;
         if (owner != null) {
             stage.initOwner(owner);
