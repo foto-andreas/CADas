@@ -3865,9 +3865,9 @@ public final class CadWorkbench extends BorderPane {
 
     private void exportCurrentLevel(Path targetFile) {
         try {
-            Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".dxf");
+            Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".dxf").toAbsolutePath().normalize();
             levelExchangeService.exportLevel(activeLevel.get(), exportPath);
-            draftLabel.setText("DXF exportiert: " + exportPath.getFileName());
+            confirmExportWritten(exportPath);
         } catch (Exception exception) {
             draftLabel.setText("DXF-Export fehlgeschlagen: " + exception.getMessage());
         }
@@ -3887,11 +3887,19 @@ public final class CadWorkbench extends BorderPane {
 
     private void exportProjectAsDxf(Path targetFile) {
         try {
-            Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".dxf");
+            Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".dxf").toAbsolutePath().normalize();
             projectExchangeService.exportProject(project, exportPath);
-            draftLabel.setText("Gebäude-DXF exportiert: " + exportPath.getFileName());
+            confirmExportWritten(exportPath);
         } catch (Exception exception) {
             draftLabel.setText("Gebäude-DXF-Export fehlgeschlagen: " + exception.getMessage());
+        }
+    }
+
+    private void confirmExportWritten(Path exportPath) {
+        if (Files.exists(exportPath) && Files.isRegularFile(exportPath)) {
+            draftLabel.setText("Gebäude-DXF exportiert: " + exportPath);
+        } else {
+            draftLabel.setText("DXF-Export konnte nicht verifiziert werden: " + exportPath);
         }
     }
 
@@ -4064,6 +4072,7 @@ public final class CadWorkbench extends BorderPane {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("DXF-Datei auswählen");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("DXF-Dateien", "*.dxf"));
+        fileChooser.setInitialDirectory(Path.of(System.getProperty("user.home")).toFile());
         return fileChooser;
     }
 
