@@ -65,6 +65,10 @@ public final class ConstructionDrawingPdfService {
                 PlanPoint center = room.centerPoint();
                 canvas.text(viewport.x(center.xMillimeters()), viewport.y(center.yMillimeters()), 7.5f, room.name());
             }
+            for (var extension : level.floorExtensions()) {
+                drawPolygon(canvas, viewport, extension.outline(), new Color(222, 210, 190), 0.7f);
+                canvas.text(viewport.x(extension.minX()) + 5, viewport.y(extension.minY()) - 12, 7.5f, extension.type().toString());
+            }
             for (Wall wall : level.walls()) {
                 float width = (float) Math.max(1.1, wall.thickness().toMillimeters() * viewport.factor());
                 canvas.line(viewport.x(wall.axis().start().xMillimeters()), viewport.y(wall.axis().start().yMillimeters()),
@@ -162,6 +166,14 @@ public final class ConstructionDrawingPdfService {
         double baseHeight = 0.0;
         double angle = Math.toRadians(angleDegrees);
         for (Level level : project.levels()) {
+            for (var extension : level.floorExtensions()) {
+                List<PlanPoint> outline = extension.outline();
+                for (int index = 0; index < outline.size(); index++) {
+                    SpatialPoint first = project(outline.get(index), baseHeight, angle, isometric);
+                    SpatialPoint second = project(outline.get((index + 1) % outline.size()), baseHeight, angle, isometric);
+                    lines.add(new SpatialLine(first.x(), first.y(), second.x(), second.y(), true));
+                }
+            }
             for (Wall wall : level.walls()) {
                 SpatialPoint startBottom = project(wall.axis().start(), baseHeight, angle, isometric);
                 SpatialPoint endBottom = project(wall.axis().end(), baseHeight, angle, isometric);
@@ -260,6 +272,7 @@ public final class ConstructionDrawingPdfService {
             points.add(stair.firstCorner());
             points.add(stair.oppositeCorner());
         });
+        level.floorExtensions().forEach(extension -> points.addAll(extension.outline()));
         if (points.isEmpty()) {
             return new Bounds(0, 0, 10_000, 7_000);
         }

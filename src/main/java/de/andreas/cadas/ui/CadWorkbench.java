@@ -62,6 +62,9 @@ import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
+import de.andreas.cadas.domain.model.FloorExtensionPlacement;
+import de.andreas.cadas.domain.model.FloorExtensionType;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
@@ -301,6 +304,10 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> stairStartLandingUnit = new ComboBox<>();
     private final TextField stairEndLandingField = new TextField("0");
     private final ComboBox<LengthUnit> stairEndLandingUnit = new ComboBox<>();
+    private final ComboBox<FloorExtensionType> floorExtensionTypeSelector = new ComboBox<>();
+    private final ComboBox<FloorExtensionPlacement> floorExtensionPlacementSelector = new ComboBox<>();
+    private final TextField floorExtensionThicknessField = new TextField("18");
+    private final ComboBox<LengthUnit> floorExtensionThicknessUnit = new ComboBox<>();
     private final ComboBox<SurfaceType> surfaceTypeSelector = new ComboBox<>();
     private final ComboBox<SurfaceCoveringPreset> surfacePresetSelector = new ComboBox<>();
     private final ListView<String> surfaceLayerList = new ListView<>();
@@ -457,6 +464,10 @@ public final class CadWorkbench extends BorderPane {
         levelSelector.setValue(activeLevel.get());
         toolSelector.getItems().addAll(DrawingTool.values());
         toolSelector.setValue(DrawingTool.WALL);
+        floorExtensionTypeSelector.getItems().setAll(FloorExtensionType.values());
+        floorExtensionTypeSelector.setValue(FloorExtensionType.BALCONY);
+        floorExtensionPlacementSelector.getItems().setAll(FloorExtensionPlacement.values());
+        floorExtensionPlacementSelector.setValue(FloorExtensionPlacement.EXTERIOR);
         initializePresetSelectors();
         initializeSurfaceLayerControls();
         initializeDwgLibraryControls();
@@ -843,6 +854,7 @@ public final class CadWorkbench extends BorderPane {
                 toolMenuItem(DrawingTool.EDIT, KeyCode.E),
                 toolMenuItem(DrawingTool.WALL, KeyCode.W),
                 toolMenuItem(DrawingTool.STAIR, KeyCode.T),
+                toolMenuItem(DrawingTool.FLOOR_EXTENSION, KeyCode.G),
                 toolMenuItem(DrawingTool.DOOR, KeyCode.D),
                 toolMenuItem(DrawingTool.WINDOW, KeyCode.F),
                 toolMenuItem(DrawingTool.OBJECT, KeyCode.O),
@@ -950,6 +962,12 @@ public final class CadWorkbench extends BorderPane {
                 createPropertySection(
                         "Objekt",
                         propertyRow("Preset", roomObjectPresetSelector)
+                ),
+                createPropertySection(
+                        "Balkon/Empore",
+                        propertyRow("Element", floorExtensionTypeSelector),
+                        propertyRow("Lage", floorExtensionPlacementSelector),
+                        propertyRow("Fußbodendicke", floorExtensionThicknessField, floorExtensionThicknessUnit)
                 ),
                 createPropertySection(
                         "Ebenen",
@@ -1077,7 +1095,8 @@ public final class CadWorkbench extends BorderPane {
                 case 5 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW);
                 case 6 -> shouldShowSection(DrawingTool.STAIR, RenderableKind.STAIR);
                 case 7 -> shouldShowSection(DrawingTool.OBJECT, RenderableKind.ROOM_OBJECT);
-                case 8 -> shouldShowLayerSection();
+                case 8 -> shouldShowSection(DrawingTool.FLOOR_EXTENSION, RenderableKind.FLOOR_EXTENSION);
+                case 9 -> shouldShowLayerSection();
                 default -> true;
             };
             node.setVisible(visible);
@@ -1122,7 +1141,8 @@ public final class CadWorkbench extends BorderPane {
         return selectedSelection.get().kind() == RenderableKind.WALL
                 || selectedSelection.get().kind() == RenderableKind.ROOM_VOLUME
                 || selectedSelection.get().kind() == RenderableKind.ROOM_FLOOR
-                || selectedSelection.get().kind() == RenderableKind.ROOM_CEILING;
+                || selectedSelection.get().kind() == RenderableKind.ROOM_CEILING
+                || selectedSelection.get().kind() == RenderableKind.FLOOR_EXTENSION;
     }
 
     private String selectionSummary() {
@@ -1147,6 +1167,7 @@ public final class CadWorkbench extends BorderPane {
             case WINDOW -> "Fenster";
             case STAIR -> "Treppe";
             case ROOM_OBJECT -> "Objekt";
+            case FLOOR_EXTENSION -> "Balkon/Empore";
             default -> selection.kind().name();
         };
     }
@@ -1228,6 +1249,7 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(stairHeightField, stairHeightUnit, LengthUnit.METER);
         initializeUnitSelector(stairStartLandingField, stairStartLandingUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(stairEndLandingField, stairEndLandingUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(floorExtensionThicknessField, floorExtensionThicknessUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceLayerThicknessField, surfaceLayerThicknessUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceTileWidthField, surfaceTileWidthUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceTileHeightField, surfaceTileHeightUnit, LengthUnit.CENTIMETER);
@@ -1397,6 +1419,10 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(stairStartLandingUnit, "Bestimmt die Einheit für die Tiefe des Anfangsabsatzes.");
         applyTooltip(stairEndLandingField, "Legt die Tiefe des ebenen Absatzes am Ende der Treppe in Laufrichtung fest. Null deaktiviert den Absatz.");
         applyTooltip(stairEndLandingUnit, "Bestimmt die Einheit für die Tiefe des Endabsatzes.");
+        applyTooltip(floorExtensionTypeSelector, "Wählt, ob die rechteckige Erweiterung als Balkon oder Empore modelliert wird.");
+        applyTooltip(floorExtensionPlacementSelector, "Kennzeichnet die Erweiterung als innen oder außen an die aktive Etage angehängt.");
+        applyTooltip(floorExtensionThicknessField, "Legt die Dicke der tragenden rechteckigen Fußbodenplatte des Balkons oder der Empore fest.");
+        applyTooltip(floorExtensionThicknessUnit, "Bestimmt die Einheit für die Fußbodendicke des Balkons oder der Empore.");
         applyTooltip(roomObjectPresetSelector, "Wählt ein Raumobjekt zum Platzieren aus. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
         applyTooltip(surfaceTypeSelector, "Zeigt nur die Belagstypen an, die zur aktuellen Auswahl passen. Raum allein erlaubt Boden oder Decke, Raum plus Wand erlaubt Innenwand, Wand allein erlaubt Außenwand.");
         applyTooltip(surfacePresetSelector, "Wählt einen Beispielbelag oder eine DWG-Referenz aus und übernimmt deren Standardwerte in die Ebenenfelder.");
@@ -1842,6 +1868,19 @@ public final class CadWorkbench extends BorderPane {
                 );
                 activeLevel.get().addStaircase(staircase);
                 selectSingle(new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), staircase.id().toString()));
+            } else if (currentTool() == DrawingTool.FLOOR_EXTENSION
+                    && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
+                    && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
+                rememberStateForUndo();
+                FloorExtension extension = FloorExtension.create(
+                        Optional.ofNullable(floorExtensionTypeSelector.getValue()).orElse(FloorExtensionType.BALCONY),
+                        Optional.ofNullable(floorExtensionPlacementSelector.getValue()).orElse(FloorExtensionPlacement.EXTERIOR),
+                        previewSegment.start(),
+                        previewSegment.end(),
+                        currentFloorExtensionThickness()
+                );
+                activeLevel.get().addFloorExtension(extension);
+                selectSingle(new SelectionKey(RenderableKind.FLOOR_EXTENSION, activeLevel.get().name(), extension.id().toString()));
             }
             markThreeDDirty();
         }
@@ -1943,6 +1982,7 @@ public final class CadWorkbench extends BorderPane {
         drawWalls(graphics);
         drawWallSurfaceLayers(graphics);
         drawStaircases(graphics);
+        drawFloorExtensions(graphics);
         drawDoors(graphics);
         drawWindows(graphics);
         drawRoomObjects(graphics);
@@ -2804,6 +2844,38 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
+    private void drawFloorExtensions(GraphicsContext graphics) {
+        for (FloorExtension extension : activeLevel.get().floorExtensions()) {
+            boolean selected = isSelected(RenderableKind.FLOOR_EXTENSION, extension.id().toString());
+            graphics.save();
+            graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#806b4f"));
+            graphics.setFill(selected ? Color.color(0.85, 0.50, 0.18, 0.28) : Color.color(0.58, 0.49, 0.36, 0.20));
+            graphics.setLineWidth(1.8);
+            if (projectionService.isPlanView(activeView.get())) {
+                double x = toScreenX(extension.minX());
+                double y = toScreenY(extension.minY());
+                double width = extension.widthMillimeters() * scale();
+                double depth = extension.depthMillimeters() * scale();
+                graphics.fillRect(x, y, width, depth);
+                graphics.strokeRect(x, y, width, depth);
+                graphics.setFill(Color.web("#4b4034"));
+                graphics.setFont(Font.font("Menlo", 11));
+                graphics.fillText(extension.type().toString(), x + 8, y + 18);
+            } else {
+                double[] horizontals = extension.outline().stream().mapToDouble(point -> projectHorizontal(point, 0.0)).toArray();
+                double min = java.util.Arrays.stream(horizontals).min().orElse(0.0);
+                double max = java.util.Arrays.stream(horizontals).max().orElse(0.0);
+                double left = toScreenHorizontal(min);
+                double right = toScreenHorizontal(max);
+                double floor = toScreenVertical(0.0);
+                double bottom = toScreenVertical(extension.slabThickness().toMillimeters());
+                graphics.fillRect(Math.min(left, right), Math.min(floor, bottom), Math.max(2, Math.abs(right - left)), Math.max(2, Math.abs(bottom - floor)));
+                graphics.strokeRect(Math.min(left, right), Math.min(floor, bottom), Math.max(2, Math.abs(right - left)), Math.max(2, Math.abs(bottom - floor)));
+            }
+            graphics.restore();
+        }
+    }
+
     private void drawStaircases(GraphicsContext graphics) {
         for (Staircase staircase : activeLevel.get().staircases()) {
             boolean selected = isSelected(RenderableKind.STAIR, staircase.id().toString());
@@ -3106,7 +3178,7 @@ public final class CadWorkbench extends BorderPane {
         double startY = Math.min(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
         double endX = Math.max(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
         double endY = Math.max(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
-        if (currentTool() == DrawingTool.STAIR) {
+        if (currentTool() == DrawingTool.STAIR || currentTool() == DrawingTool.FLOOR_EXTENSION) {
             graphics.setFill(Color.color(0.45, 0.37, 0.29, 0.18));
             graphics.setStroke(Color.web("#7f6a55"));
             graphics.setLineWidth(2.0);
@@ -3346,6 +3418,10 @@ public final class CadWorkbench extends BorderPane {
         return parseLength(floorThicknessField, floorThicknessUnit.getValue()).orElse(DEFAULT_FLOOR_THICKNESS);
     }
 
+    private Length currentFloorExtensionThickness() {
+        return parseLength(floorExtensionThicknessField, floorExtensionThicknessUnit.getValue()).orElse(DEFAULT_FLOOR_THICKNESS);
+    }
+
     private Length currentCeilingThickness() {
         return parseLength(ceilingThicknessField, ceilingThicknessUnit.getValue()).orElse(DEFAULT_CEILING_THICKNESS);
     }
@@ -3460,6 +3536,7 @@ public final class CadWorkbench extends BorderPane {
             case DOOR -> "Werkzeug: Tür | Linksklick auf eine Wand platziert die Tür mit den aktuellen Maßen.";
             case WINDOW -> "Werkzeug: Fenster | Linksklick auf eine Wand platziert das Fenster mit den aktuellen Maßen.";
             case STAIR -> "Werkzeug: Treppe | Rechteck aufziehen platziert die Treppe mit dem gewählten Preset.";
+            case FLOOR_EXTENSION -> "Werkzeug: Balkon/Empore | Rechteck aufziehen fügt die Fußbodenplatte innen oder außen an die aktive Etage an.";
             case OBJECT -> "Werkzeug: Objekt | Linksklick in einen Raum platziert das ausgewählte Objekt-Preset.";
         };
     }
@@ -4742,6 +4819,9 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private List<SurfaceType> availableSurfaceTypesForSelection() {
+        if (selectedFloorExtension().isPresent()) {
+            return List.of(SurfaceType.FLOOR);
+        }
         boolean hasWalls = !selectedWalls().isEmpty();
         boolean hasSingleRoom = selectedSurfaceRoom().isPresent();
         if (hasWalls && hasSingleRoom) {
@@ -4803,6 +4883,16 @@ public final class CadWorkbench extends BorderPane {
 
     private Optional<SurfaceSelectionContext> currentSurfaceSelectionContext() {
         SurfaceType surfaceType = currentSurfaceType();
+        Optional<FloorExtension> floorExtension = selectedFloorExtension();
+        if (floorExtension.isPresent()) {
+            FloorExtension extension = floorExtension.orElseThrow();
+            return Optional.of(new SurfaceSelectionContext(
+                    SurfaceType.FLOOR,
+                    List.of(extension.surfaceTargetKey()),
+                    "Fläche: Oberseite " + extension.type(),
+                    "Beläge liegen oberhalb der Fußbodenplatte des ausgewählten Elements."
+            ));
+        }
         if (surfaceType == SurfaceType.WALL_INTERIOR || surfaceType == SurfaceType.WALL_EXTERIOR) {
             List<Wall> walls = selectedWalls();
             if (walls.isEmpty()) {
@@ -4842,6 +4932,16 @@ public final class CadWorkbench extends BorderPane {
                         ? "Deckenbeläge wirken auf die Unterseite der Raumdecke."
                         : "Bodenbeläge liegen oberhalb des Rohbodens innerhalb des ausgewählten Raums."
         ));
+    }
+
+    private Optional<FloorExtension> selectedFloorExtension() {
+        if (selectedSelections.size() != 1 || selectedSelection.get() == null
+                || selectedSelection.get().kind() != RenderableKind.FLOOR_EXTENSION) {
+            return Optional.empty();
+        }
+        return activeLevel.get().floorExtensions().stream()
+                .filter(extension -> extension.id().toString().equals(selectedSelection.get().elementId()))
+                .findFirst();
     }
 
     private String currentSurfaceSelectionHint() {
@@ -5136,6 +5236,7 @@ public final class CadWorkbench extends BorderPane {
                 case WINDOW -> activeLevel.get().removeWindow(id);
                 case STAIR -> activeLevel.get().removeStaircase(id);
                 case ROOM_OBJECT -> activeLevel.get().removeRoomObject(id);
+                case FLOOR_EXTENSION -> activeLevel.get().removeFloorExtension(id);
                 default -> false;
             };
         }
@@ -5296,6 +5397,14 @@ public final class CadWorkbench extends BorderPane {
                         syncLengthInput(stairStartLandingField, stairStartLandingUnit, stair.startLandingWidth(), LengthUnit.CENTIMETER);
                         syncLengthInput(stairEndLandingField, stairEndLandingUnit, stair.endLandingWidth(), LengthUnit.CENTIMETER);
                     });
+            case FLOOR_EXTENSION -> activeLevel.get().floorExtensions().stream()
+                    .filter(extension -> extension.id().toString().equals(selectedSelection.get().elementId()))
+                    .findFirst()
+                    .ifPresent(extension -> {
+                        floorExtensionTypeSelector.setValue(extension.type());
+                        floorExtensionPlacementSelector.setValue(extension.placement());
+                        syncLengthInput(floorExtensionThicknessField, floorExtensionThicknessUnit, extension.slabThickness(), LengthUnit.CENTIMETER);
+                    });
             default -> {
             }
         }
@@ -5338,6 +5447,14 @@ public final class CadWorkbench extends BorderPane {
                     .map(stair -> selectedIds().contains(stair.id().toString())
                             ? new Staircase(stair.id(), stair.stairType(), stair.firstCorner(), stair.oppositeCorner(), currentStairHeight(), currentStairSteps(), stair.rotationQuarterTurns(), currentStairStartLanding(), currentStairEndLanding())
                             : stair)
+                    .toList());
+            case FLOOR_EXTENSION -> activeLevel.get().replaceFloorExtensions(activeLevel.get().floorExtensions().stream()
+                    .map(extension -> selectedIds().contains(extension.id().toString())
+                            ? new FloorExtension(extension.id(),
+                            Optional.ofNullable(floorExtensionTypeSelector.getValue()).orElse(extension.type()),
+                            Optional.ofNullable(floorExtensionPlacementSelector.getValue()).orElse(extension.placement()),
+                            extension.firstCorner(), extension.oppositeCorner(), currentFloorExtensionThickness())
+                            : extension)
                     .toList());
             default -> {
             }
@@ -5603,6 +5720,14 @@ public final class CadWorkbench extends BorderPane {
         toolSelector.setValue(DrawingTool.valueOf(normalizedToolName));
     }
 
+    public int automationFloorExtensionCount() {
+        return activeLevel.get().floorExtensions().size();
+    }
+
+    public FloorExtension automationFloorExtension(int index) {
+        return activeLevel.get().floorExtensions().get(index);
+    }
+
     public void automationSelectLevel(String levelName) {
         availableLevels.stream()
                 .filter(level -> level.name().equals(levelName))
@@ -5658,6 +5783,11 @@ public final class CadWorkbench extends BorderPane {
                     .findFirst()
                     .map(roomObject -> new SelectionKey(RenderableKind.ROOM_OBJECT, activeLevel.get().name(), roomObject.id().toString()))
                     .orElseThrow(() -> new IllegalArgumentException("Objektindex `" + index + "` ist ungültig."));
+            case "FLOOR_EXTENSION", "BALCONY", "GALLERY" -> activeLevel.get().floorExtensions().stream()
+                    .skip(index)
+                    .findFirst()
+                    .map(extension -> new SelectionKey(RenderableKind.FLOOR_EXTENSION, activeLevel.get().name(), extension.id().toString()))
+                    .orElseThrow(() -> new IllegalArgumentException("Balkon-/Emporenindex `" + index + "` ist ungültig."));
             default -> throw new IllegalArgumentException("Bauteilart `" + kindName + "` wird von der Automatisierung nicht unterstützt.");
         };
         updateSelection(selectionKey, toggle);
@@ -5988,6 +6118,7 @@ public final class CadWorkbench extends BorderPane {
             case "stairSteps" -> stairStepsField;
             case "stairStartLanding" -> stairStartLandingField;
             case "stairEndLanding" -> stairEndLandingField;
+            case "floorExtensionThickness" -> floorExtensionThicknessField;
             default -> throw new IllegalArgumentException("Eingabefeld `" + fieldName + "` ist unbekannt.");
         };
     }
@@ -6001,6 +6132,7 @@ public final class CadWorkbench extends BorderPane {
             case "endpointHeight" -> endpointHeightUnit;
             case "stairStartLanding" -> stairStartLandingUnit;
             case "stairEndLanding" -> stairEndLandingUnit;
+            case "floorExtensionThickness" -> floorExtensionThicknessUnit;
             case "surfaceLayerThickness" -> surfaceLayerThicknessUnit;
             case "surfaceTileWidth" -> surfaceTileWidthUnit;
             case "surfaceTileHeight" -> surfaceTileHeightUnit;

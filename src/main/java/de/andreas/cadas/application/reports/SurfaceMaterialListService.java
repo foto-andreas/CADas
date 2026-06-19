@@ -12,6 +12,7 @@ import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.model.Level;
+import de.andreas.cadas.domain.model.FloorExtension;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
@@ -115,6 +116,12 @@ public final class SurfaceMaterialListService {
 
     private List<SurfaceCoverage> roomCoverages(Level level, SurfaceLayerStack stack) {
         List<SurfaceCoverage> coverages = new ArrayList<>();
+        if (stack.surfaceType() == SurfaceType.FLOOR) {
+            level.floorExtensions().stream()
+                    .filter(extension -> stack.targetKey().equals(extension.surfaceTargetKey()))
+                    .map(extension -> floorExtensionCoverage(level, extension))
+                    .forEach(coverages::add);
+        }
         for (Room room : level.rooms()) {
             if (!matchesRoom(stack, room)) {
                 continue;
@@ -124,6 +131,15 @@ public final class SurfaceMaterialListService {
             coverages.add(new SurfaceCoverage(level.name(), room.name(), surface, rectangles));
         }
         return coverages;
+    }
+
+    private SurfaceCoverage floorExtensionCoverage(Level level, FloorExtension extension) {
+        return new SurfaceCoverage(
+                level.name(),
+                extension.type().toString(),
+                "Oberseite " + extension.type(),
+                List.of(new SurfaceRectangle(extension.minX(), extension.minY(), extension.widthMillimeters(), extension.depthMillimeters()))
+        );
     }
 
     private List<SurfaceRectangle> roomSurfaceRectangles(Level level, Room room, SurfaceType surfaceType) {

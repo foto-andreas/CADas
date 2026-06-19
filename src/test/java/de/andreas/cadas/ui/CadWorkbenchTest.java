@@ -33,6 +33,26 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void ziehtBalkonAlsRechteckigeFußbodenplatteAuf() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("FLOOR_EXTENSION");
+            workbench.automationCanvasDrag(350, 280, 620, 460, javafx.scene.input.MouseButton.PRIMARY, true, false, false);
+            return null;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(workbench::automationFloorExtensionCount));
+        Assertions.assertEquals(180, aufFxThread(() -> workbench.automationFloorExtension(0).slabThickness().toMillimeters()), 0.001);
+    }
+
+    @Test
     void undoUndWiederherstellenBehaltenZoomUndPosition() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

@@ -14,6 +14,7 @@ import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
@@ -86,6 +87,10 @@ public final class ThreeDSceneModelBuilder {
             boxes.addAll(buildDoors(level, wallBaseHeight));
             boxes.addAll(buildWindows(level, wallBaseHeight));
             boxes.addAll(buildStairs(level, wallBaseHeight));
+            boxes.addAll(buildFloorExtensions(level, baseHeight));
+            if (renderSurfaceLayers) {
+                boxes.addAll(buildFloorExtensionSurfaceLayers(level, baseHeight));
+            }
             if (renderRoomObjects) {
                 boxes.addAll(buildRoomObjects(level, wallBaseHeight));
             }
@@ -1503,6 +1508,57 @@ public final class ThreeDSceneModelBuilder {
                     "room-object",
                     0.78
             ));
+        }
+        return boxes;
+    }
+
+    private List<RenderableBox> buildFloorExtensions(Level level, double baseHeight) {
+        List<RenderableBox> boxes = new ArrayList<>();
+        for (FloorExtension extension : level.floorExtensions()) {
+            double thickness = extension.slabThickness().toMillimeters();
+            boxes.add(new RenderableBox(
+                    new SelectionKey(RenderableKind.FLOOR_EXTENSION, level.name(), extension.id().toString()),
+                    level.name(),
+                    RenderableKind.FLOOR_EXTENSION,
+                    (extension.minX() + extension.maxX()) / 2.0,
+                    baseHeight - thickness / 2.0,
+                    (extension.minY() + extension.maxY()) / 2.0,
+                    extension.widthMillimeters(),
+                    thickness,
+                    extension.depthMillimeters(),
+                    RotationAxis.Y,
+                    0.0,
+                    extension.type() == de.andreas.cadas.domain.model.FloorExtensionType.BALCONY ? "balcony" : "gallery",
+                    1.0
+            ));
+        }
+        return boxes;
+    }
+
+    private List<RenderableBox> buildFloorExtensionSurfaceLayers(Level level, double baseHeight) {
+        List<RenderableBox> boxes = new ArrayList<>();
+        for (FloorExtension extension : level.floorExtensions()) {
+            SurfaceLayerStack stack = level.findSurfaceLayerStack(SurfaceType.FLOOR, extension.surfaceTargetKey());
+            if (stack == null) {
+                continue;
+            }
+            double currentHeight = baseHeight;
+            for (SurfaceLayer layer : stack.layers()) {
+                if (!layer.visible() || layer.thickness().toMillimeters() <= 0) {
+                    continue;
+                }
+                double thickness = layer.thickness().toMillimeters();
+                boxes.add(new RenderableBox(
+                        new SelectionKey(RenderableKind.SURFACE_LAYER, level.name(), layer.id().toString()),
+                        level.name(), RenderableKind.SURFACE_LAYER,
+                        (extension.minX() + extension.maxX()) / 2.0,
+                        currentHeight + thickness / 2.0,
+                        (extension.minY() + extension.maxY()) / 2.0,
+                        extension.widthMillimeters(), thickness, extension.depthMillimeters(),
+                        RotationAxis.Y, 0.0, "surface-layer", 1.0
+                ));
+                currentHeight += thickness;
+            }
         }
         return boxes;
     }

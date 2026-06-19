@@ -6,6 +6,7 @@ import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.RoomObject;
 import de.andreas.cadas.domain.model.Room;
@@ -29,6 +30,7 @@ public final class SelectionQueryService {
         selections.addAll(findDoorSelections(level, point, tolerance));
         selections.addAll(findWindowSelections(level, point, tolerance));
         selections.addAll(findStairSelections(level, point));
+        selections.addAll(findFloorExtensionSelections(level, point));
         selections.addAll(findWallSelections(level, point, tolerance));
         selections.addAll(findRoomObjectSelections(level, point));
         selections.addAll(findRoomSelections(level, point));
@@ -90,6 +92,16 @@ public final class SelectionQueryService {
                         && point.yMillimeters() >= staircase.minY()
                         && point.yMillimeters() <= staircase.maxY())
                 .map(staircase -> new SelectionKey(RenderableKind.STAIR, level.name(), staircase.id().toString()))
+                .toList();
+    }
+
+    private List<SelectionKey> findFloorExtensionSelections(Level level, PlanPoint point) {
+        return level.floorExtensions().stream()
+                .filter(extension -> point.xMillimeters() >= extension.minX()
+                        && point.xMillimeters() <= extension.maxX()
+                        && point.yMillimeters() >= extension.minY()
+                        && point.yMillimeters() <= extension.maxY())
+                .map(extension -> new SelectionKey(RenderableKind.FLOOR_EXTENSION, level.name(), extension.id().toString()))
                 .toList();
     }
 

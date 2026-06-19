@@ -14,6 +14,7 @@ public final class Level {
     private final List<WindowElement> windows = new ArrayList<>();
     private final List<Staircase> staircases = new ArrayList<>();
     private final List<RoomObject> roomObjects = new ArrayList<>();
+    private final List<FloorExtension> floorExtensions = new ArrayList<>();
     private final List<SurfaceLayerStack> surfaceLayerStacks = new ArrayList<>();
 
     public Level(String name) {
@@ -137,6 +138,29 @@ public final class Level {
         roomObjects.addAll(Objects.requireNonNull(updatedRoomObjects, "updatedRoomObjects darf nicht null sein."));
     }
 
+    public List<FloorExtension> floorExtensions() {
+        return List.copyOf(floorExtensions);
+    }
+
+    public void addFloorExtension(FloorExtension floorExtension) {
+        floorExtensions.add(Objects.requireNonNull(floorExtension, "floorExtension darf nicht null sein."));
+    }
+
+    public boolean removeFloorExtension(UUID floorExtensionId) {
+        Objects.requireNonNull(floorExtensionId, "floorExtensionId darf nicht null sein.");
+        String targetKey = "floor-extension:" + floorExtensionId;
+        boolean removed = floorExtensions.removeIf(extension -> extension.id().equals(floorExtensionId));
+        if (removed) {
+            surfaceLayerStacks.removeIf(stack -> stack.targetKey().equals(targetKey));
+        }
+        return removed;
+    }
+
+    public void replaceFloorExtensions(List<FloorExtension> updatedFloorExtensions) {
+        floorExtensions.clear();
+        floorExtensions.addAll(Objects.requireNonNull(updatedFloorExtensions, "updatedFloorExtensions darf nicht null sein."));
+    }
+
     public List<SurfaceLayerStack> surfaceLayerStacks() {
         return List.copyOf(surfaceLayerStacks);
     }
@@ -177,6 +201,7 @@ public final class Level {
         copy.windows.addAll(windows);
         copy.staircases.addAll(staircases);
         copy.roomObjects.addAll(roomObjects);
+        copy.floorExtensions.addAll(floorExtensions);
         surfaceLayerStacks.stream()
                 .map(SurfaceLayerStack::copy)
                 .forEach(copy.surfaceLayerStacks::add);

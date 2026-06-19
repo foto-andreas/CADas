@@ -795,6 +795,8 @@ public final class ThreeDViewport extends BorderPane {
             case "room-volume" -> Color.web("#d8c6aa");
             case "stair" -> Color.web("#7a6d60");
             case "room-object" -> Color.web("#4e8174");
+            case "balcony" -> Color.web("#a18a6c");
+            case "gallery" -> Color.web("#8f8068");
             case "roof" -> Color.web("#8e5f54");
             case "surface-layer" -> Color.web("#8e7b5e");
             case "joint" -> Color.web("#1a1510");

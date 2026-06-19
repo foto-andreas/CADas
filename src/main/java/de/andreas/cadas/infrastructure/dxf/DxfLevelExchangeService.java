@@ -5,6 +5,9 @@ import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
+import de.andreas.cadas.domain.model.FloorExtensionPlacement;
+import de.andreas.cadas.domain.model.FloorExtensionType;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
@@ -206,6 +209,18 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             ));
         }
 
+        for (FloorExtension extension : level.floorExtensions()) {
+            appendClosedPolyline(dxf, context, DxfLayer.ROOMS, extension.outline());
+            appendMetadataText(dxf, context, extension.firstCorner(), String.format(
+                    Locale.US,
+                    "FEXT|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f",
+                    extension.id(), extension.type().name(), extension.placement().name(),
+                    extension.firstCorner().xMillimeters(), extension.firstCorner().yMillimeters(),
+                    extension.oppositeCorner().xMillimeters(), extension.oppositeCorner().yMillimeters(),
+                    extension.slabThickness().toMillimeters()
+            ));
+        }
+
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
@@ -332,6 +347,13 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             Integer.parseInt(parts[9]),
                             Length.ofMillimeters(parts.length >= 11 ? parseDouble(parts[10]) : 0),
                             Length.ofMillimeters(parts.length >= 12 ? parseDouble(parts[11]) : 0)
+                    ));
+                    case "FEXT" -> level.addFloorExtension(new FloorExtension(
+                            UUID.fromString(parts[1]), FloorExtensionType.valueOf(parts[2]),
+                            FloorExtensionPlacement.valueOf(parts[3]),
+                            new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
+                            new PlanPoint(parseDouble(parts[6]), parseDouble(parts[7])),
+                            Length.ofMillimeters(parseDouble(parts[8]))
                     ));
                     case "SLS" -> {
                         SurfaceLayerStack stack = new SurfaceLayerStack(

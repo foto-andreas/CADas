@@ -9,6 +9,7 @@ public enum RenderableKind {
     WINDOW,
     STAIR,
     ROOM_OBJECT,
+    FLOOR_EXTENSION,
     ROOF,
     SURFACE_LAYER
 }

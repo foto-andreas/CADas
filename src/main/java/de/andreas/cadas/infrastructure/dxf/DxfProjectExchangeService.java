@@ -6,6 +6,9 @@ import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
+import de.andreas.cadas.domain.model.FloorExtensionPlacement;
+import de.andreas.cadas.domain.model.FloorExtensionType;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
@@ -173,6 +176,16 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 Length.ofMillimeters(parts.length >= 13 ? parseDouble(parts[12]) : 0)
                         ));
                     }
+                    case "FEXT" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        level.addFloorExtension(new FloorExtension(
+                                UUID.fromString(parts[2]), FloorExtensionType.valueOf(parts[3]),
+                                FloorExtensionPlacement.valueOf(parts[4]),
+                                new PlanPoint(parseDouble(parts[5]), parseDouble(parts[6])),
+                                new PlanPoint(parseDouble(parts[7]), parseDouble(parts[8])),
+                                Length.ofMillimeters(parseDouble(parts[9]))
+                        ));
+                    }
                     case "ROOF" -> importedRoof = new Roof(
                             RoofType.valueOf(parts[1]),
                             Angle.ofDegrees(parseDouble(parts[2])),
@@ -326,6 +339,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     staircase.rotationQuarterTurns() * 90.0
             );
         }
+        for (FloorExtension extension : level.floorExtensions()) {
+            appendClosedPolyline(dxf, context, layerPrefix + "_ROOMS", extension.outline());
+        }
     }
 
     private void exportLevelMetadata(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, Level level) {
@@ -402,6 +418,16 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     staircase.rotationQuarterTurns(),
                     staircase.startLandingWidth().toMillimeters(),
                     staircase.endLandingWidth().toMillimeters()
+            ));
+        }
+        for (FloorExtension extension : level.floorExtensions()) {
+            appendMetadataText(dxf, context, extension.firstCorner(), String.format(
+                    Locale.US,
+                    "FEXT|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f",
+                    DxfMetadataCodec.encode(level.name()), extension.id(), extension.type().name(), extension.placement().name(),
+                    extension.firstCorner().xMillimeters(), extension.firstCorner().yMillimeters(),
+                    extension.oppositeCorner().xMillimeters(), extension.oppositeCorner().yMillimeters(),
+                    extension.slabThickness().toMillimeters()
             ));
         }
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
@@ -496,6 +522,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         target.replaceWindows(source.windows());
         target.replaceStaircases(source.staircases());
         target.replaceRoomObjects(source.roomObjects());
+        target.replaceFloorExtensions(source.floorExtensions());
         target.replaceSurfaceLayerStacks(source.surfaceLayerStacks().stream()
                 .map(SurfaceLayerStack::copy)
                 .toList());

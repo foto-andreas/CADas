@@ -4,6 +4,7 @@ public enum DrawingTool {
     EDIT("Bearbeiten", true),
     WALL("Wand", false),
     STAIR("Treppe", false),
+    FLOOR_EXTENSION("Balkon/Empore", false),
     DOOR("Tür", true),
     WINDOW("Fenster", true),
     OBJECT("Objekt", true);

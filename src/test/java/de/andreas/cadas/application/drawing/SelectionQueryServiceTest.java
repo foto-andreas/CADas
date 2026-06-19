@@ -10,6 +10,9 @@ import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
+import de.andreas.cadas.domain.model.FloorExtensionPlacement;
+import de.andreas.cadas.domain.model.FloorExtensionType;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.StairType;
@@ -26,6 +29,19 @@ class SelectionQueryServiceTest {
     private static final Length TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
 
     private final SelectionQueryService selectionQueryService = new SelectionQueryService();
+
+    @Test
+    void findetBalkonAlsEigenständigesElement() {
+        Level level = new Level("EG");
+        FloorExtension balcony = FloorExtension.create(FloorExtensionType.BALCONY, FloorExtensionPlacement.EXTERIOR,
+                new PlanPoint(0, 0), new PlanPoint(2_000, 1_000), Length.ofMillimeters(180));
+        level.addFloorExtension(balcony);
+
+        var selections = selectionQueryService.findSelections(level, new PlanPoint(500, 500), Length.ofMillimeters(10));
+
+        assertEquals(RenderableKind.FLOOR_EXTENSION, selections.getFirst().kind());
+        assertEquals(balcony.id().toString(), selections.getFirst().elementId());
+    }
 
     @Test
     void priorisiertOeffnungenVorRaeumenTreppenUndWaenden() {

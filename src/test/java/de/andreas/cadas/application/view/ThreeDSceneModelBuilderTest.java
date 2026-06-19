@@ -10,6 +10,9 @@ import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
+import de.andreas.cadas.domain.model.FloorExtensionPlacement;
+import de.andreas.cadas.domain.model.FloorExtensionType;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
@@ -36,6 +39,21 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class ThreeDSceneModelBuilderTest {
+
+    @Test
+    void bautBalkonplatteUnterhalbDerEtagenFußbodenhöhe() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "EG");
+        FloorExtension balcony = FloorExtension.create(FloorExtensionType.BALCONY, FloorExtensionPlacement.EXTERIOR,
+                new PlanPoint(0, 0), new PlanPoint(3_000, 1_500), Length.ofMillimeters(180));
+        project.primaryLevel().addFloorExtension(balcony);
+
+        var model = new ThreeDSceneModelBuilder().build(project, Set.of("EG"), true);
+        var box = model.boxes().stream().filter(candidate -> candidate.kind() == RenderableKind.FLOOR_EXTENSION).findFirst().orElseThrow();
+
+        assertEquals(-90, box.centerY(), 0.001);
+        assertEquals(3_000, box.width(), 0.001);
+        assertEquals(1_500, box.depth(), 0.001);
+    }
 
     private final ThreeDSceneModelBuilder builder = new ThreeDSceneModelBuilder();
     private final AutoRoomGenerationService roomGenerationService = new AutoRoomGenerationService();

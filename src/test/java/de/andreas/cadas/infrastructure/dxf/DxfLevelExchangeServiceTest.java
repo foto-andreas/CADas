@@ -9,6 +9,9 @@ import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
+import de.andreas.cadas.domain.model.FloorExtensionPlacement;
+import de.andreas.cadas.domain.model.FloorExtensionType;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
@@ -84,6 +87,8 @@ class DxfLevelExchangeServiceTest {
                 Length.of(80, LengthUnit.CENTIMETER),
                 Length.of(60, LengthUnit.CENTIMETER)
         ));
+        level.addFloorExtension(FloorExtension.create(FloorExtensionType.BALCONY, FloorExtensionPlacement.EXTERIOR,
+                new PlanPoint(4_000, 0), new PlanPoint(7_000, 1_500), Length.ofMillimeters(180)));
 
         Path file = tempDir.resolve("grundriss.dxf");
         exchangeService.exportLevel(level, file);
@@ -94,6 +99,9 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1, imported.doors().size());
         assertEquals(1, imported.windows().size());
         assertEquals(1, imported.staircases().size());
+        assertEquals(1, imported.floorExtensions().size());
+        assertEquals(FloorExtensionType.BALCONY, imported.floorExtensions().getFirst().type());
+        assertEquals(180, imported.floorExtensions().getFirst().slabThickness().toMillimeters(), 0.001);
         assertEquals(door.id(), imported.doors().getFirst().id());
         assertEquals(window.id(), imported.windows().getFirst().id());
         assertEquals("Küche", imported.rooms().getFirst().name());

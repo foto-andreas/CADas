@@ -10,6 +10,9 @@ import de.andreas.cadas.domain.geometry.LengthUnit;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
+import de.andreas.cadas.domain.model.FloorExtension;
+import de.andreas.cadas.domain.model.FloorExtensionPlacement;
+import de.andreas.cadas.domain.model.FloorExtensionType;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
@@ -86,6 +89,8 @@ class DxfProjectExchangeServiceTest {
                 Length.of(75, LengthUnit.CENTIMETER),
                 Length.of(50, LengthUnit.CENTIMETER)
         ));
+        project.primaryLevel().addFloorExtension(FloorExtension.create(FloorExtensionType.GALLERY, FloorExtensionPlacement.INTERIOR,
+                new PlanPoint(3_000, 500), new PlanPoint(5_000, 2_000), Length.ofMillimeters(200)));
         var og = project.createLevel("Obergeschoss");
         og.addRoom(Room.rectangular(
                 "Kind",
@@ -105,6 +110,8 @@ class DxfProjectExchangeServiceTest {
         assertEquals("Haus", imported.name());
         assertTrue(imported.roof().isPresent());
         assertEquals(1, imported.primaryLevel().staircases().size());
+        assertEquals(1, imported.primaryLevel().floorExtensions().size());
+        assertEquals(FloorExtensionType.GALLERY, imported.primaryLevel().floorExtensions().getFirst().type());
         assertEquals(750, imported.primaryLevel().staircases().getFirst().startLandingWidth().toMillimeters(), 0.001);
         assertEquals(500, imported.primaryLevel().staircases().getFirst().endLandingWidth().toMillimeters(), 0.001);
         assertEquals(door.id(), imported.primaryLevel().doors().getFirst().id());
