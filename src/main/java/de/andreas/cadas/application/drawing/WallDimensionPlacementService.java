@@ -103,13 +103,15 @@ public final class WallDimensionPlacementService {
             double stepOffset,
             int stackIndex
     ) {
-        // Die Maßlinie liegt immer außerhalb der Gebäudehülle auf der Platzierungsseite.
-        // Der Normalenoffset wird rein über die Schichtung (baseOffset + stackIndex*stepOffset)
-        // berechnet, damit die Linie nie ins Gebäudeinnere rutscht, auch wenn das
-        // referenzierte Maßsegment auf der anderen Wandseite liegt.
+        // Die Maßlinie liegt außerhalb der Gebäudehülle auf der Platzierungsseite.
+        // lineDistanceFromAxis ist der Abstand der Maßlinie von der Wandachse in Modellkoordinaten.
         double lineDistanceFromAxis = outsideBoundaryDistance * renderFactor
                 + placementSideSign * (baseOffset + stackIndex * stepOffset);
-        double normalOffset = placementSideSign * (baseOffset + stackIndex * stepOffset);
+        // normalOffset ist der Abstand der Maßlinie vom referenzierten Maßsegment
+        // (das auf der Innen- oder Außenseite der Wand liegt). Dieser Wert kann
+        // betragsmäßig groß sein, wenn das Segment weit von der Außenseite entfernt liegt.
+        double dimensionDistance = signedNormalDistance(wall.axis(), dimension.dimensionSegment());
+        double normalOffset = lineDistanceFromAxis - dimensionDistance * renderFactor;
         return new PlacedDimension(dimension, exterior, normalOffset, lineDistanceFromAxis, placementSideSign, stackIndex);
     }
 
@@ -279,6 +281,15 @@ public final class WallDimensionPlacementService {
             if (stackIndex < 0) {
                 throw new IllegalArgumentException("stackIndex darf nicht negativ sein.");
             }
+        }
+
+        /**
+         * Liefert den Abstandsbetrag der Maßlinie von der Wandachse in Modellkoordinaten.
+         * Renderer nutzen {@link #placementSideSign()} um die Richtung in ihren
+         * jeweiligen Koordinatensystemen korrekt zu interpretieren.
+         */
+        public double offsetMagnitude() {
+            return Math.abs(normalOffset);
         }
     }
 }

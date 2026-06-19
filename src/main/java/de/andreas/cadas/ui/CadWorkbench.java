@@ -2323,11 +2323,16 @@ public final class CadWorkbench extends BorderPane {
         double directionX = endX - startX;
         double directionY = endY - startY;
         double directionLength = Math.max(1.0, Math.hypot(directionX, directionY));
-        double isoOffset = Math.abs(normalOffset) < 0.001 ? 24.0 : normalOffset;
-        DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(startX, startY, endX, endY, isoOffset);
-        // Text von der Maßlinie weg verschieben (in Normalenrichtung der Platzierungsseite).
+        // Der placementSideSign bezieht sich auf Modellkoordinaten. In Bildschirmkoordinaten
+        // ist die y-Achse invertiert (toScreenProjectedY kehrt y um). Daher muss das Vorzeichen
+        // für die Bildschirm-Normalenrichtung invertiert werden, damit die Maßlinie wirklich
+        // außerhalb des Gebäudes landet und nicht im Rauminneren.
+        double screenPlacementSign = -pendingLabel.placementSideSign();
+        double effectiveOffset = screenPlacementSign * Math.max(Math.abs(normalOffset), 24.0);
+        DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(startX, startY, endX, endY, effectiveOffset);
+        // Text von der Maßlinie weg verschieben (in Bildschirm-Normalenrichtung der Platzierungsseite).
         DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
-                layout, pendingLabel.placementSideSign(), DIMENSION_TEXT_AWAY_DISTANCE
+                layout, screenPlacementSign, DIMENSION_TEXT_AWAY_DISTANCE
         );
         Text textMeasure = new Text(pendingLabel.text());
         textMeasure.setFont(DIMENSION_LABEL_FONT);

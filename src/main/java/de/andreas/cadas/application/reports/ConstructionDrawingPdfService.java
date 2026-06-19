@@ -348,10 +348,14 @@ public final class ConstructionDrawingPdfService {
         double y1 = viewport.y(segment.start().yMillimeters());
         double x2 = viewport.x(segment.end().xMillimeters());
         double y2 = viewport.y(segment.end().yMillimeters());
-        double isoOffset = Math.abs(normalOffset) < 0.001 ? 24.0 : normalOffset;
-        DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(x1, y1, x2, y2, isoOffset);
+        // placementSideSign bezieht sich auf Modellkoordinaten. viewport.y invertiert y,
+        // daher muss das Vorzeichen für die Bildschirm-/PDF-Normalenrichtung invertiert werden,
+        // damit die Maßlinie außerhalb des Gebäudes landet.
+        double screenPlacementSign = -pending.placementSideSign();
+        double effectiveOffset = screenPlacementSign * Math.max(Math.abs(normalOffset), 24.0);
+        DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(x1, y1, x2, y2, effectiveOffset);
         DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
-                layout, pending.placementSideSign(), PDF_TEXT_AWAY_DISTANCE
+                layout, screenPlacementSign, PDF_TEXT_AWAY_DISTANCE
         );
         double textX = layout.textX() + away.deltaX();
         double textY = layout.textY() + away.deltaY();
