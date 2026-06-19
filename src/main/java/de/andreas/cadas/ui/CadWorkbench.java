@@ -3897,7 +3897,13 @@ public final class CadWorkbench extends BorderPane {
 
     private void confirmExportWritten(Path exportPath) {
         if (Files.exists(exportPath) && Files.isRegularFile(exportPath)) {
-            draftLabel.setText("Gebäude-DXF exportiert: " + exportPath);
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("DXF exportiert");
+            alert.setHeaderText("Die DXF-Datei wurde erfolgreich gespeichert.");
+            alert.setContentText(exportPath.toString());
+            alert.getDialogPane().setPrefWidth(560);
+            alert.showAndWait();
+            draftLabel.setText("Gebäude-DXF exportiert: " + exportPath.getFileName());
         } else {
             draftLabel.setText("DXF-Export konnte nicht verifiziert werden: " + exportPath);
         }
