@@ -3902,6 +3902,10 @@ public final class CadWorkbench extends BorderPane {
             alert.setHeaderText("Die DXF-Datei wurde erfolgreich gespeichert.");
             alert.setContentText(exportPath.toString());
             alert.getDialogPane().setPrefWidth(560);
+            Window owner = getScene() != null ? getScene().getWindow() : null;
+            if (owner != null) {
+                alert.initOwner(owner);
+            }
             alert.showAndWait();
             draftLabel.setText("Gebäude-DXF exportiert: " + exportPath.getFileName());
         } else {
