@@ -1,5 +1,6 @@
 package de.andreas.cadas.application.reports;
 
+import de.andreas.cadas.application.drawing.WallDimensionService;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
@@ -20,8 +21,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 public final class ConstructionDrawingPdfService {
@@ -35,6 +38,7 @@ public final class ConstructionDrawingPdfService {
     private static final int[] STANDARD_SCALES = {20, 25, 50, 100, 200, 500, 1_000};
     private static final PDType1Font FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
     private static final PDType1Font FONT_BOLD = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+    private final WallDimensionService wallDimensionService = new WallDimensionService();
 
     public void export(ProjectModel project, Path targetFile) throws IOException {
         Objects.requireNonNull(project, "project darf nicht null sein.");
@@ -73,7 +77,7 @@ public final class ConstructionDrawingPdfService {
                 float width = (float) Math.max(1.1, wall.thickness().toMillimeters() * viewport.factor());
                 canvas.line(viewport.x(wall.axis().start().xMillimeters()), viewport.y(wall.axis().start().yMillimeters()),
                         viewport.x(wall.axis().end().xMillimeters()), viewport.y(wall.axis().end().yMillimeters()), width, Color.DARK_GRAY);
-                drawIsoDimension(canvas, viewport, wall);
+                drawWallDimensions(canvas, viewport, level, wall);
             }
             for (Door door : level.doors()) {
                 Wall wall = level.findWall(door.wallId());
@@ -231,7 +235,32 @@ public final class ConstructionDrawingPdfService {
         canvas.line(viewport.x(start.xMillimeters()), viewport.y(start.yMillimeters()), viewport.x(end.xMillimeters()), viewport.y(end.yMillimeters()), 2.2f, color);
     }
 
-    private void drawIsoDimension(PageCanvas canvas, Viewport viewport, Wall wall) throws IOException {
+    private void drawWallDimensions(PageCanvas canvas, Viewport viewport, Level level, Wall wall) throws IOException {
+        WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(level, wall);
+        double baseOffset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
+        Map<Double, Integer> sideCounters = new HashMap<>();
+        for (WallDimensionService.SideDimension roomDimension : dimensions.roomDimensions()) {
+            int index = sideCounters.getOrDefault(roomDimension.sideSign(), 0);
+            double offset = baseOffset + index * 16.0;
+            sideCounters.put(roomDimension.sideSign(), index + 1);
+            drawIsoDimension(canvas, viewport, wall,
+                    roomDimension.name() + ": Raummaß " + formatMeters(roomDimension.length().toMillimeters()), offset * roomDimension.sideSign());
+        }
+        if (dimensions.exteriorDimension().isPresent()) {
+            WallDimensionService.SideDimension exteriorDimension = dimensions.exteriorDimension().get();
+            int index = sideCounters.getOrDefault(exteriorDimension.sideSign(), 0);
+            double offset = baseOffset + index * 16.0;
+            sideCounters.put(exteriorDimension.sideSign(), index + 1);
+            drawIsoDimension(canvas, viewport, wall,
+                    "Außenmaß " + formatMeters(exteriorDimension.length().toMillimeters()), offset * exteriorDimension.sideSign());
+        }
+        if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
+            double offset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
+            drawIsoDimension(canvas, viewport, wall, "Achsmaß " + formatMeters(wall.axis().length().toMillimeters()), offset);
+        }
+    }
+
+    private void drawIsoDimension(PageCanvas canvas, Viewport viewport, Wall wall, String text, double normalOffset) throws IOException {
         double x1 = viewport.x(wall.axis().start().xMillimeters());
         double y1 = viewport.y(wall.axis().start().yMillimeters());
         double x2 = viewport.x(wall.axis().end().xMillimeters());
@@ -239,10 +268,9 @@ public final class ConstructionDrawingPdfService {
         double dx = x2 - x1;
         double dy = y2 - y1;
         double length = Math.max(1, Math.hypot(dx, dy));
-        double nx = -dy / length * 13.0;
-        double ny = dx / length * 13.0;
-        drawOverallDimension(canvas, x1 + nx, y1 + ny, x2 + nx, y2 + ny,
-                formatMeters(wall.axis().length().toMillimeters()));
+        double nx = -dy / length * normalOffset;
+        double ny = dx / length * normalOffset;
+        drawOverallDimension(canvas, x1 + nx, y1 + ny, x2 + nx, y2 + ny, text);
     }
 
     private void drawOverallDimension(PageCanvas canvas, double x1, double y1, double x2, double y2, String text) throws IOException {
