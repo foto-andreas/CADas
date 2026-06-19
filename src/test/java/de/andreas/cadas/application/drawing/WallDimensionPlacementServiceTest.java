@@ -29,6 +29,7 @@ class WallDimensionPlacementServiceTest {
         synchronizeRooms(level);
 
         List<WallDimensionPlacementService.PlacedDimension> placements = placementService.place(
+                level,
                 wall,
                 wallDimensionService.dimensions(level, wall),
                 1.0,
@@ -53,14 +54,16 @@ class WallDimensionPlacementServiceTest {
 
     @Test
     void stapeltMehrereRaummaßeEinerAussenwandAufDerGemeinsamenAussenseite() {
+        Level level = new Level("Erdgeschoss");
         Wall wall = wall(0, 0, 4_000, 0, 200);
+        level.addWall(wall);
         WallDimensionService.WallDimensions dimensions = new WallDimensionService.WallDimensions(
                 List.of(
                         new WallDimensionService.SideDimension(
                                 "Küche",
-                                Length.ofMillimeters(1_850),
+                                Length.ofMillimeters(900),
                                 1.0,
-                                new PlanSegment(new PlanPoint(100, 100), new PlanPoint(1_950, 100))
+                                new PlanSegment(new PlanPoint(100, 100), new PlanPoint(1_000, 100))
                         ),
                         new WallDimensionService.SideDimension(
                                 "Wohnen",
@@ -78,6 +81,7 @@ class WallDimensionPlacementServiceTest {
         );
 
         List<WallDimensionPlacementService.PlacedDimension> placements = placementService.place(
+                level,
                 wall,
                 dimensions,
                 1.0,
@@ -86,6 +90,9 @@ class WallDimensionPlacementServiceTest {
         );
 
         assertEquals(3, placements.size());
+        assertEquals(900.0, placements.get(0).dimension().length().toMillimeters(), 0.001);
+        assertEquals(1_850.0, placements.get(1).dimension().length().toMillimeters(), 0.001);
+        assertEquals(4_200.0, placements.get(2).dimension().length().toMillimeters(), 0.001);
         assertEquals(-130.0, placements.get(0).lineDistanceFromAxis(), 0.001);
         assertEquals(-140.0, placements.get(1).lineDistanceFromAxis(), 0.001);
         assertEquals(-150.0, placements.get(2).lineDistanceFromAxis(), 0.001);
@@ -93,7 +100,7 @@ class WallDimensionPlacementServiceTest {
     }
 
     @Test
-    void behaeltBeiInnenwandDieGetrenntenSeitenBei() {
+    void ziehtAuchInnenwandmaßeGemeinsamAußerhalbDesGebäudes() {
         Level level = new Level("Erdgeschoss");
         Wall wall = Wall.create(
                 new PlanSegment(new PlanPoint(2_000, 0), new PlanPoint(2_000, 3_000)),
@@ -105,6 +112,7 @@ class WallDimensionPlacementServiceTest {
         level.addRoom(Room.rectangular("Rechts", new PlanPoint(2_050, 100), new PlanPoint(3_900, 2_900), Length.of(2.6, LengthUnit.METER), Length.zero(), Length.zero()));
 
         List<WallDimensionPlacementService.PlacedDimension> placements = placementService.place(
+                level,
                 wall,
                 wallDimensionService.dimensions(level, wall),
                 1.0,
@@ -113,8 +121,9 @@ class WallDimensionPlacementServiceTest {
         );
 
         assertEquals(2, placements.size());
-        assertEquals(70.0, placements.get(0).lineDistanceFromAxis(), 0.001);
-        assertEquals(-70.0, placements.get(1).lineDistanceFromAxis(), 0.001);
+        assertTrue(Math.signum(placements.get(0).lineDistanceFromAxis()) == Math.signum(placements.get(1).lineDistanceFromAxis()));
+        assertTrue(Math.abs(placements.get(0).lineDistanceFromAxis()) > 1_900.0);
+        assertTrue(Math.abs(placements.get(1).lineDistanceFromAxis()) > Math.abs(placements.get(0).lineDistanceFromAxis()));
     }
 
     private List<Wall> addRectangle(Level level, double width, double height, double thickness) {

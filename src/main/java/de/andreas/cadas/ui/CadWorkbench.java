@@ -90,6 +90,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -198,6 +199,10 @@ public final class CadWorkbench extends BorderPane {
     private static final Length DEFAULT_STAIR_HEIGHT = Length.of(2.80, LengthUnit.METER);
     private static final Length SNAP_TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
     private static final int LENGTH_INPUT_DECIMALS = 3;
+    private static final Font DIMENSION_LABEL_FONT = Font.font("Menlo", 12);
+    private static final double DIMENSION_TEXT_OFFSET_X = 8.0;
+    private static final double DIMENSION_TEXT_OFFSET_Y = -8.0;
+    private static final double DIMENSION_TEXT_PADDING = 6.0;
 
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
@@ -2075,6 +2080,7 @@ public final class CadWorkbench extends BorderPane {
         drawDoors(graphics);
         drawWindows(graphics);
         drawRoomObjects(graphics);
+        drawWallDimensions(graphics);
         drawEditablePoints(graphics);
         drawEdgeResizeHandles(graphics);
         if (previewSegment != null) {
@@ -2193,18 +2199,34 @@ public final class CadWorkbench extends BorderPane {
             } else {
                 drawWallElevation(graphics, wall, selected);
             }
-            if (showDimensions.get() && projectionService.isPlanView(activeView.get())) {
-                drawWallDimensions(graphics, wall);
-            }
         }
     }
 
-    private void drawWallDimensions(GraphicsContext graphics, Wall wall) {
+    private void drawWallDimensions(GraphicsContext graphics) {
+        if (!showDimensions.get() || !projectionService.isPlanView(activeView.get())) {
+            return;
+        }
+        List<PendingWallDimensionLabel> pendingLabels = new ArrayList<>();
+        for (Wall wall : activeLevel.get().walls()) {
+            appendWallDimensionLabels(pendingLabels, wall);
+        }
+        pendingLabels.sort(Comparator
+                .comparingDouble((PendingWallDimensionLabel label) -> Math.abs(label.lineDistanceFromAxis()))
+                .thenComparingDouble(PendingWallDimensionLabel::dimensionLengthMillimeters)
+                .thenComparing(PendingWallDimensionLabel::text));
+        List<TextBlockingBox> blockingBoxes = new ArrayList<>();
+        for (PendingWallDimensionLabel pendingLabel : pendingLabels) {
+            drawWallDimensionLabelWithBlockers(graphics, pendingLabel, blockingBoxes);
+        }
+    }
+
+    private void appendWallDimensionLabels(List<PendingWallDimensionLabel> pendingLabels, Wall wall) {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(activeLevel.get(), wall);
         double isoExtra = currentDimensionStandard() == DimensionStandard.DIN_EN_ISO_7519_2025_01 ? 12.0 : 0.0;
         double baseOffset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0 + isoExtra, 28.0 + isoExtra);
         double stepOffset = 20.0 + isoExtra;
         for (WallDimensionPlacementService.PlacedDimension placement : wallDimensionPlacementService.place(
+                activeLevel.get(),
                 wall,
                 dimensions,
                 scale(),
@@ -2212,19 +2234,90 @@ public final class CadWorkbench extends BorderPane {
                 stepOffset
         )) {
             WallDimensionService.SideDimension dimension = placement.dimension();
-            drawDimensionLabel(
-                    graphics,
+            pendingLabels.add(new PendingWallDimensionLabel(
                     dimension.dimensionSegment(),
                     placement.exterior()
                             ? "Außenmaß " + dimension.length().format(LengthUnit.METER, 2)
                             : dimension.name() + ": Raummaß " + dimension.length().format(LengthUnit.METER, 2),
-                    placement.normalOffset()
-            );
+                    placement.normalOffset(),
+                    placement.lineDistanceFromAxis(),
+                    placement.placementSideSign() * stepOffset,
+                    dimension.length().toMillimeters()
+            ));
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
-            double offset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0 + isoExtra, 28.0 + isoExtra);
-            drawDimensionLabel(graphics, wall.axis(), "Achsmaß " + wall.axis().length().format(LengthUnit.METER, 2), offset);
+            WallDimensionPlacementService.PlacedDimension axisPlacement = wallDimensionPlacementService.placeAxisDimension(
+                    activeLevel.get(),
+                    wall,
+                    scale(),
+                    baseOffset
+            );
+            pendingLabels.add(new PendingWallDimensionLabel(
+                    wall.axis(),
+                    "Achsmaß " + wall.axis().length().format(LengthUnit.METER, 2),
+                    axisPlacement.normalOffset(),
+                    axisPlacement.lineDistanceFromAxis(),
+                    axisPlacement.placementSideSign() * stepOffset,
+                    wall.axis().length().toMillimeters()
+            ));
         }
+    }
+
+    private void drawWallDimensionLabelWithBlockers(
+            GraphicsContext graphics,
+            PendingWallDimensionLabel pendingLabel,
+            List<TextBlockingBox> blockingBoxes
+    ) {
+        RenderedWallDimensionLabel renderedLabel = layoutWallDimensionLabel(pendingLabel, pendingLabel.normalOffset());
+        int safetyCounter = 0;
+        while (overlapsAny(renderedLabel.blockingBox(), blockingBoxes) && safetyCounter < 128) {
+            renderedLabel = layoutWallDimensionLabel(
+                    pendingLabel,
+                    renderedLabel.normalOffset() + pendingLabel.outwardStep()
+            );
+            safetyCounter++;
+        }
+        drawIsoDimensionLines(graphics, renderedLabel.layout(), renderedLabel.directionX(), renderedLabel.directionY());
+        graphics.setFill(CadColorPalette.DIMENSION_TEXT);
+        graphics.setFont(DIMENSION_LABEL_FONT);
+        graphics.fillText(pendingLabel.text(), renderedLabel.textX(), renderedLabel.baselineY());
+        blockingBoxes.add(renderedLabel.blockingBox());
+    }
+
+    private RenderedWallDimensionLabel layoutWallDimensionLabel(PendingWallDimensionLabel pendingLabel, double normalOffset) {
+        PlanSegment segment = pendingLabel.segment();
+        double startX = toScreenProjectedX(segment.start(), 0.0);
+        double startY = toScreenProjectedY(segment.start(), 0.0);
+        double endX = toScreenProjectedX(segment.end(), 0.0);
+        double endY = toScreenProjectedY(segment.end(), 0.0);
+        double directionX = endX - startX;
+        double directionY = endY - startY;
+        double directionLength = Math.max(1.0, Math.hypot(directionX, directionY));
+        double isoOffset = Math.abs(normalOffset) < 0.001 ? 24.0 : normalOffset;
+        DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(startX, startY, endX, endY, isoOffset);
+        Text textMeasure = new Text(pendingLabel.text());
+        textMeasure.setFont(DIMENSION_LABEL_FONT);
+        double textX = layout.textX() + DIMENSION_TEXT_OFFSET_X;
+        double baselineY = layout.textY() + DIMENSION_TEXT_OFFSET_Y;
+        TextBlockingBox blockingBox = new TextBlockingBox(
+                textX + textMeasure.getLayoutBounds().getMinX() - DIMENSION_TEXT_PADDING,
+                baselineY + textMeasure.getLayoutBounds().getMinY() - DIMENSION_TEXT_PADDING,
+                textMeasure.getLayoutBounds().getWidth() + DIMENSION_TEXT_PADDING * 2.0,
+                textMeasure.getLayoutBounds().getHeight() + DIMENSION_TEXT_PADDING * 2.0
+        );
+        return new RenderedWallDimensionLabel(
+                layout,
+                directionX / directionLength,
+                directionY / directionLength,
+                normalOffset,
+                textX,
+                baselineY,
+                blockingBox
+        );
+    }
+
+    private boolean overlapsAny(TextBlockingBox candidate, List<TextBlockingBox> blockingBoxes) {
+        return blockingBoxes.stream().anyMatch(candidate::overlaps);
     }
 
     private void drawWallSurfaceLayers(GraphicsContext graphics) {
@@ -3357,8 +3450,8 @@ public final class CadWorkbench extends BorderPane {
             midY += directionX / directionLength * normalOffset;
         }
         graphics.setFill(CadColorPalette.DIMENSION_TEXT);
-        graphics.setFont(Font.font("Menlo", 12));
-        graphics.fillText(text, midX + 8.0, midY - 8.0);
+        graphics.setFont(DIMENSION_LABEL_FONT);
+        graphics.fillText(text, midX + DIMENSION_TEXT_OFFSET_X, midY + DIMENSION_TEXT_OFFSET_Y);
     }
 
     private DimensionStandard currentDimensionStandard() {
@@ -6378,6 +6471,49 @@ public final class CadWorkbench extends BorderPane {
         return selectionKey.kind() == RenderableKind.WALL
                 || selectionKey.kind() == RenderableKind.STAIR
                 || selectionKey.kind() == RenderableKind.ROOM_OBJECT;
+    }
+
+    private record PendingWallDimensionLabel(
+            PlanSegment segment,
+            String text,
+            double normalOffset,
+            double lineDistanceFromAxis,
+            double outwardStep,
+            double dimensionLengthMillimeters
+    ) {
+    }
+
+    private record RenderedWallDimensionLabel(
+            DimensionLineLayoutService.DimensionLineLayout layout,
+            double directionX,
+            double directionY,
+            double normalOffset,
+            double textX,
+            double baselineY,
+            TextBlockingBox blockingBox
+    ) {
+    }
+
+    private record TextBlockingBox(
+            double minX,
+            double minY,
+            double width,
+            double height
+    ) {
+        private boolean overlaps(TextBlockingBox other) {
+            return minX < other.maxX()
+                    && maxX() > other.minX
+                    && minY < other.maxY()
+                    && maxY() > other.minY;
+        }
+
+        private double maxX() {
+            return minX + width;
+        }
+
+        private double maxY() {
+            return minY + height;
+        }
     }
 
     private record SurfaceSelectionContext(SurfaceType surfaceType, List<String> targetKeys, String label, String hint) {

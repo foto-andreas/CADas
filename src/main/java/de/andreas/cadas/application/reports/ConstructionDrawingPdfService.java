@@ -240,6 +240,7 @@ public final class ConstructionDrawingPdfService {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(level, wall);
         double baseOffset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
         for (WallDimensionPlacementService.PlacedDimension placement : wallDimensionPlacementService.place(
+                level,
                 wall,
                 dimensions,
                 viewport.factor(),
@@ -254,8 +255,13 @@ public final class ConstructionDrawingPdfService {
                     placement.normalOffset());
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
-            double offset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
-            drawIsoDimension(canvas, viewport, wall.axis(), "Achsmaß " + formatMeters(wall.axis().length().toMillimeters()), offset);
+            WallDimensionPlacementService.PlacedDimension placement = wallDimensionPlacementService.placeAxisDimension(
+                    level,
+                    wall,
+                    viewport.factor(),
+                    baseOffset
+            );
+            drawIsoDimension(canvas, viewport, wall.axis(), "Achsmaß " + formatMeters(wall.axis().length().toMillimeters()), placement.normalOffset());
         }
     }
 
