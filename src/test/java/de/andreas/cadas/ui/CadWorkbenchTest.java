@@ -160,6 +160,56 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void tuerKlickWechseltInNachbarraum() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Test", "Erdgeschoss");
+        var level = project.primaryLevel();
+        // Gemeinsame Trennwand bei x=4_000 zwischen Wohnen und Küche.
+        Wall trennwand = Wall.create(
+                new PlanSegment(new PlanPoint(4_000, 0), new PlanPoint(4_000, 3_000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(trennwand);
+        Door tuer = Door.create(trennwand.id(), Length.of(1, LengthUnit.METER), Length.of(1, LengthUnit.METER), Length.of(2.01, LengthUnit.METER), Length.zero());
+        level.addDoor(tuer);
+        Room wohnen = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 3_000),
+                Length.of(260, LengthUnit.CENTIMETER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        Room kueche = Room.rectangular(
+                "Küche",
+                new PlanPoint(4_000, 0),
+                new PlanPoint(7_000, 3_000),
+                Length.of(260, LengthUnit.CENTIMETER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(wohnen);
+        level.addRoom(kueche);
+        ThreeDViewport viewport = aufFxThread(() -> new ThreeDViewport(ignored -> { }, () -> { }));
+
+        aufFxThread(() -> {
+            viewport.activateInteriorView(project, level, wohnen);
+            return null;
+        });
+
+        // Klick auf die Tür simuliert den Wechsel in den Nachbarräum.
+        aufFxThread(() -> {
+            viewport.automationClickDoorToNeighborRoom(tuer.id().toString());
+            return null;
+        });
+
+        PlanPoint eyePosition = aufFxThread(viewport::automationInteriorEyePosition);
+        // Nach dem Wechsel steht die Kamera im Zentrum der Küche (5_500, 1_500).
+        Assertions.assertEquals(5_500.0, eyePosition.xMillimeters(), 0.001);
+        Assertions.assertEquals(1_500.0, eyePosition.yMillimeters(), 0.001);
+    }
+
+    @Test
     void raumkontextÖffnetInnenansichtAmAngeklicktenStandort() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

@@ -19,6 +19,7 @@ import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
+import de.andreas.cadas.domain.model.Wall;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -732,6 +733,23 @@ public final class ThreeDViewport extends BorderPane {
         }
     }
 
+    public void automationClickDoorToNeighborRoom(String doorId) {
+        if (cameraMode != CameraMode.INTERIOR || currentProject == null || interiorTarget == null) {
+            return;
+        }
+        for (Level level : currentProject.levels()) {
+            if (!level.name().equals(interiorTarget.levelName())) {
+                continue;
+            }
+            SelectionKey key = new SelectionKey(RenderableKind.DOOR, level.name(), doorId);
+            Room neighbor = findNeighborRoom(level, key, RenderableKind.DOOR);
+            if (neighbor != null && !neighbor.id().equals(interiorRoomId)) {
+                activateInteriorView(currentProject, level, neighbor, neighbor.centerPoint());
+                return;
+            }
+        }
+    }
+
     public PlanPoint automationInteriorEyePosition() {
         return new PlanPoint(interiorEyeXMillimeters, interiorEyeZMillimeters);
     }
@@ -959,10 +977,103 @@ public final class ThreeDViewport extends BorderPane {
             event.consume();
             return;
         }
+        // In der Innenansicht führt ein Klick auf eine Tür oder Wand zum
+        // Nachbarräum, wenn auf der anderen Seite ein Raum liegt. Dadurch
+        // kann man durch Türöffnungen in den Nachbarraum wechseln, auch wenn
+        // der Pick die Tür/Wand trifft statt den dahinterliegenden Boden.
+        if (cameraMode == CameraMode.INTERIOR
+                && (kind == RenderableKind.DOOR || kind == RenderableKind.WALL)
+                && selectionKey != null
+                && currentProject != null
+                && interiorTarget != null) {
+            Level activeLevel = currentProject.levels().stream()
+                    .filter(level -> level.name().equals(selectionKey.levelName()))
+                    .findFirst()
+                    .orElse(null);
+            if (activeLevel != null) {
+                Room neighbor = findNeighborRoom(activeLevel, selectionKey, kind);
+                if (neighbor != null && !neighbor.id().equals(interiorRoomId)) {
+                    activateInteriorView(currentProject, activeLevel, neighbor, neighbor.centerPoint());
+                    event.consume();
+                    return;
+                }
+            }
+        }
         if (selectionKey != null) {
             selectionConsumer.accept(selectionKey);
             event.consume();
         }
+    }
+
+    private Room findNeighborRoom(Level level, SelectionKey selectionKey, RenderableKind kind) {
+        Wall wall = resolveWallFromSelection(level, selectionKey, kind);
+        if (wall == null) {
+            return null;
+        }
+        double pickedCenterX = wall.axis().pointAt(wall.axis().length().multiply(0.5)).xMillimeters();
+        double pickedCenterY = wall.axis().pointAt(wall.axis().length().multiply(0.5)).yMillimeters();
+        double wallHalfThickness = wall.thickness().toMillimeters() / 2.0;
+        double probeDistance = wallHalfThickness + 50.0;
+        // Normale der Wandachse (dx, dy) ist (-dy, dx) und (dy, -dx). Wir testen
+        // beide Seiten und wählen den Raum, der nicht der aktuelle ist.
+        double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
+        double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
+        double length = Math.hypot(dx, dy);
+        if (length == 0.0) {
+            return null;
+        }
+        double nx = -dy / length;
+        double ny = dx / length;
+        Room currentRoom = level.rooms().stream()
+                .filter(room -> room.id().equals(interiorRoomId))
+                .findFirst()
+                .orElse(null);
+        for (double sign : new double[] { 1.0, -1.0 }) {
+            double probeX = pickedCenterX + nx * (probeDistance + (currentRoom != null ? 0.0 : 0.0)) * sign;
+            double probeY = pickedCenterY + ny * (probeDistance + (currentRoom != null ? 0.0 : 0.0)) * sign;
+            for (Room room : level.rooms()) {
+                if (room.id().equals(interiorRoomId)) {
+                    continue;
+                }
+                if (containsPoint(room.outline(), new PlanPoint(probeX, probeY))) {
+                    return room;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Wall resolveWallFromSelection(Level level, SelectionKey selectionKey, RenderableKind kind) {
+        if (kind == RenderableKind.WALL) {
+            return level.findWall(java.util.UUID.fromString(selectionKey.elementId()));
+        }
+        if (kind == RenderableKind.DOOR) {
+            return level.doors().stream()
+                    .filter(door -> door.id().toString().equals(selectionKey.elementId()))
+                    .findFirst()
+                    .map(door -> level.findWall(door.wallId()))
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private static boolean containsPoint(java.util.List<PlanPoint> outline, PlanPoint point) {
+        boolean inside = false;
+        for (int current = 0, previous = outline.size() - 1; current < outline.size(); previous = current++) {
+            PlanPoint a = outline.get(current);
+            PlanPoint b = outline.get(previous);
+            boolean crosses = (a.yMillimeters() > point.yMillimeters()) != (b.yMillimeters() > point.yMillimeters());
+            if (crosses) {
+                double intersectionX = (b.xMillimeters() - a.xMillimeters())
+                        * (point.yMillimeters() - a.yMillimeters())
+                        / (b.yMillimeters() - a.yMillimeters())
+                        + a.xMillimeters();
+                if (point.xMillimeters() < intersectionX) {
+                    inside = !inside;
+                }
+            }
+        }
+        return inside;
     }
 
     boolean isInteriorFloorHit(RenderableKind kind, double pickedHeightMillimeters) {
