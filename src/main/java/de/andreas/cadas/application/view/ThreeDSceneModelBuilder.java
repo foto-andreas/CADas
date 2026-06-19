@@ -197,7 +197,7 @@ public final class ThreeDSceneModelBuilder {
                     (wall.axis().start().xMillimeters() + wall.axis().end().xMillimeters()) / 2.0,
                     baseHeight + supportHeight / 2.0,
                     (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0,
-                    wallLength + wall.thickness().toMillimeters(),
+                    wallLength,
                     supportHeight,
                     wall.thickness().toMillimeters(),
                     RotationAxis.Y,
@@ -730,15 +730,11 @@ public final class ThreeDSceneModelBuilder {
         List<RenderableBox> boxes = new ArrayList<>();
         for (Wall wall : level.walls()) {
             double wallLength = wall.axis().length().toMillimeters();
-            double halfThickness = wall.thickness().toMillimeters() / 2.0;
             List<OpeningRange> openings = openingsForWall(level, wall);
             double cursor = 0.0;
             for (OpeningRange opening : openings) {
                 if (opening.startMillimeters() > cursor) {
-                    double segStart = cursor == 0.0
-                            ? Math.max(0.0, cursor - halfThickness)
-                            : cursor;
-                    boxes.addAll(segmentToBoxes(level.name(), wall, segStart, opening.startMillimeters(), baseHeight, 0.0, "wall", surfaceRenderingMode));
+                    boxes.addAll(segmentToBoxes(level.name(), wall, cursor, opening.startMillimeters(), baseHeight, 0.0, "wall", surfaceRenderingMode));
                 }
                 if (opening.kind() == RenderableKind.DOOR) {
                     double upperHeight = Math.max(0.0, wall.minimumHeightMillimeters() - opening.upperHeightMillimeters());
@@ -758,11 +754,7 @@ public final class ThreeDSceneModelBuilder {
                 cursor = Math.max(cursor, opening.endMillimeters());
             }
             if (cursor < wallLength) {
-                double segStart = cursor == 0.0
-                        ? Math.max(0.0, cursor - halfThickness)
-                        : cursor;
-                double segEnd = wallLength + halfThickness;
-                boxes.addAll(segmentToBoxes(level.name(), wall, segStart, segEnd, baseHeight, 0.0, "wall", surfaceRenderingMode));
+                boxes.addAll(segmentToBoxes(level.name(), wall, cursor, wallLength, baseHeight, 0.0, "wall", surfaceRenderingMode));
             }
         }
         return boxes;
