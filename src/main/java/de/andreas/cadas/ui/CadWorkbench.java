@@ -413,6 +413,9 @@ public final class CadWorkbench extends BorderPane {
     private boolean panning;
     private boolean panningMoved;
     private SelectionKey pendingContextSelection;
+    private PlanPoint pendingContextWorldPoint;
+    private SelectionKey contextMenuSelection;
+    private PlanPoint contextMenuWorldPoint;
     private boolean updatingLengthInput;
     private PlanPoint draftStart;
     private PlanSegment previewSegment;
@@ -1614,6 +1617,9 @@ public final class CadWorkbench extends BorderPane {
             pendingContextSelection = event.getButton() == MouseButton.SECONDARY && currentTool() == DrawingTool.EDIT
                     ? contextSelectionAt(event)
                     : null;
+            pendingContextWorldPoint = pendingContextSelection == null
+                    ? null
+                    : screenToWorld(event.getX(), event.getY());
             panStartX = event.getX();
             panStartY = event.getY();
             panOriginX = offsetX;
@@ -1891,12 +1897,17 @@ public final class CadWorkbench extends BorderPane {
         if (panning) {
             panning = false;
             if (!panningMoved && pendingContextSelection != null && event.getButton() == MouseButton.SECONDARY) {
+                contextMenuSelection = pendingContextSelection;
+                contextMenuWorldPoint = pendingContextWorldPoint;
                 if (!selectedSelections.contains(pendingContextSelection)) {
                     selectSingle(pendingContextSelection);
+                } else {
+                    rebuildSelectionContextMenu();
                 }
                 selectionContextMenu.show(drawingCanvas, event.getScreenX(), event.getScreenY());
             }
             pendingContextSelection = null;
+            pendingContextWorldPoint = null;
             updateMouseCursor();
             return;
         }
@@ -5648,6 +5659,15 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Eigenschaften auf Auswahl anwenden", this::applyCurrentInputsToSelection, null),
                 menuItem("Auswahl aufheben", this::clearSelection, null)
         );
+        if (selectedSelections.contains(contextMenuSelection)
+                && contextMenuRoom().isPresent()
+                && contextMenuWorldPoint != null) {
+            selectionContextMenu.getItems().add(menuItem(
+                    "Innenansicht ab diesem Standort öffnen",
+                    this::openInteriorViewFromContextLocation,
+                    null
+            ));
+        }
         if (selectedSelections.stream().anyMatch(selection -> selection.kind() != RenderableKind.ROOM_VOLUME
                 && selection.kind() != RenderableKind.ROOM_FLOOR
                 && selection.kind() != RenderableKind.ROOM_CEILING)) {
@@ -5662,6 +5682,29 @@ public final class CadWorkbench extends BorderPane {
         if (selectedWalls().size() >= 3) {
             selectionContextMenu.getItems().add(menuItem("Raum erkennen", this::recognizeRoomFromSelectedWalls, null));
         }
+    }
+
+    private Optional<Room> contextMenuRoom() {
+        if (contextMenuSelection == null
+                || contextMenuSelection.kind() != RenderableKind.ROOM_VOLUME
+                && contextMenuSelection.kind() != RenderableKind.ROOM_FLOOR
+                && contextMenuSelection.kind() != RenderableKind.ROOM_CEILING) {
+            return Optional.empty();
+        }
+        return activeLevel.get().rooms().stream()
+                .filter(room -> room.id().toString().equals(contextMenuSelection.elementId()))
+                .findFirst();
+    }
+
+    private void openInteriorViewFromContextLocation() {
+        Optional<Room> room = contextMenuRoom();
+        if (room.isEmpty() || contextMenuWorldPoint == null) {
+            draftLabel.setText("Innenansicht braucht einen Raum und einen Standort.");
+            return;
+        }
+        threeDViewport.activateInteriorView(project, activeLevel.get(), room.orElseThrow(), contextMenuWorldPoint);
+        activeWorkspaceMode.set(WorkspaceMode.INTERIOR);
+        draftLabel.setText("Innenansicht am gewählten Raumstandort geöffnet.");
     }
 
     private void recognizeRoomFromSelectedWalls() {
@@ -6045,6 +6088,42 @@ public final class CadWorkbench extends BorderPane {
         offsetY = newOffsetY;
         updateStatus();
         render();
+    }
+
+    public void automationAddRoom(Room room) {
+        activeLevel.get().addRoom(room);
+        markThreeDDirty();
+        render();
+    }
+
+    public void automationPrepareSelectionContextMenu(double screenX, double screenY) {
+        contextMenuWorldPoint = screenToWorld(screenX, screenY);
+        contextMenuSelection = selectionQueryService.findSelection(
+                activeLevel.get(),
+                contextMenuWorldPoint,
+                SNAP_TOLERANCE
+        ).orElse(null);
+        if (contextMenuSelection != null) {
+            selectSingle(contextMenuSelection);
+        } else {
+            rebuildSelectionContextMenu();
+        }
+    }
+
+    public List<String> automationSelectionContextMenuItems() {
+        return selectionContextMenu.getItems().stream().map(MenuItem::getText).toList();
+    }
+
+    public void automationInvokeSelectionContextMenuItem(String label) {
+        selectionContextMenu.getItems().stream()
+                .filter(item -> label.equals(item.getText()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unbekannter Kontextmenüeintrag: " + label))
+                .fire();
+    }
+
+    public PlanPoint automationInteriorEyePosition() {
+        return threeDViewport.automationInteriorEyePosition();
     }
 
     public WritableImage automationDrawingSnapshot() {

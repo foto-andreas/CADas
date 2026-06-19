@@ -316,12 +316,28 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     public void activateInteriorView(ProjectModel project, Level level, Room room) {
+        activateInteriorView(project, level, room, null);
+    }
+
+    public void activateInteriorView(ProjectModel project, Level level, Room room, PlanPoint eyePosition) {
         currentProject = project;
         rememberCurrentViewState();
         interiorTarget = interiorViewService.targetFor(project, level, room);
         interiorRoomId = room.id();
         cameraMode = CameraMode.INTERIOR;
-        restoreOrResetInteriorPose(level.name(), room.id());
+        if (eyePosition == null) {
+            restoreOrResetInteriorPose(level.name(), room.id());
+        } else {
+            resetInteriorPose();
+            PlanPoint bounded = boundedInteriorEyePosition(
+                    interiorEyeXMillimeters,
+                    interiorEyeZMillimeters,
+                    eyePosition.xMillimeters(),
+                    eyePosition.yMillimeters()
+            );
+            interiorEyeXMillimeters = bounded.xMillimeters();
+            interiorEyeZMillimeters = bounded.yMillimeters();
+        }
         projectionModeSelector.setValue(ProjectionMode.PERSPECTIVE);
         surfaceRenderingCheckBox.setSelected(true);
         fitToSceneRequested = false;

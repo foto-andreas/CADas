@@ -117,6 +117,45 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void raumkontextÖffnetInnenansichtAmAngeklicktenStandort() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+        Room room = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 3_000),
+                Length.of(260, LengthUnit.CENTIMETER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+
+        aufFxThread(() -> {
+            workbench.automationAddRoom(room);
+            workbench.automationSetTool("EDIT");
+            workbench.automationSetViewport(1.0, 0.0, 0.0);
+            workbench.automationPrepareSelectionContextMenu(100.0, 80.0);
+            return null;
+        });
+
+        String menuLabel = "Innenansicht ab diesem Standort öffnen";
+        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems).contains(menuLabel));
+        aufFxThread(() -> {
+            workbench.automationInvokeSelectionContextMenuItem(menuLabel);
+            return null;
+        });
+
+        Assertions.assertEquals("INTERIOR", aufFxThread(() -> workbench.automationSnapshot().workspaceMode()));
+        PlanPoint eyePosition = aufFxThread(workbench::automationInteriorEyePosition);
+        Assertions.assertEquals(1_000.0, eyePosition.xMillimeters(), 0.001);
+        Assertions.assertEquals(800.0, eyePosition.yMillimeters(), 0.001);
+    }
+
+    @Test
     void ziehtBalkonAlsRechteckigeFußbodenplatteAuf() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
