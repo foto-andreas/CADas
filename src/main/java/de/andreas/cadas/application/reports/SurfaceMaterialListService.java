@@ -3,6 +3,7 @@ package de.andreas.cadas.application.reports;
 import de.andreas.cadas.application.layers.TileLayoutRequest;
 import de.andreas.cadas.application.layers.TileLayoutService;
 import de.andreas.cadas.application.layers.TilePlacement;
+import de.andreas.cadas.application.layers.SurfaceLayerEffectService;
 import de.andreas.cadas.application.layers.WallSurfaceSideService;
 import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
 import de.andreas.cadas.application.room.OrthogonalPolygonDecompositionService;
@@ -34,6 +35,8 @@ public final class SurfaceMaterialListService {
     private final OrthogonalPolygonDecompositionService decompositionService = new OrthogonalPolygonDecompositionService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
+    private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
+    private final ResidentialAreaService residentialAreaService = new ResidentialAreaService();
 
     public SurfaceMaterialReport create(ProjectModel project) {
         Map<String, MaterialAccumulator> materials = new LinkedHashMap<>();
@@ -53,7 +56,24 @@ public final class SurfaceMaterialListService {
         }
         return new SurfaceMaterialReport(
                 materialSummaries,
-                rooms.values().stream().map(RoomAccumulator::toSummary).toList()
+                rooms.values().stream().map(RoomAccumulator::toSummary).toList(),
+                project.levels().stream()
+                        .flatMap(level -> level.rooms().stream().map(room -> roomSummary(level, room)))
+                        .toList()
+        );
+    }
+
+    private RoomSummary roomSummary(Level level, Room room) {
+        return new RoomSummary(
+                level.name(),
+                room.name(),
+                room.widthMillimeters(),
+                room.depthMillimeters(),
+                surfaceLayerEffectService.effectiveMinimumCeilingHeightMillimeters(level, room),
+                surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(level, room),
+                surfaceLayerEffectService.effectiveAreaSquareMeters(level, room),
+                surfaceLayerEffectService.effectiveVolumeCubicMeters(level, room),
+                residentialAreaService.residentialAreaSquareMeters(level, room)
         );
     }
 
@@ -737,20 +757,52 @@ public final class SurfaceMaterialListService {
 
     public record SurfaceMaterialReport(
             List<MaterialSummary> materials,
-            List<RoomComplexitySummary> roomComplexities
+            List<RoomComplexitySummary> roomComplexities,
+            List<RoomSummary> rooms
     ) {
 
         public String toMarkdown() {
             StringBuilder markdown = new StringBuilder();
             markdown.append("# Materialliste Beläge\n\n");
+            appendRooms(markdown);
             if (materials.isEmpty()) {
-                markdown.append("Keine sichtbaren Beläge vorhanden.\n");
+                markdown.append("## Beläge\n\nKeine sichtbaren Beläge vorhanden.\n");
                 return markdown.toString();
             }
             appendMaterialSummary(markdown);
             appendMaterialDetails(markdown);
             appendRoomComplexities(markdown);
             return markdown.toString();
+        }
+
+        private void appendRooms(StringBuilder markdown) {
+            markdown.append("## Räume und Mietflächen nach WoFlV\n\n");
+            if (rooms.isEmpty()) {
+                markdown.append("Keine Räume vorhanden.\n\n");
+                return;
+            }
+            markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Mietfläche | Volumen |\n");
+            markdown.append("|---|---:|---:|---:|---:|---:|\n");
+            for (RoomSummary room : rooms) {
+                markdown.append("| ")
+                        .append(markdownCell(room.levelName() + " / " + room.roomName()))
+                        .append(" | ")
+                        .append(decimal(room.widthMillimeters() / 1000.0, 2)).append(" × ")
+                        .append(decimal(room.depthMillimeters() / 1000.0, 2)).append(" m")
+                        .append(" | ")
+                        .append(decimal(room.minimumHeightMillimeters() / 1000.0, 2));
+                if (Math.abs(room.maximumHeightMillimeters() - room.minimumHeightMillimeters()) > EPSILON) {
+                    markdown.append("–").append(decimal(room.maximumHeightMillimeters() / 1000.0, 2));
+                }
+                markdown.append(" m | ")
+                        .append(decimal(room.areaSquareMeters(), 2)).append(" m²")
+                        .append(" | ")
+                        .append(decimal(room.residentialAreaSquareMeters(), 2)).append(" m²")
+                        .append(" | ")
+                        .append(decimal(room.volumeCubicMeters(), 2)).append(" m³")
+                        .append(" |\n");
+            }
+            markdown.append("\nDie Mietfläche gewichtet lichte Höhen ab 2 m vollständig, zwischen 1 m und 2 m zur Hälfte und unter 1 m nicht. Sichtbare Boden- und Deckenbeläge reduzieren die lichte Höhe.\n\n");
         }
 
         private void appendMaterialSummary(StringBuilder markdown) {
@@ -899,6 +951,19 @@ public final class SurfaceMaterialListService {
             int requiredPieces,
             int cutCount,
             double complexityScore
+    ) {
+    }
+
+    public record RoomSummary(
+            String levelName,
+            String roomName,
+            double widthMillimeters,
+            double depthMillimeters,
+            double minimumHeightMillimeters,
+            double maximumHeightMillimeters,
+            double areaSquareMeters,
+            double volumeCubicMeters,
+            double residentialAreaSquareMeters
     ) {
     }
 }

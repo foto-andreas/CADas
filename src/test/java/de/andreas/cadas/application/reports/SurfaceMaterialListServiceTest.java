@@ -30,6 +30,28 @@ class SurfaceMaterialListServiceTest {
     private final SurfaceMaterialListService service = new SurfaceMaterialListService();
 
     @Test
+    void listetRaeumeMitHoehenMassenFlaechenUndVolumenAuchOhneBelaege() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addRoom(Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 3_000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        ));
+
+        SurfaceMaterialReport report = service.create(project);
+
+        assertEquals(1, report.rooms().size());
+        assertEquals(12.0, report.rooms().getFirst().areaSquareMeters(), 0.001);
+        assertEquals(31.2, report.rooms().getFirst().volumeCubicMeters(), 0.001);
+        assertEquals(12.0, report.rooms().getFirst().residentialAreaSquareMeters(), 0.001);
+        assertTrue(report.toMarkdown().contains("Räume und Mietflächen nach WoFlV"));
+        assertTrue(report.toMarkdown().contains("4,00 × 3,00 m"));
+    }
+
+    @Test
     void berechnetRechteckigenBodenOhneSchnitteAlsEinfacheVerlegung() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Room room = Room.rectangular(
