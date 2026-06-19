@@ -612,6 +612,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(dimensionsBox, "Blendet die ISO-Bemaßung nach DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien ein oder aus.");
 
         CheckBox dimensionTextPartsBox = new CheckBox("Erweiterte Maßtexte");
+        dimensionTextPartsBox.setSelected(dimensionTextStyle.get() == DimensionTextStyle.FULL);
         dimensionTextPartsBox.selectedProperty().addListener((obs, wasFull, isFull) ->
                 dimensionTextStyle.set(Boolean.TRUE.equals(isFull) ? DimensionTextStyle.FULL : DimensionTextStyle.LENGTH_ONLY));
         dimensionTextStyle.addListener((obs, oldStyle, newStyle) ->
