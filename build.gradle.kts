@@ -34,7 +34,13 @@ javafx {
 application {
     mainModule = "de.andreas.cadas"
     mainClass = "de.andreas.cadas.CadLauncher"
-    applicationDefaultJvmArgs = listOf("--enable-native-access=javafx.graphics,ALL-UNNAMED")
+    applicationDefaultJvmArgs = listOf(
+        "--enable-native-access=javafx.graphics,ALL-UNNAMED",
+        // pdfbox und commons-logging sind als requires static deklariert und werden
+        // nur bei Bedarf geladen. Damit der Modul-Layer sie zur Laufzeit anbietet,
+        // müssen sie explizit hinzugefügt werden.
+        "--add-modules=org.apache.pdfbox,org.apache.commons.logging"
+    )
 }
 
 dependencies {

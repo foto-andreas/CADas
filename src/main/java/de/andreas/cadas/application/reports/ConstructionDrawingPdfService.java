@@ -1,5 +1,10 @@
 package de.andreas.cadas.application.reports;
 
+import de.andreas.cadas.application.drawing.DimensionLabelOptions;
+import de.andreas.cadas.application.drawing.DimensionLabelPlacementService;
+import de.andreas.cadas.application.drawing.DimensionLabelService;
+import de.andreas.cadas.application.drawing.DimensionLineLayoutService;
+import de.andreas.cadas.application.drawing.TextBlockingBox;
 import de.andreas.cadas.application.drawing.WallDimensionPlacementService;
 import de.andreas.cadas.application.drawing.WallDimensionService;
 import de.andreas.cadas.domain.geometry.PlanPoint;
@@ -38,19 +43,29 @@ public final class ConstructionDrawingPdfService {
     private static final int[] STANDARD_SCALES = {20, 25, 50, 100, 200, 500, 1_000};
     private static final PDType1Font FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
     private static final PDType1Font FONT_BOLD = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+    private static final float PDF_FONT_SIZE = 6.5f;
+    private static final double PDF_TEXT_AWAY_DISTANCE = 4.0;
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
+    private final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
+    private final DimensionLabelService dimensionLabelService = new DimensionLabelService();
+    private final DimensionLabelPlacementService dimensionLabelPlacementService = new DimensionLabelPlacementService();
 
     public void export(ProjectModel project, Path targetFile) throws IOException {
+        export(project, targetFile, ConstructionDrawingOptions.defaults());
+    }
+
+    public void export(ProjectModel project, Path targetFile, ConstructionDrawingOptions options) throws IOException {
         Objects.requireNonNull(project, "project darf nicht null sein.");
         Objects.requireNonNull(targetFile, "targetFile darf nicht null sein.");
+        Objects.requireNonNull(options, "options darf nicht null sein.");
         Path parent = targetFile.toAbsolutePath().normalize().getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
         try (PDDocument document = new PDDocument()) {
             for (Level level : project.levels()) {
-                addPlanPage(document, project, level);
+                addPlanPage(document, project, level, options);
                 addElevationsPage(document, project, level);
             }
             addSpatialViewsPage(document, project, true);
@@ -59,7 +74,7 @@ public final class ConstructionDrawingPdfService {
         }
     }
 
-    private void addPlanPage(PDDocument document, ProjectModel project, Level level) throws IOException {
+    private void addPlanPage(PDDocument document, ProjectModel project, Level level, ConstructionDrawingOptions options) throws IOException {
         Bounds bounds = levelBounds(level).expanded(400.0);
         int scale = chooseScale(bounds.width(), bounds.height(), PAGE_WIDTH - 2 * MARGIN, PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT);
         try (PageCanvas canvas = addPage(document, project.name(), "2D-Grundriss – " + level.name(), "M 1:" + scale)) {
@@ -67,8 +82,6 @@ public final class ConstructionDrawingPdfService {
                     PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT, bounds, scale);
             for (Room room : level.rooms()) {
                 drawPolygon(canvas, viewport, room.outline(), new Color(225, 231, 221), 0.45f);
-                PlanPoint center = room.centerPoint();
-                canvas.text(viewport.x(center.xMillimeters()), viewport.y(center.yMillimeters()), 7.5f, room.name());
             }
             for (var extension : level.floorExtensions()) {
                 drawPolygon(canvas, viewport, extension.outline(), new Color(222, 210, 190), 0.7f);
@@ -78,7 +91,6 @@ public final class ConstructionDrawingPdfService {
                 float width = (float) Math.max(1.1, wall.thickness().toMillimeters() * viewport.factor());
                 canvas.line(viewport.x(wall.axis().start().xMillimeters()), viewport.y(wall.axis().start().yMillimeters()),
                         viewport.x(wall.axis().end().xMillimeters()), viewport.y(wall.axis().end().yMillimeters()), width, Color.DARK_GRAY);
-                drawWallDimensions(canvas, viewport, level, wall);
             }
             for (Door door : level.doors()) {
                 Wall wall = level.findWall(door.wallId());
@@ -94,7 +106,51 @@ public final class ConstructionDrawingPdfService {
                         stair.widthMillimeters() * viewport.factor(), stair.heightMillimeters() * viewport.factor(),
                         0.7f, new Color(90, 75, 55), null);
             }
+            // Raumtexte zuerst zeichnen, damit ihre Sperrflächen als Seed-Blocker für die Bemaßung dienen.
+            List<TextBlockingBox> roomBlockers = drawRoomLabels(canvas, viewport, level, options);
+            if (options.showDimensions()) {
+                drawWallDimensions(canvas, viewport, level, options, roomBlockers);
+            }
         }
+    }
+
+    private List<TextBlockingBox> drawRoomLabels(PageCanvas canvas, Viewport viewport, Level level, ConstructionDrawingOptions options) throws IOException {
+        List<TextBlockingBox> blockers = new ArrayList<>();
+        if (!options.showAreaVolume()) {
+            for (Room room : level.rooms()) {
+                PlanPoint center = room.centerPoint();
+                double cx = viewport.x(center.xMillimeters());
+                double cy = viewport.y(center.yMillimeters());
+                canvas.text(cx - 26, cy, 7.5f, room.name());
+                blockers.add(textBoundsApproximate(room.name(), cx - 26, cy, 7.5f));
+            }
+            return blockers;
+        }
+        for (Room room : level.rooms()) {
+            PlanPoint center = room.centerPoint();
+            double cx = viewport.x(center.xMillimeters());
+            double cy = viewport.y(center.yMillimeters());
+            String name = room.name();
+            canvas.text(cx - 26, cy - 6, 7.5f, name);
+            blockers.add(textBoundsApproximate(name, cx - 26, cy - 6, 7.5f));
+            String area = String.format(Locale.GERMAN, "%.2f m²", effectiveAreaSquareMeters(level, room));
+            canvas.text(cx - 18, cy + 10, 7.0f, area);
+            blockers.add(textBoundsApproximate(area, cx - 18, cy + 10, 7.0f));
+        }
+        return blockers;
+    }
+
+    private double effectiveAreaSquareMeters(Level level, Room room) {
+        double width = Math.max(0, room.maxXMillimeters() - room.minXMillimeters()) / 1_000.0;
+        double depth = Math.max(0, room.maxYMillimeters() - room.minYMillimeters()) / 1_000.0;
+        return width * depth;
+    }
+
+    private TextBlockingBox textBoundsApproximate(String text, double x, double y, float fontSize) {
+        double approxWidth = text.length() * fontSize * 0.55;
+        double approxHeight = fontSize * 1.2;
+        double padding = 4.0;
+        return new TextBlockingBox(x - padding, y - approxHeight - padding, approxWidth + padding * 2.0, approxHeight + padding * 2.0);
     }
 
     private void addElevationsPage(PDDocument document, ProjectModel project, Level level) throws IOException {
@@ -236,46 +292,120 @@ public final class ConstructionDrawingPdfService {
         canvas.line(viewport.x(start.xMillimeters()), viewport.y(start.yMillimeters()), viewport.x(end.xMillimeters()), viewport.y(end.yMillimeters()), 2.2f, color);
     }
 
-    private void drawWallDimensions(PageCanvas canvas, Viewport viewport, Level level, Wall wall) throws IOException {
-        WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(level, wall);
-        double baseOffset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
-        for (WallDimensionPlacementService.PlacedDimension placement : wallDimensionPlacementService.place(
-                level,
-                wall,
-                dimensions,
-                viewport.factor(),
-                baseOffset,
-                16.0
-        )) {
-            WallDimensionService.SideDimension dimension = placement.dimension();
-            drawIsoDimension(canvas, viewport, dimension.dimensionSegment(),
-                    placement.exterior()
-                            ? "Außenmaß " + formatMeters(dimension.length().toMillimeters())
-                            : dimension.name() + ": Raummaß " + formatMeters(dimension.length().toMillimeters()),
-                    placement.normalOffset());
+    private void drawWallDimensions(PageCanvas canvas, Viewport viewport, Level level, ConstructionDrawingOptions options, List<TextBlockingBox> seedBlockers) throws IOException {
+        DimensionLabelOptions labelOptions = options.dimensionLabelOptions();
+        List<PdfPendingDimension> pending = new ArrayList<>();
+        for (Wall wall : level.walls()) {
+            appendPdfWallDimensions(pending, level, wall, viewport, labelOptions);
         }
-        if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
-            WallDimensionPlacementService.PlacedDimension placement = wallDimensionPlacementService.placeAxisDimension(
-                    level,
-                    wall,
-                    viewport.factor(),
-                    baseOffset
-            );
-            drawIsoDimension(canvas, viewport, wall.axis(), "Achsmaß " + formatMeters(wall.axis().length().toMillimeters()), placement.normalOffset());
+        List<PdfPlacedDimension> placed = dimensionLabelPlacementService.place(
+                pending,
+                seedBlockers,
+                (label, offset) -> layoutPdfDimension(canvas, viewport, label, offset)
+        );
+        for (PdfPlacedDimension dim : placed) {
+            drawPdfDimensionLine(canvas, dim);
         }
     }
 
-    private void drawIsoDimension(PageCanvas canvas, Viewport viewport, PlanSegment segment, String text, double normalOffset) throws IOException {
+    private void appendPdfWallDimensions(List<PdfPendingDimension> pending, Level level, Wall wall, Viewport viewport, DimensionLabelOptions options) {
+        WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(level, wall);
+        double baseOffset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
+        double stepOffset = 16.0;
+        for (WallDimensionPlacementService.PlacedDimension placement : wallDimensionPlacementService.place(
+                level, wall, dimensions, viewport.factor(), baseOffset, stepOffset
+        )) {
+            WallDimensionService.SideDimension dimension = placement.dimension();
+            pending.add(new PdfPendingDimension(
+                    dimension.dimensionSegment(),
+                    dimensionLabelService.label(dimension, placement.exterior(), options),
+                    placement.normalOffset(),
+                    placement.lineDistanceFromAxis(),
+                    placement.placementSideSign() * stepOffset,
+                    dimension.length().toMillimeters(),
+                    placement.placementSideSign()
+            ));
+        }
+        if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
+            WallDimensionPlacementService.PlacedDimension axis = wallDimensionPlacementService.placeAxisDimension(
+                    level, wall, viewport.factor(), baseOffset
+            );
+            pending.add(new PdfPendingDimension(
+                    wall.axis(),
+                    dimensionLabelService.label("Achsmaß", wall.axis().length(), false, options),
+                    axis.normalOffset(),
+                    axis.lineDistanceFromAxis(),
+                    axis.placementSideSign() * stepOffset,
+                    wall.axis().length().toMillimeters(),
+                    axis.placementSideSign()
+            ));
+        }
+    }
+
+    private PdfPlacedDimension layoutPdfDimension(PageCanvas canvas, Viewport viewport, PdfPendingDimension pending, double normalOffset) {
+        PlanSegment segment = pending.segment();
         double x1 = viewport.x(segment.start().xMillimeters());
         double y1 = viewport.y(segment.start().yMillimeters());
         double x2 = viewport.x(segment.end().xMillimeters());
         double y2 = viewport.y(segment.end().yMillimeters());
-        double dx = x2 - x1;
-        double dy = y2 - y1;
-        double length = Math.max(1, Math.hypot(dx, dy));
-        double nx = -dy / length * normalOffset;
-        double ny = dx / length * normalOffset;
-        drawOverallDimension(canvas, x1 + nx, y1 + ny, x2 + nx, y2 + ny, text);
+        double isoOffset = Math.abs(normalOffset) < 0.001 ? 24.0 : normalOffset;
+        DimensionLineLayoutService.DimensionLineLayout layout = dimensionLineLayoutService.layout(x1, y1, x2, y2, isoOffset);
+        DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
+                layout, pending.placementSideSign(), PDF_TEXT_AWAY_DISTANCE
+        );
+        double textX = layout.textX() + away.deltaX();
+        double textY = layout.textY() + away.deltaY();
+        double directionX = x2 - x1;
+        double directionY = y2 - y1;
+        double directionLength = Math.max(1.0, Math.hypot(directionX, directionY));
+        TextBlockingBox box = textBoundsApproximate(pending.text(), textX - PDF_FONT_SIZE * 0.5, textY - PDF_FONT_SIZE * 0.7, PDF_FONT_SIZE);
+        return new PdfPlacedDimension(
+                pending,
+                layout,
+                directionX / directionLength,
+                directionY / directionLength,
+                textX,
+                textY,
+                box
+        );
+    }
+
+    private void drawPdfDimensionLine(PageCanvas canvas, PdfPlacedDimension dim) throws IOException {
+        DimensionLineLayoutService.DimensionLineLayout layout = dim.layout();
+        canvas.line(layout.lineStartX(), layout.lineStartY(), layout.lineEndX(), layout.lineEndY(), 0.45f, Color.BLACK);
+        canvas.line(layout.firstExtensionStartX(), layout.firstExtensionStartY(), layout.firstExtensionEndX(), layout.firstExtensionEndY(), 0.45f, Color.BLACK);
+        canvas.line(layout.secondExtensionStartX(), layout.secondExtensionStartY(), layout.secondExtensionEndX(), layout.secondExtensionEndY(), 0.45f, Color.BLACK);
+        double tickX = (dim.directionX() - dim.directionY()) * 3.2;
+        double tickY = (dim.directionY() + dim.directionX()) * 3.2;
+        canvas.line(layout.lineStartX() - tickX, layout.lineStartY() - tickY, layout.lineStartX() + tickX, layout.lineStartY() + tickY, 0.55f, Color.BLACK);
+        canvas.line(layout.lineEndX() - tickX, layout.lineEndY() - tickY, layout.lineEndX() + tickX, layout.lineEndY() + tickY, 0.55f, Color.BLACK);
+        canvas.text(dim.textX(), dim.textY(), PDF_FONT_SIZE, dim.pending().text());
+    }
+
+    private record PdfPendingDimension(
+            PlanSegment segment,
+            String text,
+            double normalOffset,
+            double lineDistanceFromAxis,
+            double outwardStep,
+            double dimensionLengthMillimeters,
+            double placementSideSign
+    ) implements DimensionLabelPlacementService.PendingLabel {
+        @Override
+        public double initialNormalOffset() {
+            return normalOffset;
+        }
+    }
+
+    private record PdfPlacedDimension(
+            PdfPendingDimension pending,
+            DimensionLineLayoutService.DimensionLineLayout layout,
+            double directionX,
+            double directionY,
+            double textX,
+            double textY,
+            TextBlockingBox blockingBox
+    ) implements DimensionLabelPlacementService.PlacedLabel {
     }
 
     private void drawOverallDimension(PageCanvas canvas, double x1, double y1, double x2, double y2, String text) throws IOException {
@@ -287,7 +417,7 @@ public final class ConstructionDrawingPdfService {
         double ty = (dy / length + dx / length) * 3.2;
         canvas.line(x1 - tx, y1 - ty, x1 + tx, y1 + ty, 0.55f, Color.BLACK);
         canvas.line(x2 - tx, y2 - ty, x2 + tx, y2 + ty, 0.55f, Color.BLACK);
-        canvas.text((x1 + x2) / 2.0 + 4, (y1 + y2) / 2.0 + 4, 6.5f, text);
+        canvas.text((x1 + x2) / 2.0 + 4, (y1 + y2) / 2.0 + 4, PDF_FONT_SIZE, text);
     }
 
     private void drawVerticalDimension(PageCanvas canvas, double x, double y1, double y2, String text) throws IOException {
