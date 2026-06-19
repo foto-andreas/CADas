@@ -15,6 +15,7 @@ import de.andreas.cadas.domain.model.WindowElement;
 import de.andreas.cadas.infrastructure.dxf.DxfProjectExchangeService;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -45,6 +46,45 @@ class CadWorkbenchTest {
 
         Assertions.assertEquals("1", aufFxThread(() -> workbench.automationFieldValue("grid")));
         Assertions.assertEquals("CENTIMETER", aufFxThread(() -> workbench.automationUnit("grid")));
+    }
+
+    @Test
+    void startetMitZentimeterFürAlleLängeneingaben() throws Exception {
+        CadWorkbench workbench = aufFxThread(CadWorkbench::new);
+        Map<String, String> expectedValues = Map.ofEntries(
+                Map.entry("grid", "1"),
+                Map.entry("length", ""),
+                Map.entry("wallThickness", "17,5"),
+                Map.entry("wallHeight", "275"),
+                Map.entry("endpointHeight", "275"),
+                Map.entry("roomHeight", "260"),
+                Map.entry("floorThickness", "18"),
+                Map.entry("ceilingThickness", "0,1"),
+                Map.entry("kneeWallHeight", "100"),
+                Map.entry("doorWidth", "101"),
+                Map.entry("doorHeight", "201"),
+                Map.entry("threshold", "0"),
+                Map.entry("windowWidth", "120"),
+                Map.entry("windowHeight", "120"),
+                Map.entry("sillHeight", "90"),
+                Map.entry("stairHeight", "280"),
+                Map.entry("stairStartLanding", "0"),
+                Map.entry("stairEndLanding", "0"),
+                Map.entry("floorExtensionThickness", "18"),
+                Map.entry("surfaceLayerThickness", "1,2"),
+                Map.entry("surfaceTileWidth", "60"),
+                Map.entry("surfaceTileHeight", "30"),
+                Map.entry("surfaceLayoutOffset", "0"),
+                Map.entry("surfaceMinimumOffset", "10"),
+                Map.entry("surfaceMinimumEdgeWidth", "8"),
+                Map.entry("surfaceMinimumStartEndMargin", "8"),
+                Map.entry("surfaceJointWidth", "0,2")
+        );
+
+        for (Map.Entry<String, String> entry : expectedValues.entrySet()) {
+            Assertions.assertEquals("CENTIMETER", aufFxThread(() -> workbench.automationUnit(entry.getKey())), entry.getKey());
+            Assertions.assertEquals(entry.getValue(), aufFxThread(() -> workbench.automationFieldValue(entry.getKey())), entry.getKey());
+        }
     }
 
     @Test
