@@ -31,7 +31,10 @@ public final class EdgeResizeService {
     public List<EdgeHandle> handles(Level level, Set<SelectionKey> selections) {
         List<EdgeHandle> handles = new ArrayList<>();
         for (SelectionKey selection : selections) {
-            UUID id = UUID.fromString(selection.elementId());
+            UUID id = parseUuidOrNull(selection.elementId());
+            if (id == null) {
+                continue;
+            }
             switch (selection.kind()) {
                 case WALL -> level.walls().stream().filter(wall -> wall.id().equals(id)).findFirst().ifPresent(wall -> {
                     handles.add(new EdgeHandle(EdgeHandleKind.WALL_START, wall.id(), wall.id(), wall.axis().start()));
@@ -56,6 +59,14 @@ public final class EdgeResizeService {
             }
         }
         return List.copyOf(handles);
+    }
+
+    private static UUID parseUuidOrNull(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     public ResizeResult resize(Level level, EdgeHandle handle, PlanPoint targetPoint) {
