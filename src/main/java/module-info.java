@@ -6,6 +6,7 @@ module de.andreas.cadas {
     requires jdk.httpserver;
     requires org.commonmark;
     requires org.commonmark.ext.gfm.tables;
+    requires org.apache.pdfbox;
 
     exports de.andreas.cadas;
     opens de.andreas.cadas to javafx.graphics;

@@ -45,6 +45,7 @@ import de.andreas.cadas.application.parts.StandardPartLibrary;
 import de.andreas.cadas.application.parts.StandardPartLibraryService;
 import de.andreas.cadas.application.parts.WindowPreset;
 import de.andreas.cadas.application.reports.MarkdownHtmlRenderer;
+import de.andreas.cadas.application.reports.ConstructionDrawingPdfService;
 import de.andreas.cadas.application.reports.SurfaceMaterialListService;
 import de.andreas.cadas.application.room.AutoRoomGenerationService;
 import de.andreas.cadas.application.view.RenderableKind;
@@ -221,6 +222,7 @@ public final class CadWorkbench extends BorderPane {
     private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
     private final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
+    private final ConstructionDrawingPdfService constructionDrawingPdfService = new ConstructionDrawingPdfService();
     private final HelpContentService helpContentService = new HelpContentService();
     private final MarkdownHtmlRenderer markdownHtmlRenderer = new MarkdownHtmlRenderer();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
@@ -801,6 +803,7 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Projekt leeren", this::clearProject, shortcutKey(KeyCode.L)),
                 menuItem("Gebäude als DXF exportieren", this::exportProjectAsDxf, shortcutShiftKey(KeyCode.E)),
                 menuItem("Gebäude aus DXF importieren", this::importProjectFromDxf, shortcutShiftKey(KeyCode.I)),
+                menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutShiftKey(KeyCode.P)),
                 menuItem("Aktive Etage als DXF exportieren", this::exportCurrentLevel, null),
                 menuItem("DXF als neue Etage importieren", this::importLevel, null),
                 menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
@@ -3782,6 +3785,26 @@ public final class CadWorkbench extends BorderPane {
         }
         stage.setScene(new Scene(container, 920, 680));
         stage.show();
+    }
+
+    private void exportConstructionDrawingPdf() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Maßstabgerechte Bauzeichnung als PDF speichern");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
+        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".dxf");
+        fileChooser.setInitialFileName(projectName + "_Bauzeichnung.pdf");
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        java.io.File file = fileChooser.showSaveDialog(owner);
+        if (file == null) {
+            return;
+        }
+        try {
+            Path target = exchangeFileNameService.ensureSingleExtension(file.toPath(), ".pdf");
+            constructionDrawingPdfService.export(project, target);
+            draftLabel.setText("Bauzeichnungs-PDF exportiert: " + target.getFileName());
+        } catch (Exception exception) {
+            draftLabel.setText("PDF-Export fehlgeschlagen: " + exception.getMessage());
+        }
     }
 
     private void showHelpWindow() {
