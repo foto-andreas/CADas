@@ -3610,6 +3610,10 @@ public final class CadWorkbench extends BorderPane {
         dialog.setHeaderText("Neue Etage anlegen");
         dialog.setContentText("Name der Etage:");
         dialog.getDialogPane().setPrefWidth(420);
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        if (owner != null) {
+            dialog.initOwner(owner);
+        }
         dialog.showAndWait()
                 .map(String::trim)
                 .filter(name -> !name.isBlank())
@@ -4493,6 +4497,10 @@ public final class CadWorkbench extends BorderPane {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION, content, ButtonType.CANCEL, ButtonType.OK);
         alert.setTitle(title);
         alert.setHeaderText(header);
+        Window owner = getScene() != null ? getScene().getWindow() : null;
+        if (owner != null) {
+            alert.initOwner(owner);
+        }
         return alert.showAndWait()
                 .filter(ButtonType.OK::equals)
                 .isPresent();
