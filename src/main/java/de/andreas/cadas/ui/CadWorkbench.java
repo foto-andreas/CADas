@@ -191,7 +191,7 @@ public final class CadWorkbench extends BorderPane {
 
     private static final double BASE_PIXELS_PER_MILLIMETER = 0.10;
     private static final double RULER_SIZE = 32.0;
-    private static final Length DEFAULT_GRID = Length.of(25, LengthUnit.CENTIMETER);
+    private static final Length DEFAULT_GRID = Length.of(1, LengthUnit.CENTIMETER);
     private static final Length DEFAULT_WALL_THICKNESS = Length.of(17.5, LengthUnit.CENTIMETER);
     private static final Length DEFAULT_WALL_HEIGHT = Length.of(2.75, LengthUnit.METER);
     private static final Length DEFAULT_ROOM_HEIGHT = Length.of(2.60, LengthUnit.METER);
@@ -277,7 +277,7 @@ public final class CadWorkbench extends BorderPane {
     private final StackPane workspacePane = new StackPane();
     private final ObservableList<Level> availableLevels = FXCollections.observableArrayList(project.levels());
 
-    private final TextField gridField = new TextField("25");
+    private final TextField gridField = new TextField("1");
     private final ComboBox<LengthUnit> gridUnit = new ComboBox<>();
     private final TextField lengthField = new TextField();
     private final ComboBox<LengthUnit> lengthUnit = new ComboBox<>();

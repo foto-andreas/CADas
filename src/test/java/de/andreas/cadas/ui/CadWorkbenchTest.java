@@ -40,6 +40,14 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void startetMitEinemZentimeterRasterweite() throws Exception {
+        CadWorkbench workbench = aufFxThread(CadWorkbench::new);
+
+        Assertions.assertEquals("1", aufFxThread(() -> workbench.automationFieldValue("grid")));
+        Assertions.assertEquals("CENTIMETER", aufFxThread(() -> workbench.automationUnit("grid")));
+    }
+
+    @Test
     void ziehtBalkonAlsRechteckigeFußbodenplatteAuf() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
