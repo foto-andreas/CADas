@@ -1341,18 +1341,35 @@ public final class ThreeDSceneModelBuilder {
     private List<RenderableBox> buildStraightStair(String levelName, Staircase staircase, double baseHeight) {
         List<RenderableBox> boxes = new ArrayList<>();
         double stepHeight = staircase.totalHeight().toMillimeters() / staircase.stepCount();
-        double stepDepth = staircase.heightMillimeters() / staircase.stepCount();
-        for (int step = 0; step < staircase.stepCount(); step++) {
+        double startLanding = staircase.startLandingWidth().toMillimeters();
+        double endLanding = staircase.endLandingWidth().toMillimeters();
+        double regularRun = staircase.heightMillimeters() - startLanding - endLanding;
+        double stepDepth = regularRun / staircase.regularStepCount();
+        int heightIndex = 0;
+        if (startLanding > 0) {
+            boxes.add(stairBox(levelName, staircase, baseHeight + stepHeight / 2.0,
+                    staircase.widthMillimeters() / 2.0, startLanding / 2.0,
+                    staircase.widthMillimeters(), startLanding, 0.0));
+            heightIndex++;
+        }
+        for (int step = 0; step < staircase.regularStepCount(); step++) {
             boxes.add(stairBox(
                     levelName,
                     staircase,
-                    baseHeight + stepHeight * (step + 0.5),
+                    baseHeight + stepHeight * (heightIndex + step + 0.5),
                     staircase.widthMillimeters() / 2.0,
-                    stepDepth * step + stepDepth / 2.0,
+                    startLanding + stepDepth * step + stepDepth / 2.0,
                     staircase.widthMillimeters(),
                     stepDepth,
                     0.0
             ));
+        }
+        if (endLanding > 0) {
+            boxes.add(stairBox(levelName, staircase,
+                    baseHeight + staircase.totalHeight().toMillimeters() - stepHeight / 2.0,
+                    staircase.widthMillimeters() / 2.0,
+                    staircase.heightMillimeters() - endLanding / 2.0,
+                    staircase.widthMillimeters(), endLanding, 0.0));
         }
         return boxes;
     }

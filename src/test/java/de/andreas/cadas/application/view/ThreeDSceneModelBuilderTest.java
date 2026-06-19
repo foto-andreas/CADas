@@ -41,6 +41,26 @@ import org.junit.jupiter.api.Test;
 class ThreeDSceneModelBuilderTest {
 
     @Test
+    void bautAnfangsUndEndabsatzMitStufengerechterHöhe() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "EG");
+        Staircase staircase = Staircase.create(StairType.STRAIGHT,
+                new PlanPoint(0, 0), new PlanPoint(1_000, 4_000),
+                Length.ofMillimeters(2_800), 16,
+                Length.ofMillimeters(800), Length.ofMillimeters(600));
+        project.primaryLevel().addStaircase(staircase);
+
+        var stairBoxes = new ThreeDSceneModelBuilder().build(project, Set.of("EG"), true).boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.STAIR)
+                .toList();
+
+        assertEquals(16, stairBoxes.size());
+        assertEquals(800, stairBoxes.getFirst().depth(), 0.001);
+        assertEquals(87.5, stairBoxes.getFirst().centerY(), 0.001);
+        assertEquals(600, stairBoxes.getLast().depth(), 0.001);
+        assertEquals(2_712.5, stairBoxes.getLast().centerY(), 0.001);
+    }
+
+    @Test
     void bautBalkonplatteUnterhalbDerEtagenFußbodenhöhe() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "EG");
         FloorExtension balcony = FloorExtension.create(FloorExtensionType.BALCONY, FloorExtensionPlacement.EXTERIOR,
