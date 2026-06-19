@@ -2088,7 +2088,6 @@ public final class CadWorkbench extends BorderPane {
             graphics.setLineWidth(2.0);
             graphics.strokePolygon(xPoints, yPoints, xPoints.length);
         }
-        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.SQUARE);
         for (Wall wall : lowerLevel.walls()) {
             drawWall(graphics, wall.axis(), wall.thickness(), gray, 1.0);
         }
@@ -2097,7 +2096,6 @@ public final class CadWorkbench extends BorderPane {
 
     private void drawWalls(GraphicsContext graphics) {
         graphics.setFill(Color.web("#2f2a24"));
-        graphics.setLineCap(javafx.scene.shape.StrokeLineCap.SQUARE);
 
         for (Wall wall : activeLevel.get().walls()) {
             boolean selected = isSelected(RenderableKind.WALL, wall.id().toString());
@@ -3034,13 +3032,40 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawWall(GraphicsContext graphics, PlanSegment segment, Length thickness, Color color, double widthFactor) {
-        double screenStartX = toScreenProjectedX(segment.start(), 0.0);
-        double screenStartY = toScreenProjectedY(segment.start(), 0.0);
-        double screenEndX = toScreenProjectedX(segment.end(), 0.0);
-        double screenEndY = toScreenProjectedY(segment.end(), 0.0);
+        double sx = segment.start().xMillimeters();
+        double sy = segment.start().yMillimeters();
+        double ex = segment.end().xMillimeters();
+        double ey = segment.end().yMillimeters();
+        double dx = ex - sx;
+        double dy = ey - sy;
+        double length = Math.hypot(dx, dy);
+        if (length < 0.001) {
+            return;
+        }
+        double nx = -dy / length;
+        double ny = dx / length;
+        double h = thickness.toMillimeters() / 2.0 * widthFactor;
+        PlanPoint p1 = new PlanPoint(sx + nx * h, sy + ny * h);
+        PlanPoint p2 = new PlanPoint(ex + nx * h, ey + ny * h);
+        PlanPoint p3 = new PlanPoint(ex - nx * h, ey - ny * h);
+        PlanPoint p4 = new PlanPoint(sx - nx * h, sy - ny * h);
+        double[] xPoints = {
+                toScreenProjectedX(p1, 0.0),
+                toScreenProjectedX(p2, 0.0),
+                toScreenProjectedX(p3, 0.0),
+                toScreenProjectedX(p4, 0.0)
+        };
+        double[] yPoints = {
+                toScreenProjectedY(p1, 0.0),
+                toScreenProjectedY(p2, 0.0),
+                toScreenProjectedY(p3, 0.0),
+                toScreenProjectedY(p4, 0.0)
+        };
+        graphics.setFill(color);
+        graphics.fillPolygon(xPoints, yPoints, 4);
         graphics.setStroke(color);
-        graphics.setLineWidth(Math.max(thickness.toMillimeters() * scale() * widthFactor, 2.0));
-        graphics.strokeLine(screenStartX, screenStartY, screenEndX, screenEndY);
+        graphics.setLineWidth(1.0);
+        graphics.strokePolygon(xPoints, yPoints, 4);
     }
 
     private void drawWallElevation(GraphicsContext graphics, Wall wall, boolean selected) {
