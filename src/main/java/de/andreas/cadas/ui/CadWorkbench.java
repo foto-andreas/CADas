@@ -4897,6 +4897,33 @@ public final class CadWorkbench extends BorderPane {
                     menuItem("Bauteile 90° gegen den Uhrzeigersinn drehen", this::rotateSelectedComponentsCounterClockwise, null)
             );
         }
+        if (selectedWalls().size() >= 3) {
+            selectionContextMenu.getItems().add(menuItem("Raum erkennen", this::recognizeRoomFromSelectedWalls, null));
+        }
+    }
+
+    private void recognizeRoomFromSelectedWalls() {
+        List<Wall> walls = selectedWalls();
+        if (walls.size() < 3) {
+            draftLabel.setText("Raumerkennung benötigt mindestens drei ausgewählte Wände.");
+            return;
+        }
+        List<Room> previousRooms = activeLevel.get().rooms();
+        List<Room> recognizedRooms = autoRoomGenerationService.synchronizeFromSelectedWalls(
+                activeLevel.get(),
+                walls.stream().map(Wall::id).collect(java.util.stream.Collectors.toSet()),
+                currentRoomDefaults()
+        );
+        if (recognizedRooms.equals(previousRooms)) {
+            draftLabel.setText("Aus den ausgewählten Wänden konnte kein geschlossener Raum erkannt werden.");
+            return;
+        }
+        rememberStateForUndo();
+        activeLevel.get().replaceRooms(recognizedRooms);
+        markThreeDDirty();
+        updatePropertySectionVisibility();
+        render();
+        draftLabel.setText("Raum erkannt: " + recognizedRooms.size() + " Räume auf der aktiven Etage.");
     }
 
     private void syncInputsFromPrimarySelection() {
@@ -5375,6 +5402,7 @@ public final class CadWorkbench extends BorderPane {
             case "deleteSelection" -> deleteSelection();
             case "applySelectionProperties" -> applyCurrentInputsToSelection();
             case "applyEndpointHeight" -> applyEndpointHeightToSelection();
+            case "recognizeRoomFromSelectedWalls" -> recognizeRoomFromSelectedWalls();
             case "toggleSurfaceLayerVisibility" -> toggleSurfaceLayerVisibility();
             case "addSurfaceLayer" -> addSurfaceLayer();
             case "updateSurfaceLayer" -> updateSurfaceLayer();

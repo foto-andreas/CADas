@@ -17,6 +17,7 @@ import de.andreas.cadas.domain.model.SurfaceType;
 import de.andreas.cadas.domain.model.Wall;
 import de.andreas.cadas.application.layers.WallSurfaceTargetKey;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class AutoRoomGenerationServiceTest {
@@ -334,6 +335,67 @@ class AutoRoomGenerationServiceTest {
                 new PlanPoint(2900.0, 3900.0),
                 new PlanPoint(100.0, 3900.0)
         ), rooms.getFirst().outline());
+    }
+
+    @Test
+    void teiltBestehendenRaumAnAutomatischErkanntenTKanten() {
+        Level level = new Level("Erdgeschoss");
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(6000, 0),
+                new PlanPoint(6000, 4000),
+                new PlanPoint(0, 4000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+        level.replaceRooms(service.synchronize(level, defaults()));
+        java.util.UUID originalRoomId = level.rooms().getFirst().id();
+        Wall partition = Wall.create(
+                new PlanSegment(new PlanPoint(3000, 0), new PlanPoint(3000, 4000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(partition);
+
+        List<Room> rooms = service.synchronizeFromSelectedWalls(
+                level,
+                level.walls().stream().map(Wall::id).collect(java.util.stream.Collectors.toSet()),
+                defaults()
+        );
+
+        assertEquals(2, rooms.size());
+        assertEquals(1, rooms.stream().filter(room -> room.id().equals(originalRoomId)).count());
+        assertTrue(rooms.stream().allMatch(room -> Math.abs(room.areaSquareMeters() - 10.64) < 0.02));
+    }
+
+    @Test
+    void behaeltNichtVonDerAuswahlBetroffeneRaeume() {
+        Level level = new Level("Erdgeschoss");
+        addLoop(level, List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(4000, 0),
+                new PlanPoint(4000, 3000),
+                new PlanPoint(0, 3000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+        int firstLoopWallCount = level.walls().size();
+        addLoop(level, List.of(
+                new PlanPoint(6000, 0),
+                new PlanPoint(10000, 0),
+                new PlanPoint(10000, 3000),
+                new PlanPoint(6000, 3000)
+        ), Length.of(20, LengthUnit.CENTIMETER));
+        level.replaceRooms(service.synchronizeFromSelectedWalls(
+                level,
+                level.walls().stream().map(Wall::id).collect(java.util.stream.Collectors.toSet()),
+                defaults()
+        ));
+        Room unaffected = level.rooms().stream().max(java.util.Comparator.comparingDouble(Room::minXMillimeters)).orElseThrow();
+        Set<java.util.UUID> firstLoopWallIds = level.walls().subList(0, firstLoopWallCount).stream()
+                .map(Wall::id)
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<Room> rooms = service.synchronizeFromSelectedWalls(level, firstLoopWallIds, defaults());
+
+        assertEquals(2, rooms.size());
+        assertTrue(rooms.stream().anyMatch(room -> room.id().equals(unaffected.id())));
     }
 
     private AutoRoomGenerationService.RoomDefaults defaults() {

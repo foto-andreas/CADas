@@ -189,6 +189,30 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void manuelleRaumerkennungTeiltRaumAnTKante() throws Exception {
+        Path projektDatei = erzeugeProjektMitTrennwandAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("WALL", 0, false);
+            for (int index = 1; index < 5; index++) {
+                instanz.automationSelect("WALL", index, true);
+            }
+            instanz.automationInvoke("recognizeRoomFromSelectedWalls", null);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+
+        Assertions.assertEquals(2, snapshot.roomCount());
+        Assertions.assertTrue(snapshot.statusText().contains("Raum erkannt"));
+    }
+
+    @Test
     void belagsauswahlWechseltMitRaumUndWandSauberZwischenKontexten() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {
@@ -572,6 +596,19 @@ class CadWorkbenchTest {
         level.addDoor(Door.create(wall.id(), Length.of(1, LengthUnit.METER), Length.of(1, LengthUnit.METER), Length.of(2.01, LengthUnit.METER), Length.zero()));
         level.addWindow(WindowElement.create(wall.id(), Length.of(3.2, LengthUnit.METER), Length.of(1.2, LengthUnit.METER), Length.of(90, LengthUnit.CENTIMETER), Length.of(1.2, LengthUnit.METER)));
         Path datei = Files.createTempFile("cadas-pickpunkte-", ".dxf");
+        new DxfProjectExchangeService().exportProject(project, datei);
+        return datei;
+    }
+
+    private Path erzeugeProjektMitTrennwandAlsDxf() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Raumerkennung", "Erdgeschoss");
+        var level = project.primaryLevel();
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(0, 0), new PlanPoint(6_000, 0)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(6_000, 0), new PlanPoint(6_000, 4_000)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(6_000, 4_000), new PlanPoint(0, 4_000)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(0, 4_000), new PlanPoint(0, 0)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        level.addWall(Wall.create(new PlanSegment(new PlanPoint(3_000, 0), new PlanPoint(3_000, 4_000)), Length.of(20, LengthUnit.CENTIMETER), Length.of(2.8, LengthUnit.METER)));
+        Path datei = Files.createTempFile("cadas-raumerkennung-", ".dxf");
         new DxfProjectExchangeService().exportProject(project, datei);
         return datei;
     }

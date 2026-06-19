@@ -47,9 +47,39 @@ public final class AutoRoomGenerationService {
         return List.of();
     }
 
+    public List<Room> synchronizeFromSelectedWalls(Level level, Set<UUID> selectedWallIds, RoomDefaults defaults) {
+        List<Wall> selectedWalls = level.walls().stream()
+                .filter(wall -> selectedWallIds.contains(wall.id()))
+                .toList();
+        if (selectedWalls.size() < 3) {
+            return level.rooms();
+        }
+        List<WallRectangle> rectangles = wallRectangles(level, selectedWalls);
+        List<DetectedRoom> detectedRooms = rectangles.size() == selectedWalls.size()
+                ? detectRooms(rectangles)
+                : List.of();
+        if (detectedRooms.isEmpty()) {
+            detectedRooms = detectRoomsFromWallLoops(level, selectedWalls);
+        }
+        if (detectedRooms.isEmpty()) {
+            return level.rooms();
+        }
+        List<DetectedRoom> finalDetectedRooms = detectedRooms;
+        List<Room> recognizedRooms = matchWithExistingRooms(level, finalDetectedRooms, defaults);
+        List<Room> result = level.rooms().stream()
+                .filter(room -> finalDetectedRooms.stream().noneMatch(detectedRoom -> overlaps(room, detectedRoom)))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        result.addAll(recognizedRooms);
+        return List.copyOf(result);
+    }
+
     private List<WallRectangle> wallRectangles(Level level) {
+        return wallRectangles(level, level.walls());
+    }
+
+    private List<WallRectangle> wallRectangles(Level level, List<Wall> walls) {
         List<WallRectangle> rectangles = new ArrayList<>();
-        for (Wall wall : level.walls()) {
+        for (Wall wall : walls) {
             double deltaX = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
             double deltaY = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
             double halfThickness = wall.thickness().toMillimeters() / 2.0 + surfaceLayerEffectService.maximumWallInteriorThicknessMillimeters(level, wall);
@@ -134,7 +164,10 @@ public final class AutoRoomGenerationService {
     }
 
     private List<DetectedRoom> detectRoomsFromWallLoops(Level level) {
-        List<Wall> walls = level.walls();
+        return detectRoomsFromWallLoops(level, level.walls());
+    }
+
+    private List<DetectedRoom> detectRoomsFromWallLoops(Level level, List<Wall> walls) {
         Map<PointKey, List<WallConnection>> graph = buildGraph(walls);
         Set<UUID> visitedWalls = new HashSet<>();
         List<DetectedRoom> rooms = new ArrayList<>();
@@ -156,6 +189,11 @@ public final class AutoRoomGenerationService {
                     .ifPresent(rooms::add);
         }
         return rooms;
+    }
+
+    private boolean overlaps(Room room, DetectedRoom detectedRoom) {
+        return containsPoint(detectedRoom.outline(), room.centerPoint())
+                || containsPoint(room.outline(), detectedRoom.centerPoint());
     }
 
     private Set<CellIndex> floodFill(int startColumn, int startRow, boolean[][] occupied, boolean[][] visited) {
