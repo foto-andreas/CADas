@@ -259,7 +259,7 @@ public final class CadWorkbench extends BorderPane {
     private final BooleanProperty snapToEndpoints = new SimpleBooleanProperty(true);
     private final BooleanProperty showCompass = new SimpleBooleanProperty(true);
     private final BooleanProperty showDimensions = new SimpleBooleanProperty(true);
-    private final ObjectProperty<DimensionTextStyle> dimensionTextStyle = new SimpleObjectProperty<>(DimensionTextStyle.FULL);
+    private final ObjectProperty<DimensionTextStyle> dimensionTextStyle = new SimpleObjectProperty<>(DimensionTextStyle.LENGTH_ONLY);
     private final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
     private final BooleanProperty showRoomObjects = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
