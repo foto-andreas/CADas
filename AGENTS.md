@@ -64,7 +64,13 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Oberflächen-Ebenen können wahlweise als gestapelte 3D-Schichten oder im Oberflächenrendering ohne transparente Raumkörper visualisiert werden.
 * Registrierte `DWG`-Bibliotheken können zusätzlich konkrete Blocknamen als Oberflächen-Presets führen, entweder über begleitende `.blocks`-Katalogdateien oder über manuelle Eingabe in der Workbench.
 * Automatische Bemaßungen liegen vollständig außerhalb des Gebäudes. Die Platzierungsseite folgt dem nächsten Schnitt der Wandnormalen mit der Außenkante einer Außenwand; kleinere Maße werden zuerst und größere Maße mit wachsendem Außenabstand angeordnet. Jede gesetzte Bemaßung ergänzt Sperrflächen gegen Überdeckungen. Fachlich identische Raummaße aus parallelen Wänden erscheinen nur einmal. Diese Regeln gelten identisch für die 2D-Ansicht und die PDF-Bauzeichnung.
-* Das Raum-Kontextmenü der 2D-Ansicht öffnet die Innenansicht am angeklickten Standort. Bodenklicks in der Innenansicht versetzen den Standort auf den gewählten Punkt.
+* Das Raum-Kontextmenü der 2D-Ansicht öffnet die Innenansicht am angeklickten Standort. Bodenklicks in der Innenansicht versetzen den Standort auf den gewählten Punkt und wechseln durch Türen oder Wände in den Nachbarräum.
+* Etagen lassen sich umbenennen und in der Gebäude-Reihenfolge umsortieren („Etage hoch" = größerer Index = im Gebäude nach oben).
+* Gebäude-Dateien nutzen die Endung `.cadas` (intern DXF-Format). Laden heißt „Gebäude laden", Sichern heißt „Sichern" und „Sichern als ...". Beim Laden wird der Dateiname als Projektname übernommen und beim Sichern vorbelegt.
+* 3D-Wände und Fundamente enden bündig mit der Wandachse; keine Verlängerung über die Endpunkte hinaus.
+* Die Menüleiste nutzt `setUseSystemMenuBar(true)` und ist im Fenster unter macOS ausgeblendet (`setManaged(false)`/`setVisible(false)`).
+* Die In-App-Hilfe zeigt die vollständige Benutzerdokumentation aus `docs/benutzerdoku.md`; Keymap und Mausbedienung sind separater Menüpunkt.
+* `./gradlew run` ist deaktiviert; `runApp` startet das App-Bundle, damit macOS den App-Namen „CADas" in der Menüleiste zeigt.
 
 ## Empfohlene Umsetzungsreihenfolge
 1. Technisches Grundgerüst, Architektur, Tests und Qualitätswerkzeuge.
@@ -107,5 +113,8 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Gleiche Ebenen in gleicher Reihenfolge innerhalb eines Bereichs konsistent behandeln.
 
 ## Arbeitsunterlagen
+* Kompakte Einstiegsorientierung für KI-Assistenten steht in `KI.md`.
+* Systemarchitektur und Verantwortlichkeiten stehen in `docs/systemdoku.md`.
+* Benutzerdokumentation steht in `docs/benutzerdoku.md` (auch als In-App-Hilfe unter `src/main/resources/docs/benutzerdoku.md`).
 * Konkrete Arbeitspakete stehen in `TODO.md`.
 * Festgelegte Entscheidungen und ihr aktueller Stand stehen in `FRAGEN.md`.
