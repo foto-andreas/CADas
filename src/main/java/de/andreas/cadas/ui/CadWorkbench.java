@@ -452,7 +452,9 @@ public final class CadWorkbench extends BorderPane {
     private UiErrorDialogs.ErrorPresentation lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
 
     public CadWorkbench() {
-        setPadding(new Insets(12));
+        // Oberer Bereich (Werkzeugleiste) soll bündig oben anliegen, daher
+        // nur unten/links/rechts padding, oben 0.
+        setPadding(new Insets(0, 12, 12, 12));
         setStyle("-fx-background-color: linear-gradient(to bottom, #f6f1e8, #ece5d8);");
         if (automationActive()) {
             interactiveDialogsEnabled = false;
@@ -560,6 +562,14 @@ public final class CadWorkbench extends BorderPane {
     private void configureLayout() {
         MenuBar menuBar = buildMenuBar();
         menuBar.setUseSystemMenuBar(true);
+        // Im Fenster wird die MenuBar nicht dargestellt, damit sie keinen
+        // Leerraum oberhalb der Werkzeugleiste erzeugt. Unter macOS wandert
+        // das echte Menü in die Systemmenüleiste; auf anderen Plattformen
+        // bleibt es sichtbar.
+        if (System.getProperty("os.name", "").toLowerCase().contains("mac")) {
+            menuBar.setManaged(false);
+            menuBar.setVisible(false);
+        }
         ToolBar settingsBar = buildSettingsBar();
         HBox viewBar = buildViewBar();
         VBox topArea = new VBox(8.0, menuBar, settingsBar, viewBar);
