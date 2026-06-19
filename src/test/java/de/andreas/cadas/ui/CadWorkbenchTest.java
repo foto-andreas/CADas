@@ -124,16 +124,16 @@ class CadWorkbenchTest {
             return instanz;
         });
 
-        WorkbenchAutomationSnapshot wand = aufFxThread(workbench::automationSnapshot);
-        Assertions.assertTrue(wand.statusText().contains("Linksklick startet"));
+        WorkbenchAutomationSnapshot bearbeiten = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertTrue(bearbeiten.statusText().contains("Linksklick wählt aus"));
 
         aufFxThread(() -> {
-            workbench.automationSetTool("EDIT");
+            workbench.automationSetTool("WALL");
             return null;
         });
 
-        WorkbenchAutomationSnapshot bearbeiten = aufFxThread(workbench::automationSnapshot);
-        Assertions.assertTrue(bearbeiten.statusText().contains("Linksklick wählt aus"));
+        WorkbenchAutomationSnapshot wand = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertTrue(wand.statusText().contains("Linksklick startet"));
     }
 
     @Test
@@ -197,6 +197,7 @@ class CadWorkbenchTest {
             instanz.layout();
             instanz.automationInvoke("importProjectDxf", projektDatei);
             instanz.automationSetTool("EDIT");
+            instanz.automationSetShowDimensions(false);
             return instanz;
         });
 

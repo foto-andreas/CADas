@@ -2,6 +2,7 @@ package de.andreas.cadas.application.reports;
 
 import de.andreas.cadas.application.drawing.WallDimensionService;
 import de.andreas.cadas.domain.geometry.PlanPoint;
+import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.Level;
 import de.andreas.cadas.domain.model.ProjectModel;
@@ -243,7 +244,7 @@ public final class ConstructionDrawingPdfService {
             int index = sideCounters.getOrDefault(roomDimension.sideSign(), 0);
             double offset = baseOffset + index * 16.0;
             sideCounters.put(roomDimension.sideSign(), index + 1);
-            drawIsoDimension(canvas, viewport, wall,
+            drawIsoDimension(canvas, viewport, roomDimension.dimensionSegment(),
                     roomDimension.name() + ": Raummaß " + formatMeters(roomDimension.length().toMillimeters()), offset * roomDimension.sideSign());
         }
         if (dimensions.exteriorDimension().isPresent()) {
@@ -251,20 +252,20 @@ public final class ConstructionDrawingPdfService {
             int index = sideCounters.getOrDefault(exteriorDimension.sideSign(), 0);
             double offset = baseOffset + index * 16.0;
             sideCounters.put(exteriorDimension.sideSign(), index + 1);
-            drawIsoDimension(canvas, viewport, wall,
+            drawIsoDimension(canvas, viewport, exteriorDimension.dimensionSegment(),
                     "Außenmaß " + formatMeters(exteriorDimension.length().toMillimeters()), offset * exteriorDimension.sideSign());
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
             double offset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
-            drawIsoDimension(canvas, viewport, wall, "Achsmaß " + formatMeters(wall.axis().length().toMillimeters()), offset);
+            drawIsoDimension(canvas, viewport, wall.axis(), "Achsmaß " + formatMeters(wall.axis().length().toMillimeters()), offset);
         }
     }
 
-    private void drawIsoDimension(PageCanvas canvas, Viewport viewport, Wall wall, String text, double normalOffset) throws IOException {
-        double x1 = viewport.x(wall.axis().start().xMillimeters());
-        double y1 = viewport.y(wall.axis().start().yMillimeters());
-        double x2 = viewport.x(wall.axis().end().xMillimeters());
-        double y2 = viewport.y(wall.axis().end().yMillimeters());
+    private void drawIsoDimension(PageCanvas canvas, Viewport viewport, PlanSegment segment, String text, double normalOffset) throws IOException {
+        double x1 = viewport.x(segment.start().xMillimeters());
+        double y1 = viewport.y(segment.start().yMillimeters());
+        double x2 = viewport.x(segment.end().xMillimeters());
+        double y2 = viewport.y(segment.end().yMillimeters());
         double dx = x2 - x1;
         double dy = y2 - y1;
         double length = Math.max(1, Math.hypot(dx, dy));

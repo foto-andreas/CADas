@@ -29,10 +29,15 @@ class WallDimensionServiceTest {
         WallDimensionService.WallDimensions dimensions = service.dimensions(level, selectedWall);
 
         assertEquals(1, dimensions.roomDimensions().size());
-        assertEquals(3_800.0, dimensions.roomDimensions().getFirst().length().toMillimeters(), 0.001);
-        assertEquals(1.0, dimensions.roomDimensions().getFirst().sideSign());
-        assertEquals(4_200.0, dimensions.exteriorDimension().orElseThrow().length().toMillimeters(), 0.001);
-        assertEquals(-1.0, dimensions.exteriorDimension().orElseThrow().sideSign());
+        WallDimensionService.SideDimension roomDimension = dimensions.roomDimensions().getFirst();
+        assertEquals(3_800.0, roomDimension.length().toMillimeters(), 0.001);
+        assertEquals(1.0, roomDimension.sideSign());
+        assertSegmentOnLine(roomDimension.dimensionSegment(), 100.0, 100.0, 3_900.0, 100.0);
+
+        WallDimensionService.SideDimension exteriorDimension = dimensions.exteriorDimension().orElseThrow();
+        assertEquals(4_200.0, exteriorDimension.length().toMillimeters(), 0.001);
+        assertEquals(-1.0, exteriorDimension.sideSign());
+        assertSegmentOnLine(exteriorDimension.dimensionSegment(), -100.0, -100.0, 4_100.0, -100.0);
     }
 
     @Test
@@ -78,5 +83,12 @@ class WallDimensionServiceTest {
         level.replaceRooms(roomService.synchronize(level, new AutoRoomGenerationService.RoomDefaults(
                 "Raum", Length.of(2.6, LengthUnit.METER), Length.zero(), Length.zero(), null
         )));
+    }
+
+    private void assertSegmentOnLine(PlanSegment segment, double expectedStartX, double expectedStartY, double expectedEndX, double expectedEndY) {
+        assertEquals(expectedStartX, segment.start().xMillimeters(), 0.001);
+        assertEquals(expectedStartY, segment.start().yMillimeters(), 0.001);
+        assertEquals(expectedEndX, segment.end().xMillimeters(), 0.001);
+        assertEquals(expectedEndY, segment.end().yMillimeters(), 0.001);
     }
 }

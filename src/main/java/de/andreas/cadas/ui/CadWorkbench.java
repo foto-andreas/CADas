@@ -2121,7 +2121,7 @@ public final class CadWorkbench extends BorderPane {
             sideCounters.put(roomDimension.sideSign(), index + 1);
             drawDimensionLabel(
                     graphics,
-                    wall.axis(),
+                    roomDimension.dimensionSegment(),
                     roomDimension.name() + ": Raummaß " + roomDimension.length().format(LengthUnit.METER, 2),
                     offset * roomDimension.sideSign()
             );
@@ -2132,7 +2132,7 @@ public final class CadWorkbench extends BorderPane {
             sideCounters.put(exteriorDimension.sideSign(), index + 1);
             drawDimensionLabel(
                     graphics,
-                    wall.axis(),
+                    exteriorDimension.dimensionSegment(),
                     "Außenmaß " + exteriorDimension.length().format(LengthUnit.METER, 2),
                     offset * exteriorDimension.sideSign()
             );
@@ -5762,6 +5762,10 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         toolSelector.setValue(DrawingTool.valueOf(normalizedToolName));
+    }
+
+    public void automationSetShowDimensions(boolean visible) {
+        showDimensions.set(visible);
     }
 
     public int automationFloorExtensionCount() {

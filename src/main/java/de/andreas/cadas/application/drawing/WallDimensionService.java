@@ -54,8 +54,9 @@ public final class WallDimensionService {
                 .filter(segment -> overlappingLength(wall.axis(), segment) > EPSILON)
                 .map(segment -> new SideDimension(
                         room.name(),
-                        Length.ofMillimeters(overlappingLength(wall.axis(), segment)),
-                        sides.positiveSide() ? 1.0 : -1.0
+                        segment.length(),
+                        sides.positiveSide() ? 1.0 : -1.0,
+                        segment
                 ));
     }
 
@@ -69,30 +70,86 @@ public final class WallDimensionService {
         if (!sides.positiveSide() && !sides.negativeSide()) {
             return Optional.empty();
         }
-        double length = wall.axis().length().toMillimeters()
-                + endpointExtension(level, wall, wall.axis().start())
-                + endpointExtension(level, wall, wall.axis().end());
         double sideSign = sides.positiveSide() && !sides.negativeSide() ? 1.0 : -1.0;
-        return Optional.of(new SideDimension("Außen", Length.ofMillimeters(length), sideSign));
+        PlanSegment segment = exteriorSegment(level, wall, sideSign);
+        return Optional.of(new SideDimension("Außen", segment.length(), sideSign, segment));
     }
 
-    private double endpointExtension(Level level, Wall wall, PlanPoint endpoint) {
-        return level.walls().stream()
-                .filter(candidate -> !candidate.id().equals(wall.id()))
-                .filter(candidate -> touches(candidate, endpoint))
-                .mapToDouble(candidate -> extensionForAngle(wall, candidate))
-                .max()
-                .orElse(0.0);
+    private PlanSegment exteriorSegment(Level level, Wall wall, double sideSign) {
+        double offset = wall.thickness().toMillimeters() / 2.0
+                + surfaceLayerEffectService.wallExteriorThicknessMillimeters(level, wall);
+        PlanSegment shifted = shiftedSegment(wall.axis(), offset, sideSign);
+        PlanPoint start = exteriorEndpoint(level, wall, wall.axis().start(), shifted, sideSign);
+        PlanPoint end = exteriorEndpoint(level, wall, wall.axis().end(), shifted, sideSign);
+        return new PlanSegment(start, end);
     }
 
-    private double extensionForAngle(Wall wall, Wall connectedWall) {
-        Direction first = direction(wall.axis());
-        Direction second = direction(connectedWall.axis());
-        double sine = Math.abs(first.x() * second.y() - first.y() * second.x());
-        if (sine < PARALLEL_TOLERANCE) {
-            return 0.0;
+    private PlanPoint exteriorEndpoint(Level level, Wall wall, PlanPoint axisEndpoint, PlanSegment shifted, double sideSign) {
+        Direction direction = direction(wall.axis());
+        double normalX = -direction.y() * sideSign;
+        double normalY = direction.x() * sideSign;
+        boolean isStart = axisEndpoint.distanceTo(wall.axis().start()).toMillimeters() <= EPSILON;
+        PlanPoint best = isStart ? shifted.start() : shifted.end();
+        double bestProjection = projection(wall.axis().start(), best, direction);
+        PlanSegment extendedLine = new PlanSegment(
+                new PlanPoint(best.xMillimeters() - direction.x() * 10_000_000.0, best.yMillimeters() - direction.y() * 10_000_000.0),
+                new PlanPoint(best.xMillimeters() + direction.x() * 10_000_000.0, best.yMillimeters() + direction.y() * 10_000_000.0)
+        );
+        for (Wall connected : level.walls()) {
+            if (connected.id().equals(wall.id()) || !touches(connected, axisEndpoint)) {
+                continue;
+            }
+            for (int connectedSide : new int[]{-1, 1}) {
+                PlanSegment candidate = shiftedSegment(connected.axis(), connected.thickness().toMillimeters() / 2.0, connectedSide);
+                Optional<PlanPoint> intersection = lineIntersection(extendedLine.start(), extendedLine.end(), candidate.start(), candidate.end());
+                if (intersection.isPresent()) {
+                    double projection = projection(wall.axis().start(), intersection.get(), direction);
+                    double outward = (intersection.get().xMillimeters() - axisEndpoint.xMillimeters()) * normalX
+                            + (intersection.get().yMillimeters() - axisEndpoint.yMillimeters()) * normalY;
+                    if (outward < -EPSILON) {
+                        continue;
+                    }
+                    boolean better = isStart
+                            ? projection < bestProjection - EPSILON
+                            : projection > bestProjection + EPSILON;
+                    if (better) {
+                        best = intersection.get();
+                        bestProjection = projection;
+                    }
+                }
+            }
         }
-        return connectedWall.thickness().toMillimeters() / 2.0 / sine;
+        return best;
+    }
+
+    private PlanSegment shiftedSegment(PlanSegment segment, double offset, double sideSign) {
+        Direction direction = direction(segment);
+        double normalX = -direction.y() * sideSign;
+        double normalY = direction.x() * sideSign;
+        return new PlanSegment(
+                new PlanPoint(segment.start().xMillimeters() + normalX * offset, segment.start().yMillimeters() + normalY * offset),
+                new PlanPoint(segment.end().xMillimeters() + normalX * offset, segment.end().yMillimeters() + normalY * offset)
+        );
+    }
+
+    private Optional<PlanPoint> lineIntersection(PlanPoint firstStart, PlanPoint firstEnd, PlanPoint secondStart, PlanPoint secondEnd) {
+        double x1 = firstStart.xMillimeters();
+        double y1 = firstStart.yMillimeters();
+        double x2 = firstEnd.xMillimeters();
+        double y2 = firstEnd.yMillimeters();
+        double x3 = secondStart.xMillimeters();
+        double y3 = secondStart.yMillimeters();
+        double x4 = secondEnd.xMillimeters();
+        double y4 = secondEnd.yMillimeters();
+        double denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if (Math.abs(denominator) < EPSILON) {
+            return Optional.empty();
+        }
+        double determinantFirst = x1 * y2 - y1 * x2;
+        double determinantSecond = x3 * y4 - y3 * x4;
+        double intersectionX = (determinantFirst * (x3 - x4) - (x1 - x2) * determinantSecond) / denominator;
+        double intersectionY = (determinantFirst * (y3 - y4) - (y1 - y2) * determinantSecond) / denominator;
+        return Optional.of(new PlanPoint(intersectionX, intersectionY));
     }
 
     private boolean touches(Wall wall, PlanPoint point) {
@@ -154,10 +211,11 @@ public final class WallDimensionService {
     private record Direction(double x, double y) {
     }
 
-    public record SideDimension(String name, Length length, double sideSign) {
+    public record SideDimension(String name, Length length, double sideSign, PlanSegment dimensionSegment) {
         public SideDimension {
             Objects.requireNonNull(name, "name darf nicht null sein.");
             Objects.requireNonNull(length, "length darf nicht null sein.");
+            Objects.requireNonNull(dimensionSegment, "dimensionSegment darf nicht null sein.");
             if (sideSign != -1.0 && sideSign != 1.0) {
                 throw new IllegalArgumentException("sideSign muss -1 oder 1 sein.");
             }
