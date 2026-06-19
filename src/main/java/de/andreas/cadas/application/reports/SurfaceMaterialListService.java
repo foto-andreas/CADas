@@ -56,6 +56,7 @@ public final class SurfaceMaterialListService {
             }
         }
         return new SurfaceMaterialReport(
+                project.name(),
                 materialSummaries,
                 rooms.values().stream().map(RoomAccumulator::toSummary).toList(),
                 project.levels().stream()
@@ -772,6 +773,7 @@ public final class SurfaceMaterialListService {
     }
 
     public record SurfaceMaterialReport(
+            String projectName,
             List<MaterialSummary> materials,
             List<RoomComplexitySummary> roomComplexities,
             List<RoomSummary> rooms
@@ -779,7 +781,7 @@ public final class SurfaceMaterialListService {
 
         public String toMarkdown() {
             StringBuilder markdown = new StringBuilder();
-            markdown.append("# Materialliste Beläge\n\n");
+            markdown.append("# Materialliste Beläge – ").append(projectName).append("\n\n");
             appendRooms(markdown);
             if (materials.isEmpty()) {
                 markdown.append("## Beläge\n\nKeine sichtbaren Beläge vorhanden.\n");

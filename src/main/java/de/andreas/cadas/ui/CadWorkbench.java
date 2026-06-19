@@ -4300,6 +4300,11 @@ public final class CadWorkbench extends BorderPane {
         if (!targetFile.getFileName().toString().contains(".")) {
             targetFile = exchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
         }
+        String newProjectName = exchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
+        if (!newProjectName.isBlank() && !newProjectName.equals(project.name())) {
+            rememberStateForUndo();
+            project.rename(newProjectName);
+        }
         exportProjectAsDxf(targetFile);
     }
 
@@ -4363,7 +4368,7 @@ public final class CadWorkbench extends BorderPane {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Maßstabgerechte Bauzeichnung als PDF speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
-        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".dxf");
+        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
         fileChooser.setInitialFileName(projectName + "_Bauzeichnung.pdf");
         Window owner = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showSaveDialog(owner);
@@ -4437,7 +4442,7 @@ public final class CadWorkbench extends BorderPane {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Materialliste als Markdown speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Markdown-Dateien", "*.md"));
-        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".dxf");
+        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
         fileChooser.setInitialFileName(projectName + "_Materialliste_Beläge");
         Window window = getScene() != null ? getScene().getWindow() : null;
         java.io.File file = fileChooser.showSaveDialog(window);
