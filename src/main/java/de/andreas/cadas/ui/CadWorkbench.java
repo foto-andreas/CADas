@@ -463,7 +463,7 @@ public final class CadWorkbench extends BorderPane {
         levelSelector.setItems(availableLevels);
         levelSelector.setValue(activeLevel.get());
         toolSelector.getItems().addAll(DrawingTool.values());
-        toolSelector.setValue(DrawingTool.WALL);
+        toolSelector.setValue(DrawingTool.EDIT);
         floorExtensionTypeSelector.getItems().setAll(FloorExtensionType.values());
         floorExtensionTypeSelector.setValue(FloorExtensionType.BALCONY);
         floorExtensionPlacementSelector.getItems().setAll(FloorExtensionPlacement.values());
