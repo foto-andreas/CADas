@@ -712,6 +712,26 @@ public final class ThreeDViewport extends BorderPane {
         selectInteriorFloorPoint(xMillimeters, zMillimeters);
     }
 
+    public void automationClickInteriorFloorOfRoom(String roomId, double xMillimeters, double zMillimeters) {
+        if (cameraMode != CameraMode.INTERIOR || currentProject == null) {
+            return;
+        }
+        if (interiorRoomId != null && roomId.equals(interiorRoomId.toString())) {
+            selectInteriorFloorPoint(xMillimeters, zMillimeters);
+            return;
+        }
+        for (Level level : currentProject.levels()) {
+            Room targetRoom = level.rooms().stream()
+                    .filter(room -> room.id().toString().equals(roomId))
+                    .findFirst()
+                    .orElse(null);
+            if (targetRoom != null) {
+                activateInteriorView(currentProject, level, targetRoom, new PlanPoint(xMillimeters, zMillimeters));
+                return;
+            }
+        }
+    }
+
     public PlanPoint automationInteriorEyePosition() {
         return new PlanPoint(interiorEyeXMillimeters, interiorEyeZMillimeters);
     }
@@ -909,10 +929,33 @@ public final class ThreeDViewport extends BorderPane {
         Point3D pickedPoint = node.localToParent(event.getPickResult().getIntersectedPoint());
         double pickedHeightMillimeters = -pickedPoint.getY() / WORLD_SCALE;
         if (cameraMode == CameraMode.INTERIOR && isInteriorFloorHit(kind, pickedHeightMillimeters)) {
-            selectInteriorFloorPoint(
-                    pickedPoint.getX() / WORLD_SCALE,
-                    pickedPoint.getZ() / WORLD_SCALE
-            );
+            double targetX = pickedPoint.getX() / WORLD_SCALE;
+            double targetZ = pickedPoint.getZ() / WORLD_SCALE;
+            // Wenn der geklickte Boden zu einem anderen Raum gehört, wechsle die
+            // Innenansicht in diesen Raum, sodass die Kamera auch durch Türen in
+            // Nachbarräume gesetzt werden kann.
+            if (kind == RenderableKind.ROOM_FLOOR
+                    && selectionKey != null
+                    && interiorTarget != null
+                    && !selectionKey.elementId().equals(interiorRoomId == null ? null : interiorRoomId.toString())
+                    && currentProject != null) {
+                Level activeLevel = currentProject.levels().stream()
+                        .filter(level -> level.name().equals(selectionKey.levelName()))
+                        .findFirst()
+                        .orElse(null);
+                if (activeLevel != null) {
+                    Room targetRoom = activeLevel.rooms().stream()
+                            .filter(room -> room.id().toString().equals(selectionKey.elementId()))
+                            .findFirst()
+                            .orElse(null);
+                    if (targetRoom != null) {
+                        activateInteriorView(currentProject, activeLevel, targetRoom, new PlanPoint(targetX, targetZ));
+                        event.consume();
+                        return;
+                    }
+                }
+            }
+            selectInteriorFloorPoint(targetX, targetZ);
             event.consume();
             return;
         }

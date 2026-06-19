@@ -117,6 +117,49 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void bodenklickWechseltDurchTuerInNachbarraum() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Test", "Erdgeschoss");
+        Room wohnen = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 3_000),
+                Length.of(260, LengthUnit.CENTIMETER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        Room kueche = Room.rectangular(
+                "Küche",
+                new PlanPoint(4_000, 0),
+                new PlanPoint(7_000, 3_000),
+                Length.of(260, LengthUnit.CENTIMETER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        project.primaryLevel().addRoom(wohnen);
+        project.primaryLevel().addRoom(kueche);
+        ThreeDViewport viewport = aufFxThread(() -> new ThreeDViewport(ignored -> { }, () -> { }));
+
+        aufFxThread(() -> {
+            viewport.activateInteriorView(project, project.primaryLevel(), wohnen);
+            return null;
+        });
+
+        // Klick in die Küche (Nachbarraum) versetzt den Standort dorthin.
+        aufFxThread(() -> {
+            viewport.automationClickInteriorFloorOfRoom(
+                    kueche.id().toString(),
+                    5_500.0,
+                    1_500.0
+            );
+            return null;
+        });
+
+        PlanPoint eyePosition = aufFxThread(viewport::automationInteriorEyePosition);
+        Assertions.assertEquals(5_500.0, eyePosition.xMillimeters(), 0.001);
+        Assertions.assertEquals(1_500.0, eyePosition.yMillimeters(), 0.001);
+    }
+
+    @Test
     void raumkontextÖffnetInnenansichtAmAngeklicktenStandort() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
