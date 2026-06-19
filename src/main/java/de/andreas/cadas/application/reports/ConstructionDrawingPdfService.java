@@ -1,5 +1,6 @@
 package de.andreas.cadas.application.reports;
 
+import de.andreas.cadas.application.drawing.WallDimensionPlacementService;
 import de.andreas.cadas.application.drawing.WallDimensionService;
 import de.andreas.cadas.domain.geometry.PlanPoint;
 import de.andreas.cadas.domain.geometry.PlanSegment;
@@ -22,10 +23,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 
 public final class ConstructionDrawingPdfService {
@@ -40,6 +39,7 @@ public final class ConstructionDrawingPdfService {
     private static final PDType1Font FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
     private static final PDType1Font FONT_BOLD = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
     private final WallDimensionService wallDimensionService = new WallDimensionService();
+    private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
 
     public void export(ProjectModel project, Path targetFile) throws IOException {
         Objects.requireNonNull(project, "project darf nicht null sein.");
@@ -239,21 +239,19 @@ public final class ConstructionDrawingPdfService {
     private void drawWallDimensions(PageCanvas canvas, Viewport viewport, Level level, Wall wall) throws IOException {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(level, wall);
         double baseOffset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);
-        Map<Double, Integer> sideCounters = new HashMap<>();
-        for (WallDimensionService.SideDimension roomDimension : dimensions.roomDimensions()) {
-            int index = sideCounters.getOrDefault(roomDimension.sideSign(), 0);
-            double offset = baseOffset + index * 16.0;
-            sideCounters.put(roomDimension.sideSign(), index + 1);
-            drawIsoDimension(canvas, viewport, roomDimension.dimensionSegment(),
-                    roomDimension.name() + ": Raummaß " + formatMeters(roomDimension.length().toMillimeters()), offset * roomDimension.sideSign());
-        }
-        if (dimensions.exteriorDimension().isPresent()) {
-            WallDimensionService.SideDimension exteriorDimension = dimensions.exteriorDimension().get();
-            int index = sideCounters.getOrDefault(exteriorDimension.sideSign(), 0);
-            double offset = baseOffset + index * 16.0;
-            sideCounters.put(exteriorDimension.sideSign(), index + 1);
-            drawIsoDimension(canvas, viewport, exteriorDimension.dimensionSegment(),
-                    "Außenmaß " + formatMeters(exteriorDimension.length().toMillimeters()), offset * exteriorDimension.sideSign());
+        for (WallDimensionPlacementService.PlacedDimension placement : wallDimensionPlacementService.place(
+                wall,
+                dimensions,
+                viewport.factor(),
+                baseOffset,
+                16.0
+        )) {
+            WallDimensionService.SideDimension dimension = placement.dimension();
+            drawIsoDimension(canvas, viewport, dimension.dimensionSegment(),
+                    placement.exterior()
+                            ? "Außenmaß " + formatMeters(dimension.length().toMillimeters())
+                            : dimension.name() + ": Raummaß " + formatMeters(dimension.length().toMillimeters()),
+                    placement.normalOffset());
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
             double offset = Math.max(wall.thickness().toMillimeters() * viewport.factor() / 2.0 + 10.0, 18.0);

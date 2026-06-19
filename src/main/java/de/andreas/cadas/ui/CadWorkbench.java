@@ -15,6 +15,7 @@ import de.andreas.cadas.application.drawing.QuarterTurnRotationService;
 import de.andreas.cadas.application.drawing.SelectionQueryService;
 import de.andreas.cadas.application.drawing.SelectionTranslationService;
 import de.andreas.cadas.application.drawing.SnapService;
+import de.andreas.cadas.application.drawing.WallDimensionPlacementService;
 import de.andreas.cadas.application.drawing.WallEditingService;
 import de.andreas.cadas.application.drawing.WallDimensionService;
 import de.andreas.cadas.application.drawing.WallSnapService;
@@ -113,6 +114,7 @@ import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.event.Event;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
@@ -159,6 +161,7 @@ import javafx.scene.web.WebView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.stage.WindowEvent;
 import javafx.embed.swing.SwingFXUtils;
 
 public final class CadWorkbench extends BorderPane {
@@ -209,6 +212,7 @@ public final class CadWorkbench extends BorderPane {
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     private final WallEditingService wallEditingService = new WallEditingService();
     private final WallDimensionService wallDimensionService = new WallDimensionService();
+    private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
     private final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
     private final QuarterTurnRotationService quarterTurnRotationService = new QuarterTurnRotationService();
     private final SelectionTranslationService selectionTranslationService = new SelectionTranslationService();
@@ -423,6 +427,10 @@ public final class CadWorkbench extends BorderPane {
     private double lastMouseY;
     private boolean altPressed;
     private boolean spacePressed;
+    private boolean errorDialogsEnabled = true;
+    private boolean applicationExitRequested;
+    private Runnable applicationExitAction = Platform::exit;
+    private UiErrorDialogs.ErrorPresentation lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
 
     public CadWorkbench() {
         setPadding(new Insets(12));
@@ -447,6 +455,7 @@ public final class CadWorkbench extends BorderPane {
                         this::clearSelection
                 );
                 newScene.getAccelerators().put(new KeyCodeCombination(KeyCode.F1), this::showHelpWindow);
+                newScene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleGlobalShortcuts);
                 newScene.addEventFilter(KeyEvent.KEY_PRESSED, this::updateModifierState);
                 newScene.addEventFilter(KeyEvent.KEY_RELEASED, this::updateModifierState);
             }
@@ -650,7 +659,7 @@ public final class CadWorkbench extends BorderPane {
 
     private Button viewButton(String label, Runnable action, String tooltipText) {
         Button button = new Button(label);
-        button.setOnAction(event -> action.run());
+        button.setOnAction(event -> runGuardedAction(label, action));
         button.setStyle("-fx-background-radius: 999; -fx-padding: 8 14 8 14;");
         applyTooltip(button, tooltipText);
         return button;
@@ -696,7 +705,7 @@ public final class CadWorkbench extends BorderPane {
 
     private Button workspaceModeButton(WorkspaceMode workspaceMode) {
         Button button = new Button(workspaceMode.label());
-        button.setOnAction(event -> selectWorkspaceMode(workspaceMode, true));
+        button.setOnAction(event -> runGuardedAction(workspaceMode.label() + "-Arbeitsbereich", () -> selectWorkspaceMode(workspaceMode, true)));
         button.setStyle(workspaceModeButtonStyle(workspaceMode == activeWorkspaceMode.get()));
         activeWorkspaceMode.addListener((ignored, oldValue, newValue) ->
                 button.setStyle(workspaceModeButtonStyle(workspaceMode == newValue)));
@@ -820,7 +829,7 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Aktive Etage als DXF exportieren", this::exportCurrentLevel, null),
                 menuItem("DXF als neue Etage importieren", this::importLevel, null),
                 menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
-                menuItem("Beenden", Platform::exit, shortcutKey(KeyCode.Q))
+                menuItem("Beenden", this::requestApplicationExit, shortcutKey(KeyCode.Q))
         );
 
         Menu bearbeitenMenu = new Menu("Bearbeiten");
@@ -1042,23 +1051,23 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void configureActionButtons() {
-        undoButton.setOnAction(event -> undo());
-        redoButton.setOnAction(event -> redo());
-        deleteSelectionButton.setOnAction(event -> deleteSelection());
-        clearSelectionButton.setOnAction(event -> clearSelection());
-        applySelectionPropertiesButton.setOnAction(event -> applyCurrentInputsToSelection());
-        applyEndpointHeightButton.setOnAction(event -> applyEndpointHeightToSelection());
-        addSurfaceLayerButton.setOnAction(event -> addSurfaceLayer());
-        updateSurfaceLayerButton.setOnAction(event -> updateSurfaceLayer());
-        removeSurfaceLayerButton.setOnAction(event -> removeSurfaceLayer());
-        toggleSurfaceLayerVisibilityButton.setOnAction(event -> toggleSurfaceLayerVisibility());
-        moveSurfaceLayerUpButton.setOnAction(event -> moveSurfaceLayer(-1));
-        moveSurfaceLayerDownButton.setOnAction(event -> moveSurfaceLayer(1));
-        saveSurfacePresetButton.setOnAction(event -> saveCurrentSurfacePreset());
-        addDwgBlockPresetButton.setOnAction(event -> addDwgBlockPreset());
-        refreshDwgLibraryButton.setOnAction(event -> refreshCurrentDwgLibraryAnalysis());
-        addDwgBlockAsSurfaceButton.setOnAction(event -> addSelectedDwgBlockAsSurfacePreset());
-        addDwgBlockAsObjectButton.setOnAction(event -> addSelectedDwgBlockAsObjectPreset());
+        undoButton.setOnAction(event -> runGuardedAction("Rückgängig", this::undo));
+        redoButton.setOnAction(event -> runGuardedAction("Wiederherstellen", this::redo));
+        deleteSelectionButton.setOnAction(event -> runGuardedAction("Auswahl löschen", this::deleteSelection));
+        clearSelectionButton.setOnAction(event -> runGuardedAction("Auswahl aufheben", this::clearSelection));
+        applySelectionPropertiesButton.setOnAction(event -> runGuardedAction("Werte auf Auswahl anwenden", this::applyCurrentInputsToSelection));
+        applyEndpointHeightButton.setOnAction(event -> runGuardedAction("Eckhöhe anwenden", this::applyEndpointHeightToSelection));
+        addSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene hinzufügen", this::addSurfaceLayer));
+        updateSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene aktualisieren", this::updateSurfaceLayer));
+        removeSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene entfernen", this::removeSurfaceLayer));
+        toggleSurfaceLayerVisibilityButton.setOnAction(event -> runGuardedAction("Sichtbarkeit umschalten", this::toggleSurfaceLayerVisibility));
+        moveSurfaceLayerUpButton.setOnAction(event -> runGuardedAction("Ebene nach oben", () -> moveSurfaceLayer(-1)));
+        moveSurfaceLayerDownButton.setOnAction(event -> runGuardedAction("Ebene nach unten", () -> moveSurfaceLayer(1)));
+        saveSurfacePresetButton.setOnAction(event -> runGuardedAction("Belagspreset speichern", this::saveCurrentSurfacePreset));
+        addDwgBlockPresetButton.setOnAction(event -> runGuardedAction("DWG-Block hinzufügen", this::addDwgBlockPreset));
+        refreshDwgLibraryButton.setOnAction(event -> runGuardedAction("DWG prüfen", this::refreshCurrentDwgLibraryAnalysis));
+        addDwgBlockAsSurfaceButton.setOnAction(event -> runGuardedAction("DWG-Block als Belag", this::addSelectedDwgBlockAsSurfacePreset));
+        addDwgBlockAsObjectButton.setOnAction(event -> runGuardedAction("DWG-Block als Objekt", this::addSelectedDwgBlockAsObjectPreset));
         rebuildSelectionContextMenu();
         applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
         applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
@@ -1201,7 +1210,7 @@ public final class CadWorkbench extends BorderPane {
 
     private MenuItem menuItem(String label, Runnable action, KeyCombination accelerator) {
         MenuItem menuItem = new MenuItem(label);
-        menuItem.setOnAction(event -> action.run());
+        menuItem.setOnAction(event -> runGuardedAction(label, action));
         if (accelerator != null) {
             menuItem.setAccelerator(accelerator);
         }
@@ -1224,6 +1233,47 @@ public final class CadWorkbench extends BorderPane {
 
     private KeyCombination shortcutShiftKey(KeyCode keyCode) {
         return new KeyCodeCombination(keyCode, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
+    }
+
+    private void runGuardedAction(String actionLabel, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception exception) {
+            showActionException(actionLabel, exception);
+        }
+    }
+
+    private void showActionException(String actionLabel, Throwable throwable) {
+        String title = "Aktion fehlgeschlagen";
+        String header = "Die Aktion `" + actionLabel + "` konnte nicht abgeschlossen werden.";
+        String content = UiErrorDialogs.userMessage(throwable);
+        draftLabel.setText(header + " " + content);
+        showErrorDialog(title, header, content, throwable);
+    }
+
+    private void showOperationException(String title, Throwable throwable) {
+        String content = UiErrorDialogs.userMessage(throwable);
+        draftLabel.setText(title + ": " + content);
+        showErrorDialog(title, title, content, throwable);
+    }
+
+    private void showErrorDialog(String title, String header, String content, Throwable throwable) {
+        lastErrorDialog = UiErrorDialogs.fromThrowable(title, header, content, throwable);
+        UiErrorDialogs.show(lastErrorDialog, currentWindow(), errorDialogsEnabled);
+    }
+
+    private Window currentWindow() {
+        return getScene() != null ? getScene().getWindow() : null;
+    }
+
+    public void handleUnhandledException(Throwable throwable) {
+        showErrorDialog(
+                "Unerwarteter Fehler",
+                "CADas hat einen unerwarteten Fehler erkannt.",
+                UiErrorDialogs.userMessage(throwable),
+                throwable
+        );
+        draftLabel.setText("Unerwarteter Fehler: " + UiErrorDialogs.userMessage(throwable));
     }
 
     private HBox labelledNode(String label, Node node) {
@@ -1345,7 +1395,7 @@ public final class CadWorkbench extends BorderPane {
         try {
             userSurfacePresetLibrary.loadPresets().forEach(this::registerSurfacePreset);
         } catch (RuntimeException | IOException exception) {
-            draftLabel.setText("Eigene Belagspresets konnten nicht geladen werden: " + exception.getMessage());
+            showOperationException("Eigene Belagspresets konnten nicht geladen werden", exception);
         }
     }
 
@@ -1353,7 +1403,7 @@ public final class CadWorkbench extends BorderPane {
         try {
             userSurfacePresetLibrary.loadCadLibraries().forEach(this::registerConfiguredDwgLibraryReference);
         } catch (IOException exception) {
-            draftLabel.setText("Gespeicherte DWG-Bibliotheken konnten nicht geladen werden: " + exception.getMessage());
+            showOperationException("Gespeicherte DWG-Bibliotheken konnten nicht geladen werden", exception);
         }
     }
 
@@ -1461,7 +1511,7 @@ public final class CadWorkbench extends BorderPane {
 
     private Button createActionButton(String label, String style, Runnable action, String tooltipText) {
         Button button = new Button(label);
-        button.setOnAction(event -> action.run());
+        button.setOnAction(event -> runGuardedAction(label, action));
         if (style != null) {
             button.setStyle(style);
         }
@@ -1915,6 +1965,40 @@ public final class CadWorkbench extends BorderPane {
         updateMouseCursor();
     }
 
+    private void handleGlobalShortcuts(KeyEvent event) {
+        if (!event.isShortcutDown() || event.getEventType() != KeyEvent.KEY_PRESSED) {
+            return;
+        }
+        if (event.getCode() == KeyCode.Z && event.isShiftDown()) {
+            runGuardedAction("Wiederherstellen", this::redo);
+            event.consume();
+            return;
+        }
+        if (event.getCode() == KeyCode.Z) {
+            runGuardedAction("Rückgängig", this::undo);
+            event.consume();
+            return;
+        }
+        if (event.getCode() == KeyCode.Q) {
+            runGuardedAction("Beenden", this::requestApplicationExit);
+            event.consume();
+        }
+    }
+
+    private void requestApplicationExit() {
+        applicationExitRequested = true;
+        Window window = currentWindow();
+        if (window instanceof Stage stage) {
+            stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST));
+            if (stage.isShowing()) {
+                stage.close();
+            }
+        } else if (window != null) {
+            window.hide();
+        }
+        applicationExitAction.run();
+    }
+
     private void updateMouseCursor() {
         PointerCursorService.PointerTarget target = pointerTargetAtLastPosition();
         PointerCursorService.CursorType cursorType = pointerCursorService.cursor(new PointerCursorService.PointerContext(
@@ -2125,32 +2209,28 @@ public final class CadWorkbench extends BorderPane {
 
     private void drawWallDimensions(GraphicsContext graphics, Wall wall) {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(activeLevel.get(), wall);
-        double baseOffset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0, 24.0);
-        Map<Double, Integer> sideCounters = new HashMap<>();
-        for (WallDimensionService.SideDimension roomDimension : dimensions.roomDimensions()) {
-            int index = sideCounters.getOrDefault(roomDimension.sideSign(), 0);
-            double offset = baseOffset + index * 20.0;
-            sideCounters.put(roomDimension.sideSign(), index + 1);
+        double isoExtra = currentDimensionStandard() == DimensionStandard.DIN_EN_ISO_7519_2025_01 ? 12.0 : 0.0;
+        double baseOffset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0 + isoExtra, 28.0 + isoExtra);
+        double stepOffset = 20.0 + isoExtra;
+        for (WallDimensionPlacementService.PlacedDimension placement : wallDimensionPlacementService.place(
+                wall,
+                dimensions,
+                scale(),
+                baseOffset,
+                stepOffset
+        )) {
+            WallDimensionService.SideDimension dimension = placement.dimension();
             drawDimensionLabel(
                     graphics,
-                    roomDimension.dimensionSegment(),
-                    roomDimension.name() + ": Raummaß " + roomDimension.length().format(LengthUnit.METER, 2),
-                    offset * roomDimension.sideSign()
+                    dimension.dimensionSegment(),
+                    placement.exterior()
+                            ? "Außenmaß " + dimension.length().format(LengthUnit.METER, 2)
+                            : dimension.name() + ": Raummaß " + dimension.length().format(LengthUnit.METER, 2),
+                    placement.normalOffset()
             );
         }
-        dimensions.exteriorDimension().ifPresent(exteriorDimension -> {
-            int index = sideCounters.getOrDefault(exteriorDimension.sideSign(), 0);
-            double offset = baseOffset + index * 20.0;
-            sideCounters.put(exteriorDimension.sideSign(), index + 1);
-            drawDimensionLabel(
-                    graphics,
-                    exteriorDimension.dimensionSegment(),
-                    "Außenmaß " + exteriorDimension.length().format(LengthUnit.METER, 2),
-                    offset * exteriorDimension.sideSign()
-            );
-        });
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
-            double offset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0, 24.0);
+            double offset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0 + isoExtra, 28.0 + isoExtra);
             drawDimensionLabel(graphics, wall.axis(), "Achsmaß " + wall.axis().length().format(LengthUnit.METER, 2), offset);
         }
     }
@@ -3873,7 +3953,7 @@ public final class CadWorkbench extends BorderPane {
             levelExchangeService.exportLevel(activeLevel.get(), exportPath);
             confirmExportWritten(exportPath);
         } catch (Exception exception) {
-            draftLabel.setText("DXF-Export fehlgeschlagen: " + exception.getMessage());
+            showOperationException("DXF-Export fehlgeschlagen", exception);
         }
     }
 
@@ -3895,7 +3975,7 @@ public final class CadWorkbench extends BorderPane {
             projectExchangeService.exportProject(project, exportPath);
             confirmExportWritten(exportPath);
         } catch (Exception exception) {
-            draftLabel.setText("Gebäude-DXF-Export fehlgeschlagen: " + exception.getMessage());
+            showOperationException("Gebäude-DXF-Export fehlgeschlagen", exception);
         }
     }
 
@@ -3958,7 +4038,7 @@ public final class CadWorkbench extends BorderPane {
             constructionDrawingPdfService.export(project, target);
             draftLabel.setText("Bauzeichnungs-PDF exportiert: " + target.getFileName());
         } catch (Exception exception) {
-            draftLabel.setText("PDF-Export fehlgeschlagen: " + exception.getMessage());
+            showOperationException("PDF-Export fehlgeschlagen", exception);
         }
     }
 
@@ -4023,7 +4103,7 @@ public final class CadWorkbench extends BorderPane {
             Files.writeString(exportPath, surfaceMaterialListService.create(project).toMarkdown());
             draftLabel.setText("Materialliste exportiert: " + exportPath.getFileName());
         } catch (Exception exception) {
-            draftLabel.setText("Materiallisten-Export fehlgeschlagen: " + exception.getMessage());
+            showOperationException("Materiallisten-Export fehlgeschlagen", exception);
         }
     }
 
@@ -4049,7 +4129,7 @@ public final class CadWorkbench extends BorderPane {
             fitCurrentViewToContent();
             draftLabel.setText("DXF importiert: " + sourceFile.getFileName());
         } catch (Exception exception) {
-            draftLabel.setText("DXF-Import fehlgeschlagen: " + exception.getMessage());
+            showOperationException("DXF-Import fehlgeschlagen", exception);
         }
     }
 
@@ -4078,7 +4158,7 @@ public final class CadWorkbench extends BorderPane {
             fitCurrentViewToContent();
             draftLabel.setText("Gebäude-DXF importiert: " + sourceFile.getFileName());
         } catch (Exception exception) {
-            draftLabel.setText("Gebäude-DXF-Import fehlgeschlagen: " + exception.getMessage());
+            showOperationException("Gebäude-DXF-Import fehlgeschlagen", exception);
         }
     }
 
@@ -4153,7 +4233,7 @@ public final class CadWorkbench extends BorderPane {
             }
             draftLabel.setText("Teilebibliothek geladen: " + fileName);
         } catch (Exception exception) {
-            draftLabel.setText("Teilebibliothek fehlgeschlagen: " + exception.getMessage());
+            showOperationException("Teilebibliothek fehlgeschlagen", exception);
         }
     }
 
@@ -4216,7 +4296,7 @@ public final class CadWorkbench extends BorderPane {
         try {
             return userSurfacePresetLibrary.copyCadLibrary(sourceFile, overwrite);
         } catch (IOException exception) {
-            draftLabel.setText("DWG-Bibliothek konnte nicht in das Belagsverzeichnis übernommen werden: " + exception.getMessage());
+            showOperationException("DWG-Bibliothek konnte nicht in das Belagsverzeichnis übernommen werden", exception);
             return sourceFile.toAbsolutePath().normalize();
         }
     }
@@ -4469,9 +4549,9 @@ public final class CadWorkbench extends BorderPane {
             surfacePresetSelector.setValue(savedPreset);
             draftLabel.setText("Belagspreset gespeichert: " + savedPreset.name());
         } catch (FileAlreadyExistsException exception) {
-            draftLabel.setText("Belagspreset existiert bereits und wurde nicht überschrieben.");
+            showOperationException("Belagspreset existiert bereits und wurde nicht überschrieben", exception);
         } catch (IOException exception) {
-            draftLabel.setText("Belagspreset konnte nicht gespeichert werden: " + exception.getMessage());
+            showOperationException("Belagspreset konnte nicht gespeichert werden", exception);
         }
     }
 
@@ -5221,19 +5301,19 @@ public final class CadWorkbench extends BorderPane {
 
     private void undo() {
         history.undo(captureSnapshot())
-                .ifPresent(snapshot -> {
+                .ifPresentOrElse(snapshot -> {
                     restoreSnapshot(snapshot);
                     draftLabel.setText("Letzte Änderung rückgängig gemacht.");
-                });
+                }, () -> draftLabel.setText("Kein weiterer Schritt zum Rückgängigmachen vorhanden."));
         updateActionButtons();
     }
 
     private void redo() {
         history.redo(captureSnapshot())
-                .ifPresent(snapshot -> {
+                .ifPresentOrElse(snapshot -> {
                     restoreSnapshot(snapshot);
                     draftLabel.setText("Änderung wiederhergestellt.");
-                });
+                }, () -> draftLabel.setText("Kein Schritt zum Wiederherstellen vorhanden."));
         updateActionButtons();
     }
 
@@ -5982,6 +6062,55 @@ public final class CadWorkbench extends BorderPane {
                 .toList();
     }
 
+    public void automationSetErrorDialogsEnabled(boolean enabled) {
+        errorDialogsEnabled = enabled;
+    }
+
+    public void automationClearLastError() {
+        lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
+    }
+
+    public String automationLastErrorTitle() {
+        return lastErrorDialog.title();
+    }
+
+    public String automationLastErrorHeader() {
+        return lastErrorDialog.header();
+    }
+
+    public String automationLastErrorContent() {
+        return lastErrorDialog.content();
+    }
+
+    public String automationLastErrorStackTrace() {
+        return lastErrorDialog.stackTrace();
+    }
+
+    public void automationDisableApplicationExit() {
+        applicationExitAction = () -> {
+        };
+        applicationExitRequested = false;
+    }
+
+    public boolean automationExitRequested() {
+        return applicationExitRequested;
+    }
+
+    public void automationTriggerShortcut(KeyCode keyCode, boolean shortcutDown, boolean shiftDown) {
+        Node target = Optional.ofNullable(getScene())
+                .map(Scene::getFocusOwner)
+                .orElse(this);
+        Event.fireEvent(target, shortcutEvent(keyCode, shortcutDown, shiftDown));
+    }
+
+    public void automationTriggerShortcutOnField(String fieldName, KeyCode keyCode, boolean shortcutDown, boolean shiftDown) {
+        Event.fireEvent(textFieldByName(fieldName), shortcutEvent(keyCode, shortcutDown, shiftDown));
+    }
+
+    private KeyEvent shortcutEvent(KeyCode keyCode, boolean shortcutDown, boolean shiftDown) {
+        return new KeyEvent(KeyEvent.KEY_PRESSED, "", "", keyCode, shiftDown, shortcutDown, false, shortcutDown);
+    }
+
     public WorkbenchAutomationSnapshot automationInvoke(String actionName, Path path) {
         WorkbenchAutomationSnapshot result = null;
         switch (actionName) {
@@ -6109,6 +6238,7 @@ public final class CadWorkbench extends BorderPane {
                 String mode = path != null ? path.toString() : "ORTHOGRAPHIC";
                 threeDViewport.setProjectionMode(de.andreas.cadas.application.view.ProjectionMode.valueOf(mode));
             }
+            case "exit" -> requestApplicationExit();
             case "clearProject" -> clearProjectWithoutDialog();
             default -> throw new IllegalArgumentException("Automatisierungsaktion `" + actionName + "` ist unbekannt.");
         }

@@ -19,8 +19,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyCode;
 import javafx.scene.Scene;
+import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -93,6 +97,80 @@ class CadWorkbenchTest {
         Assertions.assertEquals(0.55, nachRedo.zoom(), 0.0001);
         Assertions.assertEquals(-20.0, nachRedo.offsetX(), 0.0001);
         Assertions.assertEquals(480.0, nachRedo.offsetY(), 0.0001);
+    }
+
+    @Test
+    void beendenAusDateimenueFordertAppExitAn() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationDisableApplicationExit();
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            MenuItem beenden = menuBar.getMenus().stream()
+                    .flatMap(menu -> menu.getItems().stream())
+                    .filter(item -> "Beenden".equals(item.getText()))
+                    .findFirst()
+                    .orElseThrow();
+            beenden.fire();
+            return null;
+        });
+
+        Assertions.assertTrue(aufFxThread(workbench::automationExitRequested));
+    }
+
+    @Test
+    void rueckgaengigShortcutGreiftAuchVomTextfeldAus() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetViewport(1.85, 320.0, -145.0);
+            workbench.automationRememberUndoState();
+            workbench.automationSetViewport(0.55, -20.0, 480.0);
+            workbench.automationTriggerShortcutOnField("roomName", KeyCode.Z, true, false);
+            return null;
+        });
+
+        WorkbenchAutomationSnapshot nachShortcutUndo = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertEquals(1.85, nachShortcutUndo.zoom(), 0.0001);
+        Assertions.assertEquals(320.0, nachShortcutUndo.offsetX(), 0.0001);
+        Assertions.assertEquals(-145.0, nachShortcutUndo.offsetY(), 0.0001);
+    }
+
+    @Test
+    void importfehlerWerdenImFehlerdialogFestgehalten() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationSetErrorDialogsEnabled(false);
+            instanz.automationClearLastError();
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+        Path fehlendeDatei = Path.of("gibt-es-nicht.dxf").toAbsolutePath();
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("importProjectDxf", fehlendeDatei);
+            return null;
+        });
+
+        Assertions.assertEquals("Gebäude-DXF-Import fehlgeschlagen", aufFxThread(workbench::automationLastErrorTitle));
+        Assertions.assertEquals("Gebäude-DXF-Import fehlgeschlagen", aufFxThread(workbench::automationLastErrorHeader));
+        Assertions.assertTrue(aufFxThread(workbench::automationLastErrorContent).contains("gibt-es-nicht.dxf"));
+        Assertions.assertTrue(aufFxThread(workbench::automationLastErrorStackTrace).contains("gibt-es-nicht.dxf"));
     }
 
     @Test
