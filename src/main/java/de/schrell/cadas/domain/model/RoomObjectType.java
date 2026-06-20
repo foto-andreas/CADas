@@ -8,6 +8,7 @@ public enum RoomObjectType {
     CABINET("Schrank"),
     TABLE("Tisch"),
     CUBOID("Quader"),
+    DXF_3D_REFERENCE("3D-DXF-Objekt"),
     DWG_REFERENCE("DWG-Objekt");
 
     private final String label;

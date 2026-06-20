@@ -492,7 +492,9 @@ Aktuell enthaltene Standardobjekte:
 Beim Wandschrank wird der Bodenbelag ausgespart. Schrank und Tisch stehen auf dem Bodenbelag und schneiden ihn nicht aus.
 Die Bezeichnung eines Quaders wird mittig im Grundriss angezeigt und kann über die Eigenschaftenleiste geändert werden.
 
-Zusätzliche `DWG`-Objektdateien unter `~/.config/CADas/Objekte` erscheinen beim Start als Objekt-Presets. Sie werden aktuell als referenzierte rechteckige Platzhalter mit Standardmaß geführt; echte DWG-Blockgeometrie ist als Folgearbeit festgehalten.
+Zusätzliche `DWG`-Objektdateien unter `~/.config/CADas/Objekte` erscheinen beim Start als Objekt-Presets. Nicht direkt auswertbare DWG-Geometrie wird als referenzierter rechteckiger Platzhalter geführt.
+
+Über `Datei` > `3D-Objekt aus DXF laden` importierst du DXF-Dateien mit ACIS-v1-`3DSOLID`-Körpern. CADas übernimmt die metrischen 3D-Grenzen, legt die Datei unter `~/.config/CADas/Objekte` ab und wählt das neue Preset sofort aus. Die analytischen SAT-Randkurven werden in mehrere Volumenkörper angenähert; diese Darstellung lässt sich innen oder außen platzieren sowie über Breite, Tiefe, Höhe und Winkel skalieren und drehen.
 
 ### Treppe
 

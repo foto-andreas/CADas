@@ -1,5 +1,8 @@
 package de.schrell.cadas.application.view;
 
+import de.schrell.cadas.application.dwg.Dxf3dBounds;
+import de.schrell.cadas.application.dwg.Dxf3dObjectGeometry;
+import de.schrell.cadas.application.dwg.Dxf3dObjectGeometryReader;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.layers.TileLayoutRequest;
 import de.schrell.cadas.application.layers.TileLayoutService;
@@ -18,6 +21,7 @@ import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.Roof;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.SurfaceLayer;
@@ -26,6 +30,9 @@ import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -51,6 +58,8 @@ public final class ThreeDSceneModelBuilder {
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
+    private final Dxf3dObjectGeometryReader dxf3dObjectGeometryReader = new Dxf3dObjectGeometryReader();
+    private final Map<Path, CachedDxf3dGeometry> dxf3dGeometryCache = new LinkedHashMap<>();
     private final List<RenderableMesh> meshes = new ArrayList<>();
 
     public ThreeDSceneModel build(ProjectModel project, Set<String> visibleLevelNames, boolean renderSurfaceLayers) {
@@ -1498,6 +1507,11 @@ public final class ThreeDSceneModelBuilder {
             if (!roomObject.visible()) {
                 continue;
             }
+            Optional<Dxf3dObjectGeometry> dxfGeometry = dxf3dGeometry(roomObject);
+            if (dxfGeometry.isPresent()) {
+                boxes.addAll(buildDxf3dRoomObject(level, roomObject, baseHeight, dxfGeometry.orElseThrow()));
+                continue;
+            }
             double height = Math.max(1.0, roomObject.height().toMillimeters());
             boxes.add(new RenderableBox(
                     new SelectionKey(RenderableKind.ROOM_OBJECT, level.name(), roomObject.id().toString()),
@@ -1516,6 +1530,66 @@ public final class ThreeDSceneModelBuilder {
             ));
         }
         return boxes;
+    }
+
+    private Optional<Dxf3dObjectGeometry> dxf3dGeometry(RoomObject roomObject) {
+        if (roomObject.type() != RoomObjectType.DXF_3D_REFERENCE || roomObject.source().isBlank()) {
+            return Optional.empty();
+        }
+        Path sourceFile = Path.of(roomObject.source().split("#", 2)[0]).toAbsolutePath().normalize();
+        if (!Files.isRegularFile(sourceFile)) {
+            return Optional.empty();
+        }
+        try {
+            long modifiedMillis = Files.getLastModifiedTime(sourceFile).toMillis();
+            long size = Files.size(sourceFile);
+            CachedDxf3dGeometry cached = dxf3dGeometryCache.get(sourceFile);
+            if (cached != null && cached.modifiedMillis() == modifiedMillis && cached.size() == size) {
+                return Optional.of(cached.geometry());
+            }
+            Dxf3dObjectGeometry geometry = dxf3dObjectGeometryReader.read(sourceFile);
+            dxf3dGeometryCache.put(sourceFile, new CachedDxf3dGeometry(modifiedMillis, size, geometry));
+            return Optional.of(geometry);
+        } catch (IOException | IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+    }
+
+    private List<RenderableBox> buildDxf3dRoomObject(Level level, RoomObject roomObject, double baseHeight, Dxf3dObjectGeometry geometry) {
+        Dxf3dBounds sourceBounds = geometry.bounds();
+        double scaleX = roomObject.width().toMillimeters() / Math.max(1.0, sourceBounds.widthMillimeters());
+        double scaleDepth = roomObject.depth().toMillimeters() / Math.max(1.0, sourceBounds.depthMillimeters());
+        double scaleHeight = roomObject.height().toMillimeters() / Math.max(1.0, sourceBounds.heightMillimeters());
+        double angleRadians = Math.toRadians(roomObject.rotationDegrees());
+        double cosine = Math.cos(angleRadians);
+        double sine = Math.sin(angleRadians);
+        SelectionKey selectionKey = new SelectionKey(RenderableKind.ROOM_OBJECT, level.name(), roomObject.id().toString());
+        return geometry.solidBounds().stream()
+                .map(solid -> {
+                    double localX = (solid.centerXMillimeters() - sourceBounds.centerXMillimeters()) * scaleX;
+                    double localDepth = (solid.centerYMillimeters() - sourceBounds.centerYMillimeters()) * scaleDepth;
+                    double rotatedX = localX * cosine + localDepth * sine;
+                    double rotatedDepth = -localX * sine + localDepth * cosine;
+                    return new RenderableBox(
+                            selectionKey,
+                            level.name(),
+                            RenderableKind.ROOM_OBJECT,
+                            roomObject.center().xMillimeters() + rotatedX,
+                            baseHeight + (solid.centerZMillimeters() - sourceBounds.minZMillimeters()) * scaleHeight,
+                            roomObject.center().yMillimeters() + rotatedDepth,
+                            Math.max(1.0, solid.widthMillimeters() * scaleX),
+                            Math.max(1.0, solid.heightMillimeters() * scaleHeight),
+                            Math.max(1.0, solid.depthMillimeters() * scaleDepth),
+                            RotationAxis.Y,
+                            roomObject.rotationDegrees(),
+                            "room-object",
+                            0.9
+                    );
+                })
+                .toList();
+    }
+
+    private record CachedDxf3dGeometry(long modifiedMillis, long size, Dxf3dObjectGeometry geometry) {
     }
 
     private List<RenderableBox> buildFloorExtensions(Level level, double baseHeight) {

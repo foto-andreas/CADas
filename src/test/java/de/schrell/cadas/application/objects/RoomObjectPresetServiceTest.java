@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.objects;
 
+import static de.schrell.cadas.testsupport.Dxf3dTestFixtures.simpleSolidDxf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -81,6 +82,25 @@ class RoomObjectPresetServiceTest {
         assertEquals(500.0, preset.depth().toMillimeters(), 0.001);
         assertTrue(preset.cutsFloorCovering());
         assertTrue(preset.source().endsWith("Sanitär.dwg#Waschbecken"));
+    }
+
+    @Test
+    void importiertDreidimensionaleDxfDateiAlsSkalierbaresPreset() throws Exception {
+        Path sourceDirectory = tempDir.resolve("Quelle");
+        Path objectDirectory = tempDir.resolve("Objekte");
+        Files.createDirectories(sourceDirectory);
+        Path sourceFile = sourceDirectory.resolve("Wärmepumpe.dxf");
+        Files.writeString(sourceFile, simpleSolidDxf());
+        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, new DwgLibraryAnalyzer(new UnavailableConverter()));
+
+        RoomObjectPreset preset = service.importDxf3dObject(sourceFile);
+
+        assertEquals(RoomObjectType.DXF_3D_REFERENCE, preset.type());
+        assertEquals(20.0, preset.width().toMillimeters(), 0.001);
+        assertEquals(20.0, preset.depth().toMillimeters(), 0.001);
+        assertEquals(20.0, preset.height().toMillimeters(), 0.001);
+        assertTrue(Files.exists(objectDirectory.resolve("Wärmepumpe.dxf")));
+        assertEquals(1, service.loadDxf3dPresets().size());
     }
 
     private static final class UnavailableConverter implements DwgToDxfConverter {

@@ -32,7 +32,7 @@ Vier-Schicht-Architektur: `domain` (Fachmodell, Geometrie) → `application` (Se
 | `application.objects` | Raumobjekt-Presets | `RoomObjectPresetService` |
 | `application.room` | Automatische Raumerkennung aus Wandzügen | `AutoRoomGenerationService` |
 | `application.history` | Rückgängig/Wiederherstellen | `UndoRedoStack` |
-| `application.dwg` | DWG-Analyse über externe Konverter | `DwgLibraryAnalyzer` |
+| `application.dwg` | DWG-Analyse und 3D-DXF-Objekte | `DwgLibraryAnalyzer`, `Dxf3dObjectGeometryReader` |
 | `infrastructure.dxf` | DXF-Import/Export | `DxfProjectExchangeService`, `DxfLevelExchangeService` |
 | `ui` | JavaFX-Workbench, 3D-Viewport, Automation | `CadWorkbench`, `ThreeDViewport`, `AutomationBridgeServer` |
 

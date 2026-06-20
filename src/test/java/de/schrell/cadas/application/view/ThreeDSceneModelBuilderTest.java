@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.view;
 
+import static de.schrell.cadas.testsupport.Dxf3dTestFixtures.simpleSolidDxf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,6 +17,7 @@ import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.Roof;
@@ -32,11 +34,14 @@ import de.schrell.cadas.domain.model.WindowElement;
 import de.schrell.cadas.application.layers.WallSurfaceTargetKey;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ThreeDSceneModelBuilderTest {
 
@@ -171,6 +176,37 @@ class ThreeDSceneModelBuilderTest {
         assertEquals(400.0, box.width(), 0.001);
         assertEquals(700.0, box.depth(), 0.001);
         assertEquals(37.5, box.rotationDegrees(), 0.001);
+    }
+
+    @Test
+    void rendertSkalierteDreidimensionaleDxfKoerper(@TempDir Path tempDir) throws Exception {
+        Path sourceFile = tempDir.resolve("Wärmepumpe.dxf");
+        Files.writeString(sourceFile, simpleSolidDxf());
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "dxf-3d-waermepumpe",
+                "Wärmepumpe",
+                RoomObjectType.DXF_3D_REFERENCE,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(1000, 1200),
+                Length.ofMillimeters(200),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(400),
+                90.0,
+                RoomObjectMountingMode.STANDS_ON_COVERING,
+                sourceFile.toString()
+        ));
+
+        RenderableBox box = builder.build(project, Set.of("Erdgeschoss"), false).boxes().stream()
+                .filter(renderableBox -> renderableBox.kind() == RenderableKind.ROOM_OBJECT)
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(200.0, box.width(), 0.001);
+        assertEquals(100.0, box.depth(), 0.001);
+        assertEquals(400.0, box.height(), 0.001);
+        assertEquals(90.0, box.rotationDegrees(), 0.001);
+        assertEquals(200.0, box.centerY(), 0.001);
     }
 
     @Test

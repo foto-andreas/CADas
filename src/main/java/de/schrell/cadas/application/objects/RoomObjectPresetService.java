@@ -2,6 +2,8 @@ package de.schrell.cadas.application.objects;
 
 import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.application.dwg.DwgLibraryAnalyzer;
+import de.schrell.cadas.application.dwg.Dxf3dObjectGeometry;
+import de.schrell.cadas.application.dwg.Dxf3dObjectGeometryReader;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
@@ -11,16 +13,19 @@ import de.schrell.cadas.domain.model.RoomObjectType;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public final class RoomObjectPresetService {
 
     private final Path objectDirectory;
     private final DwgLibraryAnalyzer dwgLibraryAnalyzer;
+    private final Dxf3dObjectGeometryReader dxf3dObjectGeometryReader;
 
     public RoomObjectPresetService() {
         this(defaultObjectDirectory());
@@ -33,10 +38,11 @@ public final class RoomObjectPresetService {
     public RoomObjectPresetService(Path objectDirectory, DwgLibraryAnalyzer dwgLibraryAnalyzer) {
         this.objectDirectory = Objects.requireNonNull(objectDirectory, "objectDirectory darf nicht null sein.");
         this.dwgLibraryAnalyzer = Objects.requireNonNull(dwgLibraryAnalyzer, "dwgLibraryAnalyzer darf nicht null sein.");
+        this.dxf3dObjectGeometryReader = new Dxf3dObjectGeometryReader();
     }
 
     public List<RoomObjectPreset> presets() {
-        return Stream.concat(defaults().stream(), loadDwgPresets().stream()).toList();
+        return Stream.of(defaults(), loadDwgPresets(), loadDxf3dPresets()).flatMap(List::stream).toList();
     }
 
     public List<RoomObjectPreset> defaults() {
@@ -70,6 +76,38 @@ public final class RoomObjectPresetService {
         }
     }
 
+    public List<RoomObjectPreset> loadDxf3dPresets() {
+        if (!Files.isDirectory(objectDirectory)) {
+            return List.of();
+        }
+        try (Stream<Path> files = Files.list(objectDirectory)) {
+            return files
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".dxf"))
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .map(this::readDxf3dPreset)
+                    .flatMap(Optional::stream)
+                    .toList();
+        } catch (IOException exception) {
+            return List.of();
+        }
+    }
+
+    public RoomObjectPreset importDxf3dObject(Path sourceFile) throws IOException {
+        Objects.requireNonNull(sourceFile, "sourceFile darf nicht null sein.");
+        Files.createDirectories(objectDirectory);
+        Path targetFile = importTarget(sourceFile);
+        Path normalizedSource = sourceFile.toAbsolutePath().normalize();
+        if (!Files.exists(targetFile) || !Files.isSameFile(normalizedSource, targetFile)) {
+            Files.copy(normalizedSource, targetFile, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return dxf3dPreset(targetFile);
+    }
+
+    public Path importTarget(Path sourceFile) {
+        Objects.requireNonNull(sourceFile, "sourceFile darf nicht null sein.");
+        return objectDirectory.resolve(sourceFile.getFileName()).toAbsolutePath().normalize();
+    }
+
     public RoomObjectPreset fromDwgBlock(DwgBlockDefinition block, boolean cutsFloorCovering) {
         return fromDwgBlock(block, RoomObjectMountingMode.fromCutsFloorCovering(cutsFloorCovering));
     }
@@ -95,6 +133,31 @@ public final class RoomObjectPresetService {
                 .map(block -> fromDwgBlock(block, false))
                 .toList();
         return blockPresets.isEmpty() ? List.of(dwgPreset(path)) : blockPresets;
+    }
+
+    private Optional<RoomObjectPreset> readDxf3dPreset(Path path) {
+        try {
+            return Optional.of(dxf3dPreset(path));
+        } catch (IOException | IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+    }
+
+    private RoomObjectPreset dxf3dPreset(Path path) throws IOException {
+        Dxf3dObjectGeometry geometry = dxf3dObjectGeometryReader.read(path);
+        String fileName = path.getFileName().toString();
+        String baseName = fileName.substring(0, fileName.length() - 4);
+        return new RoomObjectPreset(
+                "dxf-3d-" + normalizedId(baseName),
+                "3D-DXF: " + baseName,
+                RoomObjectType.DXF_3D_REFERENCE,
+                RoomObjectShape.RECTANGLE,
+                Length.ofMillimeters(Math.max(1.0, geometry.bounds().widthMillimeters())),
+                Length.ofMillimeters(Math.max(1.0, geometry.bounds().depthMillimeters())),
+                Length.ofMillimeters(Math.max(1.0, geometry.bounds().heightMillimeters())),
+                RoomObjectMountingMode.STANDS_ON_COVERING,
+                path.toAbsolutePath().normalize().toString()
+        );
     }
 
     private RoomObjectPreset preset(String id, String name, RoomObjectType type, RoomObjectShape shape, double widthCentimeters, double depthCentimeters, double heightCentimeters, boolean cutsFloorCovering) {
