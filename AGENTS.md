@@ -44,6 +44,7 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Türen und Fenster werden im Modell wandgebunden über Offset und Breite gespeichert, damit Wandbearbeitungen diese Öffnungen mitführen können.
 * Die erste Dateiformat-Schnittstelle wird als separater DXF-Adapter umgesetzt, damit spätere DWG-Unterstützung ohne Eingriff in die Fachlogik ergänzt werden kann.
 * Der erste Treppenumfang basiert auf Presets für gerade Treppen, 180°-Treppen und Wendeltreppen mit platzierbarer Grundfläche.
+* Treppen besitzen optionale linke und rechte Unterbauwände mit eigener Wandstärke sowie eine planare schräge Untersicht mit eigener Dicke. Unterbauwände sind normale polygonale Wände mit stabilen IDs, sodass Türen und Fenster regulär daran gebunden werden können.
 * Zusätzliche Oberflächen-Ebenen werden zunächst als allgemeine Layer-Stacks mit rechteckiger Kachelbelegung modelliert, bevor dafür eine eigene UI-Verwaltung ergänzt wird.
 * Der erste Dachumfang fokussiert das Satteldach als separates Domänenobjekt mit Winkel, Überstand und Dachrinne.
 * Dachschrägen und schräge Decken werden primär über Eckhöhen an verbundenen Wand-Endpunkten abgeleitet; daraus entstehen polygonale Raumdecken und schräge Wandoberkanten. Die ältere raumgebundene Rechteck-Schräge bleibt nur als einfacher Fallback für manuelle Rechteckräume erhalten.

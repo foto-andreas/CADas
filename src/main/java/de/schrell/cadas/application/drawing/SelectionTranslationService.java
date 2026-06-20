@@ -2,6 +2,7 @@ package de.schrell.cadas.application.drawing;
 
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
+import de.schrell.cadas.application.stairs.StairUnderbuildService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
@@ -10,16 +11,24 @@ import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
 
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public final class SelectionTranslationService {
 
     private static final double EPSILON = 0.001;
+    private final StairUnderbuildService stairUnderbuildService = new StairUnderbuildService();
 
     public TranslationResult translate(Level level, Set<SelectionKey> selections, double deltaXMillimeters, double deltaYMillimeters) {
-        Set<String> selectedWalls = selectedIds(selections, RenderableKind.WALL);
         Set<String> selectedStairs = selectedIds(selections, RenderableKind.STAIR);
+        Set<String> selectedWalls = new LinkedHashSet<>(selectedIds(selections, RenderableKind.WALL));
+        for (String staircaseId : selectedStairs) {
+            UUID id = UUID.fromString(staircaseId);
+            selectedWalls.add(stairUnderbuildService.wallId(id, StairUnderbuildService.Side.LEFT).toString());
+            selectedWalls.add(stairUnderbuildService.wallId(id, StairUnderbuildService.Side.RIGHT).toString());
+        }
         Set<String> selectedRoomObjects = selectedIds(selections, RenderableKind.ROOM_OBJECT);
         List<PlanPoint> translatedWallEndpoints = selectedWallEndpoints(level, selectedWalls);
         List<Wall> translatedWalls = level.walls().stream()
@@ -92,7 +101,10 @@ public final class SelectionTranslationService {
                 staircase.stepCount(),
                 staircase.rotationQuarterTurns(),
                 staircase.startLandingWidth(),
-                staircase.endLandingWidth()
+                staircase.endLandingWidth(),
+                staircase.leftUnderbuildWidth(),
+                staircase.rightUnderbuildWidth(),
+                staircase.undersideThickness()
         );
     }
 

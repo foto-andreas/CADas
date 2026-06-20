@@ -191,7 +191,10 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 Integer.parseInt(parts[9]),
                                 Integer.parseInt(parts[10]),
                                 Length.ofMillimeters(parts.length >= 12 ? parseDouble(parts[11]) : 0),
-                                Length.ofMillimeters(parts.length >= 13 ? parseDouble(parts[12]) : 0)
+                                Length.ofMillimeters(parts.length >= 13 ? parseDouble(parts[12]) : 0),
+                                Length.ofMillimeters(parts.length >= 14 ? parseDouble(parts[13]) : 0),
+                                Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[14]) : 0),
+                                Length.ofMillimeters(parts.length >= 16 ? parseDouble(parts[15]) : 0)
                         ));
                     }
                     case "FEXT" -> {
@@ -428,7 +431,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (Staircase staircase : level.staircases()) {
             appendMetadataText(dxf, context, staircase.firstCorner(), String.format(
                     Locale.US,
-                    "STAIR|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d|%.3f|%.3f",
+                    "STAIR|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d|%.3f|%.3f|%.3f|%.3f|%.3f",
                     DxfMetadataCodec.encode(level.name()),
                     staircase.id(),
                     staircase.stairType().name(),
@@ -440,7 +443,10 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     staircase.stepCount(),
                     staircase.rotationQuarterTurns(),
                     staircase.startLandingWidth().toMillimeters(),
-                    staircase.endLandingWidth().toMillimeters()
+                    staircase.endLandingWidth().toMillimeters(),
+                    staircase.leftUnderbuildWidth().toMillimeters(),
+                    staircase.rightUnderbuildWidth().toMillimeters(),
+                    staircase.undersideThickness().toMillimeters()
             ));
         }
         for (FloorExtension extension : level.floorExtensions()) {

@@ -59,6 +59,7 @@ import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
 import de.schrell.cadas.application.reports.ConstructionDrawingPdfService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService;
 import de.schrell.cadas.application.roof.RoofSlopeWallService;
+import de.schrell.cadas.application.stairs.StairUnderbuildService;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
 import de.schrell.cadas.application.terrain.TerrainCornerService;
 import de.schrell.cadas.application.view.RenderableKind;
@@ -227,6 +228,7 @@ public final class CadWorkbench extends BorderPane {
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     private final TerrainCornerService terrainCornerService = new TerrainCornerService();
     private final RoofSlopeWallService roofSlopeWallService = new RoofSlopeWallService();
+    private final StairUnderbuildService stairUnderbuildService = new StairUnderbuildService();
     private final DraftingService draftingService = new DraftingService();
     private final EdgeResizeService edgeResizeService = new EdgeResizeService();
     private final SnapService snapService = new SnapService();
@@ -350,6 +352,12 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> stairStartLandingUnit = new ComboBox<>();
     private final TextField stairEndLandingField = new TextField("0");
     private final ComboBox<LengthUnit> stairEndLandingUnit = new ComboBox<>();
+    private final TextField stairLeftUnderbuildField = new TextField("0");
+    private final ComboBox<LengthUnit> stairLeftUnderbuildUnit = new ComboBox<>();
+    private final TextField stairRightUnderbuildField = new TextField("0");
+    private final ComboBox<LengthUnit> stairRightUnderbuildUnit = new ComboBox<>();
+    private final TextField stairUndersideThicknessField = new TextField("0");
+    private final ComboBox<LengthUnit> stairUndersideThicknessUnit = new ComboBox<>();
     private final ComboBox<FloorExtensionType> floorExtensionTypeSelector = new ComboBox<>();
     private final ComboBox<FloorExtensionPlacement> floorExtensionPlacementSelector = new ComboBox<>();
     private final TextField floorExtensionThicknessField = new TextField("18");
@@ -1141,7 +1149,10 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Höhe", stairHeightField, stairHeightUnit),
                         propertyRow("Stufen inkl. Absätze", stairStepsField),
                         propertyRow("Absatz Anfang", stairStartLandingField, stairStartLandingUnit),
-                        propertyRow("Absatz Ende", stairEndLandingField, stairEndLandingUnit)
+                        propertyRow("Absatz Ende", stairEndLandingField, stairEndLandingUnit),
+                        propertyRow("Unterbau links", stairLeftUnderbuildField, stairLeftUnderbuildUnit),
+                        propertyRow("Unterbau rechts", stairRightUnderbuildField, stairRightUnderbuildUnit),
+                        propertyRow("Untersichtdicke", stairUndersideThicknessField, stairUndersideThicknessUnit)
                 ),
                 createPropertySection(
                         "Objekt",
@@ -1503,6 +1514,9 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(stairHeightField, stairHeightUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(stairStartLandingField, stairStartLandingUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(stairEndLandingField, stairEndLandingUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(stairLeftUnderbuildField, stairLeftUnderbuildUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(stairRightUnderbuildField, stairRightUnderbuildUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(stairUndersideThicknessField, stairUndersideThicknessUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(roomObjectWidthField, roomObjectWidthUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(roomObjectDepthField, roomObjectDepthUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(roomObjectHeightField, roomObjectHeightUnit, LengthUnit.CENTIMETER);
@@ -1679,6 +1693,12 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(stairStartLandingUnit, "Bestimmt die Einheit für die Tiefe des Anfangsabsatzes.");
         applyTooltip(stairEndLandingField, "Legt die Tiefe des ebenen Absatzes am Ende der Treppe in Laufrichtung fest. Null deaktiviert den Absatz.");
         applyTooltip(stairEndLandingUnit, "Bestimmt die Einheit für die Tiefe des Endabsatzes.");
+        applyTooltip(stairLeftUnderbuildField, "Legt die Wandstärke des optionalen linken Treppenunterbaus fest. Null entfernt diese Unterbauwand.");
+        applyTooltip(stairLeftUnderbuildUnit, "Bestimmt die Einheit für die Wandstärke des linken Treppenunterbaus.");
+        applyTooltip(stairRightUnderbuildField, "Legt die Wandstärke des optionalen rechten Treppenunterbaus fest. Null entfernt diese Unterbauwand.");
+        applyTooltip(stairRightUnderbuildUnit, "Bestimmt die Einheit für die Wandstärke des rechten Treppenunterbaus.");
+        applyTooltip(stairUndersideThicknessField, "Legt die senkrechte Dicke der planen schrägen Untersicht unterhalb der Stufen fest. Null deaktiviert die Untersichtplatte.");
+        applyTooltip(stairUndersideThicknessUnit, "Bestimmt die Einheit für die Dicke der planen schrägen Treppenuntersicht.");
         applyTooltip(floorExtensionTypeSelector, "Wählt, ob die rechteckige Erweiterung als Balkon oder Empore modelliert wird.");
         applyTooltip(floorExtensionPlacementSelector, "Kennzeichnet die Erweiterung als innen oder außen an die aktive Etage angehängt.");
         applyTooltip(floorExtensionThicknessField, "Legt die Dicke der tragenden rechteckigen Fußbodenplatte des Balkons oder der Empore fest.");
@@ -1969,6 +1989,10 @@ public final class CadWorkbench extends BorderPane {
                 activeLevel.get().replaceDoors(result.doors());
                 activeLevel.get().replaceWindows(result.windows());
                 activeLevel.get().replaceStaircases(result.staircases());
+                result.staircases().stream()
+                        .filter(staircase -> staircase.leftUnderbuildWidth().toMillimeters() > 0.0
+                                || staircase.rightUnderbuildWidth().toMillimeters() > 0.0)
+                        .forEach(this::synchronizeStairUnderbuild);
                 synchronizeRoomsFromWalls(activeLevel.get());
                 markThreeDDirty();
                 render();
@@ -2154,9 +2178,13 @@ public final class CadWorkbench extends BorderPane {
                         currentStairHeight(),
                         currentStairSteps(),
                         currentStairStartLanding(),
-                        currentStairEndLanding()
+                        currentStairEndLanding(),
+                        currentStairLeftUnderbuild(),
+                        currentStairRightUnderbuild(),
+                        currentStairUndersideThickness()
                 );
                 activeLevel.get().addStaircase(staircase);
+                synchronizeStairUnderbuild(staircase);
                 selectSingle(new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), staircase.id().toString()));
             } else if (currentTool() == DrawingTool.FLOOR_EXTENSION
                     && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
@@ -4064,6 +4092,18 @@ public final class CadWorkbench extends BorderPane {
 
     private Length currentStairEndLanding() {
         return parseLength(stairEndLandingField, stairEndLandingUnit.getValue()).orElse(Length.ofMillimeters(0));
+    }
+
+    private Length currentStairLeftUnderbuild() {
+        return parseLength(stairLeftUnderbuildField, stairLeftUnderbuildUnit.getValue()).orElse(Length.zero());
+    }
+
+    private Length currentStairRightUnderbuild() {
+        return parseLength(stairRightUnderbuildField, stairRightUnderbuildUnit.getValue()).orElse(Length.zero());
+    }
+
+    private Length currentStairUndersideThickness() {
+        return parseLength(stairUndersideThicknessField, stairUndersideThicknessUnit.getValue()).orElse(Length.zero());
     }
 
     private Length currentRoomObjectWidth(RoomObjectPreset preset) {
@@ -6113,7 +6153,7 @@ public final class CadWorkbench extends BorderPane {
                 case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> false;
                 case DOOR -> activeLevel.get().removeDoor(id);
                 case WINDOW -> activeLevel.get().removeWindow(id);
-                case STAIR -> activeLevel.get().removeStaircase(id);
+                case STAIR -> removeStaircaseWithUnderbuild(id);
                 case ROOM_OBJECT -> activeLevel.get().removeRoomObject(id);
                 case FLOOR_EXTENSION -> activeLevel.get().removeFloorExtension(id);
                 default -> false;
@@ -6129,6 +6169,14 @@ public final class CadWorkbench extends BorderPane {
         }
         draftLabel.setText("Auswahl konnte nicht gelöscht werden.");
         updateActionButtons();
+    }
+
+    private boolean removeStaircaseWithUnderbuild(UUID staircaseId) {
+        StairUnderbuildService.UnderbuildResult result = stairUnderbuildService.remove(activeLevel.get(), staircaseId);
+        activeLevel.get().replaceWalls(result.walls());
+        activeLevel.get().replaceDoors(result.doors());
+        activeLevel.get().replaceWindows(result.windows());
+        return activeLevel.get().removeStaircase(staircaseId);
     }
 
     private void updateSelection(SelectionKey selectionKey, boolean toggleSelection) {
@@ -6363,6 +6411,9 @@ public final class CadWorkbench extends BorderPane {
                         stairStepsField.setText(Integer.toString(stair.stepCount()));
                         syncLengthInput(stairStartLandingField, stairStartLandingUnit, stair.startLandingWidth(), LengthUnit.CENTIMETER);
                         syncLengthInput(stairEndLandingField, stairEndLandingUnit, stair.endLandingWidth(), LengthUnit.CENTIMETER);
+                        syncLengthInput(stairLeftUnderbuildField, stairLeftUnderbuildUnit, stair.leftUnderbuildWidth(), LengthUnit.CENTIMETER);
+                        syncLengthInput(stairRightUnderbuildField, stairRightUnderbuildUnit, stair.rightUnderbuildWidth(), LengthUnit.CENTIMETER);
+                        syncLengthInput(stairUndersideThicknessField, stairUndersideThicknessUnit, stair.undersideThickness(), LengthUnit.CENTIMETER);
                     });
             case ROOM_OBJECT -> activeLevel.get().roomObjects().stream()
                     .filter(roomObject -> roomObject.id().toString().equals(selectedSelection.get().elementId()))
@@ -6425,11 +6476,22 @@ public final class CadWorkbench extends BorderPane {
                             ? new WindowElement(window.id(), window.wallId(), window.offsetFromStart(), currentWindowWidth(), currentSillHeight(), currentWindowHeight())
                             : window)
                     .toList());
-            case STAIR -> activeLevel.get().replaceStaircases(activeLevel.get().staircases().stream()
-                    .map(stair -> selectedIds().contains(stair.id().toString())
-                            ? new Staircase(stair.id(), stair.stairType(), stair.firstCorner(), stair.oppositeCorner(), currentStairHeight(), currentStairSteps(), stair.rotationQuarterTurns(), currentStairStartLanding(), currentStairEndLanding())
-                            : stair)
-                    .toList());
+            case STAIR -> {
+                List<Staircase> updatedStaircases = activeLevel.get().staircases().stream()
+                        .map(stair -> selectedIds().contains(stair.id().toString())
+                                ? new Staircase(
+                                stair.id(), stair.stairType(), stair.firstCorner(), stair.oppositeCorner(),
+                                currentStairHeight(), currentStairSteps(), stair.rotationQuarterTurns(),
+                                currentStairStartLanding(), currentStairEndLanding(), currentStairLeftUnderbuild(),
+                                currentStairRightUnderbuild(), currentStairUndersideThickness()
+                        )
+                                : stair)
+                        .toList();
+                activeLevel.get().replaceStaircases(updatedStaircases);
+                updatedStaircases.stream()
+                        .filter(stair -> selectedIds().contains(stair.id().toString()))
+                        .forEach(this::synchronizeStairUnderbuild);
+            }
             case ROOM_OBJECT -> activeLevel.get().replaceRoomObjects(activeLevel.get().roomObjects().stream()
                     .map(roomObject -> selectedIds().contains(roomObject.id().toString())
                             ? new RoomObject(
@@ -6560,6 +6622,9 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceWalls(rotationResult.walls());
         activeLevel.get().replaceStaircases(rotationResult.staircases());
         activeLevel.get().replaceRoomObjects(rotationResult.roomObjects());
+        rotationResult.staircases().stream()
+                .filter(staircase -> selectedIds().contains(staircase.id().toString()))
+                .forEach(this::synchronizeStairUnderbuild);
         synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
         draftLabel.setText("Ausgewählte Bauteile gedreht.");
@@ -6599,6 +6664,13 @@ public final class CadWorkbench extends BorderPane {
 
     private void synchronizeRoomsFromWalls(Level level) {
         level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults()));
+    }
+
+    private void synchronizeStairUnderbuild(Staircase staircase) {
+        StairUnderbuildService.UnderbuildResult result = stairUnderbuildService.synchronize(activeLevel.get(), staircase);
+        activeLevel.get().replaceWalls(result.walls());
+        activeLevel.get().replaceDoors(result.doors());
+        activeLevel.get().replaceWindows(result.windows());
     }
 
     private void prepareSelectionDrag(SelectionKey selectionKey, PlanPoint anchorPoint) {
@@ -7308,6 +7380,9 @@ public final class CadWorkbench extends BorderPane {
             case "stairSteps" -> stairStepsField;
             case "stairStartLanding" -> stairStartLandingField;
             case "stairEndLanding" -> stairEndLandingField;
+            case "stairLeftUnderbuild" -> stairLeftUnderbuildField;
+            case "stairRightUnderbuild" -> stairRightUnderbuildField;
+            case "stairUndersideThickness" -> stairUndersideThicknessField;
             case "roomObjectName" -> roomObjectNameField;
             case "roomObjectWidth" -> roomObjectWidthField;
             case "roomObjectDepth" -> roomObjectDepthField;
@@ -7328,6 +7403,9 @@ public final class CadWorkbench extends BorderPane {
             case "endpointHeight" -> endpointHeightUnit;
             case "stairStartLanding" -> stairStartLandingUnit;
             case "stairEndLanding" -> stairEndLandingUnit;
+            case "stairLeftUnderbuild" -> stairLeftUnderbuildUnit;
+            case "stairRightUnderbuild" -> stairRightUnderbuildUnit;
+            case "stairUndersideThickness" -> stairUndersideThicknessUnit;
             case "roomObjectWidth" -> roomObjectWidthUnit;
             case "roomObjectDepth" -> roomObjectDepthUnit;
             case "roomObjectHeight" -> roomObjectHeightUnit;

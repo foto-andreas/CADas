@@ -25,6 +25,7 @@ import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.Roof;
 import de.schrell.cadas.domain.model.Staircase;
+import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
@@ -1419,8 +1420,50 @@ public final class ThreeDSceneModelBuilder {
                 case SWITCHBACK -> boxes.addAll(buildSwitchbackStair(level.name(), staircase, baseHeight));
                 case SPIRAL -> boxes.addAll(buildSpiralStair(level.name(), staircase, baseHeight));
             }
+            if (staircase.undersideThickness().toMillimeters() > 0.0 && staircase.stairType() != StairType.SPIRAL) {
+                addStairUndersideMesh(level.name(), staircase, baseHeight);
+            }
         }
         return boxes;
+    }
+
+    private void addStairUndersideMesh(String levelName, Staircase staircase, double baseHeight) {
+        double startTop = staircase.totalHeight().toMillimeters() / staircase.stepCount();
+        double endTop = staircase.totalHeight().toMillimeters();
+        double startBottom = Math.max(0.0, startTop - staircase.undersideThickness().toMillimeters());
+        double endBottom = Math.max(0.0, endTop - staircase.undersideThickness().toMillimeters());
+        double width = staircase.widthMillimeters();
+        double run = staircase.heightMillimeters();
+        MeshPoint startLeftBottom = stairMeshPoint(staircase, 0.0, 0.0, startBottom);
+        MeshPoint startLeftTop = stairMeshPoint(staircase, 0.0, 0.0, startTop);
+        MeshPoint startRightBottom = stairMeshPoint(staircase, width, 0.0, startBottom);
+        MeshPoint startRightTop = stairMeshPoint(staircase, width, 0.0, startTop);
+        MeshPoint endLeftBottom = stairMeshPoint(staircase, 0.0, run, endBottom);
+        MeshPoint endLeftTop = stairMeshPoint(staircase, 0.0, run, endTop);
+        MeshPoint endRightBottom = stairMeshPoint(staircase, width, run, endBottom);
+        MeshPoint endRightTop = stairMeshPoint(staircase, width, run, endTop);
+        List<Float> points = new ArrayList<>();
+        addQuad(points, startLeftBottom, endLeftBottom, endLeftTop, startLeftTop);
+        addQuad(points, endRightBottom, startRightBottom, startRightTop, endRightTop);
+        addQuad(points, startLeftTop, endLeftTop, endRightTop, startRightTop);
+        addQuad(points, startRightBottom, endRightBottom, endLeftBottom, startLeftBottom);
+        addQuad(points, startRightBottom, startLeftBottom, startLeftTop, startRightTop);
+        addQuad(points, endLeftBottom, endRightBottom, endRightTop, endLeftTop);
+        addMesh(
+                new SelectionKey(RenderableKind.STAIR, levelName, staircase.id().toString()),
+                levelName,
+                RenderableKind.STAIR,
+                points,
+                baseHeight,
+                staircase.totalHeight().toMillimeters(),
+                "stair",
+                1.0
+        );
+    }
+
+    private MeshPoint stairMeshPoint(Staircase staircase, double localX, double localY, double height) {
+        PlanPoint point = staircase.pointAtLocalPosition(localX, localY);
+        return new MeshPoint(point.xMillimeters(), height, point.yMillimeters());
     }
 
     private List<RenderableBox> buildStraightStair(String levelName, Staircase staircase, double baseHeight) {

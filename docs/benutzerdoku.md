@@ -518,6 +518,10 @@ Mit dem Werkzeug `Treppe` ziehst du die rechteckige Grundfläche einer Treppe au
 * Das Treppen-Preset bestimmt den Grundtyp.
 * Treppenhöhe und Stufenanzahl kannst du zusätzlich manuell anpassen.
 * Unterstützt sind aktuell gerade Treppen, 180°-Treppen, gegenläufige Treppen und Wendeltreppen.
+* `Unterbau links` und `Unterbau rechts` legen optional die jeweilige Wandstärke fest; `0` entfernt die betreffende Unterbauwand.
+* `Untersichtdicke` erzeugt eine planare schräge Platte unterhalb der Stufen; `0` deaktiviert sie.
+
+Unterbauwände sind reguläre polygonale Wände. Du kannst sie im Werkzeug `Bearbeiten` auswählen und Türen oder Fenster mit den normalen Werkzeugen daran binden. Beim Verschieben, Drehen oder Ändern der Treppe werden die Unterbauwände über stabile Wand-IDs mitgeführt. Das Deaktivieren einer Unterbauwand entfernt auch ihre daran gebundenen Öffnungen.
 
 ### Tür
 

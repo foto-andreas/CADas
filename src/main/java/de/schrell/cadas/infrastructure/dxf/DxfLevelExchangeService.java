@@ -169,7 +169,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             );
             appendMetadataText(dxf, context, staircase.firstCorner(), String.format(
                     Locale.US,
-                    "STAIR|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d|%.3f|%.3f",
+                    "STAIR|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d|%.3f|%.3f|%.3f|%.3f|%.3f",
                     staircase.id(),
                     staircase.stairType().name(),
                     staircase.firstCorner().xMillimeters(),
@@ -180,7 +180,10 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     staircase.stepCount(),
                     staircase.rotationQuarterTurns(),
                     staircase.startLandingWidth().toMillimeters(),
-                    staircase.endLandingWidth().toMillimeters()
+                    staircase.endLandingWidth().toMillimeters(),
+                    staircase.leftUnderbuildWidth().toMillimeters(),
+                    staircase.rightUnderbuildWidth().toMillimeters(),
+                    staircase.undersideThickness().toMillimeters()
             ));
         }
 
@@ -347,7 +350,10 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             Integer.parseInt(parts[8]),
                             Integer.parseInt(parts[9]),
                             Length.ofMillimeters(parts.length >= 11 ? parseDouble(parts[10]) : 0),
-                            Length.ofMillimeters(parts.length >= 12 ? parseDouble(parts[11]) : 0)
+                            Length.ofMillimeters(parts.length >= 12 ? parseDouble(parts[11]) : 0),
+                            Length.ofMillimeters(parts.length >= 13 ? parseDouble(parts[12]) : 0),
+                            Length.ofMillimeters(parts.length >= 14 ? parseDouble(parts[13]) : 0),
+                            Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[14]) : 0)
                     ));
                     case "FEXT" -> level.addFloorExtension(new FloorExtension(
                             UUID.fromString(parts[1]), FloorExtensionType.valueOf(parts[2]),

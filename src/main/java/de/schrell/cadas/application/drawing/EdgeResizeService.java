@@ -156,8 +156,8 @@ public final class EdgeResizeService {
         clampedY = Math.min(clampedY, maxY + 10_000_000.0);
         PlanPoint clampedTarget = new PlanPoint(clampedX, clampedY);
         Staircase resized = draggingFirstCorner
-                ? new Staircase(staircase.id(), staircase.stairType(), clampedTarget, staircase.oppositeCorner(), staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth())
-                : new Staircase(staircase.id(), staircase.stairType(), staircase.firstCorner(), clampedTarget, staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth());
+                ? new Staircase(staircase.id(), staircase.stairType(), clampedTarget, staircase.oppositeCorner(), staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth(), staircase.leftUnderbuildWidth(), staircase.rightUnderbuildWidth(), staircase.undersideThickness())
+                : new Staircase(staircase.id(), staircase.stairType(), staircase.firstCorner(), clampedTarget, staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth(), staircase.leftUnderbuildWidth(), staircase.rightUnderbuildWidth(), staircase.undersideThickness());
         return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases().stream().map(candidate -> candidate.id().equals(staircase.id()) ? resized : candidate).toList());
     }
 

@@ -1090,4 +1090,25 @@ class ThreeDSceneModelBuilderTest {
                 .filter(box -> box.kind() == RenderableKind.WALL)
                 .anyMatch(box -> Math.abs(box.width() - 3_000.0) < 0.001 && Math.abs(box.height() - 3_100.0) < 0.001));
     }
+
+    @Test
+    void rendertPlaneTreppenuntersichtAlsSchrägesVolumen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addStaircase(new Staircase(
+                UUID.randomUUID(), StairType.STRAIGHT,
+                new PlanPoint(0, 0), new PlanPoint(1_200, 4_000),
+                Length.ofMillimeters(2_800), 16, 0,
+                Length.zero(), Length.zero(), Length.ofMillimeters(120),
+                Length.ofMillimeters(120), Length.ofMillimeters(80)
+        ));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+
+        RenderableMesh underside = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.STAIR)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(12, underside.faceCount());
+        assertEquals(2_800.0, underside.height(), 0.001);
+    }
 }

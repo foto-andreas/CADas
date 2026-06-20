@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
+import de.schrell.cadas.application.stairs.StairUnderbuildService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -131,5 +132,29 @@ class SelectionTranslationServiceTest {
 
         assertEquals(700.0, result.roomObjects().getFirst().center().xMillimeters(), 0.001);
         assertEquals(600.0, result.roomObjects().getFirst().center().yMillimeters(), 0.001);
+    }
+
+    @Test
+    void verschiebtTreppenunterbauMitAusgewählterTreppe() {
+        Level level = new Level("Erdgeschoss");
+        Staircase staircase = new Staircase(
+                java.util.UUID.randomUUID(), StairType.STRAIGHT,
+                new PlanPoint(0, 0), new PlanPoint(1_200, 4_000),
+                Length.ofMillimeters(2_800), 16, 0,
+                Length.zero(), Length.zero(), Length.ofMillimeters(120), Length.zero(), Length.ofMillimeters(80)
+        );
+        level.addStaircase(staircase);
+        StairUnderbuildService underbuildService = new StairUnderbuildService();
+        level.replaceWalls(underbuildService.synchronize(level, staircase).walls());
+
+        SelectionTranslationService.TranslationResult result = translationService.translate(
+                level,
+                Set.of(new SelectionKey(RenderableKind.STAIR, level.name(), staircase.id().toString())),
+                200.0,
+                300.0
+        );
+
+        assertEquals(200.0, result.walls().getFirst().axis().start().xMillimeters(), 0.001);
+        assertEquals(300.0, result.walls().getFirst().axis().start().yMillimeters(), 0.001);
     }
 }

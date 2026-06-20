@@ -73,4 +73,21 @@ class StaircaseTest {
         assertEquals(1, rotated.rotationQuarterTurns());
         assertNotEquals(staircase.pointAtLocalPosition(2200, 0), rotated.pointAtLocalPosition(2200, 0));
     }
+
+    @Test
+    void erhältTreppenunterbauBeimDrehen() {
+        Staircase staircase = new Staircase(
+                java.util.UUID.randomUUID(), StairType.STRAIGHT,
+                new PlanPoint(0, 0), new PlanPoint(1_200, 4_000),
+                Length.ofMillimeters(2_800), 16, 0,
+                Length.zero(), Length.zero(), Length.ofMillimeters(120),
+                Length.ofMillimeters(150), Length.ofMillimeters(80)
+        );
+
+        Staircase rotated = staircase.rotateClockwise();
+
+        assertEquals(120.0, rotated.leftUnderbuildWidth().toMillimeters(), 0.001);
+        assertEquals(150.0, rotated.rightUnderbuildWidth().toMillimeters(), 0.001);
+        assertEquals(80.0, rotated.undersideThickness().toMillimeters(), 0.001);
+    }
 }

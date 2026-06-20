@@ -107,6 +107,8 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 `Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement`, `Staircase`, `RoomObject`, `Roof`, `Terrain` und `SurfaceLayerStack` bilden den aktuellen Grundrisskern ab. `WallProfilePoint` erweitert lineare Wandoberkanten zu stückweise linearen Polygonprofilen; Wandbearbeitung, DXF-Persistenz sowie 3D- und Seitenableitung erhalten diese Profile. `TerrainCornerService` leitet die äußeren Gebäudeecken aus der konvexen Hülle der untersten Etage ab und erhält bereits erfasste Geländehöhen. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
 
+`StairUnderbuildService` leitet aus einer Treppe deterministische linke und rechte Unterbauwand-IDs ab. Die erzeugten Wände folgen der Treppensteigung als Polygonprofil und bleiben dadurch normale Hosts für Türen und Fenster. Beim Deaktivieren einer Seite werden nur deren Wand und gebundene Öffnungen entfernt. Die planare Untersicht wird im `ThreeDSceneModelBuilder` als eigener schräger Volumenkörper aus ihrer konfigurierten Dicke abgeleitet.
+
 ## Dach- und Ebenenmodell
 
 Der aktuelle Domänenstand enthält bereits die fachlichen Grundlagen für die nächsten Ausbaustufen:

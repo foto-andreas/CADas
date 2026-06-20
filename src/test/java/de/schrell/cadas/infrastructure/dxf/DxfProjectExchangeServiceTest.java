@@ -95,7 +95,10 @@ class DxfProjectExchangeServiceTest {
                 18,
                 0,
                 Length.of(75, LengthUnit.CENTIMETER),
-                Length.of(50, LengthUnit.CENTIMETER)
+                Length.of(50, LengthUnit.CENTIMETER),
+                Length.of(12, LengthUnit.CENTIMETER),
+                Length.of(15, LengthUnit.CENTIMETER),
+                Length.of(8, LengthUnit.CENTIMETER)
         ));
         project.primaryLevel().addFloorExtension(FloorExtension.create(FloorExtensionType.GALLERY, FloorExtensionPlacement.INTERIOR,
                 new PlanPoint(3_000, 500), new PlanPoint(5_000, 2_000), Length.ofMillimeters(200)));
@@ -122,6 +125,9 @@ class DxfProjectExchangeServiceTest {
         assertEquals(FloorExtensionType.GALLERY, imported.primaryLevel().floorExtensions().getFirst().type());
         assertEquals(750, imported.primaryLevel().staircases().getFirst().startLandingWidth().toMillimeters(), 0.001);
         assertEquals(500, imported.primaryLevel().staircases().getFirst().endLandingWidth().toMillimeters(), 0.001);
+        assertEquals(120, imported.primaryLevel().staircases().getFirst().leftUnderbuildWidth().toMillimeters(), 0.001);
+        assertEquals(150, imported.primaryLevel().staircases().getFirst().rightUnderbuildWidth().toMillimeters(), 0.001);
+        assertEquals(80, imported.primaryLevel().staircases().getFirst().undersideThickness().toMillimeters(), 0.001);
         assertEquals(door.id(), imported.primaryLevel().doors().getFirst().id());
         assertEquals(window.id(), imported.primaryLevel().windows().getFirst().id());
         assertEquals("Obergeschoss", imported.levels().get(1).name());

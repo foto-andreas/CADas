@@ -86,7 +86,10 @@ class DxfLevelExchangeServiceTest {
                 18,
                 1,
                 Length.of(80, LengthUnit.CENTIMETER),
-                Length.of(60, LengthUnit.CENTIMETER)
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(12, LengthUnit.CENTIMETER),
+                Length.of(15, LengthUnit.CENTIMETER),
+                Length.of(8, LengthUnit.CENTIMETER)
         ));
         level.addFloorExtension(FloorExtension.create(FloorExtensionType.BALCONY, FloorExtensionPlacement.EXTERIOR,
                 new PlanPoint(4_000, 0), new PlanPoint(7_000, 1_500), Length.ofMillimeters(180)));
@@ -111,6 +114,9 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1, imported.staircases().getFirst().rotationQuarterTurns());
         assertEquals(800, imported.staircases().getFirst().startLandingWidth().toMillimeters(), 0.001);
         assertEquals(600, imported.staircases().getFirst().endLandingWidth().toMillimeters(), 0.001);
+        assertEquals(120, imported.staircases().getFirst().leftUnderbuildWidth().toMillimeters(), 0.001);
+        assertEquals(150, imported.staircases().getFirst().rightUnderbuildWidth().toMillimeters(), 0.001);
+        assertEquals(80, imported.staircases().getFirst().undersideThickness().toMillimeters(), 0.001);
     }
 
     @Test
