@@ -6,12 +6,11 @@ Kompakte Orientierung für KI-Assistenten. Diese Datei ergänzt `AGENTS.md`, `do
 
 ```bash
 ./gradlew test              # alle Tests (JUnit 5, JaCoCo)
-./gradlew runApp            # App über CADas.app-Bundle starten (macOS zeigt korrekten App-Namen)
+./gradlew run               # App direkt über den modularen JavaFX-Launcher starten
 ./gradlew runMitAutomatisierung  # App mit HTTP-Testzugriff auf 127.0.0.1:17845
 ./gradlew installDist       # Startskripte und Libs nach build/install/CADas
+./gradlew macosInstall      # DMG bauen und dasselbe App-Bundle nach /Applications installieren
 ```
-
-`./gradlew run` ist deaktiviert, weil die nackte JVM als App-Name „java" in der macOS-Menüleiste zeigen würde. `runApp` baut das App-Bundle und startet es.
 
 ## Architektur in einem Satz
 
@@ -66,12 +65,12 @@ Test-JVM-Arg: `--enable-native-access=ALL-UNNAMED` (unterdrückt Glass-Nativelib
 ## Session-relevante Festlegungen (aktuell)
 
 * Etagen lassen sich umbenennen und umsortieren („Etage hoch" = größerer Index = im Gebäude nach oben).
-* Innenansicht: Bodenklick wechselt durch Türen/Wände in den Nachbarräum.
+* Innenansicht: Bodenklick setzt den Kamerastandort auf den gewählten Bodenpunkt; ein Klick auf eine Tür wechselt in den angrenzenden Raum.
 * 3D-Wände und Fundamente enden bündig mit der Wandachse (keine Verlängerung über die Endpunkte hinaus).
 * `EdgeResizeService` ignoriert Nicht-UUID-Element-IDs (z. B. `wall-support-<uuid>`).
 * Menüleiste nutzt `setUseSystemMenuBar(true)` und ist unter macOS ausgeblendet (`setManaged(false)`/`setVisible(false)`).
 * Hilfe zeigt die vollständige Benutzerdokumentation aus `src/main/resources/docs/benutzerdoku.md`; Keymap ist separater Menüpunkt.
-* `./gradlew run` ist deaktiviert; `runApp` startet das App-Bundle.
+* `./gradlew run` startet die modulare JavaFX-Anwendung direkt.
 * `./gradlew macosInstall` baut das App-Bundle + DMG und installiert CADas.app direkt nach /Applications (überschreibt bestehende Version).
 
 ## Wo steht was

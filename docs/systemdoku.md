@@ -25,6 +25,7 @@ Für macOS gibt es zusätzlich Gradle-Aufgaben auf Basis von `jpackage`:
 * `installDist` für ein lokales Startverzeichnis
 * `packageMacOsAppImage` für ein App-Image
 * `packageMacOsDmg` für ein DMG-Installationspaket
+* `macosInstall` für DMG-Bau und Installation desselben frischen App-Bundles nach `/Applications`
 
 ### Paketstruktur
 
@@ -86,6 +87,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 * Flächen- und Volumenanzeige für Räume
 * Ebenenverwaltung für ausgewählte Wand- und Raumflächen mit Presets, Reihenfolge, Sichtbarkeit, DWG-Referenzen und konkreten DWG-Block-Presets
 * Materiallistenfenster mit gerendertem Markdown, Druck und Markdown-Export
+* Raum-Kontextaktion zum Öffnen der Innenansicht am angeklickten 2D-Standort
 
 ### Anwendungslogik
 
@@ -159,7 +161,7 @@ Die Standardteilversorgung besteht aus drei Ebenen:
 
 Die 2D-Zeichenfläche arbeitet intern in Millimetern und transformiert diese Weltkoordinaten mit Offset und Zoom auf Bildschirmkoordinaten. Dadurch bleiben Raster, Snap und Bemaßung konsistent, auch wenn die Ansicht verschoben oder skaliert wird.
 
-Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Raumobjekte, Dachflächen und optionale Oberflächen-Ebenen ab. Wandbeläge erhalten dabei zusätzlich dünne Fugen-Boxen, damit Fliesen und Platten auf Wänden nicht nur als glatte Schicht erscheinen. Türen und Fenster werden aus diesen Wandbelägen ausgespart; die Fugen werden auf dem vollständigen Wandraster berechnet und gegen die sichtbaren Maximalrechtecke geklippt. Fugen werden im JavaFX-Rendering ohne künstliche Mindestverbreiterung mit ihren skalierten Modellmaßen gezeichnet. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss und für Raumobjekte zusätzlich global gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Für die Orbit-Steuerung wird das Modell in einer eigenen Orbit-Gruppe um die Modellmitte gedreht; die Kamera selbst übernimmt nur Abstand und Projektion. Die Innenansicht nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in Weltkoordinaten und zeigt nur die Zielebene. In der Innenansicht verändert die Blickdrehung nur die Orientierung am festen Kamerastandpunkt; rechte-Maus-Bewegung läuft entlang der Blickrichtung innerhalb der Raumkontur, und Zoom verändert den Sichtwinkel bis 115°, statt die Kamera aus dem Raum zu verschieben. Panning verschiebt die Orbitansicht bewusst entlang der Bildschirmachsen. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
+Die 3D-Ansicht nutzt dieselben Millimeterkoordinaten und leitet daraus Box-Geometrien für Wände, Räume, Öffnungen, Treppen, Raumobjekte, Dachflächen und optionale Oberflächen-Ebenen ab. Wandbeläge erhalten dabei zusätzlich dünne Fugen-Boxen, damit Fliesen und Platten auf Wänden nicht nur als glatte Schicht erscheinen. Türen und Fenster werden aus diesen Wandbelägen ausgespart; die Fugen werden auf dem vollständigen Wandraster berechnet und gegen die sichtbaren Maximalrechtecke geklippt. Fugen werden im JavaFX-Rendering ohne künstliche Mindestverbreiterung mit ihren skalierten Modellmaßen gezeichnet. Die Darstellung läuft als JavaFX-`SubScene` mit umschaltbarer orthografischer oder perspektivischer Kamera. Sichtbarkeit wird je Geschoss und für Raumobjekte zusätzlich global gesteuert, und die Auswahl ist zwischen 2D- und 3D-Darstellung synchronisiert. Für die Orbit-Steuerung wird das Modell in einer eigenen Orbit-Gruppe um die Modellmitte gedreht; die Kamera selbst übernimmt nur Abstand und Projektion. Die Innenansicht nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in Weltkoordinaten und zeigt nur die Zielebene. Sie kann über das Raum-Kontextmenü der 2D-Ansicht direkt am angeklickten Standort geöffnet werden. Ein Bodenklick versetzt den Standort innerhalb des Raums; ein Türklick wechselt in einen angrenzenden Raum. Die Blickdrehung verändert nur die Orientierung am Kamerastandpunkt; rechte-Maus-Bewegung läuft entlang der Blickrichtung innerhalb der Raumkontur, und Zoom verändert den Sichtwinkel bis 115°, statt die Kamera aus dem Raum zu verschieben. Panning verschiebt die Orbitansicht bewusst entlang der Bildschirmachsen. `Modell einpassen` verändert den Abstand, ohne die aktuelle Blickrichtung zu verlieren.
 
 Zusätzlich gibt es einen Oberflächenmodus: Transparente Raumkörper werden ausgeblendet, während Wände, Beläge, Boden- und Deckenflächen sichtbar bleiben. Öffnungen in Wänden geben dadurch den Blick in den Innenraum frei. Schräge Decken werden mit erhöhter Segmentdichte diskretisiert, damit die Kanten in 3D weniger treppenartig erscheinen.
 

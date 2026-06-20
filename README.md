@@ -30,9 +30,10 @@ Lokale Installations- und Distributionsaufgaben:
 ./gradlew installDist
 ./gradlew packageMacOsAppImage
 ./gradlew packageMacOsDmg
+./gradlew macosInstall
 ```
 
-Hinweis: Die beiden macOS-Paketierungsaufgaben laufen nur auf `macOS`, weil dafür `jpackage` des lokalen JDK genutzt wird.
+Hinweis: Die macOS-Paketierungs- und Installationsaufgaben laufen nur auf `macOS`, weil dafür `jpackage` des lokalen JDK genutzt wird. `macosInstall` baut das DMG und ersetzt anschließend `/Applications/CADas.app` durch dasselbe frisch erzeugte App-Bundle.
 
 ## Tests
 

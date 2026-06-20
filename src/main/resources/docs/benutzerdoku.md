@@ -27,9 +27,10 @@ Danach kann die Anwendung über das erzeugte Startskript im Verzeichnis `build/i
 ```bash
 ./gradlew packageMacOsAppImage
 ./gradlew packageMacOsDmg
+./gradlew macosInstall
 ```
 
-Diese Aufgaben laufen nur auf `macOS`.
+Diese Aufgaben laufen nur auf `macOS`. `macosInstall` baut das DMG und installiert dasselbe aktuelle App-Bundle direkt nach `/Applications`.
 
 ### Anwendung mit lokalem Automatisierungszugriff starten
 
@@ -290,6 +291,8 @@ Derzeit gilt:
 * Über `Auswahl löschen` entfernst du alle aktuell markierten Bauteile.
 * Ein Rechtsklick auf eine Auswahl öffnet ein Kontextmenü mit passenden Aktionen.
 * Aktuell bietet das Kontextmenü insbesondere Eigenschaften übernehmen, Auswahl löschen, Auswahl aufheben und 90°-Drehung für rotierbare Bauteile.
+* Bei einem Raum öffnet `Innenansicht ab diesem Standort öffnen` die Innenansicht am angeklickten 2D-Punkt.
+* Beim Rechtsklick in einen Raum öffnet `Innenansicht ab diesem Standort öffnen` die Innenansicht direkt am angeklickten Punkt.
 * Mit `Alt` + Linksklick schaltest du zwischen übereinanderliegenden Treffern unter dem Cursor durch.
 
 ### Rückgängig und Wiederherstellen
@@ -306,8 +309,10 @@ Wichtige Kürzel der aktuellen Oberfläche:
 
 * `Cmd+N` oder `Strg+N`: Etage hinzufügen
 * `Cmd+L` oder `Strg+L`: Projekt leeren
-* `Cmd+Shift+E` oder `Strg+Shift+E`: Gebäude als DXF exportieren
-* `Cmd+Shift+I` oder `Strg+Shift+I`: Gebäude aus DXF importieren
+* `Cmd+Shift+I` oder `Strg+Shift+I`: Projekt laden
+* `Cmd+S` oder `Strg+S`: Projekt sichern
+* `Cmd+Shift+S` oder `Strg+Shift+S`: Projekt unter neuem Namen sichern
+* `Cmd+P` oder `Strg+P`: Bauzeichnung als PDF exportieren
 * `Cmd+Shift+B` oder `Strg+Shift+B`: Teilebibliothek laden
 * `Cmd+Z` oder `Strg+Z`: Rückgängig
 * `Cmd+Shift+Z` oder `Strg+Shift+Z`: Wiederherstellen
@@ -318,7 +323,7 @@ Wichtige Kürzel der aktuellen Oberfläche:
 * `Esc`: Auswahl aufheben
 * `Cmd+0` oder `Strg+0`: 2D-Ansicht zentrieren
 * `Cmd+Shift+0` oder `Strg+Shift+0`: 3D-Ansicht zentrieren
-* `Cmd+E`, `Cmd+W`, `Cmd+T`, `Cmd+D`, `Cmd+F`, `Cmd+O`: Werkzeuge `Bearbeiten`, `Wand`, `Treppe`, `Tür`, `Fenster`, `Objekt`
+* `Cmd+E`, `Cmd+W`, `Cmd+T`, `Cmd+G`, `Cmd+D`, `Cmd+F`, `Cmd+O`: Werkzeuge `Bearbeiten`, `Wand`, `Treppe`, `Zusatzfläche`, `Tür`, `Fenster`, `Objekt`
 
 ## Ansichten umschalten
 
@@ -340,7 +345,8 @@ Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D`, `3D` und `Innen`.
 
 * `2D` zeigt die Zeichenfläche mit Linealen und Grundrisswerkzeugen.
 * `3D` nutzt denselben Platz für die räumliche Orbit-Kontrollansicht.
-* `Innen` nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in den aktuellen Raum und zeigt Innenwand-Beläge aus dem Raum heraus. Mit dem Mausrad stellst du dort den Sichtwinkel ein; Blickdrehung und Vor-/Zurückbewegung verlassen den Raum nicht.
+* `Innen` nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in den aktuellen Raum und zeigt Innenwand-Beläge aus dem Raum heraus. Ein Bodenklick versetzt den Standort auf den gewählten Punkt; ein Türklick wechselt in den angrenzenden Raum. Mit dem Mausrad stellst du dort den Sichtwinkel ein; Blickdrehung und Vor-/Zurückbewegung verlassen den Raum nicht.
+* Ein Klick auf den Boden setzt den Kamerastandort auf diesen Punkt. Klicks auf erreichbare Böden oder Türen anderer Räume wechseln in den jeweiligen Nachbarraum.
 * Dadurch bleibt mehr Platz für die aktive Arbeitsansicht, statt 2D und 3D ständig parallel einzublenden.
 
 ## DWG-Blöcke für Oberflächen verwenden
@@ -538,8 +544,10 @@ Die Werteingabe ist einer der wichtigsten Teile der aktuellen Oberfläche. Sie s
 
 Mit `Rasterweite` legst du das Zeichenraster fest.
 
+* Der Standardwert beträgt `1 cm`.
 * Das Zahlenfeld enthält den Wert.
 * Das Einheitenfeld daneben bestimmt, ob der Wert in `mm`, `cm` oder `m` verstanden wird.
+* Längeneingaben starten standardmäßig mit `cm`; bei einem Einheitenwechsel wird der angezeigte Wert passend umgerechnet.
 * Das Raster beeinflusst die Darstellung und bei aktivem `Snap Raster` auch die Fangpunkte.
 
 Typische Nutzung:
