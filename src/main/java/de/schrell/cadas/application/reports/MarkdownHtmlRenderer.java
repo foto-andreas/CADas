@@ -6,8 +6,12 @@ import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class MarkdownHtmlRenderer {
+
+    private static final Pattern NAVIGABLE_HEADING = Pattern.compile("<h([2-4])>(.*?)</h\\1>", Pattern.DOTALL);
 
     private final Parser parser;
     private final HtmlRenderer renderer;
@@ -24,7 +28,7 @@ public final class MarkdownHtmlRenderer {
     }
 
     public String renderDocument(String markdown) {
-        String renderedBody = renderer.render(parser.parse(markdown == null ? "" : markdown));
+        String renderedBody = addHeadingAnchors(renderer.render(parser.parse(markdown == null ? "" : markdown)));
         return """
                 <!doctype html>
                 <html lang="de">
@@ -61,5 +65,19 @@ public final class MarkdownHtmlRenderer {
                 </body>
                 </html>
                 """;
+    }
+
+    private String addHeadingAnchors(String renderedBody) {
+        Matcher matcher = NAVIGABLE_HEADING.matcher(renderedBody);
+        StringBuilder result = new StringBuilder();
+        int section = 0;
+        while (matcher.find()) {
+            section++;
+            matcher.appendReplacement(result, Matcher.quoteReplacement(
+                    "<h" + matcher.group(1) + " id=\"abschnitt-" + section + "\">" + matcher.group(2) + "</h" + matcher.group(1) + ">"
+            ));
+        }
+        matcher.appendTail(result);
+        return result.toString();
     }
 }

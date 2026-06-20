@@ -62,6 +62,8 @@ Die Oberfläche besteht aktuell aus fünf Hauptbereichen:
 
 ### Menüleiste
 
+Unter `Hilfe` öffnet `Über CADas` den Info-Dialog. Die Benutzerdokumentation besitzt ein Inhaltsverzeichnis mit direkten Sprüngen zu Kapiteln sowie eine Suche mit Vorwärts- und Rückwärtsnavigation.
+
 Die Menüleiste bündelt Datei-, Bearbeitungs-, Ansichts- und Werkzeugaktionen. Dazu gehören insbesondere:
 
 * Etage hinzufügen

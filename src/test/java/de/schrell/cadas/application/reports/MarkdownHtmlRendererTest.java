@@ -25,4 +25,18 @@ class MarkdownHtmlRendererTest {
         assertTrue(html.contains("Fliese &lt;Test&gt;"));
         assertFalse(html.contains("Fliese <Test>"));
     }
+
+    @Test
+    void vergibtStabileSprungmarkenFürKapitel() {
+        String html = renderer.renderDocument("""
+                # Hilfe
+                ## Projekt
+                ### Sichern
+                ## Zeichnen
+                """);
+
+        assertTrue(html.contains("<h2 id=\"abschnitt-1\">Projekt</h2>"));
+        assertTrue(html.contains("<h3 id=\"abschnitt-2\">Sichern</h3>"));
+        assertTrue(html.contains("<h2 id=\"abschnitt-3\">Zeichnen</h2>"));
+    }
 }

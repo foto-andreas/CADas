@@ -14,6 +14,8 @@ import de.schrell.cadas.application.drawing.GuideSnapTargets;
 import de.schrell.cadas.application.exchange.ExchangeFileNameService;
 import de.schrell.cadas.application.history.UndoRedoStack;
 import de.schrell.cadas.application.help.HelpContentService;
+import de.schrell.cadas.application.help.MarkdownNavigationService;
+import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.drawing.OpeningPlacementService;
 import de.schrell.cadas.application.drawing.QuarterTurnRotationService;
@@ -250,6 +252,7 @@ public final class CadWorkbench extends BorderPane {
     private final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
     private final ConstructionDrawingPdfService constructionDrawingPdfService = new ConstructionDrawingPdfService();
     private final HelpContentService helpContentService = new HelpContentService();
+    private final MarkdownNavigationService markdownNavigationService = new MarkdownNavigationService();
     private final MarkdownHtmlRenderer markdownHtmlRenderer = new MarkdownHtmlRenderer();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
@@ -1000,6 +1003,8 @@ public final class CadWorkbench extends BorderPane {
 
         Menu hilfeMenu = new Menu("Hilfe");
         hilfeMenu.getItems().addAll(
+                menuItem("Über CADas", this::showAboutDialog, null),
+                new SeparatorMenuItem(),
                 menuItem("Benutzerdokumentation", this::showHelpWindow, new KeyCodeCombination(KeyCode.F1)),
                 menuItem("Keymap und Mausbedienung", this::showKeymapWindow, null),
                 menuItem("Drittanbieter-Lizenzen", this::showThirdPartyLicensesWindow, null)
@@ -4561,12 +4566,34 @@ public final class CadWorkbench extends BorderPane {
         WebView view = new WebView();
         view.getEngine().loadContent(markdownHtmlRenderer.renderDocument(markdown));
         VBox.setVgrow(view, Priority.ALWAYS);
+        ComboBox<HelpSection> sectionSelector = new ComboBox<>();
+        sectionSelector.getItems().setAll(markdownNavigationService.sections(markdown));
+        sectionSelector.setPromptText("Inhaltsverzeichnis");
+        sectionSelector.setPrefWidth(300);
+        sectionSelector.setOnAction(event -> Optional.ofNullable(sectionSelector.getValue())
+                .ifPresent(section -> view.getEngine().executeScript(
+                        "document.getElementById('" + section.anchor() + "').scrollIntoView({behavior:'smooth',block:'start'});"
+                )));
+        applyTooltip(sectionSelector, "Listet alle Kapitel und Unterkapitel auf und springt direkt zum gewählten Abschnitt der Dokumentation.");
+        TextField searchField = new TextField();
+        searchField.setPromptText("Dokumentation durchsuchen");
+        searchField.setPrefWidth(260);
+        applyTooltip(searchField, "Sucht im vollständigen Text der geöffneten Dokumentation. Mit Eingabe oder Weiter wird der nächste Treffer markiert.");
+        Button previousButton = new Button("Zurück");
+        previousButton.setOnAction(event -> findInWebView(view, searchField.getText(), true));
+        applyTooltip(previousButton, "Springt rückwärts zum vorherigen Treffer des eingegebenen Suchbegriffs.");
+        Button nextButton = new Button("Weiter");
+        nextButton.setOnAction(event -> findInWebView(view, searchField.getText(), false));
+        applyTooltip(nextButton, "Springt vorwärts zum nächsten Treffer des eingegebenen Suchbegriffs.");
+        searchField.setOnAction(event -> findInWebView(view, searchField.getText(), false));
+        HBox navigation = new HBox(8.0, sectionSelector, searchField, previousButton, nextButton);
+        navigation.setAlignment(Pos.CENTER_LEFT);
         Button printButton = new Button("Drucken");
         printButton.setOnAction(event -> printWebView(view, documentName));
         applyTooltip(printButton, printTooltip);
         HBox actions = new HBox(8.0, printButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        VBox container = new VBox(10.0, view, actions);
+        VBox container = new VBox(10.0, navigation, view, actions);
         container.setPadding(new Insets(12));
         Stage stage = new Stage();
         stage.setTitle(windowTitle);
@@ -4576,6 +4603,14 @@ public final class CadWorkbench extends BorderPane {
         }
         stage.setScene(new Scene(container, 960, 760));
         stage.show();
+    }
+
+    private void findInWebView(WebView view, String searchText, boolean backwards) {
+        if (searchText == null || searchText.isBlank()) {
+            return;
+        }
+        String escaped = searchText.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
+        view.getEngine().executeScript("window.find('" + escaped + "',false," + backwards + ",true,false,true,false);");
     }
 
     private void printSurfaceMaterialReport(WebView reportView) {

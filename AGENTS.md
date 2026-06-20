@@ -76,6 +76,7 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * 3D-Wände und Fundamente enden bündig mit der Wandachse; keine Verlängerung über die Endpunkte hinaus.
 * Die Menüleiste nutzt `setUseSystemMenuBar(true)` und ist im Fenster unter macOS ausgeblendet (`setManaged(false)`/`setVisible(false)`).
 * Die In-App-Hilfe zeigt die vollständige Benutzerdokumentation aus `docs/benutzerdoku.md`; Keymap und Mausbedienung sind separater Menüpunkt.
+* Die In-App-Hilfe besitzt ein Inhaltsverzeichnis mit direkten Sprungmarken und eine Vorwärts-/Rückwärtssuche. „Über CADas“ ist zusätzlich zum nativen macOS-Info-Handler sichtbar im Hilfe-Menü erreichbar.
 * `./gradlew run` ist deaktiviert; `runApp` startet das App-Bundle, damit macOS den App-Namen „CADas" in der Menüleiste zeigt.
 
 ## Empfohlene Umsetzungsreihenfolge

@@ -99,6 +99,8 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 `UndoRedoStack` kapselt den generischen Verlauf. In der Workbench werden darüber komplette Projektsnapshots einschließlich Hilfslinien, aktiver Etage und Auswahlzustand verwaltet.
 
+`MarkdownNavigationService` extrahiert die Kapitelstruktur der eingebetteten Markdown-Dokumente. `MarkdownHtmlRenderer` versieht dieselben Überschriften mit stabilen Sprungmarken; die JavaFX-Hilfe kombiniert daraus Inhaltsverzeichnis, Volltextsuche und Druckfunktion.
+
 `AutomationBridgeServer` bindet lokal auf `127.0.0.1:17845` und reicht Werkzeuge, Felder, Canvas-Aktionen sowie Import-/Export-Kommandos kontrolliert an die Workbench weiter. Dadurch lassen sich End-to-End-Tests der laufenden Desktop-Anwendung auch ohne manuelle Bedienung durchführen.
 
 ### Domäne
