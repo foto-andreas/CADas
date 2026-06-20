@@ -1,11 +1,16 @@
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.process.ExecOperations
+import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.zip.ZipFile
 
 plugins {
     application
@@ -45,6 +50,76 @@ application {
 tasks.jar {
     manifest {
         attributes["Implementation-Version"] = project.version
+    }
+}
+
+abstract class GenerateThirdPartyLicensesTask : DefaultTask() {
+
+    @get:Classpath
+    abstract val artifactFiles: ConfigurableFileCollection
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun generate() {
+        val markdown = buildString {
+            appendLine("# Drittanbieter-Lizenzen")
+            appendLine()
+            appendLine("Diese Liste wird beim Build automatisch aus allen Laufzeitabhängigkeiten erzeugt.")
+            appendLine()
+            artifactFiles.files
+                .filter { it.isFile && it.extension.equals("jar", ignoreCase = true) }
+                .sortedBy { it.name.lowercase() }
+                .forEach { artifact ->
+                    appendLine("## ${artifact.name}")
+                    appendLine()
+                    val licenseEntries = ZipFile(artifact).use { archive ->
+                        archive.entries().asSequence()
+                            .filterNot { it.isDirectory }
+                            .filter { isLicenseFile(it.name) }
+                            .sortedBy { it.name }
+                            .map { entry -> entry.name to archive.getInputStream(entry).bufferedReader().use { it.readText() } }
+                            .toList()
+                    }
+                    if (licenseEntries.isEmpty()) {
+                        appendLine("Im Artefakt ist keine Lizenzdatei eingebettet.")
+                        appendLine()
+                    } else {
+                        licenseEntries.forEach { (path, content) ->
+                            appendLine("### $path")
+                            appendLine()
+                            content.trim().lineSequence().forEach { line -> appendLine("    $line") }
+                            appendLine()
+                        }
+                    }
+                }
+        }
+        val target = outputFile.get().asFile.toPath()
+        Files.createDirectories(target.parent)
+        Files.writeString(target, markdown)
+    }
+
+    private fun isLicenseFile(path: String): Boolean {
+        val fileName = path.substringAfterLast('/').uppercase()
+        return fileName == "LICENSE"
+                || fileName.startsWith("LICENSE.")
+                || fileName == "NOTICE"
+                || fileName.startsWith("NOTICE.")
+                || fileName == "COPYING"
+                || fileName.startsWith("COPYING.")
+    }
+}
+
+val generateThirdPartyLicenses by tasks.registering(GenerateThirdPartyLicensesTask::class) {
+    artifactFiles.from(configurations.runtimeClasspath)
+    outputFile.set(layout.buildDirectory.file("generated/licenses/drittanbieter-lizenzen.md"))
+}
+
+tasks.processResources {
+    dependsOn(generateThirdPartyLicenses)
+    from(generateThirdPartyLicenses.flatMap { it.outputFile }) {
+        into("docs")
     }
 }
 

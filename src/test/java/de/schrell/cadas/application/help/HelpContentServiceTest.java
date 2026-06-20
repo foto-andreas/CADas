@@ -33,4 +33,14 @@ class HelpContentServiceTest {
         assertTrue(markdown.contains("3D-Navigation"));
         assertTrue(markdown.contains("Drucken"));
     }
+
+    @Test
+    void drittanbieterLizenzenWerdenAusLaufzeitabhaengigkeitenErzeugt() {
+        String markdown = new HelpContentService().createThirdPartyLicensesMarkdown();
+
+        assertTrue(markdown.contains("# Drittanbieter-Lizenzen"));
+        assertTrue(markdown.contains("commonmark-0.24.0.jar"));
+        assertTrue(markdown.contains("pdfbox-3.0.7.jar"));
+        assertTrue(markdown.contains("automatisch"));
+    }
 }

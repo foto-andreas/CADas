@@ -977,7 +977,8 @@ public final class CadWorkbench extends BorderPane {
         Menu hilfeMenu = new Menu("Hilfe");
         hilfeMenu.getItems().addAll(
                 menuItem("Benutzerdokumentation", this::showHelpWindow, new KeyCodeCombination(KeyCode.F1)),
-                menuItem("Keymap und Mausbedienung", this::showKeymapWindow, null)
+                menuItem("Keymap und Mausbedienung", this::showKeymapWindow, null),
+                menuItem("Drittanbieter-Lizenzen", this::showThirdPartyLicensesWindow, null)
         );
 
         MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu, berichteMenu, hilfeMenu);
@@ -4422,6 +4423,10 @@ public final class CadWorkbench extends BorderPane {
 
     private void showKeymapWindow() {
         showMarkdownWindow(helpContentService.createKeymapMarkdown(), "CADas-Keymap und Mausbedienung", "Keymap und Mausbedienung", "Druckt die Tastaturkürzel und Mausbedienung. Im Druckdialog kann auch ein PDF-Drucker gewählt werden.");
+    }
+
+    private void showThirdPartyLicensesWindow() {
+        showMarkdownWindow(helpContentService.createThirdPartyLicensesMarkdown(), "CADas-Drittanbieter-Lizenzen", "Drittanbieter-Lizenzen", "Druckt die automatisch erzeugte Liste aller Drittanbieter-Lizenzen.");
     }
 
     public void showAboutDialog() {

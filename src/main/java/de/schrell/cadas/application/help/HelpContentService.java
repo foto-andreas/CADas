@@ -8,6 +8,7 @@ import java.util.Objects;
 public final class HelpContentService {
 
     private static final String BENUTZERDOKU_PFAD = "/docs/benutzerdoku.md";
+    private static final String LIZENZEN_PFAD = "/docs/drittanbieter-lizenzen.md";
 
     public String createMarkdown() {
         return ladeRessource(BENUTZERDOKU_PFAD);
@@ -73,6 +74,10 @@ public final class HelpContentService {
 
                 Die Keymap kann über die Schaltfläche **Drucken** ausgegeben oder als PDF gedruckt werden.
                 """;
+    }
+
+    public String createThirdPartyLicensesMarkdown() {
+        return ladeRessource(LIZENZEN_PFAD);
     }
 
     private String ladeRessource(String pfad) {
