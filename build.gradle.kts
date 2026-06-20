@@ -13,7 +13,7 @@ plugins {
     id("org.openjfx.javafxplugin") version "0.1.0"
 }
 
-group = "de.andreas"
+group = "de.schrell"
 version = "1.2.1"
 
 repositories {
@@ -32,8 +32,8 @@ javafx {
 }
 
 application {
-    mainModule = "de.andreas.cadas"
-    mainClass = "de.andreas.cadas.CadLauncher"
+    mainModule = "de.schrell.cadas"
+    mainClass = "de.schrell.cadas.CadLauncher"
     applicationDefaultJvmArgs = listOf(
         "--enable-native-access=javafx.graphics,ALL-UNNAMED",
         // PDFBox ist als requires static deklariert; commons-logging wird von PDFBox
@@ -77,16 +77,16 @@ tasks.jacocoTestCoverageVerification {
         rule {
             element = "PACKAGE"
             includes = listOf(
-                "de.andreas.cadas.domain.*",
-                "de.andreas.cadas.application.drawing",
-                "de.andreas.cadas.application.exchange",
-                "de.andreas.cadas.application.layers",
-                "de.andreas.cadas.application.objects",
-                "de.andreas.cadas.application.parts",
-                "de.andreas.cadas.application.reports",
-                "de.andreas.cadas.application.room",
-                "de.andreas.cadas.application.view",
-                "de.andreas.cadas.infrastructure.dxf"
+                "de.schrell.cadas.domain.*",
+                "de.schrell.cadas.application.drawing",
+                "de.schrell.cadas.application.exchange",
+                "de.schrell.cadas.application.layers",
+                "de.schrell.cadas.application.objects",
+                "de.schrell.cadas.application.parts",
+                "de.schrell.cadas.application.reports",
+                "de.schrell.cadas.application.room",
+                "de.schrell.cadas.application.view",
+                "de.schrell.cadas.infrastructure.dxf"
             )
             limit {
                 counter = "LINE"
@@ -251,7 +251,7 @@ val commonJpackageArguments = listOf(
     // Vollständiges lib-Verzeichnis als Modulpfad fürs App-Image: proper modules und automatic modules.
     // jlink verwendet stattdessen den bereinigten jlinkModulePath, der nur proper modules enthält.
     "--module-path", installLibDirectory.absolutePath,
-    "--module", "de.andreas.cadas/de.andreas.cadas.CadLauncher",
+    "--module", "de.schrell.cadas/de.schrell.cadas.CadLauncher",
     "--java-options", "--enable-native-access=javafx.graphics,ALL-UNNAMED",
     "--java-options", "--add-modules=org.apache.pdfbox,org.apache.commons.logging"
 )
@@ -285,7 +285,7 @@ val jlinkRuntimeImage by tasks.registering(JlinkRuntimeImageTask::class) {
     outputImage.set(runtimeImageDirectory)
     addModules.set(
         listOf(
-            "de.andreas.cadas",
+            "de.schrell.cadas",
             "javafx.controls",
             "javafx.swing",
             "javafx.web",

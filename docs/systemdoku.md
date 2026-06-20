@@ -29,33 +29,33 @@ Für macOS gibt es zusätzlich Gradle-Aufgaben auf Basis von `jpackage`:
 
 ### Paketstruktur
 
-* `de.andreas.cadas`
+* `de.schrell.cadas`
   Einstiegspunkte der Anwendung.
-* `de.andreas.cadas.ui`
+* `de.schrell.cadas.ui`
   JavaFX-Workbench, Umschaltung zwischen 2D- und 3D-Arbeitsbereich sowie Interaktion mit der Zeichenfläche.
-* `de.andreas.cadas.ui.AutomationBridgeServer`
+* `de.schrell.cadas.ui.AutomationBridgeServer`
   Lokaler HTTP-Zugriff für direkte Tests gegen eine laufende JavaFX-Anwendung.
-* `de.andreas.cadas.application.history`
+* `de.schrell.cadas.application.history`
   Allgemeine Rückgängig-/Wiederherstellen-Verwaltung auf Snapshot-Basis.
-* `de.andreas.cadas.application.drawing`
+* `de.schrell.cadas.application.drawing`
   Anwendungslogik für orthogonales Zeichnen, manuelle Längen- und Winkeleingabe, Snap-Verhalten, Öffnungsplatzierung und Bearbeitung verbundener Wand-Endpunkte.
-* `de.andreas.cadas.application.exchange`
+* `de.schrell.cadas.application.exchange`
   Formatunabhängige Schnittstellen für Import und Export.
-* `de.andreas.cadas.application.parts`
+* `de.schrell.cadas.application.parts`
   Interne Standard-Teilebibliothek sowie Import zusätzlicher Presets für Türen, Fenster und Treppen.
-* `de.andreas.cadas.application.objects`
+* `de.schrell.cadas.application.objects`
   Standard-Presets und referenzierte externe Presets für einfache Raumobjekte.
-* `de.andreas.cadas.application.reports`
+* `de.schrell.cadas.application.reports`
   Fachliche Berichte, Markdown-Erzeugung und HTML-Rendering auf Basis einer Standard-Markdown-Bibliothek.
-* `de.andreas.cadas.domain.geometry`
+* `de.schrell.cadas.domain.geometry`
   Geometrische Grundbausteine wie Längen, Winkel, Raster, Punkte und Segmente.
-* `de.andreas.cadas.domain.model`
+* `de.schrell.cadas.domain.model`
   Fachliches Projektmodell für Etagen, Räume, Wände, Türen, Fenster, Treppen und Raumobjekte.
-* `de.andreas.cadas.infrastructure.dxf`
+* `de.schrell.cadas.infrastructure.dxf`
   Konkreter Adapter für ASCII-DXF-Import und -Export.
-* `de.andreas.cadas.application.layers`
+* `de.schrell.cadas.application.layers`
   Belags-Presets, Kachelbelegung, Schichtwirkungen auf Raumgeometrie und Konsistenz zusätzlicher Oberflächen-Ebenen.
-* `de.andreas.cadas.application.view`
+* `de.schrell.cadas.application.view`
   Ableitung renderbarer 3D-Modelle, Kamerasteuerung, Innenansicht und Belags-Ausschnitte für Wandöffnungen.
 
 ## Verantwortlichkeiten

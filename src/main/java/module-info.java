@@ -1,4 +1,4 @@
-module de.andreas.cadas {
+module de.schrell.cadas {
     requires javafx.controls;
     requires javafx.swing;
     requires javafx.web;
@@ -10,5 +10,5 @@ module de.andreas.cadas {
     // Es wird zur Laufzeit über den Modulpfad bereitgestellt, daher nur statisch angebunden.
     requires static org.apache.pdfbox;
 
-    opens de.andreas.cadas to javafx.graphics;
+    opens de.schrell.cadas to javafx.graphics;
 }

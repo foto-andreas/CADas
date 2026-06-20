@@ -48,7 +48,7 @@ Vier-Schicht-Architektur: `domain` (Fachmodell, Geometrie) → `application` (Se
 | Tests | JUnit 5 Jupiter, JaCoCo |
 | Markdown | commonmark + gfm-tables |
 | PDF | Apache PDFBox 3.0.7 |
-| Module | `de.andreas.cadas` mit `module-info.java` |
+| Module | `de.schrell.cadas` mit `module-info.java` |
 | macOS-Pakete | `jpackage` über `packageMacOsAppImage` / `packageMacOsDmg` |
 
 Test-JVM-Arg: `--enable-native-access=ALL-UNNAMED` (unterdrückt Glass-Nativelibrary-Warnung).
