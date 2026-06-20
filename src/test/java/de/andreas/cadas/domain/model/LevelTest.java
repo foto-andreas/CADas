@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class LevelTest {
 
     @Test
-    void entferntMitWandAuchGebundeneÖffnungen() {
+    void entferntMitWandAuchGebundeneÖffnungenUndBeläge() {
         Level level = new Level("Erdgeschoss");
         Wall removedWall = wallAt(0);
         Wall retainedWall = wallAt(2_000);
@@ -45,18 +45,42 @@ class LevelTest {
                 Length.ofMillimeters(900),
                 Length.ofMillimeters(1_200)
         );
+        SurfaceLayerStack removedExteriorStack = new SurfaceLayerStack(
+                SurfaceType.WALL_EXTERIOR,
+                removedWall.id().toString()
+        );
+        SurfaceLayerStack removedInteriorStack = new SurfaceLayerStack(
+                SurfaceType.WALL_INTERIOR,
+                removedWall.id() + "@" + UUID.randomUUID()
+        );
+        SurfaceLayerStack retainedWallStack = new SurfaceLayerStack(
+                SurfaceType.WALL_INTERIOR,
+                retainedWall.id().toString()
+        );
+        SurfaceLayerStack retainedFloorStack = new SurfaceLayerStack(
+                SurfaceType.FLOOR,
+                removedWall.id().toString()
+        );
         level.addWall(removedWall);
         level.addWall(retainedWall);
         level.addDoor(removedDoor);
         level.addDoor(retainedDoor);
         level.addWindow(removedWindow);
         level.addWindow(retainedWindow);
+        level.addSurfaceLayerStack(removedExteriorStack);
+        level.addSurfaceLayerStack(removedInteriorStack);
+        level.addSurfaceLayerStack(retainedWallStack);
+        level.addSurfaceLayerStack(retainedFloorStack);
 
         assertTrue(level.removeWall(removedWall.id()));
 
         assertEquals(1, level.walls().size());
         assertEquals(retainedDoor, level.doors().getFirst());
         assertEquals(retainedWindow, level.windows().getFirst());
+        assertFalse(level.surfaceLayerStacks().contains(removedExteriorStack));
+        assertFalse(level.surfaceLayerStacks().contains(removedInteriorStack));
+        assertTrue(level.surfaceLayerStacks().contains(retainedWallStack));
+        assertTrue(level.surfaceLayerStacks().contains(retainedFloorStack));
         assertFalse(level.removeWall(UUID.randomUUID()));
     }
 

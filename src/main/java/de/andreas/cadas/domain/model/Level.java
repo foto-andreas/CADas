@@ -47,8 +47,19 @@ public final class Level {
         if (removed) {
             doors.removeIf(door -> door.wallId().equals(wallId));
             windows.removeIf(window -> window.wallId().equals(wallId));
+            surfaceLayerStacks.removeIf(stack -> targetsWall(stack, wallId));
         }
         return removed;
+    }
+
+    private boolean targetsWall(SurfaceLayerStack stack, UUID wallId) {
+        if (stack.surfaceType() != SurfaceType.WALL_INTERIOR
+                && stack.surfaceType() != SurfaceType.WALL_EXTERIOR) {
+            return false;
+        }
+        String wallTargetKey = wallId.toString();
+        return stack.targetKey().equals(wallTargetKey)
+                || stack.targetKey().startsWith(wallTargetKey + "@");
     }
 
     public void replaceWalls(List<Wall> updatedWalls) {
