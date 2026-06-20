@@ -304,7 +304,7 @@ Die aktuelle Version besitzt einen Projektverlauf für fachliche Bearbeitungssch
 
 ### Bauzeichnung als PDF
 
-Die PDF-Bauzeichnung enthält pro Etage Grundriss und Seitenaufrisse sowie gemeinsame räumliche Ansichten. Bei langgestreckten oder diagonalen Grundrissen begrenzt CADas den Tiefenversatz der räumlichen Projektion automatisch relativ zur Geschosshöhe. Dadurch bleiben Bauteile derselben Etage als zusammengehörige Ebene erkennbar und werden nicht optisch zu zusätzlichen Geschossen verschoben.
+Die PDF-Bauzeichnung enthält für jede Etage einen eigenen 2D-Grundriss. Gemeinsame 3D- und orthogonale Seitenansichten zeigen jeweils das gesamte Gebäude mit allen Etagen. Bei langgestreckten oder diagonalen Grundrissen begrenzt CADas den Tiefenversatz der räumlichen Projektion automatisch relativ zur Geschosshöhe. Dadurch bleiben Bauteile derselben Etage als zusammengehörige Ebene erkennbar und werden nicht optisch zu zusätzlichen Geschossen verschoben.
 
 ## Tastaturkürzel
 

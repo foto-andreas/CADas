@@ -36,14 +36,38 @@ class ConstructionDrawingPdfServiceTest {
 
         assertTrue(Files.size(target) > 2_000);
         try (var document = Loader.loadPDF(target.toFile())) {
-            assertEquals(4, document.getNumberOfPages());
+            assertEquals(3, document.getNumberOfPages());
             String text = new PDFTextStripper().getText(document);
             assertTrue(text.contains("2D-Grundriss"));
-            assertTrue(text.contains("Seitenaufrisse"));
+            assertTrue(text.contains("Seitenansichten - gesamtes Gebäude"));
             assertTrue(text.contains("3D-ISO"));
-            assertTrue(text.contains("3D-Seitenansichten"));
             assertTrue(text.contains(ConstructionDrawingPdfService.STANDARD));
             assertTrue(text.contains("M 1:"));
+        }
+    }
+
+    @Test
+    void exportiertGrundrisseEinzelnUndGebäudeansichtenGemeinsam() throws Exception {
+        ProjectModel project = sampleProject();
+        var upperLevel = project.createLevel("Obergeschoss");
+        upperLevel.addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(6_000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.5, LengthUnit.METER)
+        ));
+        Path target = tempDir.resolve("mehrere-etagen.pdf");
+
+        new ConstructionDrawingPdfService().export(project, target);
+
+        try (var document = Loader.loadPDF(target.toFile())) {
+            assertEquals(4, document.getNumberOfPages());
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("2D-Grundriss - Erdgeschoss"));
+            assertTrue(text.contains("2D-Grundriss - Obergeschoss"));
+            assertTrue(text.contains("3D-ISO - gesamtes Gebäude"));
+            assertTrue(text.contains("Seitenansichten - gesamtes Gebäude"));
+            assertFalse(text.contains("Seitenaufrisse - Erdgeschoss"));
+            assertFalse(text.contains("Seitenaufrisse - Obergeschoss"));
         }
     }
 

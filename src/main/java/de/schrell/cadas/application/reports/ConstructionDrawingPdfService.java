@@ -70,7 +70,6 @@ public final class ConstructionDrawingPdfService {
         try (PDDocument document = new PDDocument()) {
             for (Level level : project.levels()) {
                 addPlanPage(document, project, level, options);
-                addElevationsPage(document, project, level);
             }
             addSpatialViewsPage(document, project, true);
             addSpatialViewsPage(document, project, false);
@@ -154,44 +153,8 @@ public final class ConstructionDrawingPdfService {
         return new TextBlockingBox(x - padding, y - approxHeight - padding, approxWidth + padding * 2.0, approxHeight + padding * 2.0);
     }
 
-    private void addElevationsPage(PDDocument document, ProjectModel project, Level level) throws IOException {
-        try (PageCanvas canvas = addPage(document, project.name(), "Seitenaufrisse – " + level.name(), STANDARD)) {
-            String[] names = {"Nord", "Ost", "Süd", "West"};
-            for (int index = 0; index < 4; index++) {
-                double x = MARGIN + (index % 2) * (PAGE_WIDTH - 2 * MARGIN) / 2.0;
-                double y = MARGIN + TITLE_HEIGHT + (1 - index / 2) * (PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT) / 2.0;
-                double width = (PAGE_WIDTH - 2 * MARGIN) / 2.0 - 12.0;
-                double height = (PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT) / 2.0 - 18.0;
-                drawElevation(canvas, level, index, x, y, width, height, names[index]);
-            }
-        }
-    }
-
-    private void drawElevation(PageCanvas canvas, Level level, int direction, double x, double y, double width, double height, String name) throws IOException {
-        Bounds bounds = levelBounds(level);
-        double horizontalExtent = direction % 2 == 0 ? bounds.width() : bounds.height();
-        double maximumHeight = maximumHeight(level);
-        int scale = chooseScale(horizontalExtent + 800.0, maximumHeight + 800.0, width, height - 18.0);
-        double factor = POINTS_PER_MILLIMETER / scale;
-        double left = x + (width - horizontalExtent * factor) / 2.0;
-        double floor = y + 20.0;
-        canvas.text(x + 4, y + height - 12, 8.5f, name + " – M 1:" + scale);
-        canvas.line(left, floor, left + horizontalExtent * factor, floor, 0.6f, Color.GRAY);
-        for (Wall wall : level.walls()) {
-            double first = direction % 2 == 0 ? wall.axis().start().xMillimeters() - bounds.minX() : wall.axis().start().yMillimeters() - bounds.minY();
-            double second = direction % 2 == 0 ? wall.axis().end().xMillimeters() - bounds.minX() : wall.axis().end().yMillimeters() - bounds.minY();
-            double min = Math.min(first, second);
-            double span = Math.max(Math.abs(second - first), wall.thickness().toMillimeters());
-            canvas.rectangle(left + min * factor, floor, span * factor, wall.maximumHeightMillimeters() * factor,
-                    0.6f, Color.DARK_GRAY, new Color(232, 232, 232));
-        }
-        drawOverallDimension(canvas, left, floor - 12, left + horizontalExtent * factor, floor - 12,
-                formatMeters(horizontalExtent));
-        drawVerticalDimension(canvas, left - 14, floor, floor + maximumHeight * factor, formatMeters(maximumHeight));
-    }
-
     private void addSpatialViewsPage(PDDocument document, ProjectModel project, boolean isometric) throws IOException {
-        String title = isometric ? "3D-ISO – vier Ansichten" : "3D-Seitenansichten";
+        String title = isometric ? "3D-ISO – gesamtes Gebäude" : "Seitenansichten – gesamtes Gebäude";
         try (PageCanvas canvas = addPage(document, project.name(), title, STANDARD)) {
             double[] angles = isometric ? new double[]{45, 135, 225, 315} : new double[]{0, 90, 180, 270};
             for (int index = 0; index < angles.length; index++) {
@@ -212,7 +175,7 @@ public final class ConstructionDrawingPdfService {
         double factor = POINTS_PER_MILLIMETER / scale;
         double centerX = x + width / 2.0;
         double centerY = y + height / 2.0;
-        canvas.text(x + 4, y + height - 12, 8.5f, String.format(Locale.GERMAN, "Blick %.0f° – M 1:%d", angleDegrees, scale));
+        canvas.text(x + 4, y + height - 12, 8.5f, spatialViewLabel(angleDegrees, isometric, scale));
         for (SpatialLine line : lines) {
             canvas.line(centerX + (line.x1() - projected.centerX()) * factor,
                     centerY + (line.y1() - projected.centerY()) * factor,
@@ -221,6 +184,20 @@ public final class ConstructionDrawingPdfService {
                     line.top() ? 0.8f : 0.45f, line.top() ? Color.DARK_GRAY : Color.GRAY);
         }
         drawOverallDimension(canvas, x + 12, y + 8, x + width - 12, y + 8, "maßstabgerechte Ansicht");
+    }
+
+    private String spatialViewLabel(double angleDegrees, boolean isometric, int scale) {
+        if (isometric) {
+            return String.format(Locale.GERMAN, "Blick %.0f° – M 1:%d", angleDegrees, scale);
+        }
+        String direction = switch ((int) Math.round(angleDegrees)) {
+            case 0 -> "Nord";
+            case 90 -> "Ost";
+            case 180 -> "Süd";
+            case 270 -> "West";
+            default -> String.format(Locale.GERMAN, "Blick %.0f°", angleDegrees);
+        };
+        return direction + " – M 1:" + scale;
     }
 
     private List<SpatialLine> spatialLines(ProjectModel project, double angleDegrees, boolean isometric) {
@@ -557,10 +534,6 @@ public final class ConstructionDrawingPdfService {
         canvas.text((x1 + x2) / 2.0 + 4, (y1 + y2) / 2.0 + 4, PDF_FONT_SIZE, text);
     }
 
-    private void drawVerticalDimension(PageCanvas canvas, double x, double y1, double y2, String text) throws IOException {
-        drawOverallDimension(canvas, x, y1, x, y2, text);
-    }
-
     private PageCanvas addPage(PDDocument document, String projectName, String title, String subtitle) throws IOException {
         PDPage page = new PDPage(new PDRectangle((float) PAGE_WIDTH, (float) PAGE_HEIGHT));
         document.addPage(page);
@@ -608,10 +581,6 @@ public final class ConstructionDrawingPdfService {
         return new Bounds(minX, minY, maxX, maxY);
     }
 
-    private double maximumHeight(Level level) {
-        return level.walls().stream().mapToDouble(Wall::maximumHeightMillimeters).max().orElse(2_750.0);
-    }
-
     private int chooseScale(double modelWidth, double modelHeight, double availableWidthPoints, double availableHeightPoints) {
         for (int scale : STANDARD_SCALES) {
             if (modelWidth * POINTS_PER_MILLIMETER / scale <= availableWidthPoints
@@ -620,10 +589,6 @@ public final class ConstructionDrawingPdfService {
             }
         }
         return STANDARD_SCALES[STANDARD_SCALES.length - 1];
-    }
-
-    private String formatMeters(double millimeters) {
-        return String.format(Locale.GERMAN, "%.2f m", millimeters / 1_000.0);
     }
 
     private record Bounds(double minX, double minY, double maxX, double maxY) {
