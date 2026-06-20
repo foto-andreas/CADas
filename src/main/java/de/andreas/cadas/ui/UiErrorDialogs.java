@@ -9,6 +9,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
@@ -62,6 +63,7 @@ public final class UiErrorDialogs {
     private static VBox expandableStackTrace(String stackTrace) {
         Label label = new Label("Stacktrace");
         Button copyButton = new Button("Stacktrace kopieren");
+        Tooltip.install(copyButton, new Tooltip("Kopiert den vollständigen technischen Stacktrace in die Zwischenablage, damit er für die Fehleranalyse weitergegeben werden kann."));
         copyButton.setOnAction(event -> {
             ClipboardContent content = new ClipboardContent();
             content.putString(stackTrace);
