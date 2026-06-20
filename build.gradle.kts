@@ -42,6 +42,12 @@ application {
     )
 }
 
+tasks.jar {
+    manifest {
+        attributes["Implementation-Version"] = project.version
+    }
+}
+
 dependencies {
     implementation("org.commonmark:commonmark:0.24.0")
     implementation("org.commonmark:commonmark-ext-gfm-tables:0.24.0")

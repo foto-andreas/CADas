@@ -3,6 +3,7 @@ package de.schrell.cadas;
 import de.schrell.cadas.ui.CadWorkbench;
 import de.schrell.cadas.ui.AutomationBridgeServer;
 import de.schrell.cadas.ui.UiErrorDialogs;
+import java.awt.Desktop;
 import java.util.Objects;
 import java.util.Optional;
 import javafx.application.Application;
@@ -19,6 +20,7 @@ public final class CadApplication extends Application {
             CadWorkbench workbench = new CadWorkbench();
             Optional<AutomationBridgeServer> automationBridge = AutomationBridgeServer.startIfEnabled(workbench);
             installExceptionHandling(workbench);
+            installDesktopHandlers(workbench);
             Scene scene = new Scene(workbench, 1600, 980);
             stage.setTitle("CADas - Gebäude-Grundrisse");
             stage.getIcons().add(new Image(Objects.requireNonNull(
@@ -56,5 +58,15 @@ public final class CadApplication extends Application {
         };
         Thread.setDefaultUncaughtExceptionHandler(handler);
         Thread.currentThread().setUncaughtExceptionHandler(handler);
+    }
+
+    private void installDesktopHandlers(CadWorkbench workbench) {
+        if (!Desktop.isDesktopSupported()) {
+            return;
+        }
+        Desktop desktop = Desktop.getDesktop();
+        if (desktop.isSupported(Desktop.Action.APP_ABOUT)) {
+            desktop.setAboutHandler(event -> Platform.runLater(workbench::showAboutDialog));
+        }
     }
 }

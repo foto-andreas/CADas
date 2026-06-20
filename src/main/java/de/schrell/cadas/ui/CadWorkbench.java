@@ -14,6 +14,7 @@ import de.schrell.cadas.application.drawing.GuideSnapTargets;
 import de.schrell.cadas.application.exchange.ExchangeFileNameService;
 import de.schrell.cadas.application.history.UndoRedoStack;
 import de.schrell.cadas.application.help.HelpContentService;
+import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.drawing.OpeningPlacementService;
 import de.schrell.cadas.application.drawing.QuarterTurnRotationService;
 import de.schrell.cadas.application.drawing.SelectionQueryService;
@@ -4421,6 +4422,21 @@ public final class CadWorkbench extends BorderPane {
 
     private void showKeymapWindow() {
         showMarkdownWindow(helpContentService.createKeymapMarkdown(), "CADas-Keymap und Mausbedienung", "Keymap und Mausbedienung", "Druckt die Tastaturkürzel und Mausbedienung. Im Druckdialog kann auch ein PDF-Drucker gewählt werden.");
+    }
+
+    public void showAboutDialog() {
+        if (!interactiveDialogsEnabled) {
+            return;
+        }
+        AboutInformation information = AboutInformation.current();
+        Alert alert = new Alert(Alert.AlertType.INFORMATION, information.detailText(), ButtonType.OK);
+        alert.setTitle("Über CADas");
+        alert.setHeaderText(information.applicationName());
+        Window owner = currentWindow();
+        if (owner != null) {
+            alert.initOwner(owner);
+        }
+        alert.showAndWait();
     }
 
     private void showMarkdownWindow(String markdown, String windowTitle, String documentName, String printTooltip) {
