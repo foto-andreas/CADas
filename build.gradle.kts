@@ -76,11 +76,22 @@ tasks.jacocoTestCoverageVerification {
     violationRules {
         rule {
             element = "PACKAGE"
-            includes = listOf("de.andreas.cadas.domain.*")
+            includes = listOf(
+                "de.andreas.cadas.domain.*",
+                "de.andreas.cadas.application.drawing",
+                "de.andreas.cadas.application.exchange",
+                "de.andreas.cadas.application.layers",
+                "de.andreas.cadas.application.objects",
+                "de.andreas.cadas.application.parts",
+                "de.andreas.cadas.application.reports",
+                "de.andreas.cadas.application.room",
+                "de.andreas.cadas.application.view",
+                "de.andreas.cadas.infrastructure.dxf"
+            )
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                minimum = "0.85".toBigDecimal()
+                minimum = "0.90".toBigDecimal()
             }
         }
     }
