@@ -47,6 +47,8 @@ public final class ConstructionDrawingPdfService {
     private static final double PDF_TEXT_AWAY_DISTANCE = 4.0;
     private static final double PDF_PARALLEL_TEXT_AWAY_DISTANCE = 8.0;
     private static final double PDF_DIMENSION_LINE_BLOCKING_PADDING = 2.0;
+    private static final double STANDARD_SPATIAL_DEPTH_FACTOR = 0.45;
+    private static final double MAXIMUM_SAME_LEVEL_DEPTH_SHIFT_RATIO = 0.55;
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
     private final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
@@ -225,20 +227,21 @@ public final class ConstructionDrawingPdfService {
         List<SpatialLine> lines = new ArrayList<>();
         double baseHeight = 0.0;
         double angle = Math.toRadians(angleDegrees);
+        double depthFactor = isometric ? spatialDepthFactor(project, angle) : 0.0;
         for (Level level : project.levels()) {
             for (var extension : level.floorExtensions()) {
                 List<PlanPoint> outline = extension.outline();
                 for (int index = 0; index < outline.size(); index++) {
-                    SpatialPoint first = project(outline.get(index), baseHeight, angle, isometric);
-                    SpatialPoint second = project(outline.get((index + 1) % outline.size()), baseHeight, angle, isometric);
+                    SpatialPoint first = project(outline.get(index), baseHeight, angle, depthFactor);
+                    SpatialPoint second = project(outline.get((index + 1) % outline.size()), baseHeight, angle, depthFactor);
                     lines.add(new SpatialLine(first.x(), first.y(), second.x(), second.y(), true));
                 }
             }
             for (Wall wall : level.walls()) {
-                SpatialPoint startBottom = project(wall.axis().start(), baseHeight, angle, isometric);
-                SpatialPoint endBottom = project(wall.axis().end(), baseHeight, angle, isometric);
-                SpatialPoint startTop = project(wall.axis().start(), baseHeight + wall.startHeight().toMillimeters(), angle, isometric);
-                SpatialPoint endTop = project(wall.axis().end(), baseHeight + wall.endHeight().toMillimeters(), angle, isometric);
+                SpatialPoint startBottom = project(wall.axis().start(), baseHeight, angle, depthFactor);
+                SpatialPoint endBottom = project(wall.axis().end(), baseHeight, angle, depthFactor);
+                SpatialPoint startTop = project(wall.axis().start(), baseHeight + wall.startHeight().toMillimeters(), angle, depthFactor);
+                SpatialPoint endTop = project(wall.axis().end(), baseHeight + wall.endHeight().toMillimeters(), angle, depthFactor);
                 lines.add(new SpatialLine(startBottom.x(), startBottom.y(), endBottom.x(), endBottom.y(), false));
                 lines.add(new SpatialLine(startTop.x(), startTop.y(), endTop.x(), endTop.y(), true));
                 lines.add(new SpatialLine(startBottom.x(), startBottom.y(), startTop.x(), startTop.y(), false));
@@ -247,6 +250,46 @@ public final class ConstructionDrawingPdfService {
             baseHeight += estimateLevelHeight(level);
         }
         return lines;
+    }
+
+    double spatialDepthFactor(ProjectModel project, double angleRadians) {
+        List<PlanPoint> points = new ArrayList<>();
+        for (Level level : project.levels()) {
+            level.walls().forEach(wall -> {
+                points.add(wall.axis().start());
+                points.add(wall.axis().end());
+            });
+            level.rooms().forEach(room -> points.addAll(room.outline()));
+            level.floorExtensions().forEach(extension -> points.addAll(extension.outline()));
+        }
+        if (points.isEmpty()) {
+            return STANDARD_SPATIAL_DEPTH_FACTOR;
+        }
+        double minimumDepth = points.stream()
+                .mapToDouble(point -> spatialDepth(point, angleRadians))
+                .min()
+                .orElse(0.0);
+        double maximumDepth = points.stream()
+                .mapToDouble(point -> spatialDepth(point, angleRadians))
+                .max()
+                .orElse(minimumDepth);
+        double depthSpan = maximumDepth - minimumDepth;
+        if (depthSpan <= 0.0) {
+            return STANDARD_SPATIAL_DEPTH_FACTOR;
+        }
+        double minimumLevelHeight = project.levels().stream()
+                .mapToDouble(this::estimateLevelHeight)
+                .filter(height -> height > 0.0)
+                .min()
+                .orElse(2_750.0);
+        return Math.min(
+                STANDARD_SPATIAL_DEPTH_FACTOR,
+                minimumLevelHeight * MAXIMUM_SAME_LEVEL_DEPTH_SHIFT_RATIO / depthSpan
+        );
+    }
+
+    private double spatialDepth(PlanPoint point, double angleRadians) {
+        return point.xMillimeters() * Math.sin(angleRadians) + point.yMillimeters() * Math.cos(angleRadians);
     }
 
     private double estimateLevelHeight(Level level) {
@@ -262,10 +305,10 @@ public final class ConstructionDrawingPdfService {
         return Math.max(Math.max(wallHeight, objectHeight), Math.max(roomHeight, stairHeight));
     }
 
-    private SpatialPoint project(PlanPoint point, double z, double angle, boolean isometric) {
+    private SpatialPoint project(PlanPoint point, double z, double angle, double depthFactor) {
         double horizontal = point.xMillimeters() * Math.cos(angle) - point.yMillimeters() * Math.sin(angle);
-        double depth = point.xMillimeters() * Math.sin(angle) + point.yMillimeters() * Math.cos(angle);
-        double vertical = isometric ? z - depth * 0.45 : z;
+        double depth = spatialDepth(point, angle);
+        double vertical = z - depth * depthFactor;
         return new SpatialPoint(horizontal, vertical);
     }
 

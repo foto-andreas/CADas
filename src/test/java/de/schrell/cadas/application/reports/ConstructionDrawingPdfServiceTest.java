@@ -98,6 +98,28 @@ class ConstructionDrawingPdfServiceTest {
         }
     }
 
+    @Test
+    void begrenztTiefenversatzDamitEineEtageNichtWieMehrereWirkt() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Langhaus", "Keller");
+        project.primaryLevel().addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(20_000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.5, LengthUnit.METER)
+        ));
+        project.primaryLevel().addWall(Wall.create(
+                new PlanSegment(new PlanPoint(20_000, 0), new PlanPoint(20_000, 10_000)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.5, LengthUnit.METER)
+        ));
+        ConstructionDrawingPdfService service = new ConstructionDrawingPdfService();
+
+        double factor = service.spatialDepthFactor(project, Math.toRadians(45.0));
+        double depthSpan = 20_000 * Math.sin(Math.toRadians(45.0)) + 10_000 * Math.cos(Math.toRadians(45.0));
+
+        assertTrue(factor < 0.1);
+        assertTrue(depthSpan * factor < 1_400.0);
+    }
+
     private ProjectModel sampleProject() {
         ProjectModel project = ProjectModel.withDefaultLevel("Wohnhaus", "Erdgeschoss");
         project.primaryLevel().addWall(Wall.create(

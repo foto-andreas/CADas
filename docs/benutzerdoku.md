@@ -302,6 +302,10 @@ Die aktuelle Version besitzt einen Projektverlauf für fachliche Bearbeitungssch
 * `Wiederherstellen` stellt einen zuvor zurückgenommenen Schritt erneut her.
 * Der Verlauf umfasst unter anderem Bauteil-Anlage, Löschen, Etagenanlage, Projektleeren, DXF-Import, Hilfslinien und Eigenschaftsübernahmen.
 
+### Bauzeichnung als PDF
+
+Die PDF-Bauzeichnung enthält pro Etage Grundriss und Seitenaufrisse sowie gemeinsame räumliche Ansichten. Bei langgestreckten oder diagonalen Grundrissen begrenzt CADas den Tiefenversatz der räumlichen Projektion automatisch relativ zur Geschosshöhe. Dadurch bleiben Bauteile derselben Etage als zusammengehörige Ebene erkennbar und werden nicht optisch zu zusätzlichen Geschossen verschoben.
+
 ## Tastaturkürzel
 
 Wichtige Kürzel der aktuellen Oberfläche:
