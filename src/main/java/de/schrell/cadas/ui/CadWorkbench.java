@@ -3900,7 +3900,7 @@ public final class CadWorkbench extends BorderPane {
             case WINDOW -> "Werkzeug: Fenster | Linksklick auf eine Wand platziert das Fenster mit den aktuellen Maßen.";
             case STAIR -> "Werkzeug: Treppe | Rechteck aufziehen platziert die Treppe mit dem gewählten Preset.";
             case FLOOR_EXTENSION -> "Werkzeug: Balkon/Empore | Rechteck aufziehen fügt die Fußbodenplatte innen oder außen an die aktive Etage an.";
-            case OBJECT -> "Werkzeug: Objekt | Linksklick in einen Raum platziert das ausgewählte Objekt-Preset.";
+            case OBJECT -> "Werkzeug: Objekt | Linksklick platziert das ausgewählte Objekt-Preset innen oder außen.";
         };
     }
 
@@ -4148,10 +4148,6 @@ public final class CadWorkbench extends BorderPane {
             draftLabel.setText("Kein Objekt-Preset ausgewählt.");
             return;
         }
-        if (activeLevel.get().rooms().stream().noneMatch(room -> containsPoint(room, clickPoint))) {
-            draftLabel.setText("Objekte können nur innerhalb eines Raums platziert werden.");
-            return;
-        }
         rememberStateForUndo();
         RoomObject roomObject = RoomObject.create(
                 preset.id(),
@@ -4168,25 +4164,6 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().addRoomObject(roomObject);
         selectSingle(new SelectionKey(RenderableKind.ROOM_OBJECT, activeLevel.get().name(), roomObject.id().toString()));
         markThreeDDirty();
-    }
-
-    private boolean containsPoint(Room room, PlanPoint point) {
-        boolean inside = false;
-        int lastIndex = room.outline().size() - 1;
-        for (int currentIndex = 0; currentIndex < room.outline().size(); currentIndex++) {
-            PlanPoint current = room.outline().get(currentIndex);
-            PlanPoint previous = room.outline().get(lastIndex);
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            lastIndex = currentIndex;
-        }
-        return inside;
     }
 
     private void startGuideDrag(GuideOrientation orientation, double worldMillimeters) {
@@ -6364,6 +6341,10 @@ public final class CadWorkbench extends BorderPane {
 
     public int automationFloorExtensionCount() {
         return activeLevel.get().floorExtensions().size();
+    }
+
+    public int automationRoomObjectCount() {
+        return activeLevel.get().roomObjects().size();
     }
 
     public FloorExtension automationFloorExtension(int index) {

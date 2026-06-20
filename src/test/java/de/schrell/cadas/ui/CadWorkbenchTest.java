@@ -478,6 +478,22 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void objektKannOhneRaumAußerhalbDesGebäudesPlatziertWerden() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetTool("OBJECT");
+            instanz.automationCanvasClick(900, 600, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            return instanz;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(workbench::automationRoomObjectCount));
+        Assertions.assertTrue(aufFxThread(workbench::automationSnapshot).statusText().contains("innen oder außen"));
+    }
+
+    @Test
     void innenansichtOhneRaumBleibtImAktivenArbeitsbereichUndMeldetDenGrund() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
