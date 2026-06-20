@@ -56,8 +56,8 @@ Test-JVM-Arg: `--enable-native-access=ALL-UNNAMED` (unterdrückt Glass-Nativelib
 
 ## Dateiformate
 
-* **`.cadas`**: Gebäude-Datei (intern DXF-Format, UI-Endung `.cadas`). Laden über „Gebäude laden", Sichern über „Sichern"/„Sichern als ...".
-* **`.dxf`**: Etagen-Export/Import als Zusatzfunktion. Auch `.cadas`-Dateien können als `.dxf` gelesen werden, da das Format identisch ist.
+* **`.cadas`**: Gebäude-Datei (intern DXF-Format, UI-Endung `.cadas`). Laden über „Laden", Sichern über „Sichern"/„Sichern als ...". Etagen laden/sichern analog über „Etage laden"/„Etage sichern"/„Etage sichern als ...".
+* **`.dxf`**: Auch `.cadas`-Dateien können als `.dxf` gelesen werden, da das Format identisch ist. Etagen-Export/Import nutzt ebenfalls `.cadas`.
 * **`.cadasparts`**: Externe Teilebibliothek (textbasiert).
 * **`.cadasbelag`**: Eigene Belags-Presets unter `~/.config/CADas/Belag`.
 * **`.blocks`**: Begleitkatalog für DWG-Blöcke.
@@ -72,6 +72,7 @@ Test-JVM-Arg: `--enable-native-access=ALL-UNNAMED` (unterdrückt Glass-Nativelib
 * Menüleiste nutzt `setUseSystemMenuBar(true)` und ist unter macOS ausgeblendet (`setManaged(false)`/`setVisible(false)`).
 * Hilfe zeigt die vollständige Benutzerdokumentation aus `src/main/resources/docs/benutzerdoku.md`; Keymap ist separater Menüpunkt.
 * `./gradlew run` ist deaktiviert; `runApp` startet das App-Bundle.
+* `./gradlew macosInstall` baut das App-Bundle + DMG und installiert CADas.app direkt nach /Applications (überschreibt bestehende Version).
 
 ## Wo steht was
 
