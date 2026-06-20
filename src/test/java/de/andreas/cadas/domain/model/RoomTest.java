@@ -167,6 +167,29 @@ class RoomTest {
         assertFalse(room.slopeVisibleInNorthSouthView());
     }
 
+    @Test
+    void berechnetSchrägdeckenVolumenFürLFörmigenRaumFlächengewichtet() {
+        Room room = new Room(
+                UUID.randomUUID(),
+                "Dachstudio",
+                List.of(
+                        new PlanPoint(0, 0),
+                        new PlanPoint(4_000, 0),
+                        new PlanPoint(4_000, 2_000),
+                        new PlanPoint(2_000, 2_000),
+                        new PlanPoint(2_000, 4_000),
+                        new PlanPoint(0, 4_000)
+                ),
+                Length.of(3, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.of(1, LengthUnit.METER))
+        );
+
+        assertEquals(12.0, room.areaSquareMeters(), 0.001);
+        assertEquals(22.0, room.volumeCubicMeters(), 0.001);
+    }
+
     private void assertSlope(
             SlopedCeilingSide lowSide,
             PlanPoint lowPoint,

@@ -137,10 +137,29 @@ public record Room(
             }
             return volumeMillimeters / 1_000_000_000.0;
         }
-        double averageHeight = slopedCeilingProfile()
-                .map(profile -> (profile.kneeWallHeight().toMillimeters() + roomHeight.toMillimeters()) / 2.0)
-                .orElse(roomHeight.toMillimeters());
+        double averageHeight = slopedCeiling == null
+                ? roomHeight.toMillimeters()
+                : ceilingHeightAt(areaCentroid());
         return areaSquareMeters() * averageHeight / 1000.0;
+    }
+
+    private PlanPoint areaCentroid() {
+        double crossSum = 0.0;
+        double weightedX = 0.0;
+        double weightedY = 0.0;
+        for (int index = 0; index < outline.size(); index++) {
+            PlanPoint current = outline.get(index);
+            PlanPoint next = outline.get((index + 1) % outline.size());
+            double cross = current.xMillimeters() * next.yMillimeters()
+                    - next.xMillimeters() * current.yMillimeters();
+            crossSum += cross;
+            weightedX += (current.xMillimeters() + next.xMillimeters()) * cross;
+            weightedY += (current.yMillimeters() + next.yMillimeters()) * cross;
+        }
+        if (Math.abs(crossSum) < 0.001) {
+            return centerPoint();
+        }
+        return new PlanPoint(weightedX / (3.0 * crossSum), weightedY / (3.0 * crossSum));
     }
 
     public PlanPoint centerPoint() {
