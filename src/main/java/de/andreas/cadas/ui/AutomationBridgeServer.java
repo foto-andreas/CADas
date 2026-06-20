@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public final class AutomationBridgeServer {
 
@@ -155,10 +156,24 @@ public final class AutomationBridgeServer {
                 future.completeExceptionally(exception);
             }
         });
+        return awaitAutomationResult(future);
+    }
+
+    static <T> T awaitAutomationResult(CompletableFuture<T> future) {
         try {
             return future.get();
-        } catch (Exception exception) {
-            throw new IllegalStateException("Automatisierungsaktion konnte nicht abgeschlossen werden.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Warten auf Automatisierungsaktion wurde unterbrochen.", exception);
+        } catch (ExecutionException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException("Automatisierungsaktion konnte nicht abgeschlossen werden.", cause);
         }
     }
 
