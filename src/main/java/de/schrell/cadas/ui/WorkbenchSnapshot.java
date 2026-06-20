@@ -13,7 +13,8 @@ public record WorkbenchSnapshot(
         SelectionKey primarySelection,
         double zoom,
         double offsetX,
-        double offsetY
+        double offsetY,
+        long changeRevision
 ) {
 
     public WorkbenchSnapshot {

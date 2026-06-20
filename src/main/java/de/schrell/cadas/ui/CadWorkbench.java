@@ -136,6 +136,7 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -463,6 +464,11 @@ public final class CadWorkbench extends BorderPane {
     // Wird durch die Automatisierung deaktiviert, damit Tests nicht an Dialogen hängen bleiben.
     private boolean interactiveDialogsEnabled = true;
     private boolean applicationExitRequested;
+    private boolean applicationExitConfirmed;
+    private Boolean automatedUnsavedChangesExitDecision;
+    private long currentChangeRevision;
+    private long savedChangeRevision;
+    private long nextChangeRevision = 1;
     private Runnable applicationExitAction = Platform::exit;
     private UiErrorDialogs.ErrorPresentation lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
 
@@ -2129,6 +2135,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void requestApplicationExit() {
+        if (!confirmApplicationClose()) {
+            return;
+        }
+        applicationExitConfirmed = true;
         applicationExitRequested = true;
         Window window = currentWindow();
         if (window instanceof Stage stage) {
@@ -2140,6 +2150,47 @@ public final class CadWorkbench extends BorderPane {
             window.hide();
         }
         applicationExitAction.run();
+    }
+
+    public boolean confirmApplicationClose() {
+        if (applicationExitConfirmed || !hasUnsavedChanges()) {
+            return true;
+        }
+        if (automatedUnsavedChangesExitDecision != null) {
+            return automatedUnsavedChangesExitDecision;
+        }
+        if (!interactiveDialogsEnabled) {
+            return true;
+        }
+
+        ButtonType saveButton = new ButtonType("Sichern", ButtonBar.ButtonData.YES);
+        ButtonType discardButton = new ButtonType("Ohne Sichern beenden", ButtonBar.ButtonData.NO);
+        Alert alert = new Alert(Alert.AlertType.WARNING, "", saveButton, discardButton, ButtonType.CANCEL);
+        alert.setTitle("Ungesicherte Änderungen");
+        alert.setHeaderText("Änderungen vor dem Beenden sichern?");
+        alert.setContentText("Das Projekt enthält Änderungen, die noch nicht gesichert wurden. Beim Beenden ohne Sichern gehen diese Änderungen verloren.");
+        alert.getDialogPane().setPrefWidth(560);
+        Window owner = currentWindow();
+        if (owner != null) {
+            alert.initOwner(owner);
+        }
+        applyTooltip(alert.getDialogPane().lookupButton(saveButton),
+                "Sichert das vollständige Gebäude und beendet CADas anschließend.");
+        applyTooltip(alert.getDialogPane().lookupButton(discardButton),
+                "Beendet CADas und verwirft alle Änderungen seit der letzten Gebäudesicherung.");
+        applyTooltip(alert.getDialogPane().lookupButton(ButtonType.CANCEL),
+                "Bricht das Beenden ab und kehrt zum aktuellen Projekt zurück.");
+
+        Optional<ButtonType> decision = alert.showAndWait();
+        if (decision.filter(saveButton::equals).isPresent()) {
+            saveProject();
+            return !hasUnsavedChanges();
+        }
+        return decision.filter(discardButton::equals).isPresent();
+    }
+
+    private boolean hasUnsavedChanges() {
+        return currentChangeRevision != savedChangeRevision;
     }
 
     private void updateMouseCursor() {
@@ -4392,6 +4443,7 @@ public final class CadWorkbench extends BorderPane {
             Path exportPath = targetFile.toAbsolutePath().normalize();
             projectExchangeService.exportProject(project, exportPath);
             lastProjectSavePath = exportPath;
+            savedChangeRevision = currentChangeRevision;
             confirmExportWritten(exportPath);
         } catch (Exception exception) {
             showOperationException("Gebäude-Sicherung fehlgeschlagen", exception);
@@ -4645,6 +4697,7 @@ public final class CadWorkbench extends BorderPane {
             markThreeDDirty();
             fitCurrentViewToContent();
             lastProjectSavePath = sourceFile.toAbsolutePath().normalize();
+            savedChangeRevision = currentChangeRevision;
             draftLabel.setText("Gebäude geladen: " + sourceFile.getFileName());
         } catch (Exception exception) {
             showOperationException("Gebäude-Laden fehlgeschlagen", exception);
@@ -5822,6 +5875,8 @@ public final class CadWorkbench extends BorderPane {
 
     private void rememberStateForUndo() {
         history.remember(captureSnapshot());
+        currentChangeRevision = nextChangeRevision++;
+        applicationExitConfirmed = false;
         updateActionButtons();
     }
 
@@ -5834,7 +5889,8 @@ public final class CadWorkbench extends BorderPane {
                 selectedSelection.get(),
                 zoom,
                 offsetX,
-                offsetY
+                offsetY,
+                currentChangeRevision
         );
     }
 
@@ -5867,6 +5923,8 @@ public final class CadWorkbench extends BorderPane {
         zoom = snapshot.zoom();
         offsetX = snapshot.offsetX();
         offsetY = snapshot.offsetY();
+        currentChangeRevision = snapshot.changeRevision();
+        applicationExitConfirmed = false;
         updateStatus();
         render();
     }
@@ -6476,7 +6534,8 @@ public final class CadWorkbench extends BorderPane {
     }
 
     public void automationRememberUndoState() {
-        rememberStateForUndo();
+        history.remember(captureSnapshot());
+        updateActionButtons();
     }
 
     public void automationSetTool(String toolName) {
@@ -6722,6 +6781,14 @@ public final class CadWorkbench extends BorderPane {
 
     public boolean automationExitRequested() {
         return applicationExitRequested;
+    }
+
+    public boolean automationHasUnsavedChanges() {
+        return hasUnsavedChanges();
+    }
+
+    public void automationSetUnsavedChangesExitDecision(boolean exitWithoutSaving) {
+        automatedUnsavedChangesExitDecision = exitWithoutSaving;
     }
 
     public void automationTriggerShortcutOnField(String fieldName, KeyCode keyCode, boolean shortcutDown, boolean shiftDown) {

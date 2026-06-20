@@ -29,7 +29,13 @@ public final class CadApplication extends Application {
             )));
             stage.setMinWidth(1200);
             stage.setMinHeight(760);
-            stage.setOnCloseRequest(event -> automationBridge.ifPresent(AutomationBridgeServer::stop));
+            stage.setOnCloseRequest(event -> {
+                if (!workbench.confirmApplicationClose()) {
+                    event.consume();
+                    return;
+                }
+                automationBridge.ifPresent(AutomationBridgeServer::stop);
+            });
             stage.setScene(scene);
             stage.show();
         } catch (RuntimeException exception) {

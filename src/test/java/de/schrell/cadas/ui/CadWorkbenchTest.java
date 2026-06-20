@@ -345,6 +345,72 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void abbruchVerhindertBeendenBeiUngesichertenÄnderungen() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationDisableApplicationExit();
+            instanz.automationInvoke("clearProject", null);
+            instanz.automationSetUnsavedChangesExitDecision(false);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("exit", null);
+            return null;
+        });
+
+        Assertions.assertTrue(aufFxThread(workbench::automationHasUnsavedChanges));
+        Assertions.assertFalse(aufFxThread(workbench::automationExitRequested));
+        Assertions.assertFalse(aufFxThread(workbench::confirmApplicationClose));
+    }
+
+    @Test
+    void bewusstesVerwerfenErlaubtBeendenBeiUngesichertenÄnderungen() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationDisableApplicationExit();
+            instanz.automationInvoke("clearProject", null);
+            instanz.automationSetUnsavedChangesExitDecision(true);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("exit", null);
+            return null;
+        });
+
+        Assertions.assertTrue(aufFxThread(workbench::automationExitRequested));
+    }
+
+    @Test
+    void gebäudesicherungUndRückgängigSetzenÄnderungsstatusKorrekt() throws Exception {
+        Path exportDatei = Files.createTempFile("cadas-sicherungsstatus-", ".cadas");
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationInvoke("clearProject", null);
+            return instanz;
+        });
+
+        Assertions.assertTrue(aufFxThread(workbench::automationHasUnsavedChanges));
+        aufFxThread(() -> {
+            workbench.automationInvoke("exportProjectDxf", exportDatei);
+            workbench.automationInvoke("clearProject", null);
+            return null;
+        });
+        Assertions.assertTrue(aufFxThread(workbench::automationHasUnsavedChanges));
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("undo", null);
+            return null;
+        });
+
+        Assertions.assertFalse(aufFxThread(workbench::automationHasUnsavedChanges));
+    }
+
+    @Test
     void menüeinträgeHabenEindeutigeTastaturkürzel() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

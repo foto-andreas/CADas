@@ -120,6 +120,8 @@ Unten zeigt die Anwendung:
 
 ## Grundbedienung
 
+Beim Beenden warnt CADas vor ungesicherten Änderungen. Das vollständige Gebäude kann direkt gesichert, bewusst verworfen oder das Beenden abgebrochen werden.
+
 ## Fachliches Modell einer Etage
 
 Für das Verständnis der aktuellen Version ist jetzt ein anderer Punkt zentral: `Wände` sind die primäre bauliche Geometrie, `Räume` werden daraus automatisch abgeleitet.
