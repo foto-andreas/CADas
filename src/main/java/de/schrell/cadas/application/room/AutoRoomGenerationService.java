@@ -526,6 +526,7 @@ public final class AutoRoomGenerationService {
             if (matchedRoom.isPresent()) {
                 Room previous = matchedRoom.orElseThrow();
                 matchedIds.add(previous.id());
+                boolean preserveManualSlope = previous.slopedCeilingProfile().isPresent();
                 room = new Room(
                         previous.id(),
                         previous.name(),
@@ -533,8 +534,8 @@ public final class AutoRoomGenerationService {
                         derivedRoomHeight,
                         previous.floorThickness(),
                         previous.ceilingThickness(),
-                        hasVariableHeights(vertexHeights) ? null : previous.slopedCeiling(),
-                        vertexHeights
+                        preserveManualSlope || !hasVariableHeights(vertexHeights) ? previous.slopedCeiling() : null,
+                        preserveManualSlope ? null : vertexHeights
                 );
             } else {
                 room = new Room(

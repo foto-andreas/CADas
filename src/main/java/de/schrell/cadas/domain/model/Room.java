@@ -270,10 +270,14 @@ public record Room(
     }
 
     private double runMillimeters(SlopedCeilingSide side) {
-        return switch (side) {
+        double roomRun = switch (side) {
             case NORTH, SOUTH -> depthMillimeters();
             case EAST, WEST -> widthMillimeters();
         };
+        if (slopedCeiling == null || slopedCeiling.horizontalRun().toMillimeters() <= 0.0) {
+            return roomRun;
+        }
+        return Math.min(roomRun, slopedCeiling.horizontalRun().toMillimeters());
     }
 
     private double distanceFromLowSide(PlanPoint point, SlopedCeilingSide side) {

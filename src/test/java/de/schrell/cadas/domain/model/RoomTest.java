@@ -122,6 +122,28 @@ class RoomTest {
     }
 
     @Test
+    void begrenztDachschrägeAufAngegebeneHorizontaleBreite() {
+        Room room = Room.rectangular(
+                "Dachzimmer",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 5_000),
+                Length.ofMillimeters(2_800),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200),
+                new SlopedCeilingProfile(
+                        SlopedCeilingSide.NORTH,
+                        Length.ofMillimeters(1_000),
+                        Length.ofMillimeters(1_200)
+                )
+        );
+
+        assertEquals(1_900.0, room.ceilingHeightAt(new PlanPoint(2_000, 600)), 0.001);
+        assertEquals(2_800.0, room.ceilingHeightAt(new PlanPoint(2_000, 1_200)), 0.001);
+        assertEquals(2_800.0, room.ceilingHeightAt(new PlanPoint(2_000, 4_000)), 0.001);
+        assertEquals(56.3099, room.slopeAngleDegrees(), 0.001);
+    }
+
+    @Test
     void lehntUnvollständigeEckhöhenUndZuHoheKniestöckeAb() {
         List<PlanPoint> outline = List.of(
                 new PlanPoint(0, 0),

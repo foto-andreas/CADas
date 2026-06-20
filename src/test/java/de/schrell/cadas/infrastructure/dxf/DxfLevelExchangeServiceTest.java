@@ -498,7 +498,11 @@ class DxfLevelExchangeServiceTest {
                 Length.of(2.8, LengthUnit.METER),
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER),
-                new SlopedCeilingProfile(SlopedCeilingSide.SOUTH, Length.of(1.1, LengthUnit.METER))
+                new SlopedCeilingProfile(
+                        SlopedCeilingSide.SOUTH,
+                        Length.of(1.1, LengthUnit.METER),
+                        Length.of(1.4, LengthUnit.METER)
+                )
         ));
 
         Path file = tempDir.resolve("dachgeschoss.dxf");
@@ -507,6 +511,7 @@ class DxfLevelExchangeServiceTest {
 
         assertEquals(SlopedCeilingSide.SOUTH, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().lowSide());
         assertEquals(1100.0, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().kneeWallHeight().toMillimeters(), 0.001);
+        assertEquals(1400.0, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().horizontalRun().toMillimeters(), 0.001);
     }
 
     @Test

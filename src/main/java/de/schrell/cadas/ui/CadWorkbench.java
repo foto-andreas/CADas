@@ -58,6 +58,7 @@ import de.schrell.cadas.application.reports.MarkdownHtmlRenderer;
 import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
 import de.schrell.cadas.application.reports.ConstructionDrawingPdfService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService;
+import de.schrell.cadas.application.roof.RoofSlopeWallService;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
 import de.schrell.cadas.application.terrain.TerrainCornerService;
 import de.schrell.cadas.application.view.RenderableKind;
@@ -225,6 +226,7 @@ public final class CadWorkbench extends BorderPane {
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     private final TerrainCornerService terrainCornerService = new TerrainCornerService();
+    private final RoofSlopeWallService roofSlopeWallService = new RoofSlopeWallService();
     private final DraftingService draftingService = new DraftingService();
     private final EdgeResizeService edgeResizeService = new EdgeResizeService();
     private final SnapService snapService = new SnapService();
@@ -6201,6 +6203,13 @@ public final class CadWorkbench extends BorderPane {
                     menuItem("Bauteile 90° gegen den Uhrzeigersinn drehen", this::rotateSelectedComponentsCounterClockwise, null)
             );
         }
+        if (selectedWalls().size() == 1) {
+            selectionContextMenu.getItems().add(menuItem(
+                    "Dachschräge aus Wand erzeugen …",
+                    this::createRoofSlopeFromSelectedWall,
+                    null
+            ));
+        }
         if (selectedWalls().size() >= 3) {
             selectionContextMenu.getItems().add(menuItem("Raum erkennen", this::recognizeRoomFromSelectedWalls, null));
         }
@@ -6216,6 +6225,54 @@ public final class CadWorkbench extends BorderPane {
         return activeLevel.get().rooms().stream()
                 .filter(room -> room.id().toString().equals(contextMenuSelection.elementId()))
                 .findFirst();
+    }
+
+    private void createRoofSlopeFromSelectedWall() {
+        List<Wall> walls = selectedWalls();
+        if (walls.size() != 1 || !interactiveDialogsEnabled) {
+            return;
+        }
+        Length currentKneeHeight = parseLength(this.kneeWallHeightField, kneeWallHeightUnit.getValue())
+                .orElse(Length.of(1.0, LengthUnit.METER));
+        TextField kneeHeightField = new TextField(formatValue(currentKneeHeight, LengthUnit.CENTIMETER, LENGTH_INPUT_DECIMALS));
+        TextField slopeWidthField = new TextField("120");
+        kneeHeightField.setPrefColumnCount(8);
+        slopeWidthField.setPrefColumnCount(8);
+        applyTooltip(kneeHeightField, "Legt die Sockel- beziehungsweise Kniestockhöhe an der Innenkante der ausgewählten Wand in Zentimetern fest.");
+        applyTooltip(slopeWidthField, "Legt die horizontale Breite unterhalb der Dachschräge ab der Wandinnenkante in Zentimetern fest.");
+        VBox content = new VBox(
+                10.0,
+                new HBox(10.0, new Label("Sockelhöhe"), kneeHeightField, new Label("cm")),
+                new HBox(10.0, new Label("Breite unter Schräge"), slopeWidthField, new Label("cm"))
+        );
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Dachschräge aus Wand erzeugen");
+        dialog.setHeaderText("Dachschräge von der Wandinnenkante in den angrenzenden Raum aufbauen");
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().setPrefWidth(580);
+        Window owner = currentWindow();
+        if (owner != null) {
+            dialog.initOwner(owner);
+        }
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Erzeugt die Dachschräge, setzt die niedrige Wandhöhe und ergänzt polygonale Profile an den angrenzenden Seitenwänden.");
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Schließt den Dialog, ohne Wände oder Raumdecke zu ändern.");
+        if (dialog.showAndWait().filter(ButtonType.OK::equals).isEmpty()) {
+            return;
+        }
+        Length kneeHeight = parseLength(kneeHeightField, LengthUnit.CENTIMETER)
+                .orElseThrow(() -> new IllegalArgumentException("Die Sockelhöhe ist ungültig."));
+        Length slopeWidth = parseLength(slopeWidthField, LengthUnit.CENTIMETER)
+                .orElseThrow(() -> new IllegalArgumentException("Die Breite unterhalb der Dachschräge ist ungültig."));
+        RoofSlopeWallService.RoofSlopeResult result = roofSlopeWallService.apply(
+                activeLevel.get(), walls.getFirst().id(), kneeHeight, slopeWidth
+        );
+        rememberStateForUndo();
+        activeLevel.get().replaceWalls(result.walls());
+        activeLevel.get().replaceRooms(result.rooms());
+        markThreeDDirty();
+        draftLabel.setText("Dachschräge aus Wandinnenkante erzeugt.");
+        render();
     }
 
     private void openInteriorViewFromContextLocation() {

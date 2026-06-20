@@ -104,6 +104,22 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void wandkontextmenüBietetDachschrägenSchnellfunktion() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("WALL", 0, false);
+            return instanz;
+        });
+
+        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems)
+                .contains("Dachschräge aus Wand erzeugen …"));
+    }
+
+    @Test
     void verschiebtAuswahlMitCursortasteUmEineRasterweite() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {

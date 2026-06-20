@@ -678,9 +678,10 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         return room.slopedCeilingProfile()
                 .map(profile -> String.format(
                         Locale.US,
-                        "SLOPE,%s,%.3f",
+                        "SLOPE,%s,%.3f,%.3f",
                         profile.lowSide().name(),
-                        profile.kneeWallHeight().toMillimeters()
+                        profile.kneeWallHeight().toMillimeters(),
+                        profile.horizontalRun().toMillimeters()
                 ))
                 .orElse("NONE");
     }
@@ -699,12 +700,13 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             return null;
         }
         String[] parts = value.split(",");
-        if (parts.length != 3 || !parts[0].equals("SLOPE")) {
+        if ((parts.length != 3 && parts.length != 4) || !parts[0].equals("SLOPE")) {
             return null;
         }
         return new SlopedCeilingProfile(
                 SlopedCeilingSide.valueOf(parts[1]),
-                Length.ofMillimeters(parseDouble(parts[2]))
+                Length.ofMillimeters(parseDouble(parts[2])),
+                parts.length == 4 ? Length.ofMillimeters(parseDouble(parts[3])) : Length.zero()
         );
     }
 
