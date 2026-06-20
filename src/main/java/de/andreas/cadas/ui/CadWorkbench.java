@@ -905,7 +905,7 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Etage laden", this::importLevel, null),
                 menuItem("Etage sichern", this::saveCurrentLevel, null),
                 menuItem("Etage sichern als ...", this::saveCurrentLevelAs, null),
-                menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutShiftKey(KeyCode.P)),
+                menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
                 menuItem("Beenden", this::requestApplicationExit, shortcutKey(KeyCode.Q))
         );

@@ -16,6 +16,7 @@ import de.andreas.cadas.domain.model.WindowElement;
 import de.andreas.cadas.infrastructure.dxf.DxfProjectExchangeService;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -335,6 +336,35 @@ class CadWorkbenchTest {
         });
 
         Assertions.assertTrue(aufFxThread(workbench::automationExitRequested));
+    }
+
+    @Test
+    void menüeinträgeHabenEindeutigeTastaturkürzel() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            Map<String, String> labelsByShortcut = new HashMap<>();
+            menuBar.getMenus().stream()
+                    .flatMap(menu -> menu.getItems().stream())
+                    .filter(item -> item.getAccelerator() != null)
+                    .forEach(item -> {
+                        String shortcut = item.getAccelerator().toString();
+                        String existingLabel = labelsByShortcut.putIfAbsent(shortcut, item.getText());
+                        Assertions.assertNull(
+                                existingLabel,
+                                () -> "Tastaturkürzel " + shortcut + " ist doppelt für `" + existingLabel + "` und `" + item.getText() + "` vergeben."
+                        );
+                    });
+            return null;
+        });
     }
 
     @Test
