@@ -5321,10 +5321,6 @@ public final class CadWorkbench extends BorderPane {
         return coveringSource;
     }
 
-    private Optional<SurfaceLayerStack> currentSurfaceLayerStack() {
-        return currentDisplaySurfaceLayerStack();
-    }
-
     private Optional<SurfaceLayer> selectedSurfaceLayer() {
         SurfaceLayerStack stack = currentDisplaySurfaceLayerStack().orElse(null);
         int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
@@ -5332,12 +5328,6 @@ public final class CadWorkbench extends BorderPane {
             return Optional.empty();
         }
         return Optional.of(stack.layers().get(selectedIndex));
-    }
-
-    private Optional<String> currentSurfaceTargetKey() {
-        return currentSurfaceSelectionContext()
-                .filter(context -> context.targetKeys().size() == 1)
-                .map(context -> context.targetKeys().getFirst());
     }
 
     private SurfaceType currentSurfaceType() {
@@ -6351,13 +6341,6 @@ public final class CadWorkbench extends BorderPane {
         showDimensions.set(visible);
     }
 
-    public void automationSetDimensionTextStyle(String styleName) {
-        DimensionTextStyle style = "LENGTH_ONLY".equalsIgnoreCase(styleName)
-                ? DimensionTextStyle.LENGTH_ONLY
-                : DimensionTextStyle.FULL;
-        dimensionTextStyle.set(style);
-    }
-
     public int automationFloorExtensionCount() {
         return activeLevel.get().floorExtensions().size();
     }
@@ -6571,13 +6554,6 @@ public final class CadWorkbench extends BorderPane {
 
     public boolean automationExitRequested() {
         return applicationExitRequested;
-    }
-
-    public void automationTriggerShortcut(KeyCode keyCode, boolean shortcutDown, boolean shiftDown) {
-        Node target = Optional.ofNullable(getScene())
-                .map(Scene::getFocusOwner)
-                .orElse(this);
-        Event.fireEvent(target, shortcutEvent(keyCode, shortcutDown, shiftDown));
     }
 
     public void automationTriggerShortcutOnField(String fieldName, KeyCode keyCode, boolean shortcutDown, boolean shiftDown) {

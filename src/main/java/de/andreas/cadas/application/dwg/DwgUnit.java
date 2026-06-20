@@ -23,10 +23,6 @@ public enum DwgUnit {
         this.assumed = assumed;
     }
 
-    public int insUnitsCode() {
-        return insUnitsCode;
-    }
-
     public String label() {
         return label;
     }

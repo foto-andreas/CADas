@@ -46,10 +46,6 @@ public final class SurfaceLayerStack {
         layers.removeIf(layer -> layer.id().equals(layerId));
     }
 
-    public void renameLayer(UUID layerId, String newName) {
-        replaceLayer(layerId, layer -> layer.rename(newName));
-    }
-
     public void setVisibility(UUID layerId, boolean visible) {
         replaceLayer(layerId, layer -> layer.withVisibility(visible));
     }

@@ -63,11 +63,6 @@ public final class Level {
         rooms.add(Objects.requireNonNull(room, "room darf nicht null sein."));
     }
 
-    public boolean removeRoom(UUID roomId) {
-        Objects.requireNonNull(roomId, "roomId darf nicht null sein.");
-        return rooms.removeIf(room -> room.id().equals(roomId));
-    }
-
     public void replaceRooms(List<Room> updatedRooms) {
         rooms.clear();
         rooms.addAll(Objects.requireNonNull(updatedRooms, "updatedRooms darf nicht null sein."));

@@ -130,21 +130,6 @@ public final class SurfaceLayerEffectService {
         return room.areaSquareMeters();
     }
 
-    public double effectiveAverageHeightMillimeters(Level level, Room room) {
-        double effectiveAreaSquareMeters = effectiveAreaSquareMeters(level, room);
-        if (effectiveAreaSquareMeters <= 0.0) {
-            return 0.0;
-        }
-        if (!room.hasVariableCeilingHeights()) {
-            return effectiveMaximumCeilingHeightMillimeters(level, room);
-        }
-        double areaSquareMillimeters = effectiveAreaSquareMeters * 1_000_000.0;
-        if (areaSquareMillimeters <= 0.0) {
-            return 0.0;
-        }
-        return effectiveVolumeCubicMeters(level, room) * 1_000_000_000.0 / areaSquareMillimeters;
-    }
-
     private double triangleArea(PlanPoint a, PlanPoint b, PlanPoint c) {
         return Math.abs(
                 a.xMillimeters() * (b.yMillimeters() - c.yMillimeters())

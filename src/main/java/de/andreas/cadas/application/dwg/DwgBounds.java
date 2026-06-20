@@ -23,14 +23,6 @@ public record DwgBounds(
         return maxYMillimeters - minYMillimeters;
     }
 
-    public double centerXMillimeters() {
-        return (minXMillimeters + maxXMillimeters) / 2.0;
-    }
-
-    public double centerYMillimeters() {
-        return (minYMillimeters + maxYMillimeters) / 2.0;
-    }
-
     public DwgBounds include(DwgBounds other) {
         return new DwgBounds(
                 Math.min(minXMillimeters, other.minXMillimeters),

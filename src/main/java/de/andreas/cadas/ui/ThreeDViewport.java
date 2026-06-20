@@ -278,24 +278,6 @@ public final class ThreeDViewport extends BorderPane {
         fitCameraToScene();
     }
 
-    public void resetElevationToZero() {
-        cameraPose = new CameraPose(
-                cameraPose.projectionMode(),
-                cameraPose.azimuthDegrees(),
-                0.0,
-                cameraPose.distance(),
-                cameraPose.panX(),
-                cameraPose.panY(),
-                cameraPose.panZ()
-        );
-        fitToSceneRequested = true;
-        if (currentProject != null) {
-            refresh(currentProject);
-            return;
-        }
-        updateCamera();
-    }
-
     public void activateOrbitView() {
         rememberCurrentViewState();
         cameraMode = CameraMode.ORBIT;
@@ -632,10 +614,6 @@ public final class ThreeDViewport extends BorderPane {
 
     public String cameraStatusText() {
         return cameraStatusLabel.getText();
-    }
-
-    public SubScene subScene() {
-        return subScene;
     }
 
     public void exportSnapshot(Path path) {

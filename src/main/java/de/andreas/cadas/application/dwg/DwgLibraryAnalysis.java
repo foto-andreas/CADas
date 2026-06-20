@@ -27,10 +27,6 @@ public record DwgLibraryAnalysis(
         return new DwgLibraryAnalysis(sourceFile, false, "", DwgUnit.UNITLESS, List.of(), List.of(message));
     }
 
-    public boolean hasUsableBlocks() {
-        return successful && blocks.stream().anyMatch(DwgBlockDefinition::hasGeometry);
-    }
-
     public String summary() {
         if (!successful) {
             return messages.isEmpty() ? "DWG konnte nicht analysiert werden." : messages.getFirst();

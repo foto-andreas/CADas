@@ -306,10 +306,6 @@ public final class WallSurfaceOpeningService {
     }
 
     public record WallSurfaceInterval(double startMillimeters, double endMillimeters) {
-
-        public double lengthMillimeters() {
-            return endMillimeters - startMillimeters;
-        }
     }
 
     public record WallOpeningRectangle(
