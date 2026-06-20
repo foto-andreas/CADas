@@ -181,7 +181,8 @@ public final class ConstructionDrawingPdfService {
                     centerY + (line.y1() - projected.centerY()) * factor,
                     centerX + (line.x2() - projected.centerX()) * factor,
                     centerY + (line.y2() - projected.centerY()) * factor,
-                    line.top() ? 0.8f : 0.45f, line.top() ? Color.DARK_GRAY : Color.GRAY);
+                    line.terrain() || line.top() ? 0.8f : 0.45f,
+                    line.terrain() ? new Color(166, 130, 78) : line.top() ? Color.DARK_GRAY : Color.GRAY);
         }
         drawOverallDimension(canvas, x + 12, y + 8, x + width - 12, y + 8, "maßstabgerechte Ansicht");
     }
@@ -205,6 +206,14 @@ public final class ConstructionDrawingPdfService {
         double baseHeight = 0.0;
         double angle = Math.toRadians(angleDegrees);
         double depthFactor = isometric ? spatialDepthFactor(project, angle) : 0.0;
+        List<de.schrell.cadas.domain.model.TerrainVertex> terrain = project.terrain().vertices();
+        for (int index = 0; index < terrain.size(); index++) {
+            var firstVertex = terrain.get(index);
+            var secondVertex = terrain.get((index + 1) % terrain.size());
+            SpatialPoint first = project(firstVertex.position(), firstVertex.elevationAboveLowestFloor().toMillimeters(), angle, depthFactor);
+            SpatialPoint second = project(secondVertex.position(), secondVertex.elevationAboveLowestFloor().toMillimeters(), angle, depthFactor);
+            lines.add(new SpatialLine(first.x(), first.y(), second.x(), second.y(), true, true));
+        }
         for (Level level : project.levels()) {
             for (var extension : level.floorExtensions()) {
                 List<PlanPoint> outline = extension.outline();
@@ -649,7 +658,11 @@ public final class ConstructionDrawingPdfService {
     private record SpatialPoint(double x, double y) {
     }
 
-    private record SpatialLine(double x1, double y1, double x2, double y2, boolean top) {
+    private record SpatialLine(double x1, double y1, double x2, double y2, boolean top, boolean terrain) {
+
+        private SpatialLine(double x1, double y1, double x2, double y2, boolean top) {
+            this(x1, y1, x2, y2, top, false);
+        }
     }
 
     private static final class PageCanvas implements AutoCloseable {

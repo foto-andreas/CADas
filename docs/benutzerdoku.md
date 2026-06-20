@@ -504,6 +504,12 @@ Zusätzliche `DWG`-Objektdateien unter `~/.config/CADas/Objekte` erscheinen beim
 
 Über `Datei` > `3D-Objekt aus DXF laden` importierst du DXF-Dateien mit ACIS-v1-`3DSOLID`-Körpern. CADas übernimmt die metrischen 3D-Grenzen, legt die Datei unter `~/.config/CADas/Objekte` ab und wählt das neue Preset sofort aus. CADas tesselliert die entschlüsselte SAT-Topologie zu gefüllten Dreiecksnetzen; diese Darstellung lässt sich innen oder außen platzieren sowie über Breite, Tiefe, Höhe, positive oder negative Basishöhe und Winkel skalieren, vertikal versetzen und drehen.
 
+### Hanggelände
+
+Über `Werkzeuge` > `Geländehöhen bearbeiten` erfasst du für jede äußere Ecke des Gebäudes die Geländehöhe in Zentimetern relativ zum Boden der untersten Etage. CADas leitet die äußeren Ecken automatisch aus dem Grundriss ab und erhält vorhandene Höhen beim erneuten Öffnen des Dialogs.
+
+Die 3D-Ansicht zeigt das Gelände hellbraun als zusammenhängende Fläche. In den orthogonalen Seitenansichten erscheint die Geländeaußenkante, sodass Gefälle und Steigungen kontrollierbar bleiben.
+
 ### Treppe
 
 Mit dem Werkzeug `Treppe` ziehst du die rechteckige Grundfläche einer Treppe auf.

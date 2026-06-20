@@ -860,6 +860,7 @@ public final class ThreeDViewport extends BorderPane {
             case "room-volume" -> Color.web("#d8c6aa");
             case "stair" -> Color.web("#7a6d60");
             case "room-object" -> Color.web("#4e8174");
+            case "terrain" -> Color.web("#c6a46b");
             case "balcony" -> Color.web("#a18a6c");
             case "gallery" -> Color.web("#8f8068");
             case "roof" -> Color.web("#8e5f54");
@@ -904,7 +905,9 @@ public final class ThreeDViewport extends BorderPane {
         PhongMaterial material = new PhongMaterial(color);
         material.setSpecularColor(color.brighter());
         meshView.setMaterial(material);
-        meshView.setDrawMode(surfaceRenderingMode || "room-object".equals(rm.materialKey()) ? DrawMode.FILL : DrawMode.LINE);
+        meshView.setDrawMode(surfaceRenderingMode
+                || "room-object".equals(rm.materialKey())
+                || "terrain".equals(rm.materialKey()) ? DrawMode.FILL : DrawMode.LINE);
         meshView.setCullFace(CullFace.NONE);
         meshView.setOpacity(rm.opacity());
         meshView.setUserData(rm.selectionKey());

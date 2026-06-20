@@ -67,6 +67,11 @@ class ProjectModelTest {
                 Length.of(17.5, LengthUnit.CENTIMETER),
                 Length.of(2.75, LengthUnit.METER)
         ));
+        model.defineTerrain(new Terrain(java.util.List.of(
+                new TerrainVertex(new PlanPoint(0, 0), Length.zero()),
+                new TerrainVertex(new PlanPoint(2000, 0), Length.ofMillimeters(100)),
+                new TerrainVertex(new PlanPoint(0, 2000), Length.ofMillimeters(200))
+        )));
 
         ProjectModel snapshot = model.copy();
 
@@ -77,6 +82,7 @@ class ProjectModelTest {
         assertEquals(1, model.levels().size());
         assertEquals(1, model.primaryLevel().walls().size());
         assertNotSame(snapshot.primaryLevel(), model.primaryLevel());
+        assertEquals(3, model.terrain().vertices().size());
     }
 
     @Test

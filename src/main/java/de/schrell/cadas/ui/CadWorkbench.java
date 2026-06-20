@@ -58,6 +58,7 @@ import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
 import de.schrell.cadas.application.reports.ConstructionDrawingPdfService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
+import de.schrell.cadas.application.terrain.TerrainCornerService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.application.view.WallSurfaceOpeningService;
@@ -86,6 +87,8 @@ import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
+import de.schrell.cadas.domain.model.Terrain;
+import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
@@ -129,6 +132,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
@@ -218,6 +222,7 @@ public final class CadWorkbench extends BorderPane {
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
+    private final TerrainCornerService terrainCornerService = new TerrainCornerService();
     private final DraftingService draftingService = new DraftingService();
     private final EdgeResizeService edgeResizeService = new EdgeResizeService();
     private final SnapService snapService = new SnapService();
@@ -921,6 +926,59 @@ public final class CadWorkbench extends BorderPane {
         alert.showAndWait();
     }
 
+    private void editTerrainElevations() {
+        Terrain synchronizedTerrain = terrainCornerService.synchronize(project.primaryLevel(), project.terrain());
+        if (!synchronizedTerrain.configured()) {
+            draftLabel.setText("Geländehöhen benötigen mindestens drei äußere Gebäudeecken.");
+            return;
+        }
+        if (!interactiveDialogsEnabled) {
+            return;
+        }
+        List<TextField> elevationFields = new ArrayList<>();
+        VBox rows = new VBox(8.0);
+        for (int index = 0; index < synchronizedTerrain.vertices().size(); index++) {
+            TerrainVertex vertex = synchronizedTerrain.vertices().get(index);
+            TextField field = new TextField(formatValue(vertex.elevationAboveLowestFloor(), LengthUnit.CENTIMETER, LENGTH_INPUT_DECIMALS));
+            field.setPrefColumnCount(8);
+            applyTooltip(field, "Legt die Geländehöhe an dieser äußeren Gebäudeecke relativ zum Boden der untersten Etage in Zentimetern fest. Positive und negative Werte sind zulässig.");
+            Label label = new Label(String.format(Locale.GERMAN, "Ecke %d bei %.2f / %.2f m", index + 1,
+                    vertex.position().xMillimeters() / 1_000.0, vertex.position().yMillimeters() / 1_000.0));
+            rows.getChildren().add(new HBox(10.0, label, field, new Label("cm")));
+            elevationFields.add(field);
+        }
+        ScrollPane scrollPane = new ScrollPane(rows);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefViewportHeight(Math.min(420.0, 52.0 * elevationFields.size()));
+        applyTooltip(scrollPane, "Zeigt alle automatisch aus dem untersten Gebäudegrundriss abgeleiteten äußeren Geländeecken.");
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Geländehöhen bearbeiten");
+        dialog.setHeaderText("Höhe über dem Boden der untersten Etage");
+        dialog.getDialogPane().setContent(scrollPane);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().setPrefWidth(560);
+        Window owner = currentWindow();
+        if (owner != null) {
+            dialog.initOwner(owner);
+        }
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Übernimmt alle Geländehöhen und aktualisiert 3D- sowie Seitenansichten.");
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Verwirft die Eingaben und lässt das Gelände unverändert.");
+        if (dialog.showAndWait().filter(ButtonType.OK::equals).isEmpty()) {
+            return;
+        }
+        List<TerrainVertex> updatedVertices = new ArrayList<>();
+        for (int index = 0; index < synchronizedTerrain.vertices().size(); index++) {
+            TerrainVertex vertex = synchronizedTerrain.vertices().get(index);
+            Length elevation = parseLength(elevationFields.get(index), LengthUnit.CENTIMETER)
+                    .orElse(vertex.elevationAboveLowestFloor());
+            updatedVertices.add(new TerrainVertex(vertex.position(), elevation));
+        }
+        rememberStateForUndo();
+        project.defineTerrain(new Terrain(updatedVertices));
+        markThreeDDirty();
+        render();
+    }
+
     private MenuBar buildMenuBar() {
         Menu dateiMenu = new Menu("Datei");
         dateiMenu.getItems().addAll(
@@ -975,6 +1033,8 @@ public final class CadWorkbench extends BorderPane {
                 toolMenuItem(DrawingTool.DOOR, KeyCode.D),
                 toolMenuItem(DrawingTool.WINDOW, KeyCode.F),
                 toolMenuItem(DrawingTool.OBJECT, KeyCode.O),
+                new SeparatorMenuItem(),
+                menuItem("Geländehöhen bearbeiten", this::editTerrainElevations, null),
                 menuItem("Ausgewählte Bauteile 90° rechts drehen", this::rotateSelectedComponentsClockwise, shortcutShiftKey(KeyCode.RIGHT)),
                 menuItem("Ausgewählte Bauteile 90° links drehen", this::rotateSelectedComponentsCounterClockwise, shortcutShiftKey(KeyCode.LEFT))
         );
@@ -2280,6 +2340,7 @@ public final class CadWorkbench extends BorderPane {
         if (showGuides.get()) {
             drawGuides(graphics);
         }
+        drawTerrainElevation(graphics);
         drawRooms(graphics);
         drawWalls(graphics);
         drawWallSurfaceLayers(graphics);
@@ -2886,6 +2947,34 @@ public final class CadWorkbench extends BorderPane {
             graphics.strokePolygon(xPoints, yPoints, xPoints.length);
             drawRoomSlopeMarker(graphics, room);
             drawRoomTileGrid(graphics, room);
+        }
+    }
+
+    private void drawTerrainElevation(GraphicsContext graphics) {
+        if (projectionService.isPlanView(activeView.get()) || !project.terrain().configured()) {
+            return;
+        }
+        java.util.TreeMap<Long, Double> profile = new java.util.TreeMap<>();
+        for (TerrainVertex vertex : project.terrain().vertices()) {
+            long horizontal = Math.round(projectHorizontal(vertex.position(), 0.0));
+            profile.merge(horizontal, vertex.elevationAboveLowestFloor().toMillimeters(), Math::max);
+        }
+        if (profile.size() < 2) {
+            return;
+        }
+        graphics.setStroke(Color.web("#a67c46"));
+        graphics.setLineWidth(2.4);
+        Map.Entry<Long, Double> previous = null;
+        for (Map.Entry<Long, Double> current : profile.entrySet()) {
+            if (previous != null) {
+                graphics.strokeLine(
+                        toScreenHorizontal(previous.getKey()),
+                        toScreenVertical(-previous.getValue()),
+                        toScreenHorizontal(current.getKey()),
+                        toScreenVertical(-current.getValue())
+                );
+            }
+            previous = current;
         }
     }
 

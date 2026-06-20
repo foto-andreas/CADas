@@ -28,6 +28,7 @@ import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
+import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 
@@ -53,6 +54,7 @@ public final class ThreeDSceneModelBuilder {
     private static final int MIN_SLOPE_SEGMENTS = 24;
     private static final double JOINT_HEIGHT = 2.5;
     private static final double JOINT_SURFACE_OFFSET = 2.0;
+    private static final double TERRAIN_MARGIN = 2_000.0;
     private final OrthogonalPolygonDecompositionService decompositionService = new OrthogonalPolygonDecompositionService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
@@ -75,6 +77,9 @@ public final class ThreeDSceneModelBuilder {
         List<RenderableBox> boxes = new ArrayList<>();
         meshes.clear();
         Map<String, Double> levelBaseHeights = computeLevelBaseHeights(project.levels());
+        if (!visibleLevelNames.isEmpty()) {
+            buildTerrain(project);
+        }
 
         for (Level level : project.levels()) {
             if (!visibleLevelNames.contains(level.name())) {
@@ -105,6 +110,65 @@ public final class ThreeDSceneModelBuilder {
 
         project.roof().ifPresent(roof -> boxes.addAll(buildRoof(project, roof, levelBaseHeights, visibleLevelNames)));
         return new ThreeDSceneModel(List.copyOf(boxes), List.copyOf(meshes));
+    }
+
+    private void buildTerrain(ProjectModel project) {
+        List<TerrainVertex> vertices = project.terrain().vertices();
+        if (vertices.size() < 3) {
+            return;
+        }
+        double centerX = vertices.stream().mapToDouble(vertex -> vertex.position().xMillimeters()).average().orElse(0.0);
+        double centerZ = vertices.stream().mapToDouble(vertex -> vertex.position().yMillimeters()).average().orElse(0.0);
+        double minimumElevation = vertices.stream().mapToDouble(vertex -> vertex.elevationAboveLowestFloor().toMillimeters()).min().orElse(0.0);
+        double maximumElevation = vertices.stream().mapToDouble(vertex -> vertex.elevationAboveLowestFloor().toMillimeters()).max().orElse(0.0);
+        List<MeshPoint> inner = vertices.stream()
+                .map(vertex -> new MeshPoint(
+                        vertex.position().xMillimeters(),
+                        vertex.elevationAboveLowestFloor().toMillimeters() - minimumElevation,
+                        vertex.position().yMillimeters()
+                ))
+                .toList();
+        List<MeshPoint> outer = inner.stream().map(point -> expandTerrainPoint(point, centerX, centerZ)).toList();
+        List<Float> trianglePoints = new ArrayList<>();
+        for (int index = 1; index + 1 < inner.size(); index++) {
+            appendTriangle(trianglePoints, inner.getFirst(), inner.get(index), inner.get(index + 1));
+        }
+        for (int index = 0; index < inner.size(); index++) {
+            int next = (index + 1) % inner.size();
+            appendTriangle(trianglePoints, inner.get(index), outer.get(index), outer.get(next));
+            appendTriangle(trianglePoints, inner.get(index), outer.get(next), inner.get(next));
+        }
+        float[] points = new float[trianglePoints.size()];
+        for (int index = 0; index < trianglePoints.size(); index++) {
+            points[index] = trianglePoints.get(index);
+        }
+        meshes.add(new RenderableMesh(
+                new SelectionKey(RenderableKind.TERRAIN, "Gelände", "terrain"),
+                "Gelände",
+                RenderableKind.TERRAIN,
+                points,
+                points.length / 9,
+                minimumElevation,
+                maximumElevation - minimumElevation,
+                "terrain",
+                1.0
+        ));
+    }
+
+    private MeshPoint expandTerrainPoint(MeshPoint point, double centerX, double centerZ) {
+        double deltaX = point.x() - centerX;
+        double deltaZ = point.z() - centerZ;
+        double distance = Math.max(1.0, Math.hypot(deltaX, deltaZ));
+        double factor = (distance + TERRAIN_MARGIN) / distance;
+        return new MeshPoint(centerX + deltaX * factor, point.y(), centerZ + deltaZ * factor);
+    }
+
+    private void appendTriangle(List<Float> target, MeshPoint first, MeshPoint second, MeshPoint third) {
+        for (MeshPoint point : List.of(first, second, third)) {
+            target.add((float) point.x());
+            target.add((float) point.y());
+            target.add((float) point.z());
+        }
     }
 
     private Map<String, Double> computeLevelBaseHeights(List<Level> levels) {

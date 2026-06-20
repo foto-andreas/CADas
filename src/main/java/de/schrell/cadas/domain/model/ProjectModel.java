@@ -9,6 +9,7 @@ public final class ProjectModel {
     private String name;
     private final List<Level> levels = new ArrayList<>();
     private Roof roof;
+    private Terrain terrain = Terrain.empty();
 
     private ProjectModel(String name, List<Level> initialLevels) {
         this.name = Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -88,12 +89,21 @@ public final class ProjectModel {
         this.roof = Objects.requireNonNull(roof, "roof darf nicht null sein.");
     }
 
+    public Terrain terrain() {
+        return terrain;
+    }
+
+    public void defineTerrain(Terrain terrain) {
+        this.terrain = Objects.requireNonNull(terrain, "terrain darf nicht null sein.");
+    }
+
     public ProjectModel copy() {
         ProjectModel copy = new ProjectModel(name, List.of());
         levels.stream()
                 .map(Level::copy)
                 .forEach(copy.levels::add);
         copy.roof = roof;
+        copy.terrain = terrain;
         return copy;
     }
 
@@ -105,11 +115,13 @@ public final class ProjectModel {
                 .map(Level::copy)
                 .forEach(levels::add);
         roof = snapshot.roof;
+        terrain = snapshot.terrain;
     }
 
     public Level resetToSingleLevel(String levelName) {
         levels.clear();
         roof = null;
+        terrain = Terrain.empty();
         Level level = new Level(levelName);
         levels.add(level);
         return level;

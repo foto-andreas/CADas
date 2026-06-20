@@ -29,6 +29,8 @@ import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
+import de.schrell.cadas.domain.model.Terrain;
+import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 import de.schrell.cadas.application.layers.WallSurfaceTargetKey;
@@ -193,6 +195,27 @@ class ThreeDSceneModelBuilderTest {
                 .orElseThrow();
 
         assertEquals(100.0, box.centerY(), 0.001);
+    }
+
+    @Test
+    void rendertHanggeländeAlsHellbraunesFlächennetz() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Hanghaus", "Keller");
+        project.defineTerrain(new Terrain(List.of(
+                new TerrainVertex(new PlanPoint(0, 0), Length.ofMillimeters(-200)),
+                new TerrainVertex(new PlanPoint(4000, 0), Length.zero()),
+                new TerrainVertex(new PlanPoint(4000, 3000), Length.ofMillimeters(300)),
+                new TerrainVertex(new PlanPoint(0, 3000), Length.ofMillimeters(100))
+        )));
+
+        RenderableMesh terrain = builder.build(project, Set.of("Keller"), false).meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.TERRAIN)
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("terrain", terrain.materialKey());
+        assertEquals(-200.0, terrain.baseY(), 0.001);
+        assertEquals(500.0, terrain.height(), 0.001);
+        assertEquals(10, terrain.faceCount());
     }
 
     @Test

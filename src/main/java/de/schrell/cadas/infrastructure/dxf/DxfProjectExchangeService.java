@@ -27,6 +27,8 @@ import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
+import de.schrell.cadas.domain.model.Terrain;
+import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 import java.io.IOException;
@@ -77,6 +79,13 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 roof.overhang().toMillimeters(),
                 roof.gutterEnabled()
         )));
+        project.terrain().vertices().forEach(vertex -> appendMetadataText(dxf, context, vertex.position(), String.format(
+                Locale.US,
+                "TERRAIN|%.3f|%.3f|%.3f",
+                vertex.position().xMillimeters(),
+                vertex.position().yMillimeters(),
+                vertex.elevationAboveLowestFloor().toMillimeters()
+        )));
 
         DxfDocumentSupport.finishDocument(context);
         Files.writeString(targetFile, dxf.toString());
@@ -99,6 +108,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         Map<String, List<WindowElement>> pendingWindowsByLevel = new LinkedHashMap<>();
         String importedProjectName = projectName;
         Roof importedRoof = null;
+        List<TerrainVertex> importedTerrainVertices = new ArrayList<>();
         boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadata);
         boolean objectRotationDegrees = DxfMetadataCodec.usesObjectRotationDegrees(metadata);
         for (String entry : metadata) {
@@ -110,6 +120,10 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 switch (parts[0]) {
                     case "PROJECT" -> importedProjectName = stripDxfExtension(DxfMetadataCodec.decode(parts[1], encodedFields));
                     case "LEVEL" -> levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                    case "TERRAIN" -> importedTerrainVertices.add(new TerrainVertex(
+                            new PlanPoint(parseDouble(parts[1]), parseDouble(parts[2])),
+                            Length.ofMillimeters(parseDouble(parts[3]))
+                    ));
                     case "WALL" -> {
                         Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
                         double startHeight = parts.length >= 11 ? parseDouble(parts[5]) : parseDouble(parts[4]);
@@ -266,6 +280,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         }
         if (importedRoof != null) {
             project.defineRoof(importedRoof);
+        }
+        if (importedTerrainVertices.size() >= 3) {
+            project.defineTerrain(new Terrain(importedTerrainVertices));
         }
         return project;
     }

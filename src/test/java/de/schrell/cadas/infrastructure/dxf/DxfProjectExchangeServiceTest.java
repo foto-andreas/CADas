@@ -28,6 +28,8 @@ import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
+import de.schrell.cadas.domain.model.Terrain;
+import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 import java.nio.file.Files;
@@ -300,6 +302,12 @@ class DxfProjectExchangeServiceTest {
                 RoomObjectMountingMode.WALL_MOUNTED,
                 "Spiegel.dwg#Block"
         ).withBaseElevation(Length.of(-15, LengthUnit.CENTIMETER)));
+        project.defineTerrain(new Terrain(java.util.List.of(
+                new TerrainVertex(new PlanPoint(0, 0), Length.ofMillimeters(-100)),
+                new TerrainVertex(new PlanPoint(5000, 0), Length.ofMillimeters(200)),
+                new TerrainVertex(new PlanPoint(5000, 4000), Length.ofMillimeters(600)),
+                new TerrainVertex(new PlanPoint(0, 4000), Length.ofMillimeters(300))
+        )));
 
         var og = project.createLevel("Obergeschoss");
         og.addRoom(Room.rectangular(
@@ -348,6 +356,8 @@ class DxfProjectExchangeServiceTest {
         assertFalse(importedEg.roomObjects().getFirst().cutsFloorCovering());
         assertEquals(22.5, importedEg.roomObjects().getFirst().rotationDegrees(), 0.001);
         assertEquals(-150.0, importedEg.roomObjects().getFirst().baseElevation().toMillimeters(), 0.001);
+        assertEquals(4, imported.terrain().vertices().size());
+        assertEquals(600.0, imported.terrain().vertices().get(2).elevationAboveLowestFloor().toMillimeters(), 0.001);
         assertEquals(egRoom.id(), importedEg.rooms().getFirst().id(), "Raum-UUID muss im Rundlauf erhalten bleiben");
 
         var importedOg = imported.levels().get(1);
