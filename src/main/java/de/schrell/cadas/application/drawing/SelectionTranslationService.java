@@ -119,7 +119,7 @@ public final class SelectionTranslationService {
                 roomObject.width(),
                 roomObject.depth(),
                 roomObject.height(),
-                roomObject.rotationQuarterTurns(),
+                roomObject.rotationDegrees(),
                 roomObject.mountingMode(),
                 roomObject.visible(),
                 roomObject.source()

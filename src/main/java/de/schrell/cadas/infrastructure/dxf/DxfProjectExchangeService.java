@@ -100,6 +100,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         String importedProjectName = projectName;
         Roof importedRoof = null;
         boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadata);
+        boolean objectRotationDegrees = DxfMetadataCodec.usesObjectRotationDegrees(metadata);
         for (String entry : metadata) {
             String[] parts = DxfMetadataCodec.split(entry);
             if (DxfMetadataCodec.isMarker(parts)) {
@@ -237,7 +238,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 Length.ofMillimeters(parseDouble(parts[9])),
                                 Length.ofMillimeters(parseDouble(parts[10])),
                                 Length.ofMillimeters(parseDouble(parts[11])),
-                                Integer.parseInt(parts[12]),
+                                parseObjectRotation(parts[12], objectRotationDegrees),
                                 RoomObjectMountingMode.fromStoredValue(parts.length >= 17 ? parts[16] : null, Boolean.parseBoolean(parts[13])),
                                 Boolean.parseBoolean(parts[14]),
                                 DxfMetadataCodec.decode(parts[15], encodedFields)
@@ -464,7 +465,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%s|%s|%s|%s",
+                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s",
                     DxfMetadataCodec.encode(level.name()),
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
@@ -476,13 +477,18 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     roomObject.width().toMillimeters(),
                     roomObject.depth().toMillimeters(),
                     roomObject.height().toMillimeters(),
-                    roomObject.rotationQuarterTurns(),
+                    roomObject.rotationDegrees(),
                     roomObject.cutsFloorCovering(),
                     roomObject.visible(),
                     DxfMetadataCodec.encode(roomObject.source()),
                     roomObject.mountingMode().name()
             ));
         }
+    }
+
+    private double parseObjectRotation(String storedRotation, boolean storedInDegrees) {
+        double value = parseDouble(storedRotation);
+        return storedInDegrees ? value : value * 90.0;
     }
 
     private List<String> extractMetadata(List<String> lines) {

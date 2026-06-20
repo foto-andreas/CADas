@@ -296,6 +296,7 @@ class DxfProjectExchangeServiceTest {
                 Length.of(80, LengthUnit.CENTIMETER),
                 Length.of(5, LengthUnit.CENTIMETER),
                 Length.of(120, LengthUnit.CENTIMETER),
+                22.5,
                 RoomObjectMountingMode.WALL_MOUNTED,
                 "Spiegel.dwg#Block"
         ));
@@ -345,6 +346,7 @@ class DxfProjectExchangeServiceTest {
         assertEquals("DWG-Spiegel", importedEg.roomObjects().getFirst().name());
         assertEquals(RoomObjectMountingMode.WALL_MOUNTED, importedEg.roomObjects().getFirst().mountingMode());
         assertFalse(importedEg.roomObjects().getFirst().cutsFloorCovering());
+        assertEquals(22.5, importedEg.roomObjects().getFirst().rotationDegrees(), 0.001);
         assertEquals(egRoom.id(), importedEg.rooms().getFirst().id(), "Raum-UUID muss im Rundlauf erhalten bleiben");
 
         var importedOg = imported.levels().get(1);
@@ -404,7 +406,7 @@ class DxfProjectExchangeServiceTest {
         String dxf = Files.readString(file);
         ProjectModel imported = exchangeService.importProject(file, "Fallback");
 
-        assertTrue(dxf.contains("CADAS_DXF|3"));
+        assertTrue(dxf.contains("CADAS_DXF|4"));
         assertFalse(dxf.contains("Haus | Süd/West"));
         assertEquals("Haus | Süd/West", imported.name());
         assertEquals("EG | Wohnen/Kochen", imported.primaryLevel().name());

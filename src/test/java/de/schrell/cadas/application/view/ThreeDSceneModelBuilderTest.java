@@ -157,7 +157,7 @@ class ThreeDSceneModelBuilderTest {
                 Length.of(40, LengthUnit.CENTIMETER),
                 Length.of(70, LengthUnit.CENTIMETER),
                 Length.of(80, LengthUnit.CENTIMETER),
-                1,
+                37.5,
                 false,
                 true,
                 ""
@@ -170,7 +170,7 @@ class ThreeDSceneModelBuilderTest {
 
         assertEquals(400.0, box.width(), 0.001);
         assertEquals(700.0, box.depth(), 0.001);
-        assertEquals(90.0, box.rotationDegrees(), 0.001);
+        assertEquals(37.5, box.rotationDegrees(), 0.001);
     }
 
     @Test

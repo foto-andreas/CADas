@@ -6,6 +6,7 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
 
@@ -18,6 +19,7 @@ public final class QuarterTurnRotationService {
         Set<String> selectedWalls = selectedIds(selections, RenderableKind.WALL);
         Set<String> selectedRooms = selectedIds(selections, RenderableKind.ROOM_VOLUME, RenderableKind.ROOM_FLOOR, RenderableKind.ROOM_CEILING);
         Set<String> selectedStairs = selectedIds(selections, RenderableKind.STAIR);
+        Set<String> selectedRoomObjects = selectedIds(selections, RenderableKind.ROOM_OBJECT);
 
         List<Wall> rotatedWalls = level.walls().stream()
                 .map(wall -> selectedWalls.contains(wall.id().toString()) ? rotateWall(wall, clockwise) : wall)
@@ -30,8 +32,13 @@ public final class QuarterTurnRotationService {
                         ? (clockwise ? staircase.rotateClockwise() : staircase.rotateCounterClockwise())
                         : staircase)
                 .toList();
-        boolean changed = !selectedWalls.isEmpty() || !selectedRooms.isEmpty() || !selectedStairs.isEmpty();
-        return new RotationResult(rotatedWalls, rotatedRooms, rotatedStaircases, changed);
+        List<RoomObject> rotatedRoomObjects = level.roomObjects().stream()
+                .map(roomObject -> selectedRoomObjects.contains(roomObject.id().toString())
+                        ? roomObject.withRotationDegrees(roomObject.rotationDegrees() + (clockwise ? 90.0 : -90.0))
+                        : roomObject)
+                .toList();
+        boolean changed = !selectedWalls.isEmpty() || !selectedRooms.isEmpty() || !selectedStairs.isEmpty() || !selectedRoomObjects.isEmpty();
+        return new RotationResult(rotatedWalls, rotatedRooms, rotatedStaircases, rotatedRoomObjects, changed);
     }
 
     private Set<String> selectedIds(Set<SelectionKey> selections, RenderableKind... kinds) {
@@ -90,6 +97,6 @@ public final class QuarterTurnRotationService {
         return new PlanPoint(center.xMillimeters() + rotatedX, center.yMillimeters() + rotatedY);
     }
 
-    public record RotationResult(List<Wall> walls, List<Room> rooms, List<Staircase> staircases, boolean changed) {
+    public record RotationResult(List<Wall> walls, List<Room> rooms, List<Staircase> staircases, List<RoomObject> roomObjects, boolean changed) {
     }
 }

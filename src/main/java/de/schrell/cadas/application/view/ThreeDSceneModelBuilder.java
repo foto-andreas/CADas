@@ -1510,7 +1510,7 @@ public final class ThreeDSceneModelBuilder {
                     height,
                     roomObject.depth().toMillimeters(),
                     RotationAxis.Y,
-                    roomObject.rotationQuarterTurns() * 90.0,
+                    roomObject.rotationDegrees(),
                     "room-object",
                     0.78
             ));

@@ -11,6 +11,10 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectMountingMode;
+import de.schrell.cadas.domain.model.RoomObjectShape;
+import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
@@ -83,5 +87,31 @@ class QuarterTurnRotationServiceTest {
         ), true);
 
         assertEquals(SlopedCeilingSide.EAST, result.rooms().getFirst().slopedCeilingProfile().orElseThrow().lowSide());
+    }
+
+    @Test
+    void drehtObjekteAusgehendVonFreiemWinkel() {
+        Level level = new Level("Außenbereich");
+        RoomObject roomObject = RoomObject.create(
+                "tisch",
+                "Tisch",
+                RoomObjectType.TABLE,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(1000, 1000),
+                Length.of(160, LengthUnit.CENTIMETER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(75, LengthUnit.CENTIMETER),
+                25.0,
+                RoomObjectMountingMode.STANDS_ON_COVERING,
+                ""
+        );
+        level.addRoomObject(roomObject);
+
+        QuarterTurnRotationService.RotationResult result = service.rotate(level, Set.of(
+                new SelectionKey(RenderableKind.ROOM_OBJECT, level.name(), roomObject.id().toString())
+        ), false);
+
+        assertTrue(result.changed());
+        assertEquals(295.0, result.roomObjects().getFirst().rotationDegrees(), 0.001);
     }
 }

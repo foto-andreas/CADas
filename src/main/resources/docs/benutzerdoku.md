@@ -470,11 +470,13 @@ Im Materiallistenfenster druckst du die gerenderte Ansicht über `Drucken`. Übe
 
 ### Objekt
 
-Mit dem Werkzeug `Objekt` platzierst du einfache Einrichtungs- und Sanitärobjekte in erkannten Räumen.
+Mit dem Werkzeug `Objekt` platzierst du einfache Einrichtungs- und Sanitärobjekte innerhalb oder außerhalb des Gebäudes.
 
 * Wähle links im Bereich `Objekt` ein Preset.
-* Klicke anschließend in einen automatisch erkannten Raum.
-* Das Objekt wird mittig an der Klickposition platziert und kann im Werkzeug `Bearbeiten` ausgewählt, verschoben oder gelöscht werden.
+* Passe bei Bedarf Breite, Tiefe, Höhe und den freien Drehwinkel in Grad an.
+* Klicke anschließend an die gewünschte Position.
+* Das Objekt wird mittig an der Klickposition platziert und kann im Werkzeug `Bearbeiten` ausgewählt, verschoben, gedreht, skaliert oder gelöscht werden.
+* Geänderte Maße und Winkel werden mit `Werte auf Auswahl anwenden` auf das ausgewählte Objekt übernommen.
 * Über die Anzeigeoption `Objekte` blendest du alle Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.
 
 Aktuell enthaltene Standardobjekte:

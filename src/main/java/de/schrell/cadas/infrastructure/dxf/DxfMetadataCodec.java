@@ -8,7 +8,7 @@ import java.util.List;
 final class DxfMetadataCodec {
 
     static final String MARKER_TYPE = "CADAS_DXF";
-    static final String CURRENT_VERSION = "3";
+    static final String CURRENT_VERSION = "4";
     static final String CURRENT_MARKER = MARKER_TYPE + "|" + CURRENT_VERSION;
 
     private DxfMetadataCodec() {
@@ -20,12 +20,29 @@ final class DxfMetadataCodec {
                 .anyMatch(parts -> parts.length >= 2 && MARKER_TYPE.equals(parts[0]) && encodedMarkerVersion(parts[1]));
     }
 
-    private static boolean encodedMarkerVersion(String version) {
+    static boolean usesObjectRotationDegrees(List<String> metadataEntries) {
+        return markerVersion(metadataEntries) >= 4;
+    }
+
+    private static int markerVersion(List<String> metadataEntries) {
+        return metadataEntries.stream()
+                .map(DxfMetadataCodec::split)
+                .filter(parts -> parts.length >= 2 && MARKER_TYPE.equals(parts[0]))
+                .mapToInt(parts -> parseVersion(parts[1]))
+                .max()
+                .orElse(0);
+    }
+
+    private static int parseVersion(String version) {
         try {
-            return Integer.parseInt(version) >= 2;
+            return Integer.parseInt(version);
         } catch (NumberFormatException exception) {
-            return false;
+            return 0;
         }
+    }
+
+    private static boolean encodedMarkerVersion(String version) {
+        return parseVersion(version) >= 2;
     }
 
     static String[] split(String metadataEntry) {

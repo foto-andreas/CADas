@@ -8,6 +8,7 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
@@ -72,6 +73,9 @@ class CadWorkbenchTest {
                 Map.entry("stairHeight", "280"),
                 Map.entry("stairStartLanding", "0"),
                 Map.entry("stairEndLanding", "0"),
+                Map.entry("roomObjectWidth", "90"),
+                Map.entry("roomObjectDepth", "90"),
+                Map.entry("roomObjectHeight", "200"),
                 Map.entry("floorExtensionThickness", "18"),
                 Map.entry("surfaceLayerThickness", "1,2"),
                 Map.entry("surfaceTileWidth", "60"),
@@ -87,6 +91,7 @@ class CadWorkbenchTest {
             Assertions.assertEquals("CENTIMETER", aufFxThread(() -> workbench.automationUnit(entry.getKey())), entry.getKey());
             Assertions.assertEquals(entry.getValue(), aufFxThread(() -> workbench.automationFieldValue(entry.getKey())), entry.getKey());
         }
+        Assertions.assertEquals("0", aufFxThread(() -> workbench.automationFieldValue("roomObjectAngle")));
     }
 
     @Test
@@ -491,6 +496,40 @@ class CadWorkbenchTest {
 
         Assertions.assertEquals(1, aufFxThread(workbench::automationRoomObjectCount));
         Assertions.assertTrue(aufFxThread(workbench::automationSnapshot).statusText().contains("innen oder außen"));
+    }
+
+    @Test
+    void objektmaßeUndWinkelSindBeimPlatzierenUndBearbeitenEinstellbar() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetTool("OBJECT");
+            instanz.automationSetField("roomObjectWidth", "120");
+            instanz.automationSetField("roomObjectDepth", "80");
+            instanz.automationSetField("roomObjectHeight", "240");
+            instanz.automationSetField("roomObjectAngle", "37,5");
+            instanz.automationCanvasClick(900, 600, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            return instanz;
+        });
+
+        RoomObject placed = aufFxThread(() -> workbench.automationRoomObject(0));
+        Assertions.assertEquals(1200.0, placed.width().toMillimeters(), 0.001);
+        Assertions.assertEquals(800.0, placed.depth().toMillimeters(), 0.001);
+        Assertions.assertEquals(2400.0, placed.height().toMillimeters(), 0.001);
+        Assertions.assertEquals(37.5, placed.rotationDegrees(), 0.001);
+
+        aufFxThread(() -> {
+            workbench.automationSetField("roomObjectWidth", "150");
+            workbench.automationSetField("roomObjectAngle", "-15");
+            workbench.automationInvoke("applySelectionProperties", null);
+            return null;
+        });
+
+        RoomObject edited = aufFxThread(() -> workbench.automationRoomObject(0));
+        Assertions.assertEquals(1500.0, edited.width().toMillimeters(), 0.001);
+        Assertions.assertEquals(345.0, edited.rotationDegrees(), 0.001);
     }
 
     @Test

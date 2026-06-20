@@ -228,7 +228,8 @@ class DxfLevelExchangeServiceTest {
                 Length.of(80, LengthUnit.CENTIMETER),
                 Length.of(35, LengthUnit.CENTIMETER),
                 Length.of(200, LengthUnit.CENTIMETER),
-                true,
+                37.5,
+                RoomObjectMountingMode.CUTS_FLOOR_COVERING,
                 "Standard"
         ));
 
@@ -261,6 +262,7 @@ class DxfLevelExchangeServiceTest {
         assertEquals("Wandschrank", imported.roomObjects().getFirst().name());
         assertTrue(imported.roomObjects().getFirst().cutsFloorCovering());
         assertEquals(RoomObjectMountingMode.CUTS_FLOOR_COVERING, imported.roomObjects().getFirst().mountingMode());
+        assertEquals(37.5, imported.roomObjects().getFirst().rotationDegrees(), 0.001);
     }
 
     @Test
@@ -302,7 +304,7 @@ class DxfLevelExchangeServiceTest {
         String dxf = Files.readString(file);
         Level imported = exchangeService.importLevel(file, "Import");
 
-        assertTrue(dxf.contains("CADAS_DXF|3"));
+        assertTrue(dxf.contains("CADAS_DXF|4"));
         assertFalse(dxf.contains("Bad | Küche/Flur"));
         assertEquals("Bad | Küche/Flur ä\nNord", imported.rooms().getFirst().name());
         assertEquals("Raum/" + room.id() + "|Boden", imported.surfaceLayerStacks().getFirst().targetKey());
@@ -359,6 +361,37 @@ class DxfLevelExchangeServiceTest {
         assertTrue(dxf.contains("\n2\nCADAS_STAIR\n"));
         assertTrue(dxf.contains("\n0\nDICTIONARY\n"));
         assertTrue(dxf.contains("\n0\nLAYOUT\n"));
+    }
+
+    @Test
+    void importiertAlteObjektVierteldrehungAlsGradwert() throws Exception {
+        Path file = tempDir.resolve("altes-objekt.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                CADAS_DXF|3
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                OBJ|%s|test|Testobjekt|TABLE|RECTANGLE|100.000|200.000|1000.000|500.000|750.000|1|false|true||STANDS_ON_COVERING
+                0
+                ENDSEC
+                0
+                EOF
+                """.formatted(java.util.UUID.randomUUID()));
+
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertEquals(90.0, imported.roomObjects().getFirst().rotationDegrees(), 0.001);
     }
 
     @Test

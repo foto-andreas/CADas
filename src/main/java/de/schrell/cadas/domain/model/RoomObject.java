@@ -16,7 +16,7 @@ public record RoomObject(
         Length width,
         Length depth,
         Length height,
-        int rotationQuarterTurns,
+        double rotationDegrees,
         RoomObjectMountingMode mountingMode,
         boolean visible,
         String source
@@ -34,7 +34,31 @@ public record RoomObject(
         Objects.requireNonNull(height, "height darf nicht null sein.");
         Objects.requireNonNull(mountingMode, "mountingMode darf nicht null sein.");
         Objects.requireNonNull(source, "source darf nicht null sein.");
-        rotationQuarterTurns = Math.floorMod(rotationQuarterTurns, 4);
+        if (width.toMillimeters() <= 0.0 || depth.toMillimeters() <= 0.0 || height.toMillimeters() <= 0.0) {
+            throw new IllegalArgumentException("Objektmaße müssen größer als null sein.");
+        }
+        if (!Double.isFinite(rotationDegrees)) {
+            throw new IllegalArgumentException("rotationDegrees muss endlich sein.");
+        }
+        rotationDegrees = normalizeDegrees(rotationDegrees);
+    }
+
+    public RoomObject(
+            UUID id,
+            String presetId,
+            String name,
+            RoomObjectType type,
+            RoomObjectShape shape,
+            PlanPoint center,
+            Length width,
+            Length depth,
+            Length height,
+            int rotationQuarterTurns,
+            RoomObjectMountingMode mountingMode,
+            boolean visible,
+            String source
+    ) {
+        this(id, presetId, name, type, shape, center, width, depth, height, rotationQuarterTurns * 90.0, mountingMode, visible, source);
     }
 
     public RoomObject(
@@ -62,7 +86,39 @@ public record RoomObject(
                 width,
                 depth,
                 height,
-                rotationQuarterTurns,
+                rotationQuarterTurns * 90.0,
+                RoomObjectMountingMode.fromCutsFloorCovering(cutsFloorCovering),
+                visible,
+                source
+        );
+    }
+
+    public RoomObject(
+            UUID id,
+            String presetId,
+            String name,
+            RoomObjectType type,
+            RoomObjectShape shape,
+            PlanPoint center,
+            Length width,
+            Length depth,
+            Length height,
+            double rotationDegrees,
+            boolean cutsFloorCovering,
+            boolean visible,
+            String source
+    ) {
+        this(
+                id,
+                presetId,
+                name,
+                type,
+                shape,
+                center,
+                width,
+                depth,
+                height,
+                rotationDegrees,
                 RoomObjectMountingMode.fromCutsFloorCovering(cutsFloorCovering),
                 visible,
                 source
@@ -107,7 +163,23 @@ public record RoomObject(
             RoomObjectMountingMode mountingMode,
             String source
     ) {
-        return new RoomObject(UUID.randomUUID(), presetId, name, type, shape, center, width, depth, height, 0, mountingMode, true, source);
+        return create(presetId, name, type, shape, center, width, depth, height, 0.0, mountingMode, source);
+    }
+
+    public static RoomObject create(
+            String presetId,
+            String name,
+            RoomObjectType type,
+            RoomObjectShape shape,
+            PlanPoint center,
+            Length width,
+            Length depth,
+            Length height,
+            double rotationDegrees,
+            RoomObjectMountingMode mountingMode,
+            String source
+    ) {
+        return new RoomObject(UUID.randomUUID(), presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, true, source);
     }
 
     public boolean cutsFloorCovering() {
@@ -115,11 +187,15 @@ public record RoomObject(
     }
 
     public double footprintWidthMillimeters() {
-        return rotationQuarterTurns % 2 == 0 ? width.toMillimeters() : depth.toMillimeters();
+        double radians = Math.toRadians(rotationDegrees);
+        return Math.abs(width.toMillimeters() * Math.cos(radians))
+                + Math.abs(depth.toMillimeters() * Math.sin(radians));
     }
 
     public double footprintDepthMillimeters() {
-        return rotationQuarterTurns % 2 == 0 ? depth.toMillimeters() : width.toMillimeters();
+        double radians = Math.toRadians(rotationDegrees);
+        return Math.abs(width.toMillimeters() * Math.sin(radians))
+                + Math.abs(depth.toMillimeters() * Math.cos(radians));
     }
 
     public double minXMillimeters() {
@@ -139,6 +215,15 @@ public record RoomObject(
     }
 
     public RoomObject withVisibility(boolean newVisibility) {
-        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationQuarterTurns, mountingMode, newVisibility, source);
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, newVisibility, source);
+    }
+
+    public RoomObject withRotationDegrees(double newRotationDegrees) {
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, newRotationDegrees, mountingMode, visible, source);
+    }
+
+    private static double normalizeDegrees(double degrees) {
+        double normalized = degrees % 360.0;
+        return normalized < 0.0 ? normalized + 360.0 : normalized;
     }
 }

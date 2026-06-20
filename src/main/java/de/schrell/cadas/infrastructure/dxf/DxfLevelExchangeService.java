@@ -185,7 +185,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%s|%s|%s|%s",
+                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s",
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
                     DxfMetadataCodec.encode(roomObject.name()),
@@ -196,7 +196,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     roomObject.width().toMillimeters(),
                     roomObject.depth().toMillimeters(),
                     roomObject.height().toMillimeters(),
-                    roomObject.rotationQuarterTurns(),
+                    roomObject.rotationDegrees(),
                     roomObject.cutsFloorCovering(),
                     roomObject.visible(),
                     DxfMetadataCodec.encode(roomObject.source()),
@@ -279,6 +279,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         List<Staircase> importedStaircases = new ArrayList<>();
         List<SurfaceLayerStack> importedStacks = new ArrayList<>();
         boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadataEntries);
+        boolean objectRotationDegrees = DxfMetadataCodec.usesObjectRotationDegrees(metadataEntries);
 
         for (String metadata : metadataEntries) {
             String[] parts = DxfMetadataCodec.split(metadata);
@@ -390,7 +391,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             Length.ofMillimeters(parseDouble(parts[8])),
                             Length.ofMillimeters(parseDouble(parts[9])),
                             Length.ofMillimeters(parseDouble(parts[10])),
-                            Integer.parseInt(parts[11]),
+                            parseObjectRotation(parts[11], objectRotationDegrees),
                             RoomObjectMountingMode.fromStoredValue(parts.length >= 16 ? parts[15] : null, Boolean.parseBoolean(parts[12])),
                             Boolean.parseBoolean(parts[13]),
                             DxfMetadataCodec.decode(parts[14], encodedFields)
@@ -412,6 +413,11 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         pendingWindows.stream()
                 .filter(window -> wallsById.containsKey(window.wallId()))
                 .forEach(level::addWindow);
+    }
+
+    private double parseObjectRotation(String storedRotation, boolean storedInDegrees) {
+        double value = parseDouble(storedRotation);
+        return storedInDegrees ? value : value * 90.0;
     }
 
     private void importFallbackGeometry(Level level, List<DxfEntity> entities) {
