@@ -125,7 +125,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 - [x] Drehen der 3D-Ansicht ist unhandlich und unverständlich
 - [x] Durchforste die AutoCAD-Doku und suche nach Dingen, die wichtig sind und hier fehlen. Einfaches einbauen, Konpliziertes in TODO für später ergänzen.
 - [x] Drehen von Bauteilen in den 90°-Winkeln ergänzen
-- [x] Kontextmenü bei Selektion von Bauteilen ergänzen und sinnvolle EInträge ergänzen
+- [x] Kontextmenü bei Selektion von Bauteilen ergänzen und sinnvolle Einträge ergänzen
 - [x] Kannst du ermöglichen, dass du direkt auf eine zum Testen gestartete APP zugreifen kannst? Wenn es zu JavaFX nichts Passendes gibt: Ggf. einen MCP-Server in der App ergänzen, dem du Maus-Aktionen, Tastatur-Eingaben usw. in Feldern an die App schicken kannst oder das in der Event-Ebene realisierst. Ziel soll sein, dass du Dinge selber testen kannst, dann exportierst und in der Datei nachsehen kannst, ob neue Funktionen funktionieren oder nicht.
 - [x] horizontales Lineal ist rechts nicht lang genug, da ist eine weiße Box.
 - [x] offenbar werden aktuell nur DXFs für einzelne Etagen erstellt/geladen. Das ist eine Option, es soll aber auch das ganze Gebäude ex-/importiert werden. Und das soll der Standard sein.
@@ -148,7 +148,7 @@ Wenn nicht anders gefordert, ist immer die Liste vollständig ohne Unterbrechung
 
 ## Nächste Aufgaben
 
-- [x] Prüfe den gesamten Code auf Aufälligkeiten, Fehler, Pfusch, Verdecken von Problemen in der 3D-Ansicht durch zusätzliche "Korrekturen" des Modells. Korrigiere und verbessere.
+- [x] Prüfe den gesamten Code auf Auffälligkeiten, Fehler, Pfusch, Verdecken von Problemen in der 3D-Ansicht durch zusätzliche "Korrekturen" des Modells. Korrigiere und verbessere.
 - [x] Die Decken sind nun Polygon-Meshes. Dies soll auch für Böden und Belege gelten, damit sie korrekt behandelt werden können. Pass deren Struktur entsprechend an.
 - [x] Decken-, Wand- und Bodenbeläge beziehen sich immer auf die entsprechende Fläche des Raums. Sie verkleinern den Raum, wenn sie vorhanden und nicht ausgeblendet sind.
 - [x] Aufeinander liegende Schichten von Belägen verhalten sich iterativ genauso.

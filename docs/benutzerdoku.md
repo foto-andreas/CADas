@@ -292,7 +292,6 @@ Derzeit gilt:
 * Ein Rechtsklick auf eine Auswahl öffnet ein Kontextmenü mit passenden Aktionen.
 * Aktuell bietet das Kontextmenü insbesondere Eigenschaften übernehmen, Auswahl löschen, Auswahl aufheben und 90°-Drehung für rotierbare Bauteile.
 * Bei einem Raum öffnet `Innenansicht ab diesem Standort öffnen` die Innenansicht am angeklickten 2D-Punkt.
-* Beim Rechtsklick in einen Raum öffnet `Innenansicht ab diesem Standort öffnen` die Innenansicht direkt am angeklickten Punkt.
 * Mit `Alt` + Linksklick schaltest du zwischen übereinanderliegenden Treffern unter dem Cursor durch.
 
 ### Rückgängig und Wiederherstellen
@@ -346,7 +345,6 @@ Oberhalb des Mittelbereichs gibt es jetzt die Umschalter `2D`, `3D` und `Innen`.
 * `2D` zeigt die Zeichenfläche mit Linealen und Grundrisswerkzeugen.
 * `3D` nutzt denselben Platz für die räumliche Orbit-Kontrollansicht.
 * `Innen` nutzt dasselbe 3D-Fenster, setzt die Kamera auf Augenhöhe in den aktuellen Raum und zeigt Innenwand-Beläge aus dem Raum heraus. Ein Bodenklick versetzt den Standort auf den gewählten Punkt; ein Türklick wechselt in den angrenzenden Raum. Mit dem Mausrad stellst du dort den Sichtwinkel ein; Blickdrehung und Vor-/Zurückbewegung verlassen den Raum nicht.
-* Ein Klick auf den Boden setzt den Kamerastandort auf diesen Punkt. Klicks auf erreichbare Böden oder Türen anderer Räume wechseln in den jeweiligen Nachbarraum.
 * Dadurch bleibt mehr Platz für die aktive Arbeitsansicht, statt 2D und 3D ständig parallel einzublenden.
 
 ## DWG-Blöcke für Oberflächen verwenden
