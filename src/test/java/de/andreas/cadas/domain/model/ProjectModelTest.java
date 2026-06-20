@@ -105,6 +105,25 @@ class ProjectModelTest {
         ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
 
         assertThrows(IllegalArgumentException.class, () -> model.renameLevel(model.primaryLevel(), "  "));
+        assertEquals("Erdgeschoss", model.primaryLevel().name());
+    }
+
+    @Test
+    void projektnameBleibtNachUngültigerUmbenennungErhalten() {
+        ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+
+        assertThrows(IllegalArgumentException.class, () -> model.rename("  "));
+
+        assertEquals("Haus", model.name());
+    }
+
+    @Test
+    void etagennameBleibtNachUngültigerDirekterUmbenennungErhalten() {
+        Level level = new Level("Erdgeschoss");
+
+        assertThrows(IllegalArgumentException.class, () -> level.rename("  "));
+
+        assertEquals("Erdgeschoss", level.name());
     }
 
     @Test

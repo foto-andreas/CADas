@@ -26,10 +26,11 @@ public final class Level {
     }
 
     public void rename(String newName) {
-        this.name = Objects.requireNonNull(newName, "newName darf nicht null sein.").trim();
-        if (this.name.isEmpty()) {
+        String trimmedName = Objects.requireNonNull(newName, "newName darf nicht null sein.").trim();
+        if (trimmedName.isEmpty()) {
             throw new IllegalArgumentException("Etage darf nicht leer benannt werden.");
         }
+        this.name = trimmedName;
     }
 
     public List<Wall> walls() {

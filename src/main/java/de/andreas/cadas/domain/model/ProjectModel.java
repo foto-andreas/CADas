@@ -24,10 +24,11 @@ public final class ProjectModel {
     }
 
     public void rename(String newName) {
-        this.name = Objects.requireNonNull(newName, "newName darf nicht null sein.").trim();
-        if (this.name.isEmpty()) {
+        String trimmedName = Objects.requireNonNull(newName, "newName darf nicht null sein.").trim();
+        if (trimmedName.isEmpty()) {
             throw new IllegalArgumentException("Projektname darf nicht leer sein.");
         }
+        this.name = trimmedName;
     }
 
     public List<Level> levels() {
