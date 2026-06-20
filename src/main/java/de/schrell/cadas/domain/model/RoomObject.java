@@ -19,7 +19,8 @@ public record RoomObject(
         double rotationDegrees,
         RoomObjectMountingMode mountingMode,
         boolean visible,
-        String source
+        String source,
+        Length baseElevation
 ) {
 
     public RoomObject {
@@ -34,6 +35,7 @@ public record RoomObject(
         Objects.requireNonNull(height, "height darf nicht null sein.");
         Objects.requireNonNull(mountingMode, "mountingMode darf nicht null sein.");
         Objects.requireNonNull(source, "source darf nicht null sein.");
+        Objects.requireNonNull(baseElevation, "baseElevation darf nicht null sein.");
         if (width.toMillimeters() <= 0.0 || depth.toMillimeters() <= 0.0 || height.toMillimeters() <= 0.0) {
             throw new IllegalArgumentException("Objektmaße müssen größer als null sein.");
         }
@@ -41,6 +43,24 @@ public record RoomObject(
             throw new IllegalArgumentException("rotationDegrees muss endlich sein.");
         }
         rotationDegrees = normalizeDegrees(rotationDegrees);
+    }
+
+    public RoomObject(
+            UUID id,
+            String presetId,
+            String name,
+            RoomObjectType type,
+            RoomObjectShape shape,
+            PlanPoint center,
+            Length width,
+            Length depth,
+            Length height,
+            double rotationDegrees,
+            RoomObjectMountingMode mountingMode,
+            boolean visible,
+            String source
+    ) {
+        this(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, Length.zero());
     }
 
     public RoomObject(
@@ -215,11 +235,15 @@ public record RoomObject(
     }
 
     public RoomObject withVisibility(boolean newVisibility) {
-        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, newVisibility, source);
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, newVisibility, source, baseElevation);
     }
 
     public RoomObject withRotationDegrees(double newRotationDegrees) {
-        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, newRotationDegrees, mountingMode, visible, source);
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, newRotationDegrees, mountingMode, visible, source, baseElevation);
+    }
+
+    public RoomObject withBaseElevation(Length newBaseElevation) {
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, newBaseElevation);
     }
 
     private static double normalizeDegrees(double degrees) {

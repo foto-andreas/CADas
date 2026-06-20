@@ -77,6 +77,7 @@ class CadWorkbenchTest {
                 Map.entry("roomObjectWidth", "90"),
                 Map.entry("roomObjectDepth", "90"),
                 Map.entry("roomObjectHeight", "200"),
+                Map.entry("roomObjectBaseElevation", "0"),
                 Map.entry("floorExtensionThickness", "18"),
                 Map.entry("surfaceLayerThickness", "1,2"),
                 Map.entry("surfaceTileWidth", "60"),
@@ -597,6 +598,7 @@ class CadWorkbenchTest {
             instanz.automationSetField("roomObjectWidth", "120");
             instanz.automationSetField("roomObjectDepth", "80");
             instanz.automationSetField("roomObjectHeight", "240");
+            instanz.automationSetField("roomObjectBaseElevation", "-15");
             instanz.automationSetField("roomObjectAngle", "37,5");
             instanz.automationCanvasClick(900, 600, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
             return instanz;
@@ -606,11 +608,13 @@ class CadWorkbenchTest {
         Assertions.assertEquals(1200.0, placed.width().toMillimeters(), 0.001);
         Assertions.assertEquals(800.0, placed.depth().toMillimeters(), 0.001);
         Assertions.assertEquals(2400.0, placed.height().toMillimeters(), 0.001);
+        Assertions.assertEquals(-150.0, placed.baseElevation().toMillimeters(), 0.001);
         Assertions.assertEquals(37.5, placed.rotationDegrees(), 0.001);
 
         aufFxThread(() -> {
             workbench.automationSetField("roomObjectWidth", "150");
             workbench.automationSetField("roomObjectAngle", "-15");
+            workbench.automationSetField("roomObjectBaseElevation", "25");
             workbench.automationInvoke("applySelectionProperties", null);
             return null;
         });
@@ -618,6 +622,7 @@ class CadWorkbenchTest {
         RoomObject edited = aufFxThread(() -> workbench.automationRoomObject(0));
         Assertions.assertEquals(1500.0, edited.width().toMillimeters(), 0.001);
         Assertions.assertEquals(345.0, edited.rotationDegrees(), 0.001);
+        Assertions.assertEquals(250.0, edited.baseElevation().toMillimeters(), 0.001);
     }
 
     @Test

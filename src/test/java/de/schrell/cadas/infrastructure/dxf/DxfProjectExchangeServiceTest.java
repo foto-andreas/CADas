@@ -299,7 +299,7 @@ class DxfProjectExchangeServiceTest {
                 22.5,
                 RoomObjectMountingMode.WALL_MOUNTED,
                 "Spiegel.dwg#Block"
-        ));
+        ).withBaseElevation(Length.of(-15, LengthUnit.CENTIMETER)));
 
         var og = project.createLevel("Obergeschoss");
         og.addRoom(Room.rectangular(
@@ -347,6 +347,7 @@ class DxfProjectExchangeServiceTest {
         assertEquals(RoomObjectMountingMode.WALL_MOUNTED, importedEg.roomObjects().getFirst().mountingMode());
         assertFalse(importedEg.roomObjects().getFirst().cutsFloorCovering());
         assertEquals(22.5, importedEg.roomObjects().getFirst().rotationDegrees(), 0.001);
+        assertEquals(-150.0, importedEg.roomObjects().getFirst().baseElevation().toMillimeters(), 0.001);
         assertEquals(egRoom.id(), importedEg.rooms().getFirst().id(), "Raum-UUID muss im Rundlauf erhalten bleiben");
 
         var importedOg = imported.levels().get(1);

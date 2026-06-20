@@ -122,7 +122,8 @@ public final class SelectionTranslationService {
                 roomObject.rotationDegrees(),
                 roomObject.mountingMode(),
                 roomObject.visible(),
-                roomObject.source()
+                roomObject.source(),
+                roomObject.baseElevation()
         );
     }
 

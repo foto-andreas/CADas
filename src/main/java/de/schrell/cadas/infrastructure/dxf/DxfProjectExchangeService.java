@@ -241,7 +241,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 parseObjectRotation(parts[12], objectRotationDegrees),
                                 RoomObjectMountingMode.fromStoredValue(parts.length >= 17 ? parts[16] : null, Boolean.parseBoolean(parts[13])),
                                 Boolean.parseBoolean(parts[14]),
-                                DxfMetadataCodec.decode(parts[15], encodedFields)
+                                DxfMetadataCodec.decode(parts[15], encodedFields),
+                                Length.ofMillimeters(parts.length >= 18 ? parseDouble(parts[17]) : 0.0)
                         ));
                     }
                     default -> {
@@ -465,7 +466,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s",
+                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f",
                     DxfMetadataCodec.encode(level.name()),
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
@@ -481,7 +482,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     roomObject.cutsFloorCovering(),
                     roomObject.visible(),
                     DxfMetadataCodec.encode(roomObject.source()),
-                    roomObject.mountingMode().name()
+                    roomObject.mountingMode().name(),
+                    roomObject.baseElevation().toMillimeters()
             ));
         }
     }

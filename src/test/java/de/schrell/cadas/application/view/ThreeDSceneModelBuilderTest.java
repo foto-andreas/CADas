@@ -179,6 +179,23 @@ class ThreeDSceneModelBuilderTest {
     }
 
     @Test
+    void berücksichtigtPositiveUndNegativeObjektBasishöhen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "cuboid", "Podest", RoomObjectType.CUBOID, RoomObjectShape.RECTANGLE,
+                new PlanPoint(500, 500), Length.ofMillimeters(400), Length.ofMillimeters(300),
+                Length.ofMillimeters(600), 0.0, RoomObjectMountingMode.STANDS_ON_COVERING, ""
+        ).withBaseElevation(Length.ofMillimeters(-200)));
+
+        RenderableBox box = builder.build(project, Set.of("Erdgeschoss"), false).boxes().stream()
+                .filter(candidate -> candidate.kind() == RenderableKind.ROOM_OBJECT)
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(100.0, box.centerY(), 0.001);
+    }
+
+    @Test
     void rendertSkalierteDreidimensionaleDxfKoerper(@TempDir Path tempDir) throws Exception {
         Path sourceFile = tempDir.resolve("Wärmepumpe.dxf");
         Files.writeString(sourceFile, simpleSolidDxf());

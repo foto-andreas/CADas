@@ -140,7 +140,7 @@ Für den aktuellen Stand gilt:
 * Wände, Räume, Türen, Fenster und Treppen werden sichtbar als DXF-Geometrie exportiert.
 * Zielversion für neue produktive DXF-Dateien ist `AutoCAD 2000` mit `$ACADVER = AC1015`.
 * Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
-* Neue Exporte schreiben `CADAS_DXF|4` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben. Türen, Fenster und Raumobjekte behalten in dieser Metadatenspur ihre Objekt-IDs, Objektwinkel werden als Gradwert gespeichert.
+* Neue Exporte schreiben `CADAS_DXF|4` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben. Türen, Fenster und Raumobjekte behalten in dieser Metadatenspur ihre Objekt-IDs; Objektwinkel und positive oder negative Basishöhen werden verlustfrei gespeichert.
 * Der Import bleibt zu älteren CADas-DXF-Metadaten ohne Versionsmarker kompatibel und überspringt einzelne beschädigte Metadatensätze sowie Öffnungen ohne gültige Host-Wand, statt den gesamten Import abzubrechen.
 * Der Export schreibt aktuell metrische Kopfvariablen über `$INSUNITS = 4` und `$MEASUREMENT = 1`.
 * Exportierte Entities werden explizit als Model-Space-Elemente gekennzeichnet und mit eigenen Handles versehen.

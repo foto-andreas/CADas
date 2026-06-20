@@ -119,7 +119,10 @@ public final class ThreeDSceneModelBuilder {
 
     private double estimateLevelHeight(Level level) {
         double wallHeight = level.walls().stream().mapToDouble(Wall::maximumHeightMillimeters).max().orElse(2750.0);
-        double objectHeight = level.roomObjects().stream().mapToDouble(roomObject -> roomObject.height().toMillimeters()).max().orElse(0.0);
+        double objectHeight = level.roomObjects().stream()
+                .mapToDouble(roomObject -> roomObject.baseElevation().toMillimeters() + roomObject.height().toMillimeters())
+                .max()
+                .orElse(0.0);
         double roomHeight = level.rooms().stream()
                 .mapToDouble(room -> surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(level, room)
                         + room.floorThickness().toMillimeters()
@@ -1508,9 +1511,10 @@ public final class ThreeDSceneModelBuilder {
             if (!roomObject.visible()) {
                 continue;
             }
+            double objectBaseHeight = baseHeight + roomObject.baseElevation().toMillimeters();
             Optional<Dxf3dObjectGeometry> dxfGeometry = dxf3dGeometry(roomObject);
             if (dxfGeometry.isPresent()) {
-                buildDxf3dRoomObjectMeshes(level, roomObject, baseHeight, dxfGeometry.orElseThrow());
+                buildDxf3dRoomObjectMeshes(level, roomObject, objectBaseHeight, dxfGeometry.orElseThrow());
                 continue;
             }
             double height = Math.max(1.0, roomObject.height().toMillimeters());
@@ -1519,7 +1523,7 @@ public final class ThreeDSceneModelBuilder {
                     level.name(),
                     RenderableKind.ROOM_OBJECT,
                     roomObject.center().xMillimeters(),
-                    baseHeight + height / 2.0,
+                    objectBaseHeight + height / 2.0,
                     roomObject.center().yMillimeters(),
                     roomObject.width().toMillimeters(),
                     height,

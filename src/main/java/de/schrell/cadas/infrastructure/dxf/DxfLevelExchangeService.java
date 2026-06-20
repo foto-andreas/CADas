@@ -185,7 +185,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s",
+                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f",
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
                     DxfMetadataCodec.encode(roomObject.name()),
@@ -200,7 +200,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     roomObject.cutsFloorCovering(),
                     roomObject.visible(),
                     DxfMetadataCodec.encode(roomObject.source()),
-                    roomObject.mountingMode().name()
+                    roomObject.mountingMode().name(),
+                    roomObject.baseElevation().toMillimeters()
             ));
         }
 
@@ -394,7 +395,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             parseObjectRotation(parts[11], objectRotationDegrees),
                             RoomObjectMountingMode.fromStoredValue(parts.length >= 16 ? parts[15] : null, Boolean.parseBoolean(parts[12])),
                             Boolean.parseBoolean(parts[13]),
-                            DxfMetadataCodec.decode(parts[14], encodedFields)
+                            DxfMetadataCodec.decode(parts[14], encodedFields),
+                            Length.ofMillimeters(parts.length >= 17 ? parseDouble(parts[16]) : 0.0)
                     ));
                     default -> {
                     }
