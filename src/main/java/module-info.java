@@ -6,10 +6,9 @@ module de.andreas.cadas {
     requires jdk.httpserver;
     requires org.commonmark;
     requires org.commonmark.ext.gfm.tables;
-    // pdfbox und commons-logging sind automatic modules und können nicht per jlink gelinkt werden.
-    // Sie werden zur Laufzeit über den Classpath bereitgestellt, daher nur statisch angebunden.
+    // PDFBox ist ein automatisches Modul und kann nicht per jlink gelinkt werden.
+    // Es wird zur Laufzeit über den Modulpfad bereitgestellt, daher nur statisch angebunden.
     requires static org.apache.pdfbox;
-    requires static org.apache.commons.logging;
 
     opens de.andreas.cadas to javafx.graphics;
 }
