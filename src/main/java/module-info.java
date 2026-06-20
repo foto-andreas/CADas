@@ -11,6 +11,5 @@ module de.andreas.cadas {
     requires static org.apache.pdfbox;
     requires static org.apache.commons.logging;
 
-    exports de.andreas.cadas;
     opens de.andreas.cadas to javafx.graphics;
 }
