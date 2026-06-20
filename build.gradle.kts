@@ -368,20 +368,32 @@ tasks.register<DefaultTask>("packageMacOsDmg") {
     dependsOn(buildMacOsDmgWithLink)
 }
 
-// Kopiert das fertige CADas.app-Bundle direkt in den Programme-Ordner.
-// Existierende Installation wird überschrieben.
+// Installiert CADas.app direkt in den macOS-Programme-Ordner (/Applications).
+// Eine bestehende Installation wird vorher entfernt, danach das DMG gebaut
+// und das neue App-Bundle kopiert.
 tasks.register<Exec>("macosInstall") {
     group = "distribution"
-    description = "Installiert CADas.app direkt in den macOS-Programme-Ordner (/Applications)."
+    description = "Installiert CADas.app nach /Applications (überschreibt bestehende Version) und baut das DMG."
     enabled = macOsPackagingSupported.get()
-    dependsOn("packageMacOsAppImage")
+    dependsOn("packageMacOsDmg")
+    val appBundle = appImageOutputDirectory.resolve("CADas.app")
+    inputs.dir(appBundle)
+    executable = "rm"
+    args("-rf", "/Applications/CADas.app")
+    doFirst {
+        logger.lifecycle("Entferne bestehende CADas.app und installiere neue Version nach /Applications ...")
+    }
+    finalizedBy("macosInstallCopy")
+}
+
+tasks.register<Exec>("macosInstallCopy") {
+    group = "distribution"
+    description = "Kopiert das fertige CADas.app-Bundle nach /Applications (interner Teil von macosInstall)."
+    enabled = macOsPackagingSupported.get()
     val appBundle = appImageOutputDirectory.resolve("CADas.app")
     inputs.dir(appBundle)
     executable = "cp"
     args("-R", appBundle.absolutePath, "/Applications/")
-    doFirst {
-        logger.lifecycle("Installiere CADas.app nach /Applications ...")
-    }
 }
 
 tasks.register<Exec>("runMitAutomatisierung") {
