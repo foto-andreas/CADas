@@ -204,11 +204,11 @@ public final class AutomationBridgeServer {
 
     private String snapshotJson(WorkbenchAutomationSnapshot snapshot) {
         return "{"
-                + "\"timestamp\":\"" + escape(Instant.now().toString()) + "\","
-                + "\"projectName\":\"" + escape(snapshot.projectName()) + "\","
-                + "\"activeLevel\":\"" + escape(snapshot.activeLevel()) + "\","
-                + "\"activeView\":\"" + escape(snapshot.activeView()) + "\","
-                + "\"activeTool\":\"" + escape(snapshot.activeTool()) + "\","
+                + "\"timestamp\":\"" + escapeJson(Instant.now().toString()) + "\","
+                + "\"projectName\":\"" + escapeJson(snapshot.projectName()) + "\","
+                + "\"activeLevel\":\"" + escapeJson(snapshot.activeLevel()) + "\","
+                + "\"activeView\":\"" + escapeJson(snapshot.activeView()) + "\","
+                + "\"activeTool\":\"" + escapeJson(snapshot.activeTool()) + "\","
                 + "\"wallCount\":" + snapshot.wallCount() + ","
                 + "\"roomCount\":" + snapshot.roomCount() + ","
                 + "\"doorCount\":" + snapshot.doorCount() + ","
@@ -218,14 +218,14 @@ public final class AutomationBridgeServer {
                 + "\"registeredCadLibraries\":" + snapshot.registeredCadLibraries() + ","
                 + "\"threeDBodyCount\":" + snapshot.threeDBodyCount() + ","
                 + "\"threeDHasContent\":" + snapshot.threeDHasContent() + ","
-                + "\"threeDCameraStatus\":\"" + escape(snapshot.threeDCameraStatus()) + "\","
-                + "\"surfaceType\":\"" + escape(snapshot.surfaceType()) + "\","
-                + "\"surfaceTypeOptions\":\"" + escape(snapshot.surfaceTypeOptions()) + "\","
-                + "\"surfaceTargetLabel\":\"" + escape(snapshot.surfaceTargetLabel()) + "\","
-                + "\"surfaceSelectionHint\":\"" + escape(snapshot.surfaceSelectionHint()) + "\","
-                + "\"surfaceCoverageLabel\":\"" + escape(snapshot.surfaceCoverageLabel()) + "\","
-                + "\"selectedRoomMetrics\":\"" + escape(snapshot.selectedRoomMetrics()) + "\","
-                + "\"statusText\":\"" + escape(snapshot.statusText()) + "\","
+                + "\"threeDCameraStatus\":\"" + escapeJson(snapshot.threeDCameraStatus()) + "\","
+                + "\"surfaceType\":\"" + escapeJson(snapshot.surfaceType()) + "\","
+                + "\"surfaceTypeOptions\":\"" + escapeJson(snapshot.surfaceTypeOptions()) + "\","
+                + "\"surfaceTargetLabel\":\"" + escapeJson(snapshot.surfaceTargetLabel()) + "\","
+                + "\"surfaceSelectionHint\":\"" + escapeJson(snapshot.surfaceSelectionHint()) + "\","
+                + "\"surfaceCoverageLabel\":\"" + escapeJson(snapshot.surfaceCoverageLabel()) + "\","
+                + "\"selectedRoomMetrics\":\"" + escapeJson(snapshot.selectedRoomMetrics()) + "\","
+                + "\"statusText\":\"" + escapeJson(snapshot.statusText()) + "\","
                 + "\"zoom\":" + snapshot.zoom() + ","
                 + "\"offsetX\":" + snapshot.offsetX() + ","
                 + "\"offsetY\":" + snapshot.offsetY()
@@ -233,14 +233,31 @@ public final class AutomationBridgeServer {
     }
 
     private String errorJson(String message) {
-        return "{\"status\":\"error\",\"message\":\"" + escape(Optional.ofNullable(message).orElse("Unbekannter Fehler")) + "\"}";
+        return "{\"status\":\"error\",\"message\":\"" + escapeJson(Optional.ofNullable(message).orElse("Unbekannter Fehler")) + "\"}";
     }
 
-    private String escape(String value) {
-        return value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n");
+    static String escapeJson(String value) {
+        StringBuilder escaped = new StringBuilder(value.length());
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            switch (character) {
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                case '"' -> escaped.append("\\\"");
+                case '\\' -> escaped.append("\\\\");
+                default -> {
+                    if (character < 0x20) {
+                        escaped.append("\\u").append(String.format("%04x", (int) character));
+                    } else {
+                        escaped.append(character);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     @FunctionalInterface
