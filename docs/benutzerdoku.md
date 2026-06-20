@@ -751,6 +751,12 @@ Wenn aktiv:
 
 Das ist besonders wichtig, um geschlossene Grundrisskonturen konsistent aufzubauen.
 
+### Auswahl präzise korrigieren
+
+Im Werkzeug `Bearbeiten` verschieben die vier Cursortasten ausgewählte Wände, Treppen und Objekte jeweils um genau eine Rasterweite. Gemeinsame Wandenden bleiben dabei verbunden.
+
+Die Kontextaktion `90°-Korrektur` richtet ausgewählte Wände und Objektwinkel auf das nächste Vielfache von 90° aus, sofern die Abweichung höchstens 10° beträgt. Korrigierte Wandenden rasten am Raster ein; größere Abweichungen bleiben unverändert.
+
 ## Hilfslinien
 
 * Ziehe aus dem oberen Lineal eine horizontale Hilfslinie in die Zeichnung.

@@ -97,6 +97,34 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void kontextmenüBietetNeunzigGradKorrekturFürAuswahlen() throws Exception {
+        CadWorkbench workbench = aufFxThread(CadWorkbench::new);
+
+        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems).contains("90°-Korrektur"));
+    }
+
+    @Test
+    void verschiebtAuswahlMitCursortasteUmEineRasterweite() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("WALL", 0, false);
+            return instanz;
+        });
+        Wall before = aufFxThread(() -> workbench.automationWall(0));
+
+        Assertions.assertTrue(aufFxThread(() -> workbench.automationMoveSelectionWithArrowKey(KeyCode.RIGHT)));
+
+        Wall after = aufFxThread(() -> workbench.automationWall(0));
+        Assertions.assertEquals(before.axis().start().xMillimeters() + 10.0, after.axis().start().xMillimeters(), 0.001);
+        Assertions.assertEquals(before.axis().end().xMillimeters() + 10.0, after.axis().end().xMillimeters(), 0.001);
+        Assertions.assertTrue(aufFxThread(workbench::automationHasUnsavedChanges));
+    }
+
+    @Test
     void bodenklickSetztNeuenStandortDerInnenansicht() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Test", "Erdgeschoss");
         Room room = Room.rectangular(

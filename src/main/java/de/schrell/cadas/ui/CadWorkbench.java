@@ -18,6 +18,7 @@ import de.schrell.cadas.application.help.MarkdownNavigationService;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.drawing.OpeningPlacementService;
+import de.schrell.cadas.application.drawing.OrthogonalCorrectionService;
 import de.schrell.cadas.application.drawing.QuarterTurnRotationService;
 import de.schrell.cadas.application.drawing.SelectionQueryService;
 import de.schrell.cadas.application.drawing.SelectionTranslationService;
@@ -238,6 +239,7 @@ public final class CadWorkbench extends BorderPane {
     private final DimensionLabelService dimensionLabelService = new DimensionLabelService();
     private final DimensionLabelPlacementService dimensionLabelPlacementService = new DimensionLabelPlacementService();
     private final QuarterTurnRotationService quarterTurnRotationService = new QuarterTurnRotationService();
+    private final OrthogonalCorrectionService orthogonalCorrectionService = new OrthogonalCorrectionService();
     private final SelectionTranslationService selectionTranslationService = new SelectionTranslationService();
     private final LevelExchangeService levelExchangeService = new DxfLevelExchangeService();
     private final ProjectExchangeService projectExchangeService = new DxfProjectExchangeService();
@@ -1739,6 +1741,7 @@ public final class CadWorkbench extends BorderPane {
     private void configureCanvas() {
         horizontalRuler.setHeight(RULER_SIZE);
         verticalRuler.setWidth(RULER_SIZE);
+        drawingCanvas.setFocusTraversable(true);
 
         drawingPane.widthProperty().addListener((ignored, oldValue, newValue) -> resizeCanvases());
         drawingPane.heightProperty().addListener((ignored, oldValue, newValue) -> resizeCanvases());
@@ -1774,6 +1777,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void handleMousePressed(MouseEvent event) {
+        drawingCanvas.requestFocus();
         if (event.getButton() == MouseButton.SECONDARY && event.isAltDown()) {
             removeNearestGuide(screenToWorld(event.getX(), event.getY()));
             return;
@@ -2186,7 +2190,14 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void handleGlobalShortcuts(KeyEvent event) {
-        if (!event.isShortcutDown() || event.getEventType() != KeyEvent.KEY_PRESSED) {
+        if (event.getEventType() != KeyEvent.KEY_PRESSED) {
+            return;
+        }
+        if (!event.isShortcutDown() && moveSelectionWithArrowKey(event.getCode())) {
+            event.consume();
+            return;
+        }
+        if (!event.isShortcutDown()) {
             return;
         }
         if (event.getCode() == KeyCode.Z && event.isShiftDown()) {
@@ -6160,6 +6171,7 @@ public final class CadWorkbench extends BorderPane {
     private void rebuildSelectionContextMenu() {
         selectionContextMenu.getItems().setAll(
                 menuItem("Eigenschaften auf Auswahl anwenden", this::applyCurrentInputsToSelection, null),
+                menuItem("90°-Korrektur", this::correctSelectedComponentsOrthogonally, null),
                 menuItem("Auswahl aufheben", this::clearSelection, null)
         );
         if (selectedSelections.contains(contextMenuSelection)
@@ -6573,6 +6585,70 @@ public final class CadWorkbench extends BorderPane {
         markThreeDDirty();
     }
 
+    private boolean moveSelectionWithArrowKey(KeyCode keyCode) {
+        if (!drawingCanvas.isFocused()
+                || activeWorkspaceMode.get() != WorkspaceMode.TWO_D
+                || !isDirectEditingView()
+                || currentTool() != DrawingTool.EDIT
+                || selectedSelections.stream().noneMatch(this::isTranslatableSelection)) {
+            return false;
+        }
+        return moveSelectionByArrowKey(keyCode);
+    }
+
+    private boolean moveSelectionByArrowKey(KeyCode keyCode) {
+        double spacing = currentGrid().spacing().toMillimeters();
+        double deltaX = switch (keyCode) {
+            case LEFT -> -spacing;
+            case RIGHT -> spacing;
+            default -> 0.0;
+        };
+        double deltaY = switch (keyCode) {
+            case UP -> -spacing;
+            case DOWN -> spacing;
+            default -> 0.0;
+        };
+        if (deltaX == 0.0 && deltaY == 0.0) {
+            return false;
+        }
+        moveSelectedComponents(deltaX, deltaY);
+        return true;
+    }
+
+    private void moveSelectedComponents(double deltaX, double deltaY) {
+        SelectionTranslationService.TranslationResult result = selectionTranslationService.translate(
+                activeLevel.get(), Set.copyOf(selectedSelections), deltaX, deltaY
+        );
+        if (!result.changed()) {
+            return;
+        }
+        rememberStateForUndo();
+        activeLevel.get().replaceWalls(result.walls());
+        activeLevel.get().replaceStaircases(result.staircases());
+        activeLevel.get().replaceRoomObjects(result.roomObjects());
+        synchronizeRoomsFromWalls(activeLevel.get());
+        markThreeDDirty();
+        draftLabel.setText("Auswahl um eine Rasterweite verschoben.");
+        render();
+    }
+
+    private void correctSelectedComponentsOrthogonally() {
+        OrthogonalCorrectionService.CorrectionResult result = orthogonalCorrectionService.correct(
+                activeLevel.get(), Set.copyOf(selectedSelections), currentGrid(), 10.0
+        );
+        if (!result.changed()) {
+            draftLabel.setText("Keine Abweichung bis 10° zur 90°-Ausrichtung gefunden.");
+            return;
+        }
+        rememberStateForUndo();
+        activeLevel.get().replaceWalls(result.walls());
+        activeLevel.get().replaceRoomObjects(result.roomObjects());
+        synchronizeRoomsFromWalls(activeLevel.get());
+        markThreeDDirty();
+        draftLabel.setText("Auswahl auf 90° korrigiert und am Raster ausgerichtet.");
+        render();
+    }
+
     private void refreshThreeDIfNeeded() {
         if (!threeDDirty) {
             return;
@@ -6707,6 +6783,14 @@ public final class CadWorkbench extends BorderPane {
 
     public RoomObject automationRoomObject(int index) {
         return activeLevel.get().roomObjects().get(index);
+    }
+
+    public Wall automationWall(int index) {
+        return activeLevel.get().walls().get(index);
+    }
+
+    public boolean automationMoveSelectionWithArrowKey(KeyCode keyCode) {
+        return moveSelectionByArrowKey(keyCode);
     }
 
     public FloorExtension automationFloorExtension(int index) {
