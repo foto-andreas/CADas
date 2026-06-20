@@ -51,16 +51,11 @@ public final class QuarterTurnRotationService {
 
     private Wall rotateWall(Wall wall, boolean clockwise) {
         PlanPoint center = midpoint(wall.axis().start(), wall.axis().end());
-        return new Wall(
-                wall.id(),
+        return wall.withAxis(
                 new PlanSegment(
                         rotatePoint(wall.axis().start(), center, clockwise),
                         rotatePoint(wall.axis().end(), center, clockwise)
-                ),
-                wall.thickness(),
-                wall.height(),
-                wall.startHeight(),
-                wall.endHeight()
+                )
         );
     }
 

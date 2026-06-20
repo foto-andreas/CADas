@@ -31,6 +31,7 @@ import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Terrain;
 import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,7 +54,12 @@ class DxfProjectExchangeServiceTest {
                 Length.of(17.5, LengthUnit.CENTIMETER),
                 Length.of(3.1, LengthUnit.METER),
                 Length.of(2.5, LengthUnit.METER),
-                Length.of(3.1, LengthUnit.METER)
+                Length.of(3.1, LengthUnit.METER),
+                java.util.List.of(
+                        new WallProfilePoint(Length.zero(), Length.of(2.5, LengthUnit.METER)),
+                        new WallProfilePoint(Length.of(3, LengthUnit.METER), Length.of(3.1, LengthUnit.METER)),
+                        new WallProfilePoint(Length.of(5, LengthUnit.METER), Length.of(3.1, LengthUnit.METER))
+                )
         );
         project.primaryLevel().addWall(wall);
         Door door = Door.create(
@@ -121,6 +127,8 @@ class DxfProjectExchangeServiceTest {
         assertEquals("Obergeschoss", imported.levels().get(1).name());
         assertEquals(2500.0, imported.primaryLevel().walls().getFirst().startHeight().toMillimeters(), 0.001);
         assertEquals(3100.0, imported.primaryLevel().walls().getFirst().endHeight().toMillimeters(), 0.001);
+        assertEquals(3, imported.primaryLevel().walls().getFirst().profile().size());
+        assertEquals(3000.0, imported.primaryLevel().walls().getFirst().profile().get(1).offset().toMillimeters(), 0.001);
     }
 
     @Test

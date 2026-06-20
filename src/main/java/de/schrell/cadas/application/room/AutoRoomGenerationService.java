@@ -195,16 +195,11 @@ public final class AutoRoomGenerationService {
     private List<Wall> normalizeConnectedEndpoints(List<Wall> walls) {
         List<PlanPoint> canonicalPoints = new ArrayList<>();
         return walls.stream()
-                .map(wall -> new Wall(
-                        wall.id(),
+                .map(wall -> wall.withAxis(
                         new PlanSegment(
                                 canonicalPoint(wall.axis().start(), canonicalPoints),
                                 canonicalPoint(wall.axis().end(), canonicalPoints)
-                        ),
-                        wall.thickness(),
-                        wall.height(),
-                        wall.startHeight(),
-                        wall.endHeight()
+                        )
                 ))
                 .toList();
     }

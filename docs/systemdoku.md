@@ -105,7 +105,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 ### Domäne
 
-`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement`, `Staircase`, `RoomObject`, `Roof`, `Terrain` und `SurfaceLayerStack` bilden den aktuellen Grundrisskern ab. `TerrainCornerService` leitet die äußeren Gebäudeecken aus der konvexen Hülle der untersten Etage ab und erhält bereits erfasste Geländehöhen. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
+`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement`, `Staircase`, `RoomObject`, `Roof`, `Terrain` und `SurfaceLayerStack` bilden den aktuellen Grundrisskern ab. `WallProfilePoint` erweitert lineare Wandoberkanten zu stückweise linearen Polygonprofilen; Wandbearbeitung, DXF-Persistenz sowie 3D- und Seitenableitung erhalten diese Profile. `TerrainCornerService` leitet die äußeren Gebäudeecken aus der konvexen Hülle der untersten Etage ab und erhält bereits erfasste Geländehöhen. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
 
 ## Dach- und Ebenenmodell
 

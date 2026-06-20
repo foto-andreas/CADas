@@ -95,6 +95,7 @@ import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
 import de.schrell.cadas.infrastructure.dxf.DxfLevelExchangeService;
 import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
@@ -3602,18 +3603,24 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawWallElevation(GraphicsContext graphics, Wall wall, boolean selected) {
-        double startX = toScreenProjectedX(wall.axis().start(), 0.0);
-        double endX = toScreenProjectedX(wall.axis().end(), 0.0);
-        double floorY = toScreenProjectedY(wall.axis().start(), 0.0);
-        double startTopY = toScreenProjectedY(wall.axis().start(), wall.heightAtStart());
-        double endTopY = toScreenProjectedY(wall.axis().end(), wall.heightAtEnd());
-        double[] xPoints = {startX, endX, endX, startX};
-        double[] yPoints = {floorY, floorY, endTopY, startTopY};
+        List<WallProfilePoint> profile = wall.resolvedProfile();
+        double[] xPoints = new double[profile.size() + 2];
+        double[] yPoints = new double[profile.size() + 2];
+        xPoints[0] = toScreenProjectedX(wall.axis().start(), 0.0);
+        yPoints[0] = toScreenProjectedY(wall.axis().start(), 0.0);
+        xPoints[1] = toScreenProjectedX(wall.axis().end(), 0.0);
+        yPoints[1] = toScreenProjectedY(wall.axis().end(), 0.0);
+        for (int index = 0; index < profile.size(); index++) {
+            var profilePoint = profile.get(profile.size() - 1 - index);
+            PlanPoint point = wall.axis().pointAt(profilePoint.offset());
+            xPoints[index + 2] = toScreenProjectedX(point, profilePoint.height().toMillimeters());
+            yPoints[index + 2] = toScreenProjectedY(point, profilePoint.height().toMillimeters());
+        }
         graphics.setFill(selected ? Color.color(0.85, 0.57, 0.22, 0.24) : Color.color(0.23, 0.39, 0.54, 0.18));
-        graphics.fillPolygon(xPoints, yPoints, xPoints.length);
+        graphics.fillPolygon(xPoints, yPoints, profile.size() + 2);
         graphics.setStroke(selected ? Color.web("#d97f2f") : CadColorPalette.WALL);
         graphics.setLineWidth(2.0);
-        graphics.strokePolygon(xPoints, yPoints, xPoints.length);
+        graphics.strokePolygon(xPoints, yPoints, profile.size() + 2);
     }
 
     private void drawRoomElevation(GraphicsContext graphics, Room room) {

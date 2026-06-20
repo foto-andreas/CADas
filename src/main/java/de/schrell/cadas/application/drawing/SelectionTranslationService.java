@@ -52,16 +52,11 @@ public final class SelectionTranslationService {
     }
 
     private Wall translateWall(Wall wall, double deltaXMillimeters, double deltaYMillimeters) {
-        return new Wall(
-                wall.id(),
+        return wall.withAxis(
                 new PlanSegment(
                         translatePoint(wall.axis().start(), deltaXMillimeters, deltaYMillimeters),
                         translatePoint(wall.axis().end(), deltaXMillimeters, deltaYMillimeters)
-                ),
-                wall.thickness(),
-                wall.height(),
-                wall.startHeight(),
-                wall.endHeight()
+                )
         );
     }
 
@@ -75,14 +70,7 @@ public final class SelectionTranslationService {
         if (start == wall.axis().start() && end == wall.axis().end()) {
             return wall;
         }
-        return new Wall(
-                wall.id(),
-                new PlanSegment(start, end),
-                wall.thickness(),
-                wall.height(),
-                wall.startHeight(),
-                wall.endHeight()
-        );
+        return wall.withAxis(new PlanSegment(start, end));
     }
 
     private boolean isConnectedToAny(PlanPoint point, List<PlanPoint> endpoints) {

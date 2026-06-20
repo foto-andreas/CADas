@@ -30,6 +30,7 @@ import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Terrain;
 import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -129,6 +130,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                         double startHeight = parts.length >= 11 ? parseDouble(parts[5]) : parseDouble(parts[4]);
                         double endHeight = parts.length >= 11 ? parseDouble(parts[6]) : parseDouble(parts[4]);
                         int pointOffset = parts.length >= 11 ? 2 : 0;
+                        List<WallProfilePoint> profile = parts.length >= 12 ? deserializeWallProfile(parts[11]) : List.of();
                         level.addWall(new Wall(
                                 UUID.fromString(parts[2]),
                                 new PlanSegment(
@@ -138,7 +140,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 Length.ofMillimeters(parseDouble(parts[3])),
                                 Length.ofMillimeters(parseDouble(parts[4])),
                                 Length.ofMillimeters(startHeight),
-                                Length.ofMillimeters(endHeight)
+                                Length.ofMillimeters(endHeight),
+                                profile
                         ));
                     }
                     case "ROOM" -> {
@@ -367,7 +370,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (Wall wall : level.walls()) {
             appendMetadataText(dxf, context, wall.axis().start(), String.format(
                     Locale.US,
-                    "WALL|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
+                    "WALL|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s",
                     DxfMetadataCodec.encode(level.name()),
                     wall.id(),
                     wall.thickness().toMillimeters(),
@@ -377,7 +380,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     wall.axis().start().xMillimeters(),
                     wall.axis().start().yMillimeters(),
                     wall.axis().end().xMillimeters(),
-                    wall.axis().end().yMillimeters()
+                    wall.axis().end().yMillimeters(),
+                    serializeWallProfile(wall)
             ));
         }
         for (Room room : level.rooms()) {
@@ -713,6 +717,34 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             heights.add(Length.ofMillimeters(parseDouble(part)));
         }
         return List.copyOf(heights);
+    }
+
+    private String serializeWallProfile(Wall wall) {
+        if (!wall.hasPolygonalProfile()) {
+            return "NONE";
+        }
+        return wall.profile().stream()
+                .map(point -> String.format(Locale.US, "%.3f,%.3f", point.offset().toMillimeters(), point.height().toMillimeters()))
+                .reduce((left, right) -> left + ";" + right)
+                .orElse("NONE");
+    }
+
+    private List<WallProfilePoint> deserializeWallProfile(String value) {
+        if (value == null || value.isBlank() || value.equals("NONE")) {
+            return List.of();
+        }
+        List<WallProfilePoint> profile = new ArrayList<>();
+        for (String serializedPoint : value.split(";")) {
+            String[] coordinates = serializedPoint.split(",");
+            if (coordinates.length != 2) {
+                throw new IllegalArgumentException("Ungültiger Wandprofilpunkt: " + serializedPoint);
+            }
+            profile.add(new WallProfilePoint(
+                    Length.ofMillimeters(parseDouble(coordinates[0])),
+                    Length.ofMillimeters(parseDouble(coordinates[1]))
+            ));
+        }
+        return List.copyOf(profile);
     }
 
     private static boolean isUuid(String text) {

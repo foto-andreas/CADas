@@ -643,6 +643,8 @@ Typische Wandhöhen:
 * `2,60 m`
 * `2,75 m`
 
+Wände können außerdem mehrere Höhenpunkte entlang ihrer Achse besitzen. CADas bildet daraus eine polygonale Wandoberkante, übernimmt sie verlustfrei in Gebäude- und Etagen-DXF und zeigt sie in 3D sowie in den Seitenansichten. Beim Verlängern oder Verkürzen einer solchen Wand werden die Profilabstände proportional mitgeführt.
+
 ### Raum
 
 `Name`, `Raumhöhe`, `Boden` und `Decke` gelten für neue Räume und für ausgewählte Räume.

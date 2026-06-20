@@ -89,7 +89,7 @@ public final class OrthogonalCorrectionService {
         if (start == wall.axis().start() && end == wall.axis().end()) {
             return wall;
         }
-        return new Wall(wall.id(), new PlanSegment(start, end), wall.thickness(), wall.height(), wall.startHeight(), wall.endHeight());
+        return wall.withAxis(new PlanSegment(start, end));
     }
 
     private int findWallIndex(List<Wall> walls, String elementId) {

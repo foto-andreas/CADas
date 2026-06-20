@@ -24,6 +24,7 @@ import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
 
 import java.io.IOException;
@@ -65,7 +66,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             appendLineEntity(dxf, context, DxfLayer.WALLS, wall.axis().start(), wall.axis().end());
             appendMetadataText(dxf, context, wall.axis().start(), String.format(
                     Locale.US,
-                    "WALL|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
+                    "WALL|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s",
                     wall.id(),
                     wall.thickness().toMillimeters(),
                     wall.height().toMillimeters(),
@@ -74,7 +75,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     wall.axis().start().xMillimeters(),
                     wall.axis().start().yMillimeters(),
                     wall.axis().end().xMillimeters(),
-                    wall.axis().end().yMillimeters()
+                    wall.axis().end().yMillimeters(),
+                    serializeWallProfile(wall)
             ));
         }
 
@@ -293,6 +295,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                         double startHeight = parts.length >= 10 ? parseDouble(parts[4]) : parseDouble(parts[3]);
                         double endHeight = parts.length >= 10 ? parseDouble(parts[5]) : parseDouble(parts[3]);
                         int pointOffset = parts.length >= 10 ? 2 : 0;
+                        List<WallProfilePoint> profile = parts.length >= 11 ? deserializeWallProfile(parts[10]) : List.of();
                         Wall wall = new Wall(
                                 UUID.fromString(parts[1]),
                                 new PlanSegment(
@@ -302,7 +305,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                                 Length.ofMillimeters(parseDouble(parts[2])),
                                 Length.ofMillimeters(parseDouble(parts[3])),
                                 Length.ofMillimeters(startHeight),
-                                Length.ofMillimeters(endHeight)
+                                Length.ofMillimeters(endHeight),
+                                profile
                         );
                         level.addWall(wall);
                         wallsById.put(wall.id(), wall);
@@ -666,6 +670,34 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             heights.add(Length.ofMillimeters(parseDouble(part)));
         }
         return List.copyOf(heights);
+    }
+
+    private static String serializeWallProfile(Wall wall) {
+        if (!wall.hasPolygonalProfile()) {
+            return "NONE";
+        }
+        return wall.profile().stream()
+                .map(point -> String.format(Locale.US, "%.3f,%.3f", point.offset().toMillimeters(), point.height().toMillimeters()))
+                .reduce((left, right) -> left + ";" + right)
+                .orElse("NONE");
+    }
+
+    private static List<WallProfilePoint> deserializeWallProfile(String value) {
+        if (value == null || value.isBlank() || value.equals("NONE")) {
+            return List.of();
+        }
+        List<WallProfilePoint> profile = new ArrayList<>();
+        for (String serializedPoint : value.split(";")) {
+            String[] coordinates = serializedPoint.split(",");
+            if (coordinates.length != 2) {
+                throw new IllegalArgumentException("Ungültiger Wandprofilpunkt: " + serializedPoint);
+            }
+            profile.add(new WallProfilePoint(
+                    Length.ofMillimeters(parseDouble(coordinates[0])),
+                    Length.ofMillimeters(parseDouble(coordinates[1]))
+            ));
+        }
+        return List.copyOf(profile);
     }
 
     private Set<String> collectLevelLayers() {

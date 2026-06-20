@@ -94,14 +94,7 @@ public final class EdgeResizeService {
             startShift = 0.0;
             resizedAxis = new PlanSegment(wall.axis().start(), pointAt(wall.axis().start(), direction, newLength));
         }
-        Wall resizedWall = new Wall(
-                wall.id(),
-                resizedAxis,
-                wall.thickness(),
-                wall.height(),
-                wall.startHeight(),
-                wall.endHeight()
-        );
+        Wall resizedWall = wall.withAxis(resizedAxis);
         List<Wall> walls = level.walls().stream().map(candidate -> candidate.id().equals(wall.id()) ? resizedWall : candidate).toList();
         List<Door> doors = level.doors().stream()
                 .map(door -> door.wallId().equals(wall.id()) ? door.withOffset(Length.ofMillimeters(door.offsetFromStart().toMillimeters() - startShift)) : door)

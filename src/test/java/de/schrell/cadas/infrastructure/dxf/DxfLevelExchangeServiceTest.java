@@ -28,6 +28,7 @@ import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
 
 import java.nio.file.Path;
@@ -517,7 +518,12 @@ class DxfLevelExchangeServiceTest {
                 Length.of(20, LengthUnit.CENTIMETER),
                 Length.of(3.1, LengthUnit.METER),
                 Length.of(2.4, LengthUnit.METER),
-                Length.of(3.1, LengthUnit.METER)
+                Length.of(3.1, LengthUnit.METER),
+                java.util.List.of(
+                        new WallProfilePoint(Length.zero(), Length.of(2.4, LengthUnit.METER)),
+                        new WallProfilePoint(Length.of(1.5, LengthUnit.METER), Length.of(3.1, LengthUnit.METER)),
+                        new WallProfilePoint(Length.of(4, LengthUnit.METER), Length.of(3.1, LengthUnit.METER))
+                )
         ));
         level.addRoom(new Room(
                 java.util.UUID.randomUUID(),
@@ -546,6 +552,8 @@ class DxfLevelExchangeServiceTest {
 
         assertEquals(2400.0, imported.walls().getFirst().startHeight().toMillimeters(), 0.001);
         assertEquals(3100.0, imported.walls().getFirst().endHeight().toMillimeters(), 0.001);
+        assertEquals(3, imported.walls().getFirst().profile().size());
+        assertEquals(1500.0, imported.walls().getFirst().profile().get(1).offset().toMillimeters(), 0.001);
         assertEquals(4, imported.rooms().getFirst().ceilingVertexHeights().size());
         assertEquals(2600.0, imported.rooms().getFirst().ceilingVertexHeights().get(3).toMillimeters(), 0.001);
     }

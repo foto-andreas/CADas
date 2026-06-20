@@ -47,6 +47,7 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Zusätzliche Oberflächen-Ebenen werden zunächst als allgemeine Layer-Stacks mit rechteckiger Kachelbelegung modelliert, bevor dafür eine eigene UI-Verwaltung ergänzt wird.
 * Der erste Dachumfang fokussiert das Satteldach als separates Domänenobjekt mit Winkel, Überstand und Dachrinne.
 * Dachschrägen und schräge Decken werden primär über Eckhöhen an verbundenen Wand-Endpunkten abgeleitet; daraus entstehen polygonale Raumdecken und schräge Wandoberkanten. Die ältere raumgebundene Rechteck-Schräge bleibt nur als einfacher Fallback für manuelle Rechteckräume erhalten.
+* Wände besitzen optional ein stückweise lineares Polygon-Höhenprofil entlang ihrer Achse. DXF-Persistenz, Längenänderungen, 3D-Körper und Seitenansichten erhalten und verwenden sämtliche Profilpunkte.
 * Sichtbare Wand-Innenbeläge verschieben die effektive Raum-Innenkante bereits heute; weitere Wandebenen und komplexere Mehrschichtregeln müssen darauf fachlich konsistent aufbauen.
 * Externe Teilebibliotheken werden im ersten Schritt über das textbasierte Format `.cadasparts` importiert und in die bestehende Preset-Verwaltung integriert.
 * Die erste 3D-Visualisierung wird als JavaFX-`SubScene` mit gemeinsamem Auswahlmodell zwischen 2D und 3D sowie aus dem Fachmodell abgeleiteten Volumenkörpern umgesetzt.

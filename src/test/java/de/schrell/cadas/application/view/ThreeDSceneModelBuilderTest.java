@@ -32,6 +32,7 @@ import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Terrain;
 import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
 import de.schrell.cadas.application.layers.WallSurfaceTargetKey;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
@@ -1063,5 +1064,30 @@ class ThreeDSceneModelBuilderTest {
                 .orElseThrow();
         assertTrue(hasMeshHeightBetween(wallMesh, 2350.0, 2450.0));
         assertTrue(hasMeshHeightBetween(wallMesh, 3050.0, 3150.0));
+    }
+
+    @Test
+    void zerlegtPolygonalesWandprofilInSchrägeUndGeradeAbschnitte() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
+        project.primaryLevel().addWall(new Wall(
+                UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4_000, 0)),
+                Length.ofMillimeters(200),
+                Length.ofMillimeters(3_100),
+                Length.ofMillimeters(2_400),
+                Length.ofMillimeters(3_100),
+                List.of(
+                        new WallProfilePoint(Length.zero(), Length.ofMillimeters(2_400)),
+                        new WallProfilePoint(Length.ofMillimeters(1_000), Length.ofMillimeters(3_100)),
+                        new WallProfilePoint(Length.ofMillimeters(4_000), Length.ofMillimeters(3_100))
+                )
+        ));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Dachgeschoss"), false);
+
+        assertEquals(1, sceneModel.meshes().stream().filter(mesh -> mesh.kind() == RenderableKind.WALL).count());
+        assertTrue(sceneModel.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.WALL)
+                .anyMatch(box -> Math.abs(box.width() - 3_000.0) < 0.001 && Math.abs(box.height() - 3_100.0) < 0.001));
     }
 }

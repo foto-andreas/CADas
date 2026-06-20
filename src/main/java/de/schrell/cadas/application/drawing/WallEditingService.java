@@ -40,7 +40,7 @@ public final class WallEditingService {
             if (selection.endWallIds().contains(wall.id())) {
                 axis = new PlanSegment(axis.start(), newPoint);
             }
-            updatedWalls.add(new Wall(wall.id(), axis, wall.thickness(), wall.height(), wall.startHeight(), wall.endHeight()));
+            updatedWalls.add(wall.withAxis(axis));
         }
         return updatedWalls;
     }
@@ -75,14 +75,10 @@ public final class WallEditingService {
         } while (changed);
 
         return walls.stream()
-                .map(wall -> new Wall(
-                        wall.id(),
-                        new PlanSegment(points.get(wall.axis().start()).toPlanPoint(), points.get(wall.axis().end()).toPlanPoint()),
-                        wall.thickness(),
-                        wall.height(),
-                        wall.startHeight(),
-                        wall.endHeight()
-                ))
+                .map(wall -> wall.withAxis(new PlanSegment(
+                        points.get(wall.axis().start()).toPlanPoint(),
+                        points.get(wall.axis().end()).toPlanPoint()
+                )))
                 .toList();
     }
 

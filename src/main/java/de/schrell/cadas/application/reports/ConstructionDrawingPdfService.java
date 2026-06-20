@@ -14,6 +14,7 @@ import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -226,10 +227,27 @@ public final class ConstructionDrawingPdfService {
             for (Wall wall : level.walls()) {
                 SpatialPoint startBottom = project(wall.axis().start(), baseHeight, angle, depthFactor);
                 SpatialPoint endBottom = project(wall.axis().end(), baseHeight, angle, depthFactor);
-                SpatialPoint startTop = project(wall.axis().start(), baseHeight + wall.startHeight().toMillimeters(), angle, depthFactor);
-                SpatialPoint endTop = project(wall.axis().end(), baseHeight + wall.endHeight().toMillimeters(), angle, depthFactor);
+                List<WallProfilePoint> profile = wall.resolvedProfile();
+                SpatialPoint startTop = project(wall.axis().start(), baseHeight + profile.getFirst().height().toMillimeters(), angle, depthFactor);
+                SpatialPoint endTop = project(wall.axis().end(), baseHeight + profile.getLast().height().toMillimeters(), angle, depthFactor);
                 lines.add(new SpatialLine(startBottom.x(), startBottom.y(), endBottom.x(), endBottom.y(), false));
-                lines.add(new SpatialLine(startTop.x(), startTop.y(), endTop.x(), endTop.y(), true));
+                for (int profileIndex = 1; profileIndex < profile.size(); profileIndex++) {
+                    var previousProfilePoint = profile.get(profileIndex - 1);
+                    var profilePoint = profile.get(profileIndex);
+                    SpatialPoint previousTop = project(
+                            wall.axis().pointAt(previousProfilePoint.offset()),
+                            baseHeight + previousProfilePoint.height().toMillimeters(),
+                            angle,
+                            depthFactor
+                    );
+                    SpatialPoint top = project(
+                            wall.axis().pointAt(profilePoint.offset()),
+                            baseHeight + profilePoint.height().toMillimeters(),
+                            angle,
+                            depthFactor
+                    );
+                    lines.add(new SpatialLine(previousTop.x(), previousTop.y(), top.x(), top.y(), true));
+                }
                 lines.add(new SpatialLine(startBottom.x(), startBottom.y(), startTop.x(), startTop.y(), false));
                 lines.add(new SpatialLine(endBottom.x(), endBottom.y(), endTop.x(), endTop.y(), false));
             }

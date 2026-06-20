@@ -1239,15 +1239,34 @@ public final class ThreeDSceneModelBuilder {
             String materialKey,
             boolean surfaceRenderingMode
     ) {
-        if (!wall.hasVariableTopHeight()) {
-            double heightMillimeters = Math.max(0.0, wall.heightAt((startMillimeters + endMillimeters) / 2.0) - subtractBottomMillimeters);
-            if (heightMillimeters <= 0.0) {
-                return List.of();
+        List<Double> sectionOffsets = new ArrayList<>();
+        sectionOffsets.add(startMillimeters);
+        wall.resolvedProfile().stream()
+                .mapToDouble(point -> point.offset().toMillimeters())
+                .filter(offset -> offset > startMillimeters + 0.001 && offset < endMillimeters - 0.001)
+                .forEach(sectionOffsets::add);
+        sectionOffsets.add(endMillimeters);
+        List<RenderableBox> result = new ArrayList<>();
+        for (int index = 1; index < sectionOffsets.size(); index++) {
+            double sectionStart = sectionOffsets.get(index - 1);
+            double sectionEnd = sectionOffsets.get(index);
+            double startHeight = Math.max(0.0, wall.heightAt(sectionStart) - subtractBottomMillimeters);
+            double endHeight = Math.max(0.0, wall.heightAt(sectionEnd) - subtractBottomMillimeters);
+            if (startHeight <= 0.001 && endHeight <= 0.001) {
+                continue;
             }
-            return List.of(segmentToUniformBox(levelName, wall, startMillimeters, endMillimeters, baseHeight, heightMillimeters, materialKey, surfaceRenderingMode));
+            if (Math.abs(startHeight - endHeight) <= 0.001) {
+                result.add(segmentToUniformBox(
+                        levelName, wall, sectionStart, sectionEnd, baseHeight, startHeight, materialKey, surfaceRenderingMode
+                ));
+            } else {
+                addWallSegmentMesh(
+                        levelName, wall, sectionStart, sectionEnd, baseHeight, subtractBottomMillimeters,
+                        materialKey, surfaceRenderingMode ? 1.0 : 1.0
+                );
+            }
         }
-        addWallSegmentMesh(levelName, wall, startMillimeters, endMillimeters, baseHeight, subtractBottomMillimeters, materialKey, surfaceRenderingMode ? 1.0 : 1.0);
-        return List.of();
+        return List.copyOf(result);
     }
 
     private RenderableBox segmentToUniformBox(
