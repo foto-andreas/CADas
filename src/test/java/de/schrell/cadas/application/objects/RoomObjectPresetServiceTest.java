@@ -35,6 +35,9 @@ class RoomObjectPresetServiceTest {
         assertTrue(presets.stream().anyMatch(preset -> preset.type() == RoomObjectType.TOILET));
         assertTrue(presets.stream().anyMatch(preset -> preset.shape() == RoomObjectShape.HALF_ROUND));
         assertTrue(presets.stream().anyMatch(RoomObjectPreset::cutsFloorCovering));
+        RoomObjectPreset cuboid = presets.stream().filter(preset -> preset.type() == RoomObjectType.CUBOID).findFirst().orElseThrow();
+        assertEquals("custom-cuboid", cuboid.id());
+        assertEquals(1000.0, cuboid.width().toMillimeters(), 0.001);
     }
 
     @Test

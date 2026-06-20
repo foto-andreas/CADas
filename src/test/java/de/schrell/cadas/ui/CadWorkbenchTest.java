@@ -9,6 +9,7 @@ import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
@@ -530,6 +531,36 @@ class CadWorkbenchTest {
         RoomObject edited = aufFxThread(() -> workbench.automationRoomObject(0));
         Assertions.assertEquals(1500.0, edited.width().toMillimeters(), 0.001);
         Assertions.assertEquals(345.0, edited.rotationDegrees(), 0.001);
+    }
+
+    @Test
+    void quaderHatFreiEinstellbareBezeichnungUndSichtbareBeschriftung() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSelectRoomObjectPreset("custom-cuboid");
+            instanz.automationSetField("roomObjectName", "Wärmepumpe");
+            instanz.automationSetField("roomObjectWidth", "130");
+            instanz.automationSetTool("OBJECT");
+            instanz.automationCanvasClick(900, 600, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            return instanz;
+        });
+
+        RoomObject placed = aufFxThread(() -> workbench.automationRoomObject(0));
+        Assertions.assertEquals(RoomObjectType.CUBOID, placed.type());
+        Assertions.assertEquals("Wärmepumpe", placed.name());
+        Assertions.assertEquals(1300.0, placed.width().toMillimeters(), 0.001);
+        Assertions.assertNotNull(aufFxThread(workbench::automationDrawingSnapshot));
+
+        aufFxThread(() -> {
+            workbench.automationSetField("roomObjectName", "Außengerät");
+            workbench.automationInvoke("applySelectionProperties", null);
+            return null;
+        });
+
+        Assertions.assertEquals("Außengerät", aufFxThread(() -> workbench.automationRoomObject(0).name()));
     }
 
     @Test

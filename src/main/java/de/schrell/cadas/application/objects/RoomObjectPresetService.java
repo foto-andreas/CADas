@@ -50,7 +50,8 @@ public final class RoomObjectPresetService {
                 preset("cabinet", "Schrank 80 x 60", RoomObjectType.CABINET, RoomObjectShape.RECTANGLE, 80, 60, 200, false),
                 preset("table-rectangle", "Tisch Rechteck 160 x 90", RoomObjectType.TABLE, RoomObjectShape.RECTANGLE, 160, 90, 75, false),
                 preset("table-oval", "Tisch oval 160 x 90", RoomObjectType.TABLE, RoomObjectShape.OVAL, 160, 90, 75, false),
-                preset("table-round", "Tisch rund 110", RoomObjectType.TABLE, RoomObjectShape.CIRCLE, 110, 110, 75, false)
+                preset("table-round", "Tisch rund 110", RoomObjectType.TABLE, RoomObjectShape.CIRCLE, 110, 110, 75, false),
+                preset("custom-cuboid", "Quader", RoomObjectType.CUBOID, RoomObjectShape.RECTANGLE, 100, 100, 100, false)
         );
     }
 

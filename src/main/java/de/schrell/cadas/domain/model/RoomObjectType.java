@@ -7,6 +7,7 @@ public enum RoomObjectType {
     WALL_CABINET("Wandschrank"),
     CABINET("Schrank"),
     TABLE("Tisch"),
+    CUBOID("Quader"),
     DWG_REFERENCE("DWG-Objekt");
 
     private final String label;

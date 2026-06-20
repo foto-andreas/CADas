@@ -487,8 +487,10 @@ Aktuell enthaltene Standardobjekte:
 * Wandschrank
 * Schrank
 * Tisch rechteckig, oval und rund
+* frei bezeichneter Quader mit einstellbarer Breite, Tiefe und Höhe
 
 Beim Wandschrank wird der Bodenbelag ausgespart. Schrank und Tisch stehen auf dem Bodenbelag und schneiden ihn nicht aus.
+Die Bezeichnung eines Quaders wird mittig im Grundriss angezeigt und kann über die Eigenschaftenleiste geändert werden.
 
 Zusätzliche `DWG`-Objektdateien unter `~/.config/CADas/Objekte` erscheinen beim Start als Objekt-Presets. Sie werden aktuell als referenzierte rechteckige Platzhalter mit Standardmaß geführt; echte DWG-Blockgeometrie ist als Folgearbeit festgehalten.
 
