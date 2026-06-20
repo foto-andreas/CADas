@@ -3,6 +3,7 @@ package de.schrell.cadas.application.room;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
+import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public final class AutoRoomGenerationService {
 
     private static final double EPSILON = 0.001;
+    private static final double WALL_JOIN_TOLERANCE = 10.0;
     private static final double MAX_ORTHOGONAL_DEVIATION_RATIO = Math.tan(Math.toRadians(0.5));
     private static final double OUTER_MARGIN = 1_000.0;
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
@@ -166,6 +168,7 @@ public final class AutoRoomGenerationService {
     }
 
     private List<DetectedRoom> detectRoomsFromWallLoops(Level level, List<Wall> walls) {
+        walls = normalizeConnectedEndpoints(walls);
         Map<PointKey, List<WallConnection>> graph = buildGraph(walls);
         Set<UUID> visitedWalls = new HashSet<>();
         List<DetectedRoom> rooms = new ArrayList<>();
@@ -187,6 +190,34 @@ public final class AutoRoomGenerationService {
                     .ifPresent(rooms::add);
         }
         return rooms;
+    }
+
+    private List<Wall> normalizeConnectedEndpoints(List<Wall> walls) {
+        List<PlanPoint> canonicalPoints = new ArrayList<>();
+        return walls.stream()
+                .map(wall -> new Wall(
+                        wall.id(),
+                        new PlanSegment(
+                                canonicalPoint(wall.axis().start(), canonicalPoints),
+                                canonicalPoint(wall.axis().end(), canonicalPoints)
+                        ),
+                        wall.thickness(),
+                        wall.height(),
+                        wall.startHeight(),
+                        wall.endHeight()
+                ))
+                .toList();
+    }
+
+    private PlanPoint canonicalPoint(PlanPoint point, List<PlanPoint> canonicalPoints) {
+        Optional<PlanPoint> existing = canonicalPoints.stream()
+                .filter(candidate -> candidate.distanceTo(point).toMillimeters() <= WALL_JOIN_TOLERANCE)
+                .min(Comparator.comparingDouble(candidate -> candidate.distanceTo(point).toMillimeters()));
+        if (existing.isPresent()) {
+            return existing.orElseThrow();
+        }
+        canonicalPoints.add(point);
+        return point;
     }
 
     private boolean overlaps(Room room, DetectedRoom detectedRoom) {
@@ -407,7 +438,7 @@ public final class AutoRoomGenerationService {
             OffsetLine previousLine = offsetLine(level, previous, orientation);
             OffsetLine currentLine = offsetLine(level, current, orientation);
             PlanPoint intersection = intersect(previousLine, currentLine)
-                    .orElse(current.start());
+                    .orElse(currentLine.start());
             outline.add(intersection);
         }
         return simplify(outline);

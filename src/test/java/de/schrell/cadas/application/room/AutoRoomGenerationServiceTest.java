@@ -72,8 +72,24 @@ class AutoRoomGenerationServiceTest {
         List<Room> rooms = service.synchronize(level, defaults());
 
         assertEquals(1, rooms.size());
-        assertEquals(7_740.25, rooms.getFirst().widthMillimeters(), 0.01);
-        assertEquals(5_734.38, rooms.getFirst().depthMillimeters(), 0.01);
+        assertEquals(7_740.0, rooms.getFirst().widthMillimeters(), 0.01);
+        assertEquals(5_739.82, rooms.getFirst().depthMillimeters(), 0.01);
+    }
+
+    @Test
+    void erkenntRaumAusAneinandergereihtenWändenMitKleinenAnschlusslücken() {
+        Level level = new Level("Erdgeschoss");
+        level.addWall(wall(0, 0, 1_997, 0));
+        level.addWall(wall(2_002, 0, 4_000, 0));
+        level.addWall(wall(4_000, 0, 4_000, 3_000));
+        level.addWall(wall(4_000, 3_000, 0, 3_000));
+        level.addWall(wall(0, 3_000, 0, 0));
+
+        List<Room> rooms = service.synchronize(level, defaults());
+
+        assertEquals(1, rooms.size());
+        assertEquals(3_800.0, rooms.getFirst().widthMillimeters(), 0.001);
+        assertEquals(2_800.0, rooms.getFirst().depthMillimeters(), 0.001);
     }
 
     @Test
@@ -424,5 +440,13 @@ class AutoRoomGenerationServiceTest {
             PlanPoint end = points.get((index + 1) % points.size());
             level.addWall(Wall.create(new PlanSegment(start, end), thickness, Length.of(2.8, LengthUnit.METER)));
         }
+    }
+
+    private Wall wall(double startX, double startY, double endX, double endY) {
+        return Wall.create(
+                new PlanSegment(new PlanPoint(startX, startY), new PlanPoint(endX, endY)),
+                Length.ofMillimeters(200),
+                Length.ofMillimeters(2_800)
+        );
     }
 }
