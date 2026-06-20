@@ -12,7 +12,6 @@ import de.andreas.cadas.application.view.WallSurfacePlanGeometryService.WallSurf
 import de.andreas.cadas.application.room.OrthogonalPolygonDecompositionService;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
-import de.andreas.cadas.domain.geometry.PlanSegment;
 import de.andreas.cadas.domain.model.Door;
 import de.andreas.cadas.domain.model.FloorExtension;
 import de.andreas.cadas.domain.model.Level;
@@ -20,7 +19,6 @@ import de.andreas.cadas.domain.model.ProjectModel;
 import de.andreas.cadas.domain.model.Room;
 import de.andreas.cadas.domain.model.RoomObject;
 import de.andreas.cadas.domain.model.Roof;
-import de.andreas.cadas.domain.model.StairType;
 import de.andreas.cadas.domain.model.Staircase;
 import de.andreas.cadas.domain.model.SurfaceLayer;
 import de.andreas.cadas.domain.model.SurfaceLayerStack;
@@ -30,7 +28,6 @@ import de.andreas.cadas.domain.model.WindowElement;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

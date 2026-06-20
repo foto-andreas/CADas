@@ -4,9 +4,7 @@ import de.andreas.cadas.domain.geometry.PlanPoint;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 public final class OrthogonalPolygonDecompositionService {
 

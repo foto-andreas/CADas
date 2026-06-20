@@ -1,6 +1,5 @@
 package de.andreas.cadas.application.drawing;
 
-import de.andreas.cadas.application.view.RenderableKind;
 import de.andreas.cadas.application.view.SelectionKey;
 import de.andreas.cadas.domain.geometry.Length;
 import de.andreas.cadas.domain.geometry.PlanPoint;
