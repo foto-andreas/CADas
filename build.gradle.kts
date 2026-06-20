@@ -14,7 +14,7 @@ plugins {
 }
 
 group = "de.andreas"
-version = "1.2.0"
+version = "1.2.1"
 
 repositories {
     mavenCentral()
@@ -376,7 +376,7 @@ tasks.register<Exec>("macosInstall") {
     description = "Installiert CADas.app nach /Applications (überschreibt bestehende Version) und baut das DMG."
     enabled = macOsPackagingSupported.get()
     dependsOn("packageMacOsDmg")
-    val appBundle = appImageOutputDirectory.resolve("CADas.app")
+    val appBundle = macOsAppImageForDmg.resolve("CADas.app")
     inputs.dir(appBundle)
     executable = "rm"
     args("-rf", "/Applications/CADas.app")
@@ -390,7 +390,8 @@ tasks.register<Exec>("macosInstallCopy") {
     group = "distribution"
     description = "Kopiert das fertige CADas.app-Bundle nach /Applications (interner Teil von macosInstall)."
     enabled = macOsPackagingSupported.get()
-    val appBundle = appImageOutputDirectory.resolve("CADas.app")
+    dependsOn(prepareMacOsAppImageForDmg)
+    val appBundle = macOsAppImageForDmg.resolve("CADas.app")
     inputs.dir(appBundle)
     executable = "cp"
     args("-R", appBundle.absolutePath, "/Applications/")
