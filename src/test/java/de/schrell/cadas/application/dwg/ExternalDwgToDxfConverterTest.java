@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,10 @@ class ExternalDwgToDxfConverterTest {
 
     @Test
     void meldetFehlendenKonverterVerständlich() {
-        ExternalDwgToDxfConverter converter = ExternalDwgToDxfConverter.fromEnvironment(Map.of("PATH", ""));
+        ExternalDwgToDxfConverter converter = ExternalDwgToDxfConverter.fromEnvironment(
+                Map.of("PATH", ""),
+                List.of(tempDir.resolve("leer"))
+        );
 
         DwgConversionAvailability availability = converter.availability();
 
@@ -43,6 +47,24 @@ class ExternalDwgToDxfConverterTest {
 
         assertTrue(availability.available());
         assertTrue(availability.converterName().contains("dwg2dxf"));
+    }
+
+    @Test
+    void erkenntLibreDwgAußerhalbDesFinderPfads() throws Exception {
+        Path homebrewBin = tempDir.resolve("homebrew/bin");
+        Files.createDirectories(homebrewBin);
+        Path executable = homebrewBin.resolve("dwg2dxf");
+        Files.writeString(executable, "#!/bin/sh\nexit 0\n");
+        assertTrue(executable.toFile().setExecutable(true));
+
+        ExternalDwgToDxfConverter converter = ExternalDwgToDxfConverter.fromEnvironment(
+                Map.of("PATH", "/usr/bin:/bin"),
+                List.of(homebrewBin)
+        );
+
+        DwgConversionAvailability availability = converter.availability();
+        assertTrue(availability.available());
+        assertTrue(availability.executable().endsWith("homebrew/bin/dwg2dxf"));
     }
 
     @Test

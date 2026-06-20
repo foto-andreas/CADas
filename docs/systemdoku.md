@@ -122,7 +122,7 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 * Sichtbare Boden- und Deckenlagen verringern die lichte Raumhöhe und beeinflussen Volumen sowie 3D-Ableitung.
 * `UserSurfaceCoveringPresetLibrary` speichert eigene Belags-Presets unter `~/.config/CADas/Belag` als `.cadasbelag` und lädt sie beim Start in die Preset-Auswahl.
 * Registrierte `DWG`-Dateien werden in dasselbe Belagsverzeichnis übernommen, über externe Konverter analysiert und als auswählbare Referenz-Presets in die Ebenenverwaltung eingehängt.
-* `DwgLibraryAnalyzer` kapselt die DWG-Konvertierung über externe Programme wie `dwg2dxf` oder `dwgread`; CADas linkt und bündelt keine DWG-Bibliotheken.
+* `DwgLibraryAnalyzer` kapselt die DWG-Konvertierung über externe Programme wie `dwg2dxf` oder `dwgread`; CADas linkt und bündelt keine DWG-Bibliotheken. `ExternalDwgToDxfConverter` prüft neben `PATH` und `CADAS_DWG_CONVERTER` explizit die üblichen Homebrew- und MacPorts-Verzeichnisse, weil per Finder gestartete App-Bundles keinen Shell-`PATH` erben.
 * Aus der konvertierten DXF-Geometrie werden Einheiten, Blockursprünge, Skalierung, Rotation, Layer, Handles, Inserts und echte Blockmaße abgeleitet.
 * Über optionale `.blocks`-Katalogdateien, manuelle Eingabe oder die analysierte Blockauswahl lassen sich konkrete DWG-Blöcke als Oberflächen- oder Objekt-Presets registrieren.
 * `SurfaceMaterialListService` erzeugt aus den sichtbaren Belägen eine Materialliste mit Fläche, Stückzahl, Materialfläche, Schnitten und Raum-Komplexität. Boden- und Deckenflächen werden über die orthogonale Raumzerlegung bewertet; Wandbeläge nutzen die vorhandenen maximalen Wandrechtecke mit ausgesparten Türen, Fenstern und anstoßenden Innenwänden.

@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -14,6 +15,13 @@ import java.util.Optional;
 public final class ExternalDwgToDxfConverter implements DwgToDxfConverter {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(90);
+    private static final List<Path> STANDARD_TOOL_DIRECTORIES = List.of(
+            Path.of("/opt/homebrew/bin"),
+            Path.of("/opt/homebrew/opt/libredwg/bin"),
+            Path.of("/usr/local/bin"),
+            Path.of("/usr/local/opt/libredwg/bin"),
+            Path.of("/opt/local/bin")
+    );
 
     private final Tool tool;
     private final Duration timeout;
@@ -32,7 +40,11 @@ public final class ExternalDwgToDxfConverter implements DwgToDxfConverter {
     }
 
     public static ExternalDwgToDxfConverter fromEnvironment(Map<String, String> environment) {
-        return new ExternalDwgToDxfConverter(detect(environment), TIMEOUT);
+        return fromEnvironment(environment, STANDARD_TOOL_DIRECTORIES);
+    }
+
+    static ExternalDwgToDxfConverter fromEnvironment(Map<String, String> environment, List<Path> standardToolDirectories) {
+        return new ExternalDwgToDxfConverter(detect(environment, standardToolDirectories), TIMEOUT);
     }
 
     @Override
@@ -79,6 +91,10 @@ public final class ExternalDwgToDxfConverter implements DwgToDxfConverter {
     }
 
     private static Tool detect(Map<String, String> environment) {
+        return detect(environment, STANDARD_TOOL_DIRECTORIES);
+    }
+
+    private static Tool detect(Map<String, String> environment, List<Path> standardToolDirectories) {
         Optional<Tool> configuredTool = Optional.ofNullable(environment.get("CADAS_DWG_CONVERTER"))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
@@ -87,19 +103,34 @@ public final class ExternalDwgToDxfConverter implements DwgToDxfConverter {
         if (configuredTool.isPresent()) {
             return configuredTool.get();
         }
-        return firstExecutableInPath(environment, "dwg2dxf")
+        List<Path> searchDirectories = searchDirectories(environment, standardToolDirectories);
+        return firstExecutable(searchDirectories, "dwg2dxf")
                 .flatMap(ExternalDwgToDxfConverter::toolForExecutable)
-                .or(() -> firstExecutableInPath(environment, "dwgread").flatMap(ExternalDwgToDxfConverter::toolForExecutable))
+                .or(() -> firstExecutable(searchDirectories, "dwgread").flatMap(ExternalDwgToDxfConverter::toolForExecutable))
                 .orElse(null);
     }
 
-    private static Optional<Path> firstExecutableInPath(Map<String, String> environment, String executableName) {
+    private static List<Path> searchDirectories(Map<String, String> environment, List<Path> standardToolDirectories) {
+        LinkedHashSet<Path> directories = new LinkedHashSet<>();
         String pathValue = environment.getOrDefault("PATH", "");
         for (String pathEntry : pathValue.split(java.io.File.pathSeparator)) {
-            if (pathEntry.isBlank()) {
-                continue;
+            if (!pathEntry.isBlank()) {
+                directories.add(Path.of(pathEntry));
             }
-            Path candidate = Path.of(pathEntry).resolve(executableName);
+        }
+        Optional.ofNullable(environment.get("HOMEBREW_PREFIX"))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(Path::of)
+                .map(path -> path.resolve("bin"))
+                .ifPresent(directories::add);
+        directories.addAll(standardToolDirectories);
+        return List.copyOf(directories);
+    }
+
+    private static Optional<Path> firstExecutable(List<Path> searchDirectories, String executableName) {
+        for (Path directory : searchDirectories) {
+            Path candidate = directory.resolve(executableName);
             if (Files.isExecutable(candidate)) {
                 return Optional.of(candidate.toAbsolutePath().normalize());
             }

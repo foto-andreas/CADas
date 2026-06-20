@@ -359,7 +359,7 @@ CADas liefert keine `DWG`-Bibliotheken und keine DWG-Konverter mit aus. Für ech
 brew install libredwg
 ```
 
-CADas nutzt dann `dwg2dxf` oder alternativ `dwgread` als externes Programm. Wenn der Konverter nicht im `PATH` liegt, kann `CADAS_DWG_CONVERTER` auf die ausführbare Datei zeigen.
+CADas nutzt dann `dwg2dxf` oder alternativ `dwgread` als externes Programm. Unter macOS durchsucht die installierte App zusätzlich die üblichen Homebrew-Pfade `/opt/homebrew/bin`, `/usr/local/bin` und deren `libredwg`-Unterverzeichnisse sowie `/opt/local/bin` für MacPorts. Wenn der Konverter dort und im `PATH` nicht liegt, kann `CADAS_DWG_CONVERTER` auf die ausführbare Datei zeigen.
 
 Beim Laden wird die `DWG` zusammen mit vorhandenen `.blocks`-Katalogen in `~/.config/CADas/Belag` übernommen. Danach analysiert CADas Einheiten, Blocknamen, Blockursprünge, Layer, Handles, Inserts, Skalierung und Rotation aus der konvertierten DXF-Geometrie.
 
