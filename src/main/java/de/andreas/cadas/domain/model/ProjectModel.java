@@ -80,22 +80,6 @@ public final class ProjectModel {
         levels.add(newIndex, level);
     }
 
-    public void moveLevelUp(Level level) {
-        // "Hoch" bedeutet im Gebäude nach oben = größerer Index (Index 0 ist die unterste Etage).
-        int currentIndex = levels.indexOf(level);
-        if (currentIndex >= 0 && currentIndex < levels.size() - 1) {
-            moveLevel(level, currentIndex + 1);
-        }
-    }
-
-    public void moveLevelDown(Level level) {
-        // "Runter" bedeutet im Gebäude nach unten = kleinerer Index.
-        int currentIndex = levels.indexOf(level);
-        if (currentIndex > 0) {
-            moveLevel(level, currentIndex - 1);
-        }
-    }
-
     public java.util.Optional<Roof> roof() {
         return java.util.Optional.ofNullable(roof);
     }
