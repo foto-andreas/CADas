@@ -197,16 +197,19 @@ class ThreeDSceneModelBuilderTest {
                 sourceFile.toString()
         ));
 
-        RenderableBox box = builder.build(project, Set.of("Erdgeschoss"), false).boxes().stream()
-                .filter(renderableBox -> renderableBox.kind() == RenderableKind.ROOM_OBJECT)
-                .findFirst()
-                .orElseThrow();
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+        List<RenderableMesh> objectMeshes = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.ROOM_OBJECT)
+                .toList();
 
-        assertEquals(200.0, box.width(), 0.001);
-        assertEquals(100.0, box.depth(), 0.001);
-        assertEquals(400.0, box.height(), 0.001);
-        assertEquals(90.0, box.rotationDegrees(), 0.001);
-        assertEquals(200.0, box.centerY(), 0.001);
+        assertFalse(objectMeshes.isEmpty());
+        assertFalse(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_OBJECT));
+        assertEquals(950.0, minimumMeshCoordinate(objectMeshes, 0), 0.01);
+        assertEquals(1050.0, maximumMeshCoordinate(objectMeshes, 0), 0.01);
+        assertEquals(0.0, minimumMeshCoordinate(objectMeshes, 1), 0.01);
+        assertEquals(400.0, maximumMeshCoordinate(objectMeshes, 1), 0.01);
+        assertEquals(1100.0, minimumMeshCoordinate(objectMeshes, 2), 0.01);
+        assertEquals(1300.0, maximumMeshCoordinate(objectMeshes, 2), 0.01);
     }
 
     @Test
@@ -904,6 +907,28 @@ class ThreeDSceneModelBuilderTest {
             minimum = Math.min(minimum, points[index]);
         }
         return minimum;
+    }
+
+    private double minimumMeshCoordinate(List<RenderableMesh> meshes, int coordinateOffset) {
+        double minimum = Double.POSITIVE_INFINITY;
+        for (RenderableMesh mesh : meshes) {
+            float[] points = mesh.points();
+            for (int index = coordinateOffset; index < points.length; index += 3) {
+                minimum = Math.min(minimum, points[index]);
+            }
+        }
+        return minimum;
+    }
+
+    private double maximumMeshCoordinate(List<RenderableMesh> meshes, int coordinateOffset) {
+        double maximum = Double.NEGATIVE_INFINITY;
+        for (RenderableMesh mesh : meshes) {
+            float[] points = mesh.points();
+            for (int index = coordinateOffset; index < points.length; index += 3) {
+                maximum = Math.max(maximum, points[index]);
+            }
+        }
+        return maximum;
     }
 
     private boolean hasMeshHeightBetween(RenderableMesh mesh, double minimum, double maximum) {

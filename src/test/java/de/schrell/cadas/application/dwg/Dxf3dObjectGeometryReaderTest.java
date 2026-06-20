@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.dwg;
 
+import static de.schrell.cadas.testsupport.Dxf3dTestFixtures.boundsOnlySolidDxf;
 import static de.schrell.cadas.testsupport.Dxf3dTestFixtures.simpleSolidDxf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,6 +30,8 @@ class Dxf3dObjectGeometryReaderTest {
         assertEquals(20.0, geometry.bounds().heightMillimeters(), 0.001);
         assertEquals(1, geometry.solidBounds().size());
         assertEquals(-10.0, geometry.solidBounds().getFirst().minXMillimeters(), 0.001);
+        assertEquals(1, geometry.solidMeshes().size());
+        assertEquals(62, geometry.solidMeshes().getFirst().triangleCount());
     }
 
     @Test
@@ -37,6 +40,17 @@ class Dxf3dObjectGeometryReaderTest {
         Files.writeString(file, "0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n");
 
         assertThrows(IllegalArgumentException.class, () -> reader.read(file));
+    }
+
+    @Test
+    void verwendetBeiNichtAufloesbarerSatTopologieEinGefuelltesFallbackNetz() throws Exception {
+        Path file = tempDir.resolve("fremdkoerper.dxf");
+        Files.writeString(file, boundsOnlySolidDxf());
+
+        Dxf3dObjectGeometry geometry = reader.read(file);
+
+        assertEquals(1, geometry.solidMeshes().size());
+        assertEquals(12, geometry.solidMeshes().getFirst().triangleCount());
     }
 
 }

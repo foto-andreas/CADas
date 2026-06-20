@@ -11,23 +11,30 @@ import java.util.Optional;
 public final class Dxf3dObjectGeometryReader {
 
     private static final Charset DXF_CHARSET = Charset.forName("windows-1252");
+    private final AcisSatMeshTessellator meshTessellator = new AcisSatMeshTessellator();
 
     public Dxf3dObjectGeometry read(Path sourceFile) throws IOException {
         List<Pair> pairs = pairs(Files.readAllLines(sourceFile, DXF_CHARSET));
         DwgUnit unit = readUnit(pairs);
         Optional<Dxf3dBounds> headerBounds = readHeaderBounds(pairs);
         List<Dxf3dBounds> rawSolids = new ArrayList<>();
+        List<Dxf3dMesh> rawMeshes = new ArrayList<>();
         int sourceSolidCount = 0;
         for (int index = 0; index < pairs.size(); index++) {
             if (!pairs.get(index).isType("3DSOLID")) {
                 continue;
             }
-            sourceSolidCount++;
+            int sourceSolidIndex = sourceSolidCount++;
             List<Pair> entityPairs = new ArrayList<>();
             for (int entityIndex = index + 1; entityIndex < pairs.size() && pairs.get(entityIndex).code() != 0; entityIndex++) {
                 entityPairs.add(pairs.get(entityIndex));
             }
-            solidBounds(entityPairs).ifPresent(rawSolids::add);
+            String sat = decryptedSat(entityPairs);
+            Optional<Dxf3dBounds> bounds = solidBounds(sat);
+            bounds.ifPresent(rawSolids::add);
+            meshTessellator.tessellate(sat, sourceSolidIndex)
+                    .or(() -> bounds.map(value -> Dxf3dMesh.box(sourceSolidIndex, value)))
+                    .ifPresent(rawMeshes::add);
         }
         if (sourceSolidCount == 0) {
             throw new IllegalArgumentException("DXF-Datei enthält keine ACIS-3DSOLID-Körper.");
@@ -42,10 +49,16 @@ public final class Dxf3dObjectGeometryReader {
         double factor = unit.millimetersPerDrawingUnit();
         Dxf3dBounds metricBounds = drawingBounds.scale(factor);
         List<Dxf3dBounds> metricSolids = normalizedSolids.stream().map(bounds -> bounds.scale(factor)).toList();
+        List<Dxf3dMesh> metricMeshes = rawMeshes.stream()
+                .map(mesh -> mesh.scale(factor))
+                .toList();
         if (metricSolids.isEmpty()) {
             metricSolids = List.of(metricBounds);
         }
-        return new Dxf3dObjectGeometry(metricBounds, metricSolids, sourceSolidCount);
+        if (metricMeshes.isEmpty()) {
+            metricMeshes = List.of(Dxf3dMesh.box(0, metricBounds));
+        }
+        return new Dxf3dObjectGeometry(metricBounds, metricSolids, metricMeshes, sourceSolidCount);
     }
 
     private List<Pair> pairs(List<String> lines) {
@@ -111,7 +124,7 @@ public final class Dxf3dObjectGeometryReader {
         return Optional.empty();
     }
 
-    private Optional<Dxf3dBounds> solidBounds(List<Pair> entityPairs) {
+    private String decryptedSat(List<Pair> entityPairs) {
         StringBuilder encrypted = new StringBuilder();
         for (Pair pair : entityPairs) {
             if (pair.code() == 1 || pair.code() == 3) {
@@ -122,9 +135,12 @@ public final class Dxf3dObjectGeometryReader {
             }
         }
         if (encrypted.isEmpty()) {
-            return Optional.empty();
+            return "";
         }
-        String sat = decryptSat(encrypted.toString());
+        return decryptSat(encrypted.toString());
+    }
+
+    private Optional<Dxf3dBounds> solidBounds(String sat) {
         Transform3 transform = sat.lines()
                 .filter(line -> line.startsWith("transform "))
                 .findFirst()
@@ -252,9 +268,9 @@ public final class Dxf3dObjectGeometryReader {
 
         private Vector3 vector(Vector3 vector) {
             return new Vector3(
-                    (matrix[0] * vector.x() + matrix[1] * vector.y() + matrix[2] * vector.z()) * scale,
-                    (matrix[3] * vector.x() + matrix[4] * vector.y() + matrix[5] * vector.z()) * scale,
-                    (matrix[6] * vector.x() + matrix[7] * vector.y() + matrix[8] * vector.z()) * scale
+                    (matrix[0] * vector.x() + matrix[3] * vector.y() + matrix[6] * vector.z()) * scale,
+                    (matrix[1] * vector.x() + matrix[4] * vector.y() + matrix[7] * vector.z()) * scale,
+                    (matrix[2] * vector.x() + matrix[5] * vector.y() + matrix[8] * vector.z()) * scale
             );
         }
     }

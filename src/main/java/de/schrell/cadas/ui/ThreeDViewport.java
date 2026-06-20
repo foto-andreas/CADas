@@ -824,7 +824,8 @@ public final class ThreeDViewport extends BorderPane {
             return true;
         }
         return "room-floor".equals(renderableBox.materialKey())
-                || "joint".equals(renderableBox.materialKey());
+                || "joint".equals(renderableBox.materialKey())
+                || "room-object".equals(renderableBox.materialKey());
     }
 
     private Rotate rotation(RotationAxis axis, double degrees) {
@@ -903,7 +904,7 @@ public final class ThreeDViewport extends BorderPane {
         PhongMaterial material = new PhongMaterial(color);
         material.setSpecularColor(color.brighter());
         meshView.setMaterial(material);
-        meshView.setDrawMode(surfaceRenderingMode ? DrawMode.FILL : DrawMode.LINE);
+        meshView.setDrawMode(surfaceRenderingMode || "room-object".equals(rm.materialKey()) ? DrawMode.FILL : DrawMode.LINE);
         meshView.setCullFace(CullFace.NONE);
         meshView.setOpacity(rm.opacity());
         meshView.setUserData(rm.selectionKey());

@@ -1,6 +1,7 @@
 package de.schrell.cadas.application.view;
 
 import de.schrell.cadas.application.dwg.Dxf3dBounds;
+import de.schrell.cadas.application.dwg.Dxf3dMesh;
 import de.schrell.cadas.application.dwg.Dxf3dObjectGeometry;
 import de.schrell.cadas.application.dwg.Dxf3dObjectGeometryReader;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
@@ -1509,7 +1510,7 @@ public final class ThreeDSceneModelBuilder {
             }
             Optional<Dxf3dObjectGeometry> dxfGeometry = dxf3dGeometry(roomObject);
             if (dxfGeometry.isPresent()) {
-                boxes.addAll(buildDxf3dRoomObject(level, roomObject, baseHeight, dxfGeometry.orElseThrow()));
+                buildDxf3dRoomObjectMeshes(level, roomObject, baseHeight, dxfGeometry.orElseThrow());
                 continue;
             }
             double height = Math.max(1.0, roomObject.height().toMillimeters());
@@ -1555,7 +1556,7 @@ public final class ThreeDSceneModelBuilder {
         }
     }
 
-    private List<RenderableBox> buildDxf3dRoomObject(Level level, RoomObject roomObject, double baseHeight, Dxf3dObjectGeometry geometry) {
+    private void buildDxf3dRoomObjectMeshes(Level level, RoomObject roomObject, double baseHeight, Dxf3dObjectGeometry geometry) {
         Dxf3dBounds sourceBounds = geometry.bounds();
         double scaleX = roomObject.width().toMillimeters() / Math.max(1.0, sourceBounds.widthMillimeters());
         double scaleDepth = roomObject.depth().toMillimeters() / Math.max(1.0, sourceBounds.depthMillimeters());
@@ -1564,29 +1565,28 @@ public final class ThreeDSceneModelBuilder {
         double cosine = Math.cos(angleRadians);
         double sine = Math.sin(angleRadians);
         SelectionKey selectionKey = new SelectionKey(RenderableKind.ROOM_OBJECT, level.name(), roomObject.id().toString());
-        return geometry.solidBounds().stream()
-                .map(solid -> {
-                    double localX = (solid.centerXMillimeters() - sourceBounds.centerXMillimeters()) * scaleX;
-                    double localDepth = (solid.centerYMillimeters() - sourceBounds.centerYMillimeters()) * scaleDepth;
-                    double rotatedX = localX * cosine + localDepth * sine;
-                    double rotatedDepth = -localX * sine + localDepth * cosine;
-                    return new RenderableBox(
-                            selectionKey,
-                            level.name(),
-                            RenderableKind.ROOM_OBJECT,
-                            roomObject.center().xMillimeters() + rotatedX,
-                            baseHeight + (solid.centerZMillimeters() - sourceBounds.minZMillimeters()) * scaleHeight,
-                            roomObject.center().yMillimeters() + rotatedDepth,
-                            Math.max(1.0, solid.widthMillimeters() * scaleX),
-                            Math.max(1.0, solid.heightMillimeters() * scaleHeight),
-                            Math.max(1.0, solid.depthMillimeters() * scaleDepth),
-                            RotationAxis.Y,
-                            roomObject.rotationDegrees(),
-                            "room-object",
-                            0.9
-                    );
-                })
-                .toList();
+        for (Dxf3dMesh sourceMesh : geometry.solidMeshes()) {
+            double[] sourceCoordinates = sourceMesh.triangleCoordinates();
+            float[] points = new float[sourceCoordinates.length];
+            for (int index = 0; index < sourceCoordinates.length; index += 3) {
+                double localX = (sourceCoordinates[index] - sourceBounds.centerXMillimeters()) * scaleX;
+                double localDepth = (sourceCoordinates[index + 1] - sourceBounds.centerYMillimeters()) * scaleDepth;
+                points[index] = (float) (roomObject.center().xMillimeters() + localX * cosine + localDepth * sine);
+                points[index + 1] = (float) ((sourceCoordinates[index + 2] - sourceBounds.minZMillimeters()) * scaleHeight);
+                points[index + 2] = (float) (roomObject.center().yMillimeters() - localX * sine + localDepth * cosine);
+            }
+            meshes.add(new RenderableMesh(
+                    selectionKey,
+                    level.name(),
+                    RenderableKind.ROOM_OBJECT,
+                    points,
+                    sourceMesh.triangleCount(),
+                    baseHeight,
+                    roomObject.height().toMillimeters(),
+                    "room-object",
+                    1.0
+            ));
+        }
     }
 
     private record CachedDxf3dGeometry(long modifiedMillis, long size, Dxf3dObjectGeometry geometry) {
