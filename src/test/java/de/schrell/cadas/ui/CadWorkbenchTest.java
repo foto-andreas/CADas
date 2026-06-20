@@ -7,6 +7,7 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Door;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -321,6 +322,41 @@ class CadWorkbenchTest {
 
         Assertions.assertEquals(1, aufFxThread(workbench::automationFloorExtensionCount));
         Assertions.assertEquals(180, aufFxThread(() -> workbench.automationFloorExtension(0).slabThickness().toMillimeters()), 0.001);
+    }
+
+    @Test
+    void ziehtRechteckigeUndRundeBodenöffnungenImRaumAuf() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("FLOOR_OPENING_RECTANGLE");
+            workbench.automationCanvasPress(100, 100, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(200, 250, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(200, 250, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationSetTool("FLOOR_OPENING_CIRCLE");
+            workbench.automationCanvasPress(250, 100, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(350, 220, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(350, 220, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        Assertions.assertEquals(2, aufFxThread(workbench::automationFloorOpeningCount),
+                aufFxThread(() -> workbench.automationSnapshot().statusText()));
+        Assertions.assertEquals(FloorOpeningShape.RECTANGLE, aufFxThread(() -> workbench.automationFloorOpening(0).shape()));
+        Assertions.assertEquals(1_000.0, aufFxThread(() -> workbench.automationFloorOpening(0).width().toMillimeters()), 0.001);
+        Assertions.assertEquals(1_000.0, aufFxThread(() -> workbench.automationFloorOpening(1).width().toMillimeters()), 0.001);
+        Assertions.assertEquals(1_000.0, aufFxThread(() -> workbench.automationFloorOpening(1).depth().toMillimeters()), 0.001);
     }
 
     @Test

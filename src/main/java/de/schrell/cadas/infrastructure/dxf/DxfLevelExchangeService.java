@@ -6,6 +6,8 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorExtension;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.Level;
@@ -221,6 +223,15 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     extension.slabThickness().toMillimeters()
             ));
         }
+        for (FloorOpening opening : level.floorOpenings()) {
+            appendMetadataText(dxf, context, opening.center(), String.format(
+                    Locale.US,
+                    "FOPEN|%s|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                    opening.id(), opening.roomId(), opening.shape().name(),
+                    opening.center().xMillimeters(), opening.center().yMillimeters(),
+                    opening.width().toMillimeters(), opening.depth().toMillimeters()
+            ));
+        }
 
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
@@ -361,6 +372,11 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
                             new PlanPoint(parseDouble(parts[6]), parseDouble(parts[7])),
                             Length.ofMillimeters(parseDouble(parts[8]))
+                    ));
+                    case "FOPEN" -> level.addFloorOpening(new FloorOpening(
+                            UUID.fromString(parts[1]), UUID.fromString(parts[2]), FloorOpeningShape.valueOf(parts[3]),
+                            new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
+                            Length.ofMillimeters(parseDouble(parts[6])), Length.ofMillimeters(parseDouble(parts[7]))
                     ));
                     case "SLS" -> {
                         SurfaceLayerStack stack = new SurfaceLayerStack(

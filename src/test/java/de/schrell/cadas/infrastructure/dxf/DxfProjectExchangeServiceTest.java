@@ -13,6 +13,8 @@ import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorExtension;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -86,6 +88,10 @@ class DxfProjectExchangeServiceTest {
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER)
         ));
+        project.primaryLevel().addFloorOpening(FloorOpening.create(
+                project.primaryLevel().rooms().getFirst().id(), FloorOpeningShape.CIRCLE,
+                new PlanPoint(2_000, 2_000), Length.ofMillimeters(1_000), Length.ofMillimeters(1_000)
+        ));
         project.primaryLevel().addStaircase(new Staircase(
                 java.util.UUID.randomUUID(),
                 StairType.HALF_TURN,
@@ -115,6 +121,8 @@ class DxfProjectExchangeServiceTest {
 
         Path file = tempDir.resolve("gebaeude.dxf");
         exchangeService.exportProject(project, file);
+        String exportedDxf = Files.readString(file);
+        assertTrue(exportedDxf.contains("FOPEN"));
         ProjectModel imported = exchangeService.importProject(file, "Import");
 
         assertEquals(2, imported.levels().size());
@@ -122,6 +130,8 @@ class DxfProjectExchangeServiceTest {
         assertTrue(imported.roof().isPresent());
         assertEquals(1, imported.primaryLevel().staircases().size());
         assertEquals(1, imported.primaryLevel().floorExtensions().size());
+        assertEquals(1, imported.primaryLevel().floorOpenings().size());
+        assertEquals(FloorOpeningShape.CIRCLE, imported.primaryLevel().floorOpenings().getFirst().shape());
         assertEquals(FloorExtensionType.GALLERY, imported.primaryLevel().floorExtensions().getFirst().type());
         assertEquals(750, imported.primaryLevel().staircases().getFirst().startLandingWidth().toMillimeters(), 0.001);
         assertEquals(500, imported.primaryLevel().staircases().getFirst().endLandingWidth().toMillimeters(), 0.001);

@@ -11,6 +11,8 @@ import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectShape;
@@ -76,6 +78,41 @@ class SurfaceMaterialListServiceTest {
         assertEquals(0, material.cutCount());
         assertEquals(0.0, report.roomComplexities().getFirst().complexityScore(), 0.001);
         assertTrue(report.toMarkdown().contains("Komplexität pro Raum"));
+    }
+
+    @Test
+    void spartBodenöffnungInBodenbelagUndDeckenbelagDarunterAus() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room lowerRoom = Room.rectangular(
+                "Unten", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        project.primaryLevel().addRoom(lowerRoom);
+        SurfaceLayerStack ceilingStack = new SurfaceLayerStack(SurfaceType.CEILING, lowerRoom.id().toString());
+        ceilingStack.addLayer(layer("Decke", Length.ofMillimeters(500), Length.ofMillimeters(500)));
+        project.primaryLevel().addSurfaceLayerStack(ceilingStack);
+        var upperLevel = project.createLevel("Obergeschoss");
+        Room upperRoom = Room.rectangular(
+                "Oben", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        upperLevel.addRoom(upperRoom);
+        upperLevel.addFloorOpening(FloorOpening.create(
+                upperRoom.id(), FloorOpeningShape.RECTANGLE, new PlanPoint(2_000, 2_000),
+                Length.ofMillimeters(1_000), Length.ofMillimeters(2_000)
+        ));
+        SurfaceLayerStack floorStack = new SurfaceLayerStack(SurfaceType.FLOOR, upperRoom.id().toString());
+        floorStack.addLayer(layer("Boden", Length.ofMillimeters(500), Length.ofMillimeters(500)));
+        upperLevel.addSurfaceLayerStack(floorStack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        assertEquals(14.0, report.materials().stream()
+                .filter(material -> material.name().equals("Boden"))
+                .findFirst().orElseThrow().coveredAreaSquareMeters(), 0.001);
+        assertEquals(14.0, report.materials().stream()
+                .filter(material -> material.name().equals("Decke"))
+                .findFirst().orElseThrow().coveredAreaSquareMeters(), 0.001);
     }
 
     @Test

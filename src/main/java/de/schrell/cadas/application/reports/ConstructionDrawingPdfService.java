@@ -7,9 +7,12 @@ import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
 import de.schrell.cadas.application.drawing.TextBlockingBox;
 import de.schrell.cadas.application.drawing.WallDimensionPlacementService;
 import de.schrell.cadas.application.drawing.WallDimensionService;
+import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
@@ -55,6 +58,7 @@ public final class ConstructionDrawingPdfService {
     private final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
     private final DimensionLabelService dimensionLabelService = new DimensionLabelService();
     private final DimensionLabelPlacementService dimensionLabelPlacementService = new DimensionLabelPlacementService();
+    private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
     public void export(ProjectModel project, Path targetFile) throws IOException {
         export(project, targetFile, ConstructionDrawingOptions.defaults());
@@ -83,6 +87,9 @@ public final class ConstructionDrawingPdfService {
         try (PageCanvas canvas = addPage(document, project.name(), "2D-Grundriss – " + level.name(), "M 1:" + viewport.scale())) {
             for (Room room : level.rooms()) {
                 drawPolygon(canvas, viewport, room.outline(), new Color(225, 231, 221), 0.45f);
+            }
+            for (FloorOpening opening : level.floorOpenings()) {
+                drawFloorOpening(canvas, viewport, opening);
             }
             for (var extension : level.floorExtensions()) {
                 drawPolygon(canvas, viewport, extension.outline(), new Color(222, 210, 190), 0.7f);
@@ -142,9 +149,7 @@ public final class ConstructionDrawingPdfService {
     }
 
     private double effectiveAreaSquareMeters(Level level, Room room) {
-        double width = Math.max(0, room.maxXMillimeters() - room.minXMillimeters()) / 1_000.0;
-        double depth = Math.max(0, room.maxYMillimeters() - room.minYMillimeters()) / 1_000.0;
-        return width * depth;
+        return surfaceLayerEffectService.effectiveAreaSquareMeters(level, room);
     }
 
     private TextBlockingBox textBoundsApproximate(String text, double x, double y, float fontSize) {
@@ -336,6 +341,26 @@ public final class ConstructionDrawingPdfService {
         PlanPoint start = wall.axis().pointAt(de.schrell.cadas.domain.geometry.Length.ofMillimeters(Math.min(offset, length)));
         PlanPoint end = wall.axis().pointAt(de.schrell.cadas.domain.geometry.Length.ofMillimeters(Math.min(offset + width, length)));
         canvas.line(viewport.x(start.xMillimeters()), viewport.y(start.yMillimeters()), viewport.x(end.xMillimeters()), viewport.y(end.yMillimeters()), 2.2f, color);
+    }
+
+    private void drawFloorOpening(PageCanvas canvas, Viewport viewport, FloorOpening opening) throws IOException {
+        List<PlanPoint> outline = new ArrayList<>();
+        if (opening.shape() == FloorOpeningShape.CIRCLE) {
+            double radius = opening.width().toMillimeters() / 2.0;
+            for (int index = 0; index < 48; index++) {
+                double angle = 2.0 * Math.PI * index / 48.0;
+                outline.add(new PlanPoint(
+                        opening.center().xMillimeters() + Math.cos(angle) * radius,
+                        opening.center().yMillimeters() + Math.sin(angle) * radius
+                ));
+            }
+        } else {
+            outline.add(new PlanPoint(opening.minXMillimeters(), opening.minYMillimeters()));
+            outline.add(new PlanPoint(opening.maxXMillimeters(), opening.minYMillimeters()));
+            outline.add(new PlanPoint(opening.maxXMillimeters(), opening.maxYMillimeters()));
+            outline.add(new PlanPoint(opening.minXMillimeters(), opening.maxYMillimeters()));
+        }
+        drawPolygon(canvas, viewport, outline, Color.WHITE, 0.9f);
     }
 
     private void drawWallDimensions(PageCanvas canvas, Viewport viewport, Level level, ConstructionDrawingOptions options, List<TextBlockingBox> seedBlockers) throws IOException {

@@ -9,6 +9,7 @@ import de.schrell.cadas.application.layers.TileLayoutRequest;
 import de.schrell.cadas.application.layers.TileLayoutService;
 import de.schrell.cadas.application.layers.TilePlacement;
 import de.schrell.cadas.application.layers.WallSurfaceSideService;
+import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.layers.WallSurfaceTargetKey;
 import de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceInterval;
 import de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle;
@@ -18,6 +19,7 @@ import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorExtension;
+import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
@@ -63,6 +65,7 @@ public final class ThreeDSceneModelBuilder {
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
     private final Dxf3dObjectGeometryReader dxf3dObjectGeometryReader = new Dxf3dObjectGeometryReader();
+    private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
     private final Map<Path, CachedDxf3dGeometry> dxf3dGeometryCache = new LinkedHashMap<>();
     private final List<RenderableMesh> meshes = new ArrayList<>();
 
@@ -82,17 +85,21 @@ public final class ThreeDSceneModelBuilder {
             buildTerrain(project);
         }
 
-        for (Level level : project.levels()) {
+        for (int levelIndex = 0; levelIndex < project.levels().size(); levelIndex++) {
+            Level level = project.levels().get(levelIndex);
             if (!visibleLevelNames.contains(level.name())) {
                 continue;
             }
+            List<FloorOpening> openingsAbove = levelIndex + 1 < project.levels().size()
+                    ? project.levels().get(levelIndex + 1).floorOpenings()
+                    : List.of();
             double baseHeight = levelBaseHeights.getOrDefault(level.name(), 0.0);
             double floorOffset = maximumFloorThickness(level);
             double wallBaseHeight = baseHeight + floorOffset;
             buildRoomFloor(level, baseHeight);
             boxes.addAll(buildRoomFloorBodies(level, baseHeight));
             boxes.addAll(buildWallFloorSupports(level, baseHeight, floorOffset));
-            boxes.addAll(buildRoomInteriors(level, baseHeight, renderSurfaceLayers, surfaceRenderingMode));
+            boxes.addAll(buildRoomInteriors(level, openingsAbove, baseHeight, renderSurfaceLayers, surfaceRenderingMode));
             boxes.addAll(buildWalls(level, wallBaseHeight, surfaceRenderingMode));
             if (renderSurfaceLayers) {
                 boxes.addAll(buildWallSurfaceLayers(level, wallBaseHeight));
@@ -217,7 +224,7 @@ public final class ThreeDSceneModelBuilder {
                     new SelectionKey(RenderableKind.ROOM_FLOOR, level.name(), room.id().toString()),
                     level.name(),
                     RenderableKind.ROOM_FLOOR,
-                    roomRectangles(room),
+                    floorOpeningGeometryService.floorRectangles(level, room),
                     baseHeight,
                     floorThickness,
                     floorThickness,
@@ -234,7 +241,7 @@ public final class ThreeDSceneModelBuilder {
             if (floorThickness <= 0.0) {
                 continue;
             }
-            for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : roomRectangles(room)) {
+            for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : floorOpeningGeometryService.floorRectangles(level, room)) {
                 boxes.add(new RenderableBox(
                         new SelectionKey(RenderableKind.ROOM_FLOOR, level.name(), room.id().toString()),
                         level.name(),
@@ -284,24 +291,32 @@ public final class ThreeDSceneModelBuilder {
         return boxes;
     }
 
-    private List<RenderableBox> buildRoomInteriors(Level level, double baseHeight, boolean renderSurfaceLayers, boolean surfaceRenderingMode) {
+    private List<RenderableBox> buildRoomInteriors(
+            Level level,
+            List<FloorOpening> openingsAbove,
+            double baseHeight,
+            boolean renderSurfaceLayers,
+            boolean surfaceRenderingMode
+    ) {
         List<RenderableBox> boxes = new ArrayList<>();
         for (Room room : level.rooms()) {
             List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles = roomRectangles(room);
+            List<OrthogonalPolygonDecompositionService.CellRectangle> floorRectangles = floorOpeningGeometryService.floorRectangles(level, room);
+            List<OrthogonalPolygonDecompositionService.CellRectangle> ceilingRectangles = floorOpeningGeometryService.ceilingRectangles(room, openingsAbove);
             if (room.hasVariableCeilingHeights()) {
                 if (!surfaceRenderingMode) {
                     boxes.addAll(buildSlopedRoomVolume(level, room, baseHeight, rectangles));
                 }
-                boxes.addAll(buildSlopedCeiling(level, room, baseHeight, rectangles, surfaceRenderingMode));
+                boxes.addAll(buildSlopedCeiling(level, room, baseHeight, ceilingRectangles, surfaceRenderingMode));
             } else {
-                buildFlatRoomCeilingMesh(level, room, baseHeight, rectangles, surfaceRenderingMode);
+                buildFlatRoomCeilingMesh(level, room, baseHeight, ceilingRectangles, surfaceRenderingMode);
                 if (!surfaceRenderingMode) {
                     boxes.addAll(buildFlatRoomVolume(level, room, baseHeight, rectangles));
                 }
             }
 
             if (renderSurfaceLayers) {
-                boxes.addAll(buildSurfaceLayers(level, room, rectangles, baseHeight));
+                boxes.addAll(buildSurfaceLayers(level, room, floorRectangles, ceilingRectangles, baseHeight));
             }
         }
         return boxes;
@@ -347,16 +362,22 @@ public final class ThreeDSceneModelBuilder {
         return boxes;
     }
 
-    private List<RenderableBox> buildSurfaceLayers(Level level, Room room, List<OrthogonalPolygonDecompositionService.CellRectangle> rectangles, double baseHeight) {
+    private List<RenderableBox> buildSurfaceLayers(
+            Level level,
+            Room room,
+            List<OrthogonalPolygonDecompositionService.CellRectangle> floorRectangles,
+            List<OrthogonalPolygonDecompositionService.CellRectangle> ceilingRectangles,
+            double baseHeight
+    ) {
         List<RenderableBox> boxes = new ArrayList<>();
         for (SurfaceLayerStack stack : level.surfaceLayerStacks()) {
             if (!matchesRoom(stack, room)) {
                 continue;
             }
             if (stack.surfaceType() == SurfaceType.FLOOR) {
-                boxes.addAll(buildFloorSurfaceLayers(level, room, rectangles, baseHeight, stack));
+                boxes.addAll(buildFloorSurfaceLayers(level, room, floorRectangles, baseHeight, stack));
             } else if (stack.surfaceType() == SurfaceType.CEILING) {
-                boxes.addAll(buildCeilingSurfaceLayers(level, room, rectangles, baseHeight, stack));
+                boxes.addAll(buildCeilingSurfaceLayers(level, room, ceilingRectangles, baseHeight, stack));
             }
         }
         return boxes;

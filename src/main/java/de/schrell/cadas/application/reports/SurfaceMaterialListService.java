@@ -5,6 +5,7 @@ import de.schrell.cadas.application.layers.TileLayoutService;
 import de.schrell.cadas.application.layers.TilePlacement;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.layers.WallSurfaceSideService;
+import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.layers.WallSurfaceTargetKey;
 import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService;
 import de.schrell.cadas.application.view.WallSurfaceOpeningService;
@@ -13,6 +14,7 @@ import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.FloorExtension;
+import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -38,11 +40,16 @@ public final class SurfaceMaterialListService {
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final ResidentialAreaService residentialAreaService = new ResidentialAreaService();
+    private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
 
     public SurfaceMaterialReport create(ProjectModel project) {
         Map<String, MaterialAccumulator> materials = new LinkedHashMap<>();
-        for (Level level : project.levels()) {
-            collectLevel(level, materials);
+        for (int levelIndex = 0; levelIndex < project.levels().size(); levelIndex++) {
+            Level level = project.levels().get(levelIndex);
+            List<FloorOpening> openingsAbove = levelIndex + 1 < project.levels().size()
+                    ? project.levels().get(levelIndex + 1).floorOpenings()
+                    : List.of();
+            collectLevel(level, openingsAbove, materials);
         }
         List<MaterialSummary> materialSummaries = materials.values().stream()
                 .map(MaterialAccumulator::toSummary)
@@ -79,13 +86,13 @@ public final class SurfaceMaterialListService {
         );
     }
 
-    private void collectLevel(Level level, Map<String, MaterialAccumulator> materials) {
+    private void collectLevel(Level level, List<FloorOpening> openingsAbove, Map<String, MaterialAccumulator> materials) {
         for (SurfaceLayerStack stack : level.surfaceLayerStacks()) {
             for (SurfaceLayer layer : stack.layers()) {
                 if (!layer.visible()) {
                     continue;
                 }
-                for (SurfaceCoverage coverage : coverages(level, stack)) {
+                for (SurfaceCoverage coverage : coverages(level, stack, openingsAbove)) {
                     CoverageEstimate estimate = estimateCoverage(layer, coverage.rectangles());
                     if (estimate.placedPieceCount() == 0) {
                         continue;
@@ -107,15 +114,15 @@ public final class SurfaceMaterialListService {
         }
     }
 
-    private List<SurfaceCoverage> coverages(Level level, SurfaceLayerStack stack) {
+    private List<SurfaceCoverage> coverages(Level level, SurfaceLayerStack stack, List<FloorOpening> openingsAbove) {
         return switch (stack.surfaceType()) {
-            case FLOOR, CEILING -> roomCoverages(level, stack);
+            case FLOOR, CEILING -> roomCoverages(level, stack, openingsAbove);
             case WALL_INTERIOR, WALL_EXTERIOR -> wallCoverages(level, stack);
             case ROOF -> List.of();
         };
     }
 
-    private List<SurfaceCoverage> roomCoverages(Level level, SurfaceLayerStack stack) {
+    private List<SurfaceCoverage> roomCoverages(Level level, SurfaceLayerStack stack, List<FloorOpening> openingsAbove) {
         List<SurfaceCoverage> coverages = new ArrayList<>();
         if (stack.surfaceType() == SurfaceType.FLOOR) {
             level.floorExtensions().stream()
@@ -127,7 +134,7 @@ public final class SurfaceMaterialListService {
             if (!matchesRoom(stack, room)) {
                 continue;
             }
-            List<SurfaceRectangle> rectangles = roomSurfaceRectangles(level, room, stack.surfaceType());
+            List<SurfaceRectangle> rectangles = roomSurfaceRectangles(level, room, stack.surfaceType(), openingsAbove);
             String surface = stack.surfaceType() == SurfaceType.FLOOR ? "Boden" : "Decke";
             coverages.add(new SurfaceCoverage(level.name(), room.name(), surface, rectangles));
         }
@@ -143,8 +150,16 @@ public final class SurfaceMaterialListService {
         );
     }
 
-    private List<SurfaceRectangle> roomSurfaceRectangles(Level level, Room room, SurfaceType surfaceType) {
-        List<SurfaceRectangle> rectangles = roomRectangles(room).stream()
+    private List<SurfaceRectangle> roomSurfaceRectangles(
+            Level level,
+            Room room,
+            SurfaceType surfaceType,
+            List<FloorOpening> openingsAbove
+    ) {
+        List<OrthogonalPolygonDecompositionService.CellRectangle> availableRectangles = surfaceType == SurfaceType.FLOOR
+                ? floorOpeningGeometryService.floorRectangles(level, room)
+                : floorOpeningGeometryService.ceilingRectangles(room, openingsAbove);
+        List<SurfaceRectangle> rectangles = availableRectangles.stream()
                 .map(rectangle -> new SurfaceRectangle(rectangle.minX(), rectangle.minY(), rectangle.width(), rectangle.height()))
                 .toList();
         if (surfaceType != SurfaceType.FLOOR) {

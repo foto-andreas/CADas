@@ -5,6 +5,8 @@ public enum DrawingTool {
     WALL("Wand", false),
     STAIR("Treppe", false),
     FLOOR_EXTENSION("Balkon/Empore", false),
+    FLOOR_OPENING_RECTANGLE("Bodenloch rechteckig", false),
+    FLOOR_OPENING_CIRCLE("Bodenloch rund", false),
     DOOR("Tür", true),
     WINDOW("Fenster", true),
     OBJECT("Objekt", true);

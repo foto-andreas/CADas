@@ -7,6 +7,8 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorExtension;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.Level;
@@ -205,6 +207,14 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 new PlanPoint(parseDouble(parts[5]), parseDouble(parts[6])),
                                 new PlanPoint(parseDouble(parts[7]), parseDouble(parts[8])),
                                 Length.ofMillimeters(parseDouble(parts[9]))
+                        ));
+                    }
+                    case "FOPEN" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        level.addFloorOpening(new FloorOpening(
+                                UUID.fromString(parts[2]), UUID.fromString(parts[3]), FloorOpeningShape.valueOf(parts[4]),
+                                new PlanPoint(parseDouble(parts[5]), parseDouble(parts[6])),
+                                Length.ofMillimeters(parseDouble(parts[7])), Length.ofMillimeters(parseDouble(parts[8]))
                         ));
                     }
                     case "ROOF" -> importedRoof = new Roof(
@@ -459,6 +469,15 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     extension.slabThickness().toMillimeters()
             ));
         }
+        for (FloorOpening opening : level.floorOpenings()) {
+            appendMetadataText(dxf, context, opening.center(), String.format(
+                    Locale.US,
+                    "FOPEN|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                    DxfMetadataCodec.encode(level.name()), opening.id(), opening.roomId(), opening.shape().name(),
+                    opening.center().xMillimeters(), opening.center().yMillimeters(),
+                    opening.width().toMillimeters(), opening.depth().toMillimeters()
+            ));
+        }
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
@@ -558,6 +577,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         target.replaceStaircases(source.staircases());
         target.replaceRoomObjects(source.roomObjects());
         target.replaceFloorExtensions(source.floorExtensions());
+        target.replaceFloorOpenings(source.floorOpenings());
         target.replaceSurfaceLayerStacks(source.surfaceLayerStacks().stream()
                 .map(SurfaceLayerStack::copy)
                 .toList());

@@ -14,6 +14,8 @@ import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorExtension;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -1110,5 +1112,36 @@ class ThreeDSceneModelBuilderTest {
                 .orElseThrow();
         assertEquals(12, underside.faceCount());
         assertEquals(2_800.0, underside.height(), 0.001);
+    }
+
+    @Test
+    void spartBodenöffnungImBodenUndInDerDeckeDarunterAus() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room lowerRoom = Room.rectangular(
+                "Unten", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        project.primaryLevel().addRoom(lowerRoom);
+        var upperLevel = project.createLevel("Obergeschoss");
+        Room upperRoom = Room.rectangular(
+                "Oben", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        upperLevel.addRoom(upperRoom);
+        upperLevel.addFloorOpening(FloorOpening.create(
+                upperRoom.id(), FloorOpeningShape.RECTANGLE, new PlanPoint(2_000, 2_000),
+                Length.ofMillimeters(1_000), Length.ofMillimeters(2_000)
+        ));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss", "Obergeschoss"), false);
+
+        RenderableMesh upperFloor = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.ROOM_FLOOR && mesh.levelName().equals("Obergeschoss"))
+                .findFirst().orElseThrow();
+        RenderableMesh lowerCeiling = sceneModel.meshes().stream()
+                .filter(mesh -> mesh.kind() == RenderableKind.ROOM_CEILING && mesh.levelName().equals("Erdgeschoss"))
+                .findFirst().orElseThrow();
+        assertEquals(8, upperFloor.faceCount());
+        assertEquals(8, lowerCeiling.faceCount());
     }
 }

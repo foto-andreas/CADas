@@ -6,6 +6,7 @@ import de.schrell.cadas.application.stairs.StairUnderbuildService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
+import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
@@ -30,6 +31,7 @@ public final class SelectionTranslationService {
             selectedWalls.add(stairUnderbuildService.wallId(id, StairUnderbuildService.Side.RIGHT).toString());
         }
         Set<String> selectedRoomObjects = selectedIds(selections, RenderableKind.ROOM_OBJECT);
+        Set<String> selectedFloorOpenings = selectedIds(selections, RenderableKind.FLOOR_OPENING);
         List<PlanPoint> translatedWallEndpoints = selectedWallEndpoints(level, selectedWalls);
         List<Wall> translatedWalls = level.walls().stream()
                 .map(wall -> selectedWalls.contains(wall.id().toString())
@@ -42,8 +44,13 @@ public final class SelectionTranslationService {
         List<RoomObject> translatedRoomObjects = level.roomObjects().stream()
                 .map(roomObject -> selectedRoomObjects.contains(roomObject.id().toString()) ? translateRoomObject(roomObject, deltaXMillimeters, deltaYMillimeters) : roomObject)
                 .toList();
-        boolean changed = !selectedWalls.isEmpty() || !selectedStairs.isEmpty() || !selectedRoomObjects.isEmpty();
-        return new TranslationResult(translatedWalls, translatedStairs, translatedRoomObjects, changed);
+        List<FloorOpening> translatedFloorOpenings = level.floorOpenings().stream()
+                .map(opening -> selectedFloorOpenings.contains(opening.id().toString())
+                        ? opening.withCenter(translatePoint(opening.center(), deltaXMillimeters, deltaYMillimeters))
+                        : opening)
+                .toList();
+        boolean changed = !selectedWalls.isEmpty() || !selectedStairs.isEmpty() || !selectedRoomObjects.isEmpty() || !selectedFloorOpenings.isEmpty();
+        return new TranslationResult(translatedWalls, translatedStairs, translatedRoomObjects, translatedFloorOpenings, changed);
     }
 
     private Set<String> selectedIds(Set<SelectionKey> selections, RenderableKind kind) {
@@ -131,6 +138,12 @@ public final class SelectionTranslationService {
         return new PlanPoint(point.xMillimeters() + deltaXMillimeters, point.yMillimeters() + deltaYMillimeters);
     }
 
-    public record TranslationResult(List<Wall> walls, List<Staircase> staircases, List<RoomObject> roomObjects, boolean changed) {
+    public record TranslationResult(
+            List<Wall> walls,
+            List<Staircase> staircases,
+            List<RoomObject> roomObjects,
+            List<FloorOpening> floorOpenings,
+            boolean changed
+    ) {
     }
 }

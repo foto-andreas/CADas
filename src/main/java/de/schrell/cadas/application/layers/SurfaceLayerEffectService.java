@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.layers;
 
+import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
@@ -14,6 +15,8 @@ import java.util.List;
 import java.util.Objects;
 
 public final class SurfaceLayerEffectService {
+
+    private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
 
     public double visibleThicknessMillimeters(Level level, SurfaceType surfaceType, String targetKey) {
         return level.surfaceLayerStacks().stream()
@@ -127,7 +130,7 @@ public final class SurfaceLayerEffectService {
     }
 
     public double effectiveAreaSquareMeters(Level level, Room room) {
-        return room.areaSquareMeters();
+        return floorOpeningGeometryService.floorAreaSquareMeters(level, room);
     }
 
     private double triangleArea(PlanPoint a, PlanPoint b, PlanPoint c) {

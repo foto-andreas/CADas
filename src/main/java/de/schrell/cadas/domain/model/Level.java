@@ -15,6 +15,7 @@ public final class Level {
     private final List<Staircase> staircases = new ArrayList<>();
     private final List<RoomObject> roomObjects = new ArrayList<>();
     private final List<FloorExtension> floorExtensions = new ArrayList<>();
+    private final List<FloorOpening> floorOpenings = new ArrayList<>();
     private final List<SurfaceLayerStack> surfaceLayerStacks = new ArrayList<>();
 
     public Level(String name) {
@@ -175,6 +176,24 @@ public final class Level {
         floorExtensions.addAll(Objects.requireNonNull(updatedFloorExtensions, "updatedFloorExtensions darf nicht null sein."));
     }
 
+    public List<FloorOpening> floorOpenings() {
+        return List.copyOf(floorOpenings);
+    }
+
+    public void addFloorOpening(FloorOpening floorOpening) {
+        floorOpenings.add(Objects.requireNonNull(floorOpening, "floorOpening darf nicht null sein."));
+    }
+
+    public boolean removeFloorOpening(UUID floorOpeningId) {
+        Objects.requireNonNull(floorOpeningId, "floorOpeningId darf nicht null sein.");
+        return floorOpenings.removeIf(opening -> opening.id().equals(floorOpeningId));
+    }
+
+    public void replaceFloorOpenings(List<FloorOpening> updatedFloorOpenings) {
+        floorOpenings.clear();
+        floorOpenings.addAll(Objects.requireNonNull(updatedFloorOpenings, "updatedFloorOpenings darf nicht null sein."));
+    }
+
     public List<SurfaceLayerStack> surfaceLayerStacks() {
         return List.copyOf(surfaceLayerStacks);
     }
@@ -216,6 +235,7 @@ public final class Level {
         copy.staircases.addAll(staircases);
         copy.roomObjects.addAll(roomObjects);
         copy.floorExtensions.addAll(floorExtensions);
+        copy.floorOpenings.addAll(floorOpenings);
         surfaceLayerStacks.stream()
                 .map(SurfaceLayerStack::copy)
                 .forEach(copy.surfaceLayerStacks::add);

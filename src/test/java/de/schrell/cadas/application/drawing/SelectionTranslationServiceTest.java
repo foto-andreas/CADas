@@ -11,6 +11,8 @@ import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -156,5 +158,24 @@ class SelectionTranslationServiceTest {
 
         assertEquals(200.0, result.walls().getFirst().axis().start().xMillimeters(), 0.001);
         assertEquals(300.0, result.walls().getFirst().axis().start().yMillimeters(), 0.001);
+    }
+
+    @Test
+    void verschiebtAusgewählteBodenöffnung() {
+        Level level = new Level("Obergeschoss");
+        FloorOpening opening = FloorOpening.create(
+                java.util.UUID.randomUUID(), FloorOpeningShape.RECTANGLE, new PlanPoint(1_000, 1_000),
+                Length.ofMillimeters(800), Length.ofMillimeters(600)
+        );
+        level.addFloorOpening(opening);
+
+        SelectionTranslationService.TranslationResult result = translationService.translate(
+                level,
+                Set.of(new SelectionKey(RenderableKind.FLOOR_OPENING, level.name(), opening.id().toString())),
+                200.0,
+                -100.0
+        );
+
+        assertEquals(new PlanPoint(1_200, 900), result.floorOpenings().getFirst().center());
     }
 }

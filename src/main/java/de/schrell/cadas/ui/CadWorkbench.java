@@ -79,6 +79,8 @@ import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorExtension;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
@@ -470,6 +472,7 @@ public final class CadWorkbench extends BorderPane {
     private List<Wall> selectionDragBaseWalls = List.of();
     private List<Staircase> selectionDragBaseStaircases = List.of();
     private List<RoomObject> selectionDragBaseRoomObjects = List.of();
+    private List<FloorOpening> selectionDragBaseFloorOpenings = List.of();
     private UUID openingDragId;
     private PlanSegment openingDragWallAxis;
     private double openingDragWidth;
@@ -1369,6 +1372,7 @@ public final class CadWorkbench extends BorderPane {
             case STAIR -> "Treppe";
             case ROOM_OBJECT -> "Objekt";
             case FLOOR_EXTENSION -> "Balkon/Empore";
+            case FLOOR_OPENING -> "Bodenöffnung";
             default -> selection.kind().name();
         };
     }
@@ -1863,6 +1867,7 @@ public final class CadWorkbench extends BorderPane {
             selectionDragBaseWalls = List.of();
             selectionDragBaseStaircases = List.of();
             selectionDragBaseRoomObjects = List.of();
+            selectionDragBaseFloorOpenings = List.of();
             historyCapturedForDrag = false;
             if (selectedEndpointGroup != null) {
                 syncEndpointHeightInputFromSelection();
@@ -1915,7 +1920,7 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
 
-        DraftingConstraints constraints = currentConstraints(!event.isShiftDown());
+        DraftingConstraints constraints = currentConstraints(currentTool() == DrawingTool.WALL && !event.isShiftDown());
         draftStart = snapDrawingPoint(screenToWorld(event.getX(), event.getY()), constraints);
         previewSegment = new PlanSegment(draftStart, draftStart);
         if (currentTool() == DrawingTool.DOOR) {
@@ -2077,7 +2082,7 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
 
-        DraftingConstraints constraints = currentConstraints(!event.isShiftDown());
+        DraftingConstraints constraints = currentConstraints(currentTool() == DrawingTool.WALL && !event.isShiftDown());
         PlanPoint snappedPoint = snapDrawingPoint(screenToWorld(event.getX(), event.getY()), constraints);
         previewSegment = draftingService.createSegment(draftStart, snappedPoint, constraints);
         if ((snapToGuides.get() || snapToWalls.get()) && constraints.manualLength().isEmpty() && constraints.manualAngle().isEmpty()) {
@@ -2151,6 +2156,7 @@ public final class CadWorkbench extends BorderPane {
             selectionDragBaseWalls = List.of();
             selectionDragBaseStaircases = List.of();
             selectionDragBaseRoomObjects = List.of();
+            selectionDragBaseFloorOpenings = List.of();
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -2199,6 +2205,13 @@ public final class CadWorkbench extends BorderPane {
                 );
                 activeLevel.get().addFloorExtension(extension);
                 selectSingle(new SelectionKey(RenderableKind.FLOOR_EXTENSION, activeLevel.get().name(), extension.id().toString()));
+            } else if ((currentTool() == DrawingTool.FLOOR_OPENING_RECTANGLE
+                    || currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE)
+                    && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
+                    && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
+                createFloorOpening(previewSegment, currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE
+                        ? FloorOpeningShape.CIRCLE
+                        : FloorOpeningShape.RECTANGLE);
             }
             markThreeDDirty();
         }
@@ -2989,6 +3002,30 @@ public final class CadWorkbench extends BorderPane {
             graphics.strokePolygon(xPoints, yPoints, xPoints.length);
             drawRoomSlopeMarker(graphics, room);
             drawRoomTileGrid(graphics, room);
+            drawFloorOpenings(graphics, room);
+        }
+    }
+
+    private void drawFloorOpenings(GraphicsContext graphics, Room room) {
+        graphics.setFill(Color.web("#f6f1e8"));
+        graphics.setLineWidth(2.0);
+        for (FloorOpening opening : activeLevel.get().floorOpenings()) {
+            if (!opening.roomId().equals(room.id())) {
+                continue;
+            }
+            boolean selected = isSelected(RenderableKind.FLOOR_OPENING, opening.id().toString());
+            graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#8a5d32"));
+            double x = toScreenProjectedX(new PlanPoint(opening.minXMillimeters(), opening.minYMillimeters()), 0.0);
+            double y = toScreenProjectedY(new PlanPoint(opening.minXMillimeters(), opening.minYMillimeters()), 0.0);
+            double width = opening.width().toMillimeters() * scale();
+            double height = opening.depth().toMillimeters() * scale();
+            if (opening.shape() == FloorOpeningShape.CIRCLE) {
+                graphics.fillOval(x, y, width, height);
+                graphics.strokeOval(x, y, width, height);
+            } else {
+                graphics.fillRect(x, y, width, height);
+                graphics.strokeRect(x, y, width, height);
+            }
         }
     }
 
@@ -3785,22 +3822,25 @@ public final class CadWorkbench extends BorderPane {
         double startY = Math.min(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
         double endX = Math.max(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
         double endY = Math.max(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
-        if (currentTool() == DrawingTool.STAIR || currentTool() == DrawingTool.FLOOR_EXTENSION) {
+        if (currentTool() == DrawingTool.STAIR
+                || currentTool() == DrawingTool.FLOOR_EXTENSION
+                || currentTool() == DrawingTool.FLOOR_OPENING_RECTANGLE
+                || currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE) {
             graphics.setFill(Color.color(0.45, 0.37, 0.29, 0.18));
             graphics.setStroke(Color.web("#7f6a55"));
             graphics.setLineWidth(2.0);
-            graphics.fillRect(
-                    toScreenProjectedX(new PlanPoint(startX, startY), 0.0),
-                    toScreenProjectedY(new PlanPoint(startX, startY), 0.0),
-                    (endX - startX) * scale(),
-                    (endY - startY) * scale()
-            );
-            graphics.strokeRect(
-                    toScreenProjectedX(new PlanPoint(startX, startY), 0.0),
-                    toScreenProjectedY(new PlanPoint(startX, startY), 0.0),
-                    (endX - startX) * scale(),
-                    (endY - startY) * scale()
-            );
+            double previewX = toScreenProjectedX(new PlanPoint(startX, startY), 0.0);
+            double previewY = toScreenProjectedY(new PlanPoint(startX, startY), 0.0);
+            double previewWidth = (endX - startX) * scale();
+            double previewHeight = (endY - startY) * scale();
+            if (currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE) {
+                double diameter = Math.min(previewWidth, previewHeight);
+                graphics.fillOval(previewX, previewY, diameter, diameter);
+                graphics.strokeOval(previewX, previewY, diameter, diameter);
+            } else {
+                graphics.fillRect(previewX, previewY, previewWidth, previewHeight);
+                graphics.strokeRect(previewX, previewY, previewWidth, previewHeight);
+            }
         } else {
             drawWall(graphics, previewSegment, currentWallThickness(), Color.web("#c26d32"), 1.0);
         }
@@ -4188,6 +4228,8 @@ public final class CadWorkbench extends BorderPane {
             case WINDOW -> "Werkzeug: Fenster | Linksklick auf eine Wand platziert das Fenster mit den aktuellen Maßen.";
             case STAIR -> "Werkzeug: Treppe | Rechteck aufziehen platziert die Treppe mit dem gewählten Preset.";
             case FLOOR_EXTENSION -> "Werkzeug: Balkon/Empore | Rechteck aufziehen fügt die Fußbodenplatte innen oder außen an die aktive Etage an.";
+            case FLOOR_OPENING_RECTANGLE -> "Werkzeug: Bodenloch rechteckig | Rechteck innerhalb eines Raums aufziehen.";
+            case FLOOR_OPENING_CIRCLE -> "Werkzeug: Bodenloch rund | Begrenzungsquadrat innerhalb eines Raums aufziehen.";
             case OBJECT -> "Werkzeug: Objekt | Linksklick platziert das ausgewählte Objekt-Preset innen oder außen.";
         };
     }
@@ -4453,6 +4495,39 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().addRoomObject(roomObject);
         selectSingle(new SelectionKey(RenderableKind.ROOM_OBJECT, activeLevel.get().name(), roomObject.id().toString()));
         markThreeDDirty();
+    }
+
+    private void createFloorOpening(PlanSegment bounds, FloorOpeningShape shape) {
+        double width = Math.abs(bounds.end().xMillimeters() - bounds.start().xMillimeters());
+        double depth = Math.abs(bounds.end().yMillimeters() - bounds.start().yMillimeters());
+        PlanPoint center = new PlanPoint(
+                (bounds.start().xMillimeters() + bounds.end().xMillimeters()) / 2.0,
+                (bounds.start().yMillimeters() + bounds.end().yMillimeters()) / 2.0
+        );
+        if (shape == FloorOpeningShape.CIRCLE) {
+            double diameter = Math.min(width, depth);
+            width = diameter;
+            depth = diameter;
+        }
+        Optional<Room> room = selectionQueryService.findSelections(activeLevel.get(), center, SNAP_TOLERANCE).stream()
+                .filter(selection -> selection.kind() == RenderableKind.ROOM_VOLUME)
+                .findFirst()
+                .flatMap(selection -> activeLevel.get().rooms().stream()
+                        .filter(candidate -> candidate.id().toString().equals(selection.elementId()))
+                        .findFirst());
+        if (room.isEmpty()) {
+            draftLabel.setText("Bodenöffnungen müssen mit ihrem Mittelpunkt in einem Raum liegen.");
+            return;
+        }
+        rememberStateForUndo();
+        FloorOpening opening = FloorOpening.create(
+                room.orElseThrow().id(), shape, center,
+                Length.ofMillimeters(width), Length.ofMillimeters(depth)
+        );
+        activeLevel.get().addFloorOpening(opening);
+        selectSingle(new SelectionKey(RenderableKind.FLOOR_OPENING, activeLevel.get().name(), opening.id().toString()));
+        markThreeDDirty();
+        draftLabel.setText("Bodenöffnung erzeugt.");
     }
 
     private void startGuideDrag(GuideOrientation orientation, double worldMillimeters) {
@@ -6099,6 +6174,7 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseWalls = List.of();
         selectionDragBaseStaircases = List.of();
         selectionDragBaseRoomObjects = List.of();
+        selectionDragBaseFloorOpenings = List.of();
         openingDragId = null;
         openingDragWallAxis = null;
         openingDragWidth = 0;
@@ -6131,6 +6207,7 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseWalls = List.of();
         selectionDragBaseStaircases = List.of();
         selectionDragBaseRoomObjects = List.of();
+        selectionDragBaseFloorOpenings = List.of();
         openingDragId = null;
         openingDragWallAxis = null;
         openingDragWidth = 0;
@@ -6156,6 +6233,7 @@ public final class CadWorkbench extends BorderPane {
                 case STAIR -> removeStaircaseWithUnderbuild(id);
                 case ROOM_OBJECT -> activeLevel.get().removeRoomObject(id);
                 case FLOOR_EXTENSION -> activeLevel.get().removeFloorExtension(id);
+                case FLOOR_OPENING -> activeLevel.get().removeFloorOpening(id);
                 default -> false;
             };
         }
@@ -6684,6 +6762,7 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseWalls = List.copyOf(activeLevel.get().walls());
         selectionDragBaseStaircases = List.copyOf(activeLevel.get().staircases());
         selectionDragBaseRoomObjects = List.copyOf(activeLevel.get().roomObjects());
+        selectionDragBaseFloorOpenings = List.copyOf(activeLevel.get().floorOpenings());
         draftLabel.setText("Ausgewählte Wände, Treppen oder Objekte können jetzt parallel verschoben werden.");
     }
 
@@ -6710,6 +6789,7 @@ public final class CadWorkbench extends BorderPane {
         dragLevel.replaceWalls(selectionDragBaseWalls);
         dragLevel.replaceStaircases(selectionDragBaseStaircases);
         dragLevel.replaceRoomObjects(selectionDragBaseRoomObjects);
+        dragLevel.replaceFloorOpenings(selectionDragBaseFloorOpenings);
         SelectionTranslationService.TranslationResult translationResult = selectionTranslationService.translate(dragLevel, Set.copyOf(selectedSelections), deltaX, deltaY);
         if (!translationResult.changed()) {
             return;
@@ -6717,6 +6797,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceWalls(translationResult.walls());
         activeLevel.get().replaceStaircases(translationResult.staircases());
         activeLevel.get().replaceRoomObjects(translationResult.roomObjects());
+        activeLevel.get().replaceFloorOpenings(translationResult.floorOpenings());
         synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
     }
@@ -6762,6 +6843,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceWalls(result.walls());
         activeLevel.get().replaceStaircases(result.staircases());
         activeLevel.get().replaceRoomObjects(result.roomObjects());
+        activeLevel.get().replaceFloorOpenings(result.floorOpenings());
         synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
         draftLabel.setText("Auswahl um eine Rasterweite verschoben.");
@@ -6913,6 +6995,14 @@ public final class CadWorkbench extends BorderPane {
         return activeLevel.get().floorExtensions().size();
     }
 
+    public int automationFloorOpeningCount() {
+        return activeLevel.get().floorOpenings().size();
+    }
+
+    public FloorOpening automationFloorOpening(int index) {
+        return activeLevel.get().floorOpenings().get(index);
+    }
+
     public int automationRoomObjectCount() {
         return activeLevel.get().roomObjects().size();
     }
@@ -6993,6 +7083,11 @@ public final class CadWorkbench extends BorderPane {
                     .findFirst()
                     .map(extension -> new SelectionKey(RenderableKind.FLOOR_EXTENSION, activeLevel.get().name(), extension.id().toString()))
                     .orElseThrow(() -> new IllegalArgumentException("Balkon-/Emporenindex `" + index + "` ist ungültig."));
+            case "FLOOR_OPENING" -> activeLevel.get().floorOpenings().stream()
+                    .skip(index)
+                    .findFirst()
+                    .map(opening -> new SelectionKey(RenderableKind.FLOOR_OPENING, activeLevel.get().name(), opening.id().toString()))
+                    .orElseThrow(() -> new IllegalArgumentException("Bodenöffnungsindex `" + index + "` ist ungültig."));
             default -> throw new IllegalArgumentException("Bauteilart `" + kindName + "` wird von der Automatisierung nicht unterstützt.");
         };
         updateSelection(selectionKey, toggle);
@@ -7041,7 +7136,7 @@ public final class CadWorkbench extends BorderPane {
 
     public void automationCanvasDrag(double fromX, double fromY, double toX, double toY, MouseButton button, boolean shiftDown, boolean shortcutDown, boolean altDown) {
         ensureCanvasReady();
-        drawingCanvas.fireEvent(mouseEvent(MouseEvent.MOUSE_PRESSED, fromX, fromY, button, shiftDown, shortcutDown, altDown, false));
+        drawingCanvas.fireEvent(mouseEvent(MouseEvent.MOUSE_PRESSED, fromX, fromY, button, shiftDown, shortcutDown, altDown, true));
         drawingCanvas.fireEvent(mouseEvent(MouseEvent.MOUSE_DRAGGED, toX, toY, button, shiftDown, shortcutDown, altDown, true));
         drawingCanvas.fireEvent(mouseEvent(MouseEvent.MOUSE_RELEASED, toX, toY, button, shiftDown, shortcutDown, altDown, false));
     }
@@ -7443,7 +7538,8 @@ public final class CadWorkbench extends BorderPane {
     private boolean isRotatableSelection(SelectionKey selectionKey) {
         return selectionKey.kind() == RenderableKind.WALL
                 || selectionKey.kind() == RenderableKind.STAIR
-                || selectionKey.kind() == RenderableKind.ROOM_OBJECT;
+                || selectionKey.kind() == RenderableKind.ROOM_OBJECT
+                || selectionKey.kind() == RenderableKind.FLOOR_OPENING;
     }
 
     private boolean isTranslatableSelection(SelectionKey selectionKey) {

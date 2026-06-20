@@ -5,6 +5,7 @@ import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.Staircase;
 
 import java.util.List;
 
@@ -38,11 +39,51 @@ public final class ResidentialAreaService {
                             rectangle.minX() + (column + 0.5) * sampleWidth,
                             rectangle.minY() + (row + 0.5) * sampleHeight
                     );
+                    if (excludedGroundArea(level, room, samplePoint)) {
+                        continue;
+                    }
                     weightedAreaSquareMillimeters += sampleArea * heightFactor(effectService.effectiveHeightAt(level, room, samplePoint));
                 }
             }
         }
         return weightedAreaSquareMillimeters / 1_000_000.0;
+    }
+
+    private boolean excludedGroundArea(Level level, Room room, PlanPoint point) {
+        boolean floorOpening = level.floorOpenings().stream()
+                .filter(opening -> opening.roomId().equals(room.id()))
+                .anyMatch(opening -> opening.contains(point));
+        if (floorOpening) {
+            return true;
+        }
+        return level.staircases().stream()
+                .filter(staircase -> staircase.stepCount() > 3)
+                .anyMatch(staircase -> contains(staircase, point));
+    }
+
+    private boolean contains(Staircase staircase, PlanPoint point) {
+        List<PlanPoint> outline = List.of(
+                staircase.pointAtLocalPosition(0.0, 0.0),
+                staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0.0),
+                staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()),
+                staircase.pointAtLocalPosition(0.0, staircase.heightMillimeters())
+        );
+        boolean inside = false;
+        int previousIndex = outline.size() - 1;
+        for (int index = 0; index < outline.size(); index++) {
+            PlanPoint current = outline.get(index);
+            PlanPoint previous = outline.get(previousIndex);
+            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
+                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
+                    * (point.yMillimeters() - current.yMillimeters())
+                    / (previous.yMillimeters() - current.yMillimeters())
+                    + current.xMillimeters();
+            if (intersects) {
+                inside = !inside;
+            }
+            previousIndex = index;
+        }
+        return inside;
     }
 
     private int sampleCount(double lengthMillimeters) {

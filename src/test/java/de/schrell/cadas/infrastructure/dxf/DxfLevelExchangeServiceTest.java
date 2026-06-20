@@ -12,6 +12,8 @@ import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorExtension;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -93,6 +95,10 @@ class DxfLevelExchangeServiceTest {
         ));
         level.addFloorExtension(FloorExtension.create(FloorExtensionType.BALCONY, FloorExtensionPlacement.EXTERIOR,
                 new PlanPoint(4_000, 0), new PlanPoint(7_000, 1_500), Length.ofMillimeters(180)));
+        level.addFloorOpening(FloorOpening.create(
+                level.rooms().getFirst().id(), FloorOpeningShape.RECTANGLE,
+                new PlanPoint(2_000, 1_500), Length.ofMillimeters(1_000), Length.ofMillimeters(800)
+        ));
 
         Path file = tempDir.resolve("grundriss.dxf");
         exchangeService.exportLevel(level, file);
@@ -104,6 +110,8 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1, imported.windows().size());
         assertEquals(1, imported.staircases().size());
         assertEquals(1, imported.floorExtensions().size());
+        assertEquals(1, imported.floorOpenings().size());
+        assertEquals(800.0, imported.floorOpenings().getFirst().depth().toMillimeters(), 0.001);
         assertEquals(FloorExtensionType.BALCONY, imported.floorExtensions().getFirst().type());
         assertEquals(180, imported.floorExtensions().getFirst().slabThickness().toMillimeters(), 0.001);
         assertEquals(door.id(), imported.doors().getFirst().id());

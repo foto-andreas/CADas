@@ -29,6 +29,7 @@ public final class SelectionQueryService {
         selections.addAll(findWindowSelections(level, point, tolerance));
         selections.addAll(findStairSelections(level, point));
         selections.addAll(findFloorExtensionSelections(level, point));
+        selections.addAll(findFloorOpeningSelections(level, point));
         selections.addAll(findWallSelections(level, point, tolerance));
         selections.addAll(findRoomObjectSelections(level, point));
         selections.addAll(findRoomSelections(level, point));
@@ -100,6 +101,13 @@ public final class SelectionQueryService {
                         && point.yMillimeters() >= extension.minY()
                         && point.yMillimeters() <= extension.maxY())
                 .map(extension -> new SelectionKey(RenderableKind.FLOOR_EXTENSION, level.name(), extension.id().toString()))
+                .toList();
+    }
+
+    private List<SelectionKey> findFloorOpeningSelections(Level level, PlanPoint point) {
+        return level.floorOpenings().stream()
+                .filter(opening -> opening.contains(point))
+                .map(opening -> new SelectionKey(RenderableKind.FLOOR_OPENING, level.name(), opening.id().toString()))
                 .toList();
     }
 
