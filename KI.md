@@ -9,7 +9,7 @@ Kompakte Orientierung für KI-Assistenten. Diese Datei ergänzt `AGENTS.md`, `do
 ./gradlew run               # App direkt über den modularen JavaFX-Launcher starten
 ./gradlew runMitAutomatisierung  # App mit HTTP-Testzugriff auf 127.0.0.1:17845
 ./gradlew installDist       # Startskripte und Libs nach build/install/CADas
-./gradlew macosInstall      # DMG bauen und dasselbe App-Bundle nach /Applications installieren
+./gradlew macosInstall      # Kompatibler Alias: DMG ausschließlich im Workspace bauen
 ```
 
 ## Architektur in einem Satz
@@ -71,7 +71,7 @@ Test-JVM-Arg: `--enable-native-access=ALL-UNNAMED` (unterdrückt Glass-Nativelib
 * Menüleiste nutzt `setUseSystemMenuBar(true)` und ist unter macOS ausgeblendet (`setManaged(false)`/`setVisible(false)`).
 * Hilfe zeigt die vollständige Benutzerdokumentation aus `src/main/resources/docs/benutzerdoku.md`; Keymap ist separater Menüpunkt.
 * `./gradlew run` startet die modulare JavaFX-Anwendung direkt.
-* `./gradlew macosInstall` baut das App-Bundle + DMG und installiert CADas.app direkt nach /Applications (überschreibt bestehende Version).
+* `./gradlew macosInstall` baut App-Bundle und DMG ausschließlich im Workspace. Installation und externe Verzeichnislinks sind absichtlich nicht Teil des Builds.
 
 ## Wo steht was
 

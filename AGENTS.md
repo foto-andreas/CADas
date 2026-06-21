@@ -79,7 +79,7 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Automatisch abgeleitete Räume schließen auch über aneinandergereihte Teilwände; Anschlusslücken bis 10 mm werden für die Topologie als gemeinsamer Wandknoten behandelt, ohne die gezeichneten Wände zu verändern.
 * Etagen lassen sich umbenennen und in der Gebäude-Reihenfolge umsortieren („Etage hoch" = größerer Index = im Gebäude nach oben).
 * Gebäude-Dateien nutzen die Endung `.cadas` (intern DXF-Format). Laden heißt „Laden", Sichern heißt „Sichern" und „Sichern als ...". Etagen laden/sichern analog über „Etage laden"/„Etage sichern"/„Etage sichern als ...". Beim Laden wird der Dateiname als Projektname übernommen und beim Sichern vorbelegt. Beim „Sichern als ..." und „Etage sichern als ..." wird der gewählte Dateiname als Projekt- bzw. Etagenname übernommen.
-* `./gradlew macosInstall` baut das App-Bundle inkl. DMG und installiert CADas.app direkt nach /Applications (überschreibt bestehende Version).
+* `./gradlew macosInstall` ist aus Sicherheitsgründen nur noch ein kompatibler Alias für den DMG-Build im Workspace. Build-Tasks verändern niemals Verzeichnisse außerhalb des Workspace und erzeugen insbesondere keine externen Verzeichnislinks.
 * 3D-Wände und Fundamente enden bündig mit der Wandachse; keine Verlängerung über die Endpunkte hinaus.
 * Die Menüleiste nutzt `setUseSystemMenuBar(true)` und ist im Fenster unter macOS ausgeblendet (`setManaged(false)`/`setVisible(false)`).
 * Die In-App-Hilfe zeigt die vollständige Benutzerdokumentation aus `docs/benutzerdoku.md`; Keymap und Mausbedienung sind separater Menüpunkt.

@@ -33,7 +33,7 @@ Lokale Installations- und Distributionsaufgaben:
 ./gradlew macosInstall
 ```
 
-Hinweis: Die macOS-Paketierungs- und Installationsaufgaben laufen nur auf `macOS`, weil dafür `jpackage` des lokalen JDK genutzt wird. `macosInstall` baut das DMG und ersetzt anschließend `/Applications/CADas.app` durch dasselbe frisch erzeugte App-Bundle.
+Hinweis: Die macOS-Paketierungsaufgaben laufen nur auf `macOS`, weil dafür `jpackage` des lokalen JDK genutzt wird. `macosInstall` ist ein kompatibler Alias für den DMG-Build und verändert nichts außerhalb des Workspace. Die Installation erfolgt bewusst manuell aus dem DMG.
 
 ## Tests
 

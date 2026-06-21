@@ -9,7 +9,8 @@ import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import java.nio.file.Files
-import java.nio.file.Paths
+import java.nio.file.LinkOption
+import java.util.Comparator
 import java.util.zip.ZipFile
 
 plugins {
@@ -186,7 +187,7 @@ val macOsPackagingSupported = providers.systemProperty("os.name")
     .map { it.startsWith("Mac", ignoreCase = true) }
     .orElse(false)
 
-val jpackageExecutable = javaToolchains.launcherFor {
+val jpackageExecutablePath = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(25)
 }.get().metadata.installationPath.asFile.resolve("bin/jpackage").absolutePath
 val jlinkExecutable = javaToolchains.launcherFor {
@@ -323,6 +324,43 @@ abstract class RenamePackagedDirectoryTask : DefaultTask() {
     }
 }
 
+abstract class JpackageAppImageTask : DefaultTask() {
+
+    @get:InputFile
+    abstract val jpackageExecutable: RegularFileProperty
+
+    @get:Input
+    abstract val arguments: ListProperty<String>
+
+    @get:InputDirectory
+    abstract val runtimeImage: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun packageAppImage() {
+        val process = ProcessBuilder(listOf(jpackageExecutable.asFile.get().absolutePath) + arguments.get())
+            .redirectErrorStream(true)
+            .start()
+        val lines = process.inputStream.bufferedReader().readLines()
+        val exitCode = process.waitFor()
+        val missingModulesWarning = lines.any { it.endsWith("Warnung: Keine JDK-Module gefunden") }
+        if (missingModulesWarning) {
+            val releaseFile = runtimeImage.file("release").get().asFile
+            val releaseContent = releaseFile.takeIf { it.isFile }?.readText().orEmpty()
+            if (!releaseContent.contains("MODULES=")) {
+                error("Das erzeugte Laufzeitimage enthält keine dokumentierte Modulliste.")
+            }
+        }
+        lines.filterNot { it.endsWith("Warnung: Keine JDK-Module gefunden") }
+            .forEach(logger::lifecycle)
+        if (exitCode != 0) {
+            error("jpackage ist mit Exit-Code $exitCode fehlgeschlagen.")
+        }
+    }
+}
+
 val commonJpackageArguments = listOf(
     "--name", "CADas",
     "--app-version", normalizedAppVersion(),
@@ -383,23 +421,23 @@ val renameMacOsAppImage by tasks.registering(RenamePackagedDirectoryTask::class)
     targetDirectoryName.set(snapshotAppImageName())
 }
 
-tasks.register<Exec>("packageMacOsAppImage") {
+tasks.register<JpackageAppImageTask>("packageMacOsAppImage") {
     group = "distribution"
     description = "Erstellt ein macOS-App-Image für CADas."
     enabled = macOsPackagingSupported.get()
     dependsOn(jlinkRuntimeImage, cleanMacOsAppImage)
     inputs.dir(installLibDirectory)
-    outputs.dir(appImageOutputDirectory)
-    executable = jpackageExecutable
-    args = listOf(
+    jpackageExecutable.set(file(jpackageExecutablePath))
+    arguments.set(listOf(
         "--type", "app-image",
         "--dest", appImageOutputDirectory.absolutePath
-    ) + commonJpackageArguments
+    ) + commonJpackageArguments)
+    runtimeImage.set(runtimeImageDirectory)
+    outputDirectory.set(appImageOutputDirectory)
     finalizedBy(renameMacOsAppImage)
 }
 
-// Vordefiniertes App-Image für die DMG-Erzeugung. jpackage legt den /Applications-Link
-// nur dann automatisch ins DMG, wenn das DMG aus einem bestehenden App-Image gebaut wird.
+// Vordefiniertes App-Image für die DMG-Erzeugung.
 val macOsAppImageForDmg = layout.buildDirectory.dir("installer/macos/app-image-for-dmg").get().asFile
 
 val cleanMacOsAppImageForDmg by tasks.registering(Delete::class) {
@@ -407,35 +445,45 @@ val cleanMacOsAppImageForDmg by tasks.registering(Delete::class) {
 }
 
 // Phase 1: App-Image in ein temporäres Verzeichnis erzeugen.
-val prepareMacOsAppImageForDmg by tasks.registering(Exec::class) {
+val prepareMacOsAppImageForDmg by tasks.registering(JpackageAppImageTask::class) {
     group = "distribution"
     description = "Erzeugt das App-Image als Vorlage für das DMG (intern)."
     enabled = macOsPackagingSupported.get()
     dependsOn(jlinkRuntimeImage, cleanMacOsAppImageForDmg)
     inputs.dir(installLibDirectory)
-    outputs.dir(macOsAppImageForDmg)
-    executable = jpackageExecutable
-    args = listOf(
+    jpackageExecutable.set(file(jpackageExecutablePath))
+    arguments.set(listOf(
         "--type", "app-image",
         "--dest", macOsAppImageForDmg.absolutePath
-    ) + commonJpackageArguments
+    ) + commonJpackageArguments)
+    runtimeImage.set(runtimeImageDirectory)
+    outputDirectory.set(macOsAppImageForDmg)
 }
 
-// Phase 2: Beschreibbares DMG mit App und /Applications-Link per hdiutil erzeugen.
-// jpackage legt bei modularen Apps mit eigenem Runtime-Image keinen /Applications-Link an;
-// daher bauen wir das DMG selbst aus einem vorbereiteten Inhaltsverzeichnis.
+// Phase 2: Beschreibbares DMG ausschließlich mit dem App-Bundle erzeugen.
 val dmgStagingDirectory = layout.buildDirectory.dir("installer/macos/dmg-staging").get().asFile
 
-val cleanMacOsDmgStaging by tasks.registering(Delete::class) {
-    delete(dmgStagingDirectory)
+fun deleteTreeWithoutFollowingLinks(directory: File) {
+    val root = directory.toPath()
+    if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
+        return
+    }
+    Files.walk(root).use { paths ->
+        paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists)
+    }
+}
+
+val cleanMacOsDmgStaging by tasks.registering(DefaultTask::class) {
+    doLast {
+        deleteTreeWithoutFollowingLinks(dmgStagingDirectory)
+    }
 }
 
 val stageDmgContent by tasks.registering(DefaultTask::class) {
     group = "distribution"
-    description = "Stagt App-Image und /Applications-Link für das DMG (intern)."
+    description = "Stagt das App-Image für das DMG (intern)."
     dependsOn(prepareMacOsAppImageForDmg, cleanMacOsDmgStaging)
     doLast {
-        dmgStagingDirectory.deleteRecursively()
         dmgStagingDirectory.mkdirs()
         // App-Image mit erhaltenen Dateirechten kopieren (cp -pR), damit die
         // ausführbare MacOS/CADas-Binärdatei ihr Execute-Bit behält.
@@ -444,19 +492,15 @@ val stageDmgContent by tasks.registering(DefaultTask::class) {
             dmgStagingDirectory.resolve("CADas.app").absolutePath)
             .redirectErrorStream(true).start().waitFor()
             .let { if (it != 0) error("Kopieren des App-Images fehlgeschlagen (Exit $it).") }
-        // /Applications-Link anlegen.
-        val link = dmgStagingDirectory.resolve("Applications")
-        Files.createSymbolicLink(link.toPath(), Paths.get("/Applications"))
     }
 }
 
-// Phase 2c: DMG aus dem Staging-Verzeichnis per hdiutil erzeugen (UDZO, mit Applications-Link).
-val buildMacOsDmgWithLink by tasks.registering(Exec::class) {
+// Phase 2c: DMG aus dem Staging-Verzeichnis per hdiutil erzeugen (UDZO).
+val buildMacOsDmg by tasks.registering(Exec::class) {
     group = "distribution"
-    description = "Erzeugt das finale DMG inklusive /Applications-Link per hdiutil (intern)."
+    description = "Erzeugt das finale DMG per hdiutil (intern)."
     dependsOn(stageDmgContent, cleanMacOsDmg)
-    // Bewusst ohne inputs.dir: das Staging-Verzeichnis enthält einen Symlink auf /Applications,
-    // dem Gradle folgen würde (OoM-Loop). Die Abhängigkeit sichert die Reihenfolge.
+    inputs.dir(dmgStagingDirectory)
     outputs.dir(dmgOutputDirectory)
     executable = "hdiutil"
     args = listOf(
@@ -470,41 +514,24 @@ val buildMacOsDmgWithLink by tasks.registering(Exec::class) {
     )
 }
 
-// Phase 2 (öffentlich): DMG bauen und Applications-Link injizieren.
+// Phase 2 (öffentlich): DMG im Workspace bauen.
 tasks.register<DefaultTask>("packageMacOsDmg") {
     group = "distribution"
-    description = "Erstellt ein macOS-DMG-Installationspaket für CADas mit /Applications-Link."
+    description = "Erstellt ein macOS-DMG-Installationspaket für CADas im Build-Verzeichnis."
     enabled = macOsPackagingSupported.get()
-    dependsOn(buildMacOsDmgWithLink)
+    dependsOn(buildMacOsDmg)
 }
 
-// Installiert CADas.app direkt in den macOS-Programme-Ordner (/Applications).
-// Eine bestehende Installation wird vorher entfernt, danach das DMG gebaut
-// und das neue App-Bundle kopiert.
-tasks.register<Exec>("macosInstall") {
+// Aus Sicherheitsgründen bleibt der historische Taskname als reiner Paketierungsalias erhalten.
+// Eine Installation außerhalb des Workspace erfolgt niemals automatisch.
+tasks.register<DefaultTask>("macosInstall") {
     group = "distribution"
-    description = "Installiert CADas.app nach /Applications (überschreibt bestehende Version) und baut das DMG."
+    description = "Veralteter Alias: Baut ausschließlich das DMG im Workspace; installiert nichts."
     enabled = macOsPackagingSupported.get()
     dependsOn("packageMacOsDmg")
-    val appBundle = macOsAppImageForDmg.resolve("CADas.app")
-    inputs.dir(appBundle)
-    executable = "rm"
-    args("-rf", "/Applications/CADas.app")
-    doFirst {
-        logger.lifecycle("Entferne bestehende CADas.app und installiere neue Version nach /Applications ...")
+    doLast {
+        logger.lifecycle("DMG erstellt. CADas wurde außerhalb des Workspace nicht verändert.")
     }
-    finalizedBy("macosInstallCopy")
-}
-
-tasks.register<Exec>("macosInstallCopy") {
-    group = "distribution"
-    description = "Kopiert das fertige CADas.app-Bundle nach /Applications (interner Teil von macosInstall)."
-    enabled = macOsPackagingSupported.get()
-    dependsOn(prepareMacOsAppImageForDmg)
-    val appBundle = macOsAppImageForDmg.resolve("CADas.app")
-    inputs.dir(appBundle)
-    executable = "cp"
-    args("-R", appBundle.absolutePath, "/Applications/")
 }
 
 tasks.register<Exec>("runMitAutomatisierung") {
