@@ -20,7 +20,7 @@ plugins {
 }
 
 group = "de.schrell"
-version = "1.3.0"
+version = "1.4.0"
 
 repositories {
     mavenCentral()
