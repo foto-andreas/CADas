@@ -61,7 +61,7 @@ public final class QuarterTurnRotationService {
 
     private Room rotateRoom(Room room, boolean clockwise) {
         PlanPoint center = room.centerPoint();
-        return new Room(
+        return Room.withSlopedCeilings(
                 room.id(),
                 room.name(),
                 room.outline().stream()
@@ -70,9 +70,9 @@ public final class QuarterTurnRotationService {
                 room.roomHeight(),
                 room.floorThickness(),
                 room.ceilingThickness(),
-                room.slopedCeilingProfile()
+                room.slopedCeilingProfiles().stream()
                         .map(profile -> clockwise ? profile.rotateClockwise() : profile.rotateCounterClockwise())
-                        .orElse(null),
+                        .toList(),
                 room.ceilingVertexHeights()
         );
     }

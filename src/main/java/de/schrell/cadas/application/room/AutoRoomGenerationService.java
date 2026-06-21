@@ -526,26 +526,30 @@ public final class AutoRoomGenerationService {
             if (matchedRoom.isPresent()) {
                 Room previous = matchedRoom.orElseThrow();
                 matchedIds.add(previous.id());
-                boolean preserveManualSlope = previous.slopedCeilingProfile().isPresent();
-                room = new Room(
+                boolean preserveManualSlope = !previous.slopedCeilingProfiles().isEmpty();
+                room = Room.withSlopedCeilings(
                         previous.id(),
                         previous.name(),
                         detectedRoom.outline(),
                         derivedRoomHeight,
                         previous.floorThickness(),
                         previous.ceilingThickness(),
-                        preserveManualSlope || !hasVariableHeights(vertexHeights) ? previous.slopedCeiling() : null,
+                        preserveManualSlope || !hasVariableHeights(vertexHeights)
+                                ? previous.slopedCeilingProfiles()
+                                : List.of(),
                         preserveManualSlope ? null : vertexHeights
                 );
             } else {
-                room = new Room(
+                room = Room.withSlopedCeilings(
                         UUID.randomUUID(),
                         defaults.generatedName(roomIndex++),
                         detectedRoom.outline(),
                         derivedRoomHeight,
                         defaults.floorThickness(),
                         defaults.ceilingThickness(),
-                        hasVariableHeights(vertexHeights) ? null : defaults.slopedCeiling(),
+                        hasVariableHeights(vertexHeights) || defaults.slopedCeiling() == null
+                                ? List.of()
+                                : List.of(defaults.slopedCeiling()),
                         vertexHeights
                 );
             }

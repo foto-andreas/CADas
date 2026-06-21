@@ -317,10 +317,9 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> floorThicknessUnit = new ComboBox<>();
     private final TextField ceilingThicknessField = new TextField("0,1");
     private final ComboBox<LengthUnit> ceilingThicknessUnit = new ComboBox<>();
-    private final ComboBox<String> slopedCeilingModeSelector = new ComboBox<>();
-    private final ComboBox<SlopedCeilingSide> slopedCeilingSideSelector = new ComboBox<>();
     private final TextField kneeWallHeightField = new TextField("100");
     private final ComboBox<LengthUnit> kneeWallHeightUnit = new ComboBox<>();
+    private final Label roofSlopeManagementLabel = new Label("Wand-Kontextmenü");
     private final TextField doorWidthField = new TextField("101");
     private final ComboBox<LengthUnit> doorWidthUnit = new ComboBox<>();
     private final TextField doorHeightField = new TextField("201");
@@ -541,7 +540,6 @@ public final class CadWorkbench extends BorderPane {
 
     private void configureControls() {
         initializeUnitSelectors();
-        initializeSlopedCeilingControls();
         levelSelector.setItems(availableLevels);
         levelSelector.setValue(activeLevel.get());
         toolSelector.getItems().addAll(DrawingTool.values());
@@ -858,8 +856,6 @@ public final class CadWorkbench extends BorderPane {
         floorThicknessField.setPrefColumnCount(6);
         ceilingThicknessField.setPrefColumnCount(6);
         endpointHeightField.setPrefColumnCount(6);
-        slopedCeilingModeSelector.setPrefWidth(160);
-        slopedCeilingSideSelector.setPrefWidth(160);
         kneeWallHeightField.setPrefColumnCount(6);
         doorWidthField.setPrefColumnCount(6);
         doorHeightField.setPrefColumnCount(6);
@@ -1136,9 +1132,7 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Raumhöhe", roomHeightField, roomHeightUnit),
                         propertyRow("Boden", floorThicknessField, floorThicknessUnit),
                         propertyRow("Decke", ceilingThicknessField, ceilingThicknessUnit),
-                        propertyRow("Dachschräge", slopedCeilingModeSelector),
-                        propertyRow("Niedrige Seite", slopedCeilingSideSelector),
-                        propertyRow("Sockelhöhe", kneeWallHeightField, kneeWallHeightUnit)
+                        propertyRow("Dachschrägen", roofSlopeManagementLabel)
                 ),
                 createPropertySection(
                         "Tür",
@@ -1558,13 +1552,6 @@ public final class CadWorkbench extends BorderPane {
                 .ifPresent(length -> field.setText(formatValue(length, newUnit, LENGTH_INPUT_DECIMALS)));
     }
 
-    private void initializeSlopedCeilingControls() {
-        slopedCeilingModeSelector.getItems().setAll("Ohne Dachschräge", "Mit Dachschräge");
-        slopedCeilingModeSelector.setValue("Ohne Dachschräge");
-        slopedCeilingSideSelector.getItems().setAll(SlopedCeilingSide.values());
-        slopedCeilingSideSelector.setValue(SlopedCeilingSide.NORTH);
-    }
-
     private void initializePresetSelectors() {
         availableDoorPresets.setAll(partLibrary.doorPresets());
         availableWindowPresets.setAll(partLibrary.windowPresets());
@@ -1679,10 +1666,9 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(floorThicknessUnit, "Bestimmt die Einheit für die Bodenstärke.");
         applyTooltip(ceilingThicknessField, "Legt die Deckenstärke für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
         applyTooltip(ceilingThicknessUnit, "Bestimmt die Einheit für die Deckenstärke.");
-        applyTooltip(slopedCeilingModeSelector, "Aktiviert optional eine innere Dachschräge beziehungsweise schräge Decke für rechteckige Räume. Ohne Aktivierung bleibt die Decke waagerecht.");
-        applyTooltip(slopedCeilingSideSelector, "Legt fest, an welcher Raumkante die niedrige Sockelhöhe liegt. Die Schräge steigt immer zur gegenüberliegenden Kante an.");
         applyTooltip(kneeWallHeightField, "Legt die Sockel- beziehungsweise Kniestockhöhe der Dachschräge an der niedrigen Raumkante fest.");
         applyTooltip(kneeWallHeightUnit, "Bestimmt die Einheit für die Sockelhöhe der Dachschräge.");
+        applyTooltip(roofSlopeManagementLabel, "Dachschrägen werden über das Kontextmenü ihrer niedrigen Wand erzeugt oder ersetzt. Jede Raumseite kann eine eigene Dachschräge besitzen.");
         applyTooltip(doorWidthField, "Legt die Breite der nächsten Tür fest.");
         applyTooltip(doorWidthUnit, "Bestimmt die Einheit für die Türbreite.");
         applyTooltip(doorHeightField, "Legt die Höhe der nächsten Tür fest.");
@@ -3213,10 +3199,20 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawRoomSlopeMarker(GraphicsContext graphics, Room room) {
-        if (!projectionService.isPlanView(activeView.get()) || room.slopedCeilingProfile().isEmpty() || room.ceilingVertexHeightsProfile().isPresent()) {
+        if (!projectionService.isPlanView(activeView.get()) || room.slopedCeilingProfiles().isEmpty()) {
             return;
         }
-        SlopedCeilingProfile profile = room.slopedCeilingProfile().orElseThrow();
+        for (int index = 0; index < room.slopedCeilingProfiles().size(); index++) {
+            drawRoomSlopeMarker(graphics, room, room.slopedCeilingProfiles().get(index), index);
+        }
+    }
+
+    private void drawRoomSlopeMarker(
+            GraphicsContext graphics,
+            Room room,
+            SlopedCeilingProfile profile,
+            int labelIndex
+    ) {
         graphics.setStroke(Color.color(0.52, 0.29, 0.14, 0.9));
         graphics.setLineWidth(1.6);
         graphics.setLineDashes(10.0, 8.0);
@@ -3259,9 +3255,9 @@ public final class CadWorkbench extends BorderPane {
                 String.format(Locale.GERMAN, "Schräge %.2f m → %.2f m | %.1f°",
                         profile.kneeWallHeight().toMillimeters() / 1000.0,
                         surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(activeLevel.get(), room) / 1000.0,
-                        room.slopeAngleDegrees()),
+                        room.slopeAngleDegrees(profile)),
                 toScreenProjectedX(room.centerPoint(), 0.0) - 72,
-                toScreenProjectedY(room.centerPoint(), 0.0) + 28
+                toScreenProjectedY(room.centerPoint(), 0.0) + 28 + labelIndex * 14.0
         );
     }
 
@@ -4095,7 +4091,7 @@ public final class CadWorkbench extends BorderPane {
                 currentRoomHeight(),
                 currentFloorThickness(),
                 currentCeilingThickness(),
-                currentSlopedCeilingProfile()
+                null
         );
     }
 
@@ -4113,16 +4109,6 @@ public final class CadWorkbench extends BorderPane {
 
     private Length currentCeilingThickness() {
         return parseLength(ceilingThicknessField, ceilingThicknessUnit.getValue()).orElse(DEFAULT_CEILING_THICKNESS);
-    }
-
-    private SlopedCeilingProfile currentSlopedCeilingProfile() {
-        if (!"Mit Dachschräge".equals(slopedCeilingModeSelector.getValue())) {
-            return null;
-        }
-        return new SlopedCeilingProfile(
-                Optional.ofNullable(slopedCeilingSideSelector.getValue()).orElse(SlopedCeilingSide.NORTH),
-                parseLength(kneeWallHeightField, kneeWallHeightUnit.getValue()).orElse(Length.of(1.0, LengthUnit.METER))
-        );
     }
 
     private Length currentDoorWidth() {
@@ -6425,7 +6411,7 @@ public final class CadWorkbench extends BorderPane {
         if (owner != null) {
             dialog.initOwner(owner);
         }
-        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Erzeugt die Dachschräge, setzt die niedrige Wandhöhe und ergänzt polygonale Profile an den angrenzenden Seitenwänden.");
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Erzeugt oder ersetzt die Dachschräge an dieser Raumseite, passt die Eckhöhen an und teilt beide Seitenwände an der oberen Schrägenkante. Weitere Raumseiten können zusätzliche Dachschrägen erhalten.");
         applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Schließt den Dialog, ohne Wände oder Raumdecke zu ändern.");
         if (dialog.showAndWait().filter(ButtonType.OK::equals).isEmpty()) {
             return;
@@ -6440,6 +6426,8 @@ public final class CadWorkbench extends BorderPane {
         rememberStateForUndo();
         activeLevel.get().replaceWalls(result.walls());
         activeLevel.get().replaceRooms(result.rooms());
+        activeLevel.get().replaceDoors(result.doors());
+        activeLevel.get().replaceWindows(result.windows());
         markThreeDDirty();
         draftLabel.setText("Dachschräge aus Wandinnenkante erzeugt.");
         render();
@@ -6539,13 +6527,10 @@ public final class CadWorkbench extends BorderPane {
                         syncLengthInput(roomHeightField, roomHeightUnit, room.roomHeight(), LengthUnit.CENTIMETER);
                         syncLengthInput(floorThicknessField, floorThicknessUnit, room.floorThickness(), LengthUnit.CENTIMETER);
                         syncLengthInput(ceilingThicknessField, ceilingThicknessUnit, room.ceilingThickness(), LengthUnit.CENTIMETER);
+                        roofSlopeManagementLabel.setText(room.slopedCeilingProfiles().size() + " Dachschräge(n)");
                         if (room.slopedCeilingProfile().isPresent()) {
                             SlopedCeilingProfile profile = room.slopedCeilingProfile().orElseThrow();
-                            slopedCeilingModeSelector.setValue("Mit Dachschräge");
-                            slopedCeilingSideSelector.setValue(profile.lowSide());
                             syncLengthInput(kneeWallHeightField, kneeWallHeightUnit, profile.kneeWallHeight(), LengthUnit.CENTIMETER);
-                        } else {
-                            slopedCeilingModeSelector.setValue("Ohne Dachschräge");
                         }
                     });
             case DOOR -> activeLevel.get().doors().stream()
@@ -6624,7 +6609,8 @@ public final class CadWorkbench extends BorderPane {
                     .toList());
             case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> activeLevel.get().replaceRooms(activeLevel.get().rooms().stream()
                     .map(room -> selectedIds().contains(room.id().toString())
-                            ? new Room(room.id(), currentRoomName(), room.outline(), currentRoomHeight(), currentFloorThickness(), currentCeilingThickness(), currentSlopedCeilingProfile(), room.ceilingVertexHeights())
+                            ? Room.withSlopedCeilings(room.id(), currentRoomName(), room.outline(), currentRoomHeight(), currentFloorThickness(), currentCeilingThickness(),
+                            room.slopedCeilingProfiles(), room.ceilingVertexHeights())
                             : room)
                     .toList());
             case DOOR -> activeLevel.get().replaceDoors(activeLevel.get().doors().stream()

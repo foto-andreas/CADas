@@ -98,7 +98,7 @@ public record Wall(
     }
 
     public boolean hasPolygonalProfile() {
-        return profile.size() > 2;
+        return !profile.isEmpty();
     }
 
     public List<WallProfilePoint> resolvedProfile() {

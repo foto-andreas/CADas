@@ -629,18 +629,48 @@ public final class ThreeDSceneModelBuilder {
     ) {
         List<Float> vertexValues = new ArrayList<>();
         for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
-            double x0 = rectangle.minX();
-            double x1 = rectangle.maxX();
-            double z0 = rectangle.minY();
-            double z1 = rectangle.maxY();
-            double y00 = room.ceilingHeightAt(new PlanPoint(x0, z0)) + verticalOffsetY;
-            double y10 = room.ceilingHeightAt(new PlanPoint(x1, z0)) + verticalOffsetY;
-            double y11 = room.ceilingHeightAt(new PlanPoint(x1, z1)) + verticalOffsetY;
-            double y01 = room.ceilingHeightAt(new PlanPoint(x0, z1)) + verticalOffsetY;
-            addTriangle(vertexValues, x0, y00, z0, x1, y10, z0, x1, y11, z1);
-            addTriangle(vertexValues, x0, y00, z0, x1, y11, z1, x0, y01, z1);
+            List<Double> xCoordinates = slopeCoordinates(room, rectangle.minX(), rectangle.maxX(), true);
+            List<Double> zCoordinates = slopeCoordinates(room, rectangle.minY(), rectangle.maxY(), false);
+            for (int xIndex = 0; xIndex < xCoordinates.size() - 1; xIndex++) {
+                for (int zIndex = 0; zIndex < zCoordinates.size() - 1; zIndex++) {
+                    double x0 = xCoordinates.get(xIndex);
+                    double x1 = xCoordinates.get(xIndex + 1);
+                    double z0 = zCoordinates.get(zIndex);
+                    double z1 = zCoordinates.get(zIndex + 1);
+                    double y00 = room.ceilingHeightAt(new PlanPoint(x0, z0)) + verticalOffsetY;
+                    double y10 = room.ceilingHeightAt(new PlanPoint(x1, z0)) + verticalOffsetY;
+                    double y11 = room.ceilingHeightAt(new PlanPoint(x1, z1)) + verticalOffsetY;
+                    double y01 = room.ceilingHeightAt(new PlanPoint(x0, z1)) + verticalOffsetY;
+                    addTriangle(vertexValues, x0, y00, z0, x1, y10, z0, x1, y11, z1);
+                    addTriangle(vertexValues, x0, y00, z0, x1, y11, z1, x0, y01, z1);
+                }
+            }
         }
         addMesh(selectionKey, levelName, kind, vertexValues, baseY, height, materialKey, opacity);
+    }
+
+    private List<Double> slopeCoordinates(
+            Room room,
+            double minimum,
+            double maximum,
+            boolean xAxis
+    ) {
+        java.util.TreeSet<Double> coordinates = new java.util.TreeSet<>();
+        coordinates.add(minimum);
+        coordinates.add(maximum);
+        for (de.schrell.cadas.domain.model.SlopedCeilingProfile profile : room.slopedCeilingProfiles()) {
+            double run = profile.horizontalRun().toMillimeters();
+            double coordinate = switch (profile.lowSide()) {
+                case WEST -> xAxis ? room.minXMillimeters() + run : Double.NaN;
+                case EAST -> xAxis ? room.maxXMillimeters() - run : Double.NaN;
+                case NORTH -> !xAxis ? room.minYMillimeters() + run : Double.NaN;
+                case SOUTH -> !xAxis ? room.maxYMillimeters() - run : Double.NaN;
+            };
+            if (Double.isFinite(coordinate) && coordinate > minimum && coordinate < maximum) {
+                coordinates.add(coordinate);
+            }
+        }
+        return List.copyOf(coordinates);
     }
 
     private void addMesh(
@@ -769,54 +799,56 @@ public final class ThreeDSceneModelBuilder {
             SelectionKey selectionKey
         ) {
         List<RenderableBox> boxes = new ArrayList<>();
-        boolean variesAlongDepth = room.slopedCeilingProfile()
-                .map(profile -> profile.lowSide() == de.schrell.cadas.domain.model.SlopedCeilingSide.NORTH
-                        || profile.lowSide() == de.schrell.cadas.domain.model.SlopedCeilingSide.SOUTH)
-                .orElse(room.depthMillimeters() >= room.widthMillimeters());
+        boolean variesAlongDepth = room.slopedCeilingProfiles().stream()
+                .anyMatch(profile -> profile.lowSide() == de.schrell.cadas.domain.model.SlopedCeilingSide.NORTH
+                        || profile.lowSide() == de.schrell.cadas.domain.model.SlopedCeilingSide.SOUTH);
+        boolean variesAlongWidth = room.slopedCeilingProfiles().stream()
+                .anyMatch(profile -> profile.lowSide() == de.schrell.cadas.domain.model.SlopedCeilingSide.EAST
+                        || profile.lowSide() == de.schrell.cadas.domain.model.SlopedCeilingSide.WEST);
+        if (room.ceilingVertexHeightsProfile().isPresent()) {
+            variesAlongDepth = true;
+            variesAlongWidth = true;
+        }
         for (OrthogonalPolygonDecompositionService.CellRectangle rectangle : rectangles) {
-            int slopeSegments = Math.max(MIN_SLOPE_SEGMENTS, (int) Math.ceil((variesAlongDepth ? rectangle.height() : rectangle.width()) / 120.0));
-            for (int index = 0; index < slopeSegments; index++) {
-                double startRatio = (double) index / slopeSegments;
-                double endRatio = (double) (index + 1) / slopeSegments;
-                double centerX = rectangle.centerX();
-                double centerZ = rectangle.centerY();
-                double width = rectangle.width();
-                double depth = rectangle.height();
-                if (variesAlongDepth) {
-                    double startY = rectangle.minY() + rectangle.height() * startRatio;
-                    double endY = rectangle.minY() + rectangle.height() * endRatio;
-                    centerZ = (startY + endY) / 2.0;
-                    depth = Math.max(24.0, endY - startY);
-                } else {
-                    double startX = rectangle.minX() + rectangle.width() * startRatio;
-                    double endX = rectangle.minX() + rectangle.width() * endRatio;
-                    centerX = (startX + endX) / 2.0;
-                    width = Math.max(24.0, endX - startX);
+            int xSegments = variesAlongWidth
+                    ? Math.max(MIN_SLOPE_SEGMENTS, (int) Math.ceil(rectangle.width() / 120.0))
+                    : 1;
+            int zSegments = variesAlongDepth
+                    ? Math.max(MIN_SLOPE_SEGMENTS, (int) Math.ceil(rectangle.height() / 120.0))
+                    : 1;
+            for (int xIndex = 0; xIndex < xSegments; xIndex++) {
+                for (int zIndex = 0; zIndex < zSegments; zIndex++) {
+                    double startX = rectangle.minX() + rectangle.width() * xIndex / xSegments;
+                    double endX = rectangle.minX() + rectangle.width() * (xIndex + 1) / xSegments;
+                    double startZ = rectangle.minY() + rectangle.height() * zIndex / zSegments;
+                    double endZ = rectangle.minY() + rectangle.height() * (zIndex + 1) / zSegments;
+                    double centerX = (startX + endX) / 2.0;
+                    double centerZ = (startZ + endZ) / 2.0;
+                    double ceilingHeightAtPoint = room.ceilingHeightAt(new PlanPoint(centerX, centerZ));
+                    double visibleHeight = "room-volume".equals(materialKey)
+                            ? surfaceLayerEffectService.effectiveHeightAt(level, room, new PlanPoint(centerX, centerZ))
+                            : ceilingHeightAtPoint;
+                    double height = sliceThickness > 0.0 ? sliceThickness : Math.max(40.0, visibleHeight);
+                    double centerY = sliceThickness > 0.0
+                            ? baseHeight + visibleHeight + sliceThickness / 2.0
+                            : baseHeight + visibleHeight / 2.0;
+                    boxes.add(new RenderableBox(
+                            selectionKey,
+                            levelName,
+                            materialKey.equals("room-volume") ? RenderableKind.ROOM_VOLUME :
+                                    materialKey.equals("room-ceiling") ? RenderableKind.ROOM_CEILING : RenderableKind.SURFACE_LAYER,
+                            centerX,
+                            centerY,
+                            centerZ,
+                            Math.max(24.0, endX - startX - 6.0),
+                            height,
+                            Math.max(24.0, endZ - startZ - 6.0),
+                            RotationAxis.Y,
+                            0.0,
+                            materialKey,
+                            opacity
+                    ));
                 }
-                double ceilingHeightAtPoint = room.ceilingHeightAt(new PlanPoint(centerX, centerZ));
-                double visibleHeight = "room-volume".equals(materialKey)
-                        ? surfaceLayerEffectService.effectiveHeightAt(level, room, new PlanPoint(centerX, centerZ))
-                        : ceilingHeightAtPoint;
-                double height = sliceThickness > 0.0 ? sliceThickness : Math.max(40.0, visibleHeight);
-                double centerY = sliceThickness > 0.0
-                        ? baseHeight + visibleHeight + sliceThickness / 2.0
-                        : baseHeight + visibleHeight / 2.0;
-                boxes.add(new RenderableBox(
-                        selectionKey,
-                        levelName,
-                        materialKey.equals("room-volume") ? RenderableKind.ROOM_VOLUME :
-                                materialKey.equals("room-ceiling") ? RenderableKind.ROOM_CEILING : RenderableKind.SURFACE_LAYER,
-                        centerX,
-                        centerY,
-                        centerZ,
-                        Math.max(24.0, width - 6.0),
-                        height,
-                        Math.max(24.0, depth - 6.0),
-                        RotationAxis.Y,
-                        0.0,
-                        materialKey,
-                        opacity
-                ));
             }
         }
         return boxes;

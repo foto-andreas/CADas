@@ -8,35 +8,78 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-public record Room(
-        UUID id,
-        String name,
-        List<PlanPoint> outline,
-        Length roomHeight,
-        Length floorThickness,
-        Length ceilingThickness,
-        SlopedCeilingProfile slopedCeiling,
-        List<Length> ceilingVertexHeights
-) {
+public final class Room {
 
-    public Room {
+    private final UUID id;
+    private final String name;
+    private final List<PlanPoint> outline;
+    private final Length roomHeight;
+    private final Length floorThickness;
+    private final Length ceilingThickness;
+    private final List<SlopedCeilingProfile> slopedCeilings;
+    private final List<Length> ceilingVertexHeights;
+
+    public Room(
+            UUID id,
+            String name,
+            List<PlanPoint> outline,
+            Length roomHeight,
+            Length floorThickness,
+            Length ceilingThickness,
+            SlopedCeilingProfile slopedCeiling,
+            List<Length> ceilingVertexHeights
+    ) {
+        this(id, name, outline, roomHeight, floorThickness, ceilingThickness,
+                slopedCeiling == null ? List.of() : List.of(slopedCeiling), ceilingVertexHeights);
+    }
+
+    private Room(
+            UUID id,
+            String name,
+            List<PlanPoint> outline,
+            Length roomHeight,
+            Length floorThickness,
+            Length ceilingThickness,
+            List<SlopedCeilingProfile> slopedCeilings,
+            List<Length> ceilingVertexHeights
+    ) {
         Objects.requireNonNull(id, "id darf nicht null sein.");
         Objects.requireNonNull(name, "name darf nicht null sein.");
         Objects.requireNonNull(outline, "outline darf nicht null sein.");
         Objects.requireNonNull(roomHeight, "roomHeight darf nicht null sein.");
         Objects.requireNonNull(floorThickness, "floorThickness darf nicht null sein.");
         Objects.requireNonNull(ceilingThickness, "ceilingThickness darf nicht null sein.");
+        Objects.requireNonNull(slopedCeilings, "slopedCeilings darf nicht null sein.");
         if (ceilingVertexHeights != null && ceilingVertexHeights.size() != outline.size()) {
             throw new IllegalArgumentException("Deckenhöhen müssen zu allen Raum-Eckpunkten passen.");
         }
-        if (slopedCeiling != null && slopedCeiling.kneeWallHeight().toMillimeters() > roomHeight.toMillimeters()) {
+        if (slopedCeilings.stream().anyMatch(profile -> profile.kneeWallHeight().toMillimeters() > roomHeight.toMillimeters())) {
             throw new IllegalArgumentException("Die Sockelhöhe der Dachschräge darf die lichte Raumhöhe nicht überschreiten.");
         }
         if (outline.size() < 3) {
             throw new IllegalArgumentException("Ein Raum benötigt mindestens drei Eckpunkte.");
         }
-        outline = List.copyOf(outline);
-        ceilingVertexHeights = ceilingVertexHeights == null ? null : List.copyOf(ceilingVertexHeights);
+        this.id = id;
+        this.name = name;
+        this.outline = List.copyOf(outline);
+        this.roomHeight = roomHeight;
+        this.floorThickness = floorThickness;
+        this.ceilingThickness = ceilingThickness;
+        this.slopedCeilings = List.copyOf(slopedCeilings);
+        this.ceilingVertexHeights = ceilingVertexHeights == null ? null : List.copyOf(ceilingVertexHeights);
+    }
+
+    public static Room withSlopedCeilings(
+            UUID id,
+            String name,
+            List<PlanPoint> outline,
+            Length roomHeight,
+            Length floorThickness,
+            Length ceilingThickness,
+            List<SlopedCeilingProfile> slopedCeilings,
+            List<Length> ceilingVertexHeights
+    ) {
+        return new Room(id, name, outline, roomHeight, floorThickness, ceilingThickness, slopedCeilings, ceilingVertexHeights);
     }
 
     public Room(
@@ -103,7 +146,43 @@ public record Room(
     }
 
     public Optional<SlopedCeilingProfile> slopedCeilingProfile() {
-        return Optional.ofNullable(slopedCeiling);
+        return slopedCeilings.stream().findFirst();
+    }
+
+    public List<SlopedCeilingProfile> slopedCeilingProfiles() {
+        return slopedCeilings;
+    }
+
+    public SlopedCeilingProfile slopedCeiling() {
+        return slopedCeilings.stream().findFirst().orElse(null);
+    }
+
+    public UUID id() {
+        return id;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public List<PlanPoint> outline() {
+        return outline;
+    }
+
+    public Length roomHeight() {
+        return roomHeight;
+    }
+
+    public Length floorThickness() {
+        return floorThickness;
+    }
+
+    public Length ceilingThickness() {
+        return ceilingThickness;
+    }
+
+    public List<Length> ceilingVertexHeights() {
+        return ceilingVertexHeights;
     }
 
     public Room withName(String newName) {
@@ -113,8 +192,12 @@ public record Room(
         }
         return new Room(
                 id, trimmedName, outline, roomHeight, floorThickness, ceilingThickness,
-                slopedCeiling, ceilingVertexHeights
+                slopedCeilings, ceilingVertexHeights
         );
+    }
+
+    public Room withSlopedCeilingProfiles(List<SlopedCeilingProfile> profiles) {
+        return new Room(id, name, outline, roomHeight, floorThickness, ceilingThickness, profiles, null);
     }
 
     public Optional<List<Length>> ceilingVertexHeightsProfile() {
@@ -148,7 +231,7 @@ public record Room(
             }
             return volumeMillimeters / 1_000_000_000.0;
         }
-        double averageHeight = slopedCeiling == null
+        double averageHeight = slopedCeilings.isEmpty()
                 ? roomHeight.toMillimeters()
                 : ceilingHeightAt(areaCentroid());
         return areaSquareMeters() * averageHeight / 1000.0;
@@ -211,16 +294,23 @@ public record Room(
         if (ceilingVertexHeights != null && ceilingVertexHeights.size() == outline.size()) {
             return interpolatedVertexHeight(point);
         }
-        if (slopedCeiling == null) {
+        if (slopedCeilings.isEmpty()) {
             return roomHeight.toMillimeters();
         }
-        double lowHeight = slopedCeiling.kneeWallHeight().toMillimeters();
+        return slopedCeilings.stream()
+                .mapToDouble(profile -> ceilingHeightAt(point, profile))
+                .min()
+                .orElse(roomHeight.toMillimeters());
+    }
+
+    private double ceilingHeightAt(PlanPoint point, SlopedCeilingProfile profile) {
+        double lowHeight = profile.kneeWallHeight().toMillimeters();
         double highHeight = roomHeight.toMillimeters();
-        double run = runMillimeters(slopedCeiling.lowSide());
+        double run = runMillimeters(profile);
         if (run <= 1.0 || highHeight <= lowHeight) {
             return highHeight;
         }
-        double distance = distanceFromLowSide(point, slopedCeiling.lowSide());
+        double distance = distanceFromLowSide(point, profile.lowSide());
         double ratio = Math.max(0.0, Math.min(1.0, distance / run));
         return lowHeight + (highHeight - lowHeight) * ratio;
     }
@@ -229,8 +319,9 @@ public record Room(
         if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
             return ceilingVertexHeights.stream().mapToDouble(Length::toMillimeters).min().orElse(roomHeight.toMillimeters());
         }
-        return slopedCeilingProfile()
-                .map(profile -> profile.kneeWallHeight().toMillimeters())
+        return slopedCeilings.stream()
+                .mapToDouble(profile -> profile.kneeWallHeight().toMillimeters())
+                .min()
                 .orElse(roomHeight.toMillimeters());
     }
 
@@ -245,11 +336,15 @@ public record Room(
         if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
             return 0.0;
         }
-        if (slopedCeiling == null) {
+        if (slopedCeilings.isEmpty()) {
             return 0.0;
         }
-        double rise = roomHeight.toMillimeters() - slopedCeiling.kneeWallHeight().toMillimeters();
-        double run = runMillimeters(slopedCeiling.lowSide());
+        return slopeAngleDegrees(slopedCeilings.getFirst());
+    }
+
+    public double slopeAngleDegrees(SlopedCeilingProfile profile) {
+        double rise = roomHeight.toMillimeters() - profile.kneeWallHeight().toMillimeters();
+        double run = runMillimeters(profile);
         if (rise <= 0.0 || run <= 1.0) {
             return 0.0;
         }
@@ -260,16 +355,16 @@ public record Room(
         if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
             return hasVariableCeilingHeights();
         }
-        return slopedCeiling != null
-                && (slopedCeiling.lowSide() == SlopedCeilingSide.NORTH || slopedCeiling.lowSide() == SlopedCeilingSide.SOUTH);
+        return slopedCeilings.stream().anyMatch(profile ->
+                profile.lowSide() == SlopedCeilingSide.NORTH || profile.lowSide() == SlopedCeilingSide.SOUTH);
     }
 
     public boolean slopeVisibleInNorthSouthView() {
         if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
             return hasVariableCeilingHeights();
         }
-        return slopedCeiling != null
-                && (slopedCeiling.lowSide() == SlopedCeilingSide.EAST || slopedCeiling.lowSide() == SlopedCeilingSide.WEST);
+        return slopedCeilings.stream().anyMatch(profile ->
+                profile.lowSide() == SlopedCeilingSide.EAST || profile.lowSide() == SlopedCeilingSide.WEST);
     }
 
     public boolean hasVariableCeilingHeights() {
@@ -277,18 +372,19 @@ public record Room(
             double reference = ceilingVertexHeights.getFirst().toMillimeters();
             return ceilingVertexHeights.stream().anyMatch(length -> Math.abs(length.toMillimeters() - reference) > 0.001);
         }
-        return slopedCeiling != null;
+        return !slopedCeilings.isEmpty();
     }
 
-    private double runMillimeters(SlopedCeilingSide side) {
+    private double runMillimeters(SlopedCeilingProfile profile) {
+        SlopedCeilingSide side = profile.lowSide();
         double roomRun = switch (side) {
             case NORTH, SOUTH -> depthMillimeters();
             case EAST, WEST -> widthMillimeters();
         };
-        if (slopedCeiling == null || slopedCeiling.horizontalRun().toMillimeters() <= 0.0) {
+        if (profile.horizontalRun().toMillimeters() <= 0.0) {
             return roomRun;
         }
-        return Math.min(roomRun, slopedCeiling.horizontalRun().toMillimeters());
+        return Math.min(roomRun, profile.horizontalRun().toMillimeters());
     }
 
     private double distanceFromLowSide(PlanPoint point, SlopedCeilingSide side) {
@@ -355,5 +451,33 @@ public record Room(
                         + b.xMillimeters() * (c.yMillimeters() - a.yMillimeters())
                         + c.xMillimeters() * (a.yMillimeters() - b.yMillimeters())
         ) / 2.0;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof Room room)) {
+            return false;
+        }
+        return id.equals(room.id)
+                && name.equals(room.name)
+                && outline.equals(room.outline)
+                && roomHeight.equals(room.roomHeight)
+                && floorThickness.equals(room.floorThickness)
+                && ceilingThickness.equals(room.ceilingThickness)
+                && slopedCeilings.equals(room.slopedCeilings)
+                && Objects.equals(ceilingVertexHeights, room.ceilingVertexHeights);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, name, outline, roomHeight, floorThickness, ceilingThickness, slopedCeilings, ceilingVertexHeights);
+    }
+
+    @Override
+    public String toString() {
+        return "Room[id=" + id + ", name=" + name + ", outline=" + outline + "]";
     }
 }

@@ -505,27 +505,42 @@ class DxfLevelExchangeServiceTest {
     @Test
     void exportiertUndImportiertRaeumeMitDachschraege() throws Exception {
         Level level = new Level("Dachgeschoss");
-        level.addRoom(Room.rectangular(
+        level.addRoom(Room.withSlopedCeilings(
+                java.util.UUID.randomUUID(),
                 "Studio",
-                new PlanPoint(0, 0),
-                new PlanPoint(4000, 3000),
+                java.util.List.of(
+                        new PlanPoint(0, 0),
+                        new PlanPoint(4000, 0),
+                        new PlanPoint(4000, 3000),
+                        new PlanPoint(0, 3000)
+                ),
                 Length.of(2.8, LengthUnit.METER),
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER),
-                new SlopedCeilingProfile(
-                        SlopedCeilingSide.SOUTH,
-                        Length.of(1.1, LengthUnit.METER),
-                        Length.of(1.4, LengthUnit.METER)
-                )
+                java.util.List.of(
+                        new SlopedCeilingProfile(
+                                SlopedCeilingSide.SOUTH,
+                                Length.of(1.1, LengthUnit.METER),
+                                Length.of(1.4, LengthUnit.METER)
+                        ),
+                        new SlopedCeilingProfile(
+                                SlopedCeilingSide.WEST,
+                                Length.of(0.9, LengthUnit.METER),
+                                Length.of(0.8, LengthUnit.METER)
+                        )
+                ),
+                null
         ));
 
         Path file = tempDir.resolve("dachgeschoss.dxf");
         exchangeService.exportLevel(level, file);
         Level imported = exchangeService.importLevel(file, "Import");
 
-        assertEquals(SlopedCeilingSide.SOUTH, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().lowSide());
-        assertEquals(1100.0, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().kneeWallHeight().toMillimeters(), 0.001);
-        assertEquals(1400.0, imported.rooms().getFirst().slopedCeilingProfile().orElseThrow().horizontalRun().toMillimeters(), 0.001);
+        assertEquals(2, imported.rooms().getFirst().slopedCeilingProfiles().size());
+        assertEquals(SlopedCeilingSide.SOUTH, imported.rooms().getFirst().slopedCeilingProfiles().getFirst().lowSide());
+        assertEquals(1100.0, imported.rooms().getFirst().slopedCeilingProfiles().getFirst().kneeWallHeight().toMillimeters(), 0.001);
+        assertEquals(1400.0, imported.rooms().getFirst().slopedCeilingProfiles().getFirst().horizontalRun().toMillimeters(), 0.001);
+        assertEquals(SlopedCeilingSide.WEST, imported.rooms().getFirst().slopedCeilingProfiles().get(1).lowSide());
     }
 
     @Test

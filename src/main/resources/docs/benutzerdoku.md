@@ -241,22 +241,15 @@ Damit entsteht keine symbolische Schräge mehr, sondern eine fachlich wirksame I
 * In 3D werden die Raumvolumina und Wandkörper aus diesen Eckhöhen abgeleitet.
 * In 3D erzeugen sichtbare Wandfliesen und Plattenbeläge zusätzlich eigene Fugen auf der Wandoberfläche, wenn `3D Ebenen` aktiv ist. Öffnungen werden auch dort ausgespart.
 
-### Einfacher Fallback für Rechteckräume
+### Dachschrägen-Schnellfunktion
 
-Für einfache Rechteckräume gibt es weiterhin die ältere raumgebundene Eingabe:
-
-* `Dachschräge = Mit Dachschräge`
-* `Niedrige Seite`
-* `Sockelhöhe`
-
-Dieser Modus ist als einfacher Fallback noch vorhanden. Für echte Dachgeschoss-Geometrien mit konkreten Wand- und Eckhöhen ist aber die Bearbeitung über `Eckhöhe` der fachlich führende Weg.
+Wähle die niedrige Wand und rufe `Dachschräge aus Wand erzeugen …` im Kontextmenü auf. CADas passt die beiden Wand-Eckhöhen an, teilt beide Seitenwände an der oberen Schrägenkante und erzeugt das dauerhafte Deckenprofil. Weitere Raumseiten können auf dieselbe Weise zusätzliche Dachschrägen erhalten. Die Pfeile und Schrägenlinien im Grundriss werden aus diesen gespeicherten Profilen erzeugt und bleiben nach Raumableitung sowie Laden erhalten.
 
 ## Aktuelle Grenzen der Dachschrägen
 
 Derzeit gilt:
 
-* Die automatische Deckenform entsteht aus Wand-Endpunkten und interpoliert dazwischen. Komplexe Dachdetails wie Dachgauben oder mehrfach geknickte Dachflächen sind noch nicht als eigene Dachobjekte modelliert.
-* Der ältere Rechteck-Fallback für `Dachschräge` bleibt bestehen, sollte aber nur für einfache Räume verwendet werden.
+* Komplexe Dachdetails wie Dachgauben sind noch nicht als eigene Dachobjekte modelliert.
 
 ### Navigation in 2D
 
@@ -418,7 +411,7 @@ Räume werden nicht mehr mit einem eigenen Zeichenwerkzeug erstellt.
 
 * Räume werden automatisch aus geschlossenen Wandzügen erzeugt.
 * Im Werkzeug `Bearbeiten` klickst du in einen automatisch erkannten Raum, um ihn gezielt auszuwählen.
-* Raumname, Raumhöhe, Bodenstärke, Deckenstärke und Dachschräge kommen aus den aktuellen Eingaben und können dann auf die Auswahl angewendet werden.
+* Raumname, Raumhöhe, Bodenstärke und Deckenstärke kommen aus den aktuellen Eingaben und können dann auf die Auswahl angewendet werden. Dachschrägen werden über das Wand-Kontextmenü verwaltet.
 * Wenn du eine gemeinsame Wandecke verschiebst, wird die Raumkontur automatisch nachgeführt und darf dabei auch schräg oder polygonal werden.
 * Aneinandergereihte Teilwände schließen ebenfalls einen Raum. Kleine Anschlusslücken bis 10 mm behandelt CADas bei der Raumableitung als gemeinsamen Wandknoten.
 * Über `Raum umbenennen …` im Kontextmenü änderst du ausschließlich den Namen des angeklickten Raums. Maße und weitere Raumeigenschaften bleiben unverändert.
@@ -650,7 +643,7 @@ Typische Wandhöhen:
 
 Wände können außerdem mehrere Höhenpunkte entlang ihrer Achse besitzen. CADas bildet daraus eine polygonale Wandoberkante, übernimmt sie verlustfrei in Gebäude- und Etagen-DXF und zeigt sie in 3D sowie in den Seitenansichten. Beim Verlängern oder Verkürzen einer solchen Wand werden die Profilabstände proportional mitgeführt.
 
-Für eine Dachschräge wählst du im Werkzeug `Bearbeiten` genau eine Außenwand und rufst im Kontextmenü `Dachschräge aus Wand erzeugen …` auf. Gib Sockelhöhe und horizontale Breite unterhalb der Schräge in Zentimetern an. CADas beginnt an der Raum-Innenkante, senkt die ausgewählte Wand auf die Sockelhöhe ab, ergänzt polygonale Profile an den angrenzenden Seitenwänden und aktualisiert die Decke des erkannten Raums. Die Schräge endet nach der angegebenen Breite; der restliche Deckenbereich bleibt waagerecht auf Raumhöhe.
+Für eine Dachschräge wählst du im Werkzeug `Bearbeiten` genau eine Außenwand und rufst im Kontextmenü `Dachschräge aus Wand erzeugen …` auf. Gib Sockelhöhe und horizontale Breite unterhalb der Schräge in Zentimetern an. CADas beginnt an der Raum-Innenkante, senkt die ausgewählte Wand auf die Sockelhöhe ab, teilt die angrenzenden Seitenwände an der oberen Schrägenkante und aktualisiert die Decke des erkannten Raums. Die Schräge endet nach der angegebenen Breite; der restliche Deckenbereich bleibt waagerecht auf Raumhöhe. Weitere Raumseiten können zusätzliche Schrägen erhalten.
 
 ### Raum
 

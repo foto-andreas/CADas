@@ -2,12 +2,15 @@ package de.schrell.cadas.application.roof;
 
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
+import de.schrell.cadas.domain.geometry.PlanSegment;
+import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WallProfilePoint;
+import de.schrell.cadas.domain.model.WindowElement;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,14 +34,12 @@ public final class RoofSlopeWallService {
             throw new IllegalArgumentException("Die Sockelhöhe muss unterhalb der Raumhöhe liegen.");
         }
         SlopedCeilingSide lowSide = lowSide(selectedWall, room);
-        List<Wall> walls = level.walls().stream()
-                .map(wall -> updateWall(wall, selectedWall, room, kneeWallHeight, slopeWidth))
-                .toList();
+        WallSplitResult splitResult = updateWalls(level, selectedWall, room, kneeWallHeight, slopeWidth);
         SlopedCeilingProfile slope = new SlopedCeilingProfile(lowSide, kneeWallHeight, slopeWidth);
         List<Room> rooms = level.rooms().stream()
                 .map(candidate -> candidate.id().equals(room.id()) ? withSlope(candidate, slope) : candidate)
                 .toList();
-        return new RoofSlopeResult(walls, rooms, room.id());
+        return new RoofSlopeResult(splitResult.walls(), rooms, splitResult.doors(), splitResult.windows(), room.id());
     }
 
     private Optional<Room> adjacentRoom(Level level, Wall wall) {
@@ -74,32 +75,130 @@ public final class RoofSlopeWallService {
         return minimumDistance;
     }
 
-    private Wall updateWall(Wall wall, Wall selectedWall, Room room, Length kneeWallHeight, Length slopeWidth) {
-        if (wall.id().equals(selectedWall.id())) {
-            return new Wall(wall.id(), wall.axis(), wall.thickness(), kneeWallHeight);
+    private WallSplitResult updateWalls(Level level, Wall selectedWall, Room room, Length kneeWallHeight, Length slopeWidth) {
+        List<Wall> walls = new ArrayList<>();
+        List<Door> doors = new ArrayList<>(level.doors());
+        List<WindowElement> windows = new ArrayList<>(level.windows());
+        for (Wall wall : level.walls()) {
+            if (wall.id().equals(selectedWall.id())) {
+                walls.add(new Wall(wall.id(), wall.axis(), wall.thickness(), kneeWallHeight));
+                continue;
+            }
+            ConnectedEnd connectedEnd = connectedEnd(wall, selectedWall);
+            if (connectedEnd == ConnectedEnd.NONE || !extendsTowardsRoom(wall, connectedEnd, selectedWall, room)) {
+                walls.add(wall);
+                continue;
+            }
+            splitSideWall(wall, connectedEnd, room.roomHeight(), kneeWallHeight, slopeWidth, walls, doors, windows);
         }
-        ConnectedEnd connectedEnd = connectedEnd(wall, selectedWall);
-        if (connectedEnd == ConnectedEnd.NONE || !extendsTowardsRoom(wall, connectedEnd, selectedWall, room)) {
-            return wall;
-        }
+        return new WallSplitResult(List.copyOf(walls), List.copyOf(doors), List.copyOf(windows));
+    }
+
+    private void splitSideWall(
+            Wall wall,
+            ConnectedEnd connectedEnd,
+            Length highHeight,
+            Length kneeWallHeight,
+            Length slopeWidth,
+            List<Wall> walls,
+            List<Door> doors,
+            List<WindowElement> windows
+    ) {
         double length = wall.axis().length().toMillimeters();
         double run = Math.min(length, slopeWidth.toMillimeters());
-        Length high = room.roomHeight();
-        List<WallProfilePoint> profile = new ArrayList<>();
-        if (connectedEnd == ConnectedEnd.START) {
-            profile.add(new WallProfilePoint(Length.zero(), kneeWallHeight));
-            if (run < length - EPSILON) {
-                profile.add(new WallProfilePoint(Length.ofMillimeters(run), high));
-            }
-            profile.add(new WallProfilePoint(Length.ofMillimeters(length), high));
-        } else {
-            profile.add(new WallProfilePoint(Length.zero(), high));
-            if (run < length - EPSILON) {
-                profile.add(new WallProfilePoint(Length.ofMillimeters(length - run), high));
-            }
-            profile.add(new WallProfilePoint(Length.ofMillimeters(length), kneeWallHeight));
+        if (run >= length - EPSILON) {
+            walls.add(wall.withProfile(sideWallProfile(length, connectedEnd, highHeight, kneeWallHeight)));
+            return;
         }
-        return wall.withProfile(profile);
+        double splitOffset = connectedEnd == ConnectedEnd.START ? run : length - run;
+        verifyNoOpeningCrossesSplit(wall.id(), splitOffset, doors, windows);
+        PlanPoint splitPoint = wall.axis().pointAt(Length.ofMillimeters(splitOffset));
+        UUID secondWallId = UUID.randomUUID();
+        Wall firstWall = new Wall(
+                wall.id(),
+                new PlanSegment(wall.axis().start(), splitPoint),
+                wall.thickness(),
+                connectedEnd == ConnectedEnd.START ? kneeWallHeight : highHeight
+        );
+        Wall secondWall = new Wall(
+                secondWallId,
+                new PlanSegment(splitPoint, wall.axis().end()),
+                wall.thickness(),
+                connectedEnd == ConnectedEnd.END ? kneeWallHeight : highHeight
+        );
+        if (connectedEnd == ConnectedEnd.START) {
+            firstWall = firstWall.withProfile(sideWallProfile(splitOffset, connectedEnd, highHeight, kneeWallHeight));
+        } else {
+            secondWall = secondWall.withProfile(sideWallProfile(length - splitOffset, connectedEnd, highHeight, kneeWallHeight));
+        }
+        walls.add(firstWall);
+        walls.add(secondWall);
+        rebindOpeningsAfterSplit(wall.id(), secondWallId, splitOffset, doors, windows);
+    }
+
+    private List<WallProfilePoint> sideWallProfile(
+            double length,
+            ConnectedEnd connectedEnd,
+            Length highHeight,
+            Length kneeWallHeight
+    ) {
+        if (connectedEnd == ConnectedEnd.START) {
+            return List.of(
+                    new WallProfilePoint(Length.zero(), kneeWallHeight),
+                    new WallProfilePoint(Length.ofMillimeters(length), highHeight)
+            );
+        }
+        return List.of(
+                new WallProfilePoint(Length.zero(), highHeight),
+                new WallProfilePoint(Length.ofMillimeters(length), kneeWallHeight)
+        );
+    }
+
+    private void verifyNoOpeningCrossesSplit(
+            UUID wallId,
+            double splitOffset,
+            List<Door> doors,
+            List<WindowElement> windows
+    ) {
+        boolean crossingDoor = doors.stream()
+                .filter(door -> door.wallId().equals(wallId))
+                .anyMatch(door -> crosses(door.offsetFromStart(), door.width(), splitOffset));
+        boolean crossingWindow = windows.stream()
+                .filter(window -> window.wallId().equals(wallId))
+                .anyMatch(window -> crosses(window.offsetFromStart(), window.width(), splitOffset));
+        if (crossingDoor || crossingWindow) {
+            throw new IllegalArgumentException("Die Oberkante der Dachschräge darf keine Tür oder kein Fenster schneiden.");
+        }
+    }
+
+    private boolean crosses(Length offset, Length width, double splitOffset) {
+        return offset.toMillimeters() < splitOffset - EPSILON
+                && offset.toMillimeters() + width.toMillimeters() > splitOffset + EPSILON;
+    }
+
+    private void rebindOpeningsAfterSplit(
+            UUID firstWallId,
+            UUID secondWallId,
+            double splitOffset,
+            List<Door> doors,
+            List<WindowElement> windows
+    ) {
+        for (int index = 0; index < doors.size(); index++) {
+            Door door = doors.get(index);
+            if (door.wallId().equals(firstWallId) && door.offsetFromStart().toMillimeters() >= splitOffset - EPSILON) {
+                doors.set(index, new Door(door.id(), secondWallId,
+                        Length.ofMillimeters(door.offsetFromStart().toMillimeters() - splitOffset),
+                        door.width(), door.height(), door.thresholdHeight()));
+            }
+        }
+        for (int index = 0; index < windows.size(); index++) {
+            WindowElement window = windows.get(index);
+            if (window.wallId().equals(firstWallId) && window.offsetFromStart().toMillimeters() >= splitOffset - EPSILON) {
+                windows.set(index, new WindowElement(window.id(), secondWallId,
+                        Length.ofMillimeters(window.offsetFromStart().toMillimeters() - splitOffset),
+                        window.width(), window.sillHeight(), window.windowHeight()));
+            }
+        }
     }
 
     private ConnectedEnd connectedEnd(Wall wall, Wall selectedWall) {
@@ -144,10 +243,11 @@ public final class RoofSlopeWallService {
     }
 
     private Room withSlope(Room room, SlopedCeilingProfile slope) {
-        return new Room(
-                room.id(), room.name(), room.outline(), room.roomHeight(), room.floorThickness(),
-                room.ceilingThickness(), slope, null
-        );
+        List<SlopedCeilingProfile> slopes = new ArrayList<>(room.slopedCeilingProfiles().stream()
+                .filter(existing -> existing.lowSide() != slope.lowSide())
+                .toList());
+        slopes.add(slope);
+        return room.withSlopedCeilingProfiles(slopes);
     }
 
     private boolean near(PlanPoint first, PlanPoint second) {
@@ -163,6 +263,15 @@ public final class RoofSlopeWallService {
     private record RoomDistance(Room room, double distance) {
     }
 
-    public record RoofSlopeResult(List<Wall> walls, List<Room> rooms, UUID roomId) {
+    private record WallSplitResult(List<Wall> walls, List<Door> doors, List<WindowElement> windows) {
+    }
+
+    public record RoofSlopeResult(
+            List<Wall> walls,
+            List<Room> rooms,
+            List<Door> doors,
+            List<WindowElement> windows,
+            UUID roomId
+    ) {
     }
 }

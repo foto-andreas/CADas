@@ -327,25 +327,25 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     }
                     case "ROOM" -> {
                         if (isUuid(parts[2])) {
-                            importedRooms.add(new Room(
+                            importedRooms.add(Room.withSlopedCeilings(
                                     UUID.fromString(parts[2]),
                                     DxfMetadataCodec.decode(parts[1], encodedFields),
                                     deserializePoints(parts[6]),
                                     Length.ofMillimeters(parseDouble(parts[3])),
                                     Length.ofMillimeters(parseDouble(parts[4])),
                                     Length.ofMillimeters(parseDouble(parts[5])),
-                                    parts.length >= 8 ? deserializeSlopedCeiling(parts[7]) : null,
+                                    parts.length >= 8 ? deserializeSlopedCeilings(parts[7]) : List.of(),
                                     parts.length >= 9 ? deserializeCeilingVertexHeights(parts[8]) : null
                             ));
                         } else {
-                            importedRooms.add(new Room(
+                            importedRooms.add(Room.withSlopedCeilings(
                                     UUID.randomUUID(),
                                     DxfMetadataCodec.decode(parts[1], encodedFields),
                                     deserializePoints(parts[5]),
                                     Length.ofMillimeters(parseDouble(parts[2])),
                                     Length.ofMillimeters(parseDouble(parts[3])),
                                     Length.ofMillimeters(parseDouble(parts[4])),
-                                    parts.length >= 7 ? deserializeSlopedCeiling(parts[6]) : null,
+                                    parts.length >= 7 ? deserializeSlopedCeilings(parts[6]) : List.of(),
                                     parts.length >= 8 ? deserializeCeilingVertexHeights(parts[7]) : null
                             ));
                         }
@@ -650,15 +650,16 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
     }
 
     private static String serializeSlopedCeiling(Room room) {
-        return room.slopedCeilingProfile()
-                .map(profile -> String.format(
-                        Locale.US,
-                        "SLOPE,%s,%.3f,%.3f",
+        if (room.slopedCeilingProfiles().isEmpty()) {
+            return "NONE";
+        }
+        return "SLOPES;" + room.slopedCeilingProfiles().stream()
+                .map(profile -> String.format(Locale.US, "%s,%.3f,%.3f",
                         profile.lowSide().name(),
                         profile.kneeWallHeight().toMillimeters(),
-                        profile.horizontalRun().toMillimeters()
-                ))
-                .orElse("NONE");
+                        profile.horizontalRun().toMillimeters()))
+                .reduce((left, right) -> left + ";" + right)
+                .orElseThrow();
     }
 
     private static String serializeCeilingVertexHeights(Room room) {
@@ -670,18 +671,32 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                 .orElse("NONE");
     }
 
-    private static SlopedCeilingProfile deserializeSlopedCeiling(String value) {
+    private static List<SlopedCeilingProfile> deserializeSlopedCeilings(String value) {
         if (value == null || value.isBlank() || value.equals("NONE")) {
-            return null;
+            return List.of();
+        }
+        if (value.startsWith("SLOPES;")) {
+            return java.util.Arrays.stream(value.substring("SLOPES;".length()).split(";"))
+                    .map(DxfLevelExchangeService::deserializeSlopeValues)
+                    .toList();
         }
         String[] parts = value.split(",");
         if ((parts.length != 3 && parts.length != 4) || !parts[0].equals("SLOPE")) {
-            return null;
+            return List.of();
         }
-        return new SlopedCeilingProfile(
+        return List.of(new SlopedCeilingProfile(
                 SlopedCeilingSide.valueOf(parts[1]),
                 Length.ofMillimeters(parseDouble(parts[2])),
                 parts.length == 4 ? Length.ofMillimeters(parseDouble(parts[3])) : Length.zero()
+        ));
+    }
+
+    private static SlopedCeilingProfile deserializeSlopeValues(String value) {
+        String[] parts = value.split(",");
+        return new SlopedCeilingProfile(
+                SlopedCeilingSide.valueOf(parts[0]),
+                Length.ofMillimeters(parseDouble(parts[1])),
+                Length.ofMillimeters(parseDouble(parts[2]))
         );
     }
 
