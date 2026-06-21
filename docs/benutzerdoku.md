@@ -499,7 +499,7 @@ Die Bezeichnung eines Quaders wird mittig im Grundriss angezeigt und kann über 
 
 Zusätzliche `DWG`-Objektdateien unter `~/.config/CADas/Objekte` erscheinen beim Start als Objekt-Presets. Nicht direkt auswertbare DWG-Geometrie wird als referenzierter rechteckiger Platzhalter geführt.
 
-Über `Datei` > `3D-Objekt aus DXF/IFC laden` importierst du DXF-Dateien mit ACIS-v1-`3DSOLID`-Körpern sowie IFC2x3-Dateien mit facettierten BREP- und extrudierten Körpern. CADas übernimmt metrische 3D-Grenzen, legt die Datei im Objektverzeichnis ab und wählt das neue Preset sofort aus. DXF-TrueColor, grundlegende ACI-Farben und IFC-Oberflächenfarben werden im 3D-Rendering beachtet. Die Darstellung lässt sich innen oder außen platzieren sowie über Breite, Tiefe, Höhe, positive oder negative Basishöhe und Winkel skalieren, vertikal versetzen und drehen.
+Über `Datei` > `3D-Objekt aus DXF/IFC/RFA laden` importierst du DXF-Dateien mit ACIS-v1-`3DSOLID`-Körpern sowie IFC2x3-Dateien mit facettierten BREP- und extrudierten Körpern. Für eine proprietäre RFA-Datei muss im selben Verzeichnis eine gleichnamige IFC- oder 3D-DXF-Datei liegen; CADas registriert beide gemeinsam und bevorzugt IFC. CADas übernimmt metrische 3D-Grenzen, legt die Dateien im Objektverzeichnis ab und wählt das neue Preset sofort aus. DXF-TrueColor, grundlegende ACI-Farben und IFC-Oberflächenfarben werden im 3D-Rendering beachtet. Die Darstellung lässt sich innen oder außen platzieren sowie über Breite, Tiefe, Höhe, positive oder negative Basishöhe und Winkel skalieren, vertikal versetzen und drehen.
 
 ### Hanggelände
 

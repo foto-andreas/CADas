@@ -1009,7 +1009,7 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Etage sichern als ...", this::saveCurrentLevelAs, null),
                 menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
-                menuItem("3D-Objekt aus DXF/IFC laden", this::importThreeDObject, null),
+                menuItem("3D-Objekt aus DXF/IFC/RFA laden", this::importThreeDObject, null),
                 menuItem("Beenden", this::requestApplicationExit, shortcutKey(KeyCode.Q))
         );
 
@@ -5078,9 +5078,9 @@ public final class CadWorkbench extends BorderPane {
 
     private void importThreeDObject() {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("3D-Objekt aus DXF oder IFC laden");
+        fileChooser.setTitle("3D-Objekt aus DXF, IFC oder RFA laden");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
-                "3D-CAD-Dateien", "*.dxf", "*.DXF", "*.ifc", "*.IFC"));
+                "3D-CAD-Dateien", "*.dxf", "*.DXF", "*.ifc", "*.IFC", "*.rfa", "*.RFA"));
         Window window = currentWindow();
         java.io.File file = fileChooser.showOpenDialog(window);
         if (file == null) {

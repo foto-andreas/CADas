@@ -10,6 +10,7 @@ public enum RoomObjectType {
     CUBOID("Quader"),
     DXF_3D_REFERENCE("3D-DXF-Objekt"),
     IFC_3D_REFERENCE("3D-IFC-Objekt"),
+    RFA_3D_REFERENCE("3D-RFA-Objekt"),
     DWG_REFERENCE("DWG-Objekt");
 
     private final String label;

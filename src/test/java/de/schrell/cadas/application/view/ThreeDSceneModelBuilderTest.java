@@ -280,6 +280,25 @@ class ThreeDSceneModelBuilderTest {
     }
 
     @Test
+    void rendertRfaÜberGleichnamigeBegleitgeometrie(@TempDir Path tempDir) throws Exception {
+        Path rfa = tempDir.resolve("Wärmepumpe.rfa");
+        Files.writeString(rfa, "RFA");
+        Files.writeString(tempDir.resolve("Wärmepumpe.dxf"), simpleSolidDxf());
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "rfa-3d-waermepumpe", "Wärmepumpe", RoomObjectType.RFA_3D_REFERENCE,
+                RoomObjectShape.RECTANGLE, new PlanPoint(1000, 1200),
+                Length.ofMillimeters(200), Length.ofMillimeters(100), Length.ofMillimeters(400),
+                RoomObjectMountingMode.STANDS_ON_COVERING, rfa.toString()
+        ));
+
+        ThreeDSceneModel sceneModel = builder.build(project, Set.of("Erdgeschoss"), false);
+
+        assertTrue(sceneModel.meshes().stream().anyMatch(mesh -> mesh.kind() == RenderableKind.ROOM_OBJECT));
+        assertFalse(sceneModel.boxes().stream().anyMatch(box -> box.kind() == RenderableKind.ROOM_OBJECT));
+    }
+
+    @Test
     void beruecksichtigtGeschossfilterUndOberflaechenEbenen() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         var erdgeschoss = project.primaryLevel();

@@ -5,6 +5,7 @@ import de.schrell.cadas.application.dwg.DwgLibraryAnalyzer;
 import de.schrell.cadas.application.dwg.Dxf3dObjectGeometry;
 import de.schrell.cadas.application.dwg.Dxf3dObjectGeometryReader;
 import de.schrell.cadas.application.dwg.Ifc3dObjectGeometryReader;
+import de.schrell.cadas.application.dwg.Rfa3dObjectGeometryReader;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
@@ -28,6 +29,7 @@ public final class RoomObjectPresetService {
     private final DwgLibraryAnalyzer dwgLibraryAnalyzer;
     private final Dxf3dObjectGeometryReader dxf3dObjectGeometryReader;
     private final Ifc3dObjectGeometryReader ifc3dObjectGeometryReader;
+    private final Rfa3dObjectGeometryReader rfa3dObjectGeometryReader;
 
     public RoomObjectPresetService() {
         this(defaultObjectDirectory());
@@ -42,6 +44,7 @@ public final class RoomObjectPresetService {
         this.dwgLibraryAnalyzer = Objects.requireNonNull(dwgLibraryAnalyzer, "dwgLibraryAnalyzer darf nicht null sein.");
         this.dxf3dObjectGeometryReader = new Dxf3dObjectGeometryReader();
         this.ifc3dObjectGeometryReader = new Ifc3dObjectGeometryReader();
+        this.rfa3dObjectGeometryReader = new Rfa3dObjectGeometryReader();
     }
 
     public List<RoomObjectPreset> presets() {
@@ -85,7 +88,7 @@ public final class RoomObjectPresetService {
         }
         try (Stream<Path> files = Files.list(objectDirectory)) {
             return files
-                    .filter(this::isSupportedCad3dFile)
+                    .filter(this::isPrimaryCad3dFile)
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
                     .map(this::readCad3dPreset)
                     .flatMap(Optional::stream)
@@ -100,9 +103,12 @@ public final class RoomObjectPresetService {
         Files.createDirectories(objectDirectory);
         Path targetFile = importTarget(sourceFile);
         Path normalizedSource = sourceFile.toAbsolutePath().normalize();
-        if (!Files.exists(targetFile) || !Files.isSameFile(normalizedSource, targetFile)) {
-            Files.copy(normalizedSource, targetFile, StandardCopyOption.REPLACE_EXISTING);
+        if (extension(normalizedSource).equals("rfa")) {
+            Path companion = rfa3dObjectGeometryReader.companionFile(normalizedSource).orElseThrow(() ->
+                    new IllegalArgumentException("Zur RFA-Datei fehlt eine gleichnamige IFC- oder 3D-DXF-Begleitdatei."));
+            copyIfNecessary(companion, importTarget(companion));
         }
+        copyIfNecessary(normalizedSource, targetFile);
         return cad3dPreset(targetFile);
     }
 
@@ -148,16 +154,20 @@ public final class RoomObjectPresetService {
 
     private RoomObjectPreset cad3dPreset(Path path) throws IOException {
         String extension = extension(path);
-        Dxf3dObjectGeometry geometry = extension.equals("ifc")
-                ? ifc3dObjectGeometryReader.read(path)
-                : dxf3dObjectGeometryReader.read(path);
+        Dxf3dObjectGeometry geometry = switch (extension) {
+            case "ifc" -> ifc3dObjectGeometryReader.read(path);
+            case "rfa" -> rfa3dObjectGeometryReader.read(path);
+            default -> dxf3dObjectGeometryReader.read(path);
+        };
         String fileName = path.getFileName().toString();
         String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
         boolean ifc = extension.equals("ifc");
+        boolean rfa = extension.equals("rfa");
         return new RoomObjectPreset(
-                (ifc ? "ifc-3d-" : "dxf-3d-") + normalizedId(baseName),
-                (ifc ? "3D-IFC: " : "3D-DXF: ") + baseName,
-                ifc ? RoomObjectType.IFC_3D_REFERENCE : RoomObjectType.DXF_3D_REFERENCE,
+                (rfa ? "rfa-3d-" : ifc ? "ifc-3d-" : "dxf-3d-") + normalizedId(baseName),
+                (rfa ? "3D-RFA: " : ifc ? "3D-IFC: " : "3D-DXF: ") + baseName,
+                rfa ? RoomObjectType.RFA_3D_REFERENCE
+                        : ifc ? RoomObjectType.IFC_3D_REFERENCE : RoomObjectType.DXF_3D_REFERENCE,
                 RoomObjectShape.RECTANGLE,
                 Length.ofMillimeters(Math.max(1.0, geometry.bounds().widthMillimeters())),
                 Length.ofMillimeters(Math.max(1.0, geometry.bounds().depthMillimeters())),
@@ -167,9 +177,23 @@ public final class RoomObjectPresetService {
         );
     }
 
-    private boolean isSupportedCad3dFile(Path path) {
+    private boolean isPrimaryCad3dFile(Path path) {
         String extension = extension(path);
-        return extension.equals("dxf") || extension.equals("ifc");
+        if (extension.equals("rfa")) {
+            return true;
+        }
+        if (!extension.equals("dxf") && !extension.equals("ifc")) {
+            return false;
+        }
+        String baseName = path.getFileName().toString().substring(0, path.getFileName().toString().lastIndexOf('.'));
+        return !Files.exists(path.resolveSibling(baseName + ".rfa"))
+                && !Files.exists(path.resolveSibling(baseName + ".RFA"));
+    }
+
+    private void copyIfNecessary(Path source, Path target) throws IOException {
+        if (!Files.exists(target) || !Files.isSameFile(source, target)) {
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private String extension(Path path) {

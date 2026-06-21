@@ -131,6 +131,25 @@ class RoomObjectPresetServiceTest {
         assertTrue(service.loadCad3dPresets().stream().anyMatch(candidate -> candidate.type() == RoomObjectType.IFC_3D_REFERENCE));
     }
 
+    @Test
+    void importiertRfaMitBegleitgeometrieAlsEinPreset() throws Exception {
+        Path sourceDirectory = tempDir.resolve("RfaQuelle");
+        Path objectDirectory = tempDir.resolve("RfaObjekte");
+        Files.createDirectories(sourceDirectory);
+        Path rfa = sourceDirectory.resolve("Wärmepumpe.rfa");
+        Files.writeString(rfa, "RFA");
+        Files.writeString(sourceDirectory.resolve("Wärmepumpe.dxf"), simpleSolidDxf());
+        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, new DwgLibraryAnalyzer(new UnavailableConverter()));
+
+        RoomObjectPreset preset = service.importCad3dObject(rfa);
+
+        assertEquals(RoomObjectType.RFA_3D_REFERENCE, preset.type());
+        assertEquals(20.0, preset.height().toMillimeters(), 0.001);
+        assertTrue(Files.exists(objectDirectory.resolve("Wärmepumpe.rfa")));
+        assertTrue(Files.exists(objectDirectory.resolve("Wärmepumpe.dxf")));
+        assertEquals(1, service.loadCad3dPresets().size());
+    }
+
     private static final class UnavailableConverter implements DwgToDxfConverter {
 
         @Override
