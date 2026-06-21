@@ -734,6 +734,34 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void dachfensterKannAufDachschrägePlatziertWerden() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.withSlopedCeilings(
+                    java.util.UUID.randomUUID(), "Studio",
+                    java.util.List.of(
+                            new PlanPoint(0, 0), new PlanPoint(4_000, 0),
+                            new PlanPoint(4_000, 3_000), new PlanPoint(0, 3_000)
+                    ),
+                    Length.ofMillimeters(2_800), Length.ofMillimeters(180), Length.ofMillimeters(200),
+                    java.util.List.of(new de.schrell.cadas.domain.model.SlopedCeilingProfile(
+                            de.schrell.cadas.domain.model.SlopedCeilingSide.NORTH,
+                            Length.ofMillimeters(1_000), Length.ofMillimeters(1_200)
+                    )), null
+            ));
+            instanz.automationSetTool("ROOF_WINDOW");
+            instanz.automationPlaceRoofWindow(2_000, 600);
+            return instanz;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(workbench::automationRoofWindowCount),
+                aufFxThread(workbench::automationSnapshot).statusText());
+    }
+
+    @Test
     void objektmaßeUndWinkelSindBeimPlatzierenUndBearbeitenEinstellbar() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

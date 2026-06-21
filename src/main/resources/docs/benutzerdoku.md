@@ -245,6 +245,8 @@ Damit entsteht keine symbolische Schräge mehr, sondern eine fachlich wirksame I
 
 Wähle die niedrige Wand und rufe `Dachschräge aus Wand erzeugen …` im Kontextmenü auf. CADas passt die beiden Wand-Eckhöhen an, teilt beide Seitenwände an der oberen Schrägenkante und erzeugt das dauerhafte Deckenprofil. Weitere Raumseiten können auf dieselbe Weise zusätzliche Dachschrägen erhalten. Die Pfeile und Schrägenlinien im Grundriss werden aus diesen gespeicherten Profilen erzeugt und bleiben nach Raumableitung sowie Laden erhalten.
 
+Mit dem Werkzeug `Dachfenster` klickst du anschließend innerhalb des Raums auf eine Dachschräge. Breite und Tiefe stammen aus den Eingaben `Fensterbreite` und `Fensterhöhe`. Das Dachfenster bleibt an die gewählte Schräge gebunden, wird in DXF gespeichert und in 3D mit deren Neigung dargestellt.
+
 ## Aktuelle Grenzen der Dachschrägen
 
 Derzeit gilt:

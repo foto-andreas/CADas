@@ -9,6 +9,7 @@ public enum DrawingTool {
     FLOOR_OPENING_CIRCLE("Bodenloch rund", false),
     DOOR("Tür", true),
     WINDOW("Fenster", true),
+    ROOF_WINDOW("Dachfenster", true),
     OBJECT("Objekt", true);
 
     private final String label;

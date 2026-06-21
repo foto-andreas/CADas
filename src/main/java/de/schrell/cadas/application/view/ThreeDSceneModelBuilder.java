@@ -26,6 +26,7 @@ import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.Roof;
+import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
@@ -106,6 +107,7 @@ public final class ThreeDSceneModelBuilder {
             }
             boxes.addAll(buildDoors(level, wallBaseHeight));
             boxes.addAll(buildWindows(level, wallBaseHeight));
+            boxes.addAll(buildRoofWindows(level, wallBaseHeight));
             boxes.addAll(buildStairs(level, wallBaseHeight));
             boxes.addAll(buildFloorExtensions(level, baseHeight));
             if (renderSurfaceLayers) {
@@ -1428,6 +1430,45 @@ public final class ThreeDSceneModelBuilder {
         for (WindowElement window : level.windows()) {
             Wall wall = level.findWall(window.wallId());
             boxes.add(openingBox(level.name(), RenderableKind.WINDOW, window.id().toString(), wall, window.offsetFromStart(), window.width(), baseHeight + window.sillHeight().toMillimeters() + window.windowHeight().toMillimeters() / 2.0, window.windowHeight().toMillimeters(), Math.min(WINDOW_GLASS_DEPTH, wall.thickness().toMillimeters() * 0.45), "window", 0.7));
+        }
+        return boxes;
+    }
+
+    private List<RenderableBox> buildRoofWindows(Level level, double baseHeight) {
+        List<RenderableBox> boxes = new ArrayList<>();
+        for (RoofWindow roofWindow : level.roofWindows()) {
+            Room room = level.rooms().stream()
+                    .filter(candidate -> candidate.id().equals(roofWindow.roomId()))
+                    .findFirst()
+                    .orElse(null);
+            if (room == null) {
+                continue;
+            }
+            de.schrell.cadas.domain.model.SlopedCeilingProfile profile = room.slopedCeilingProfiles().stream()
+                    .filter(candidate -> candidate.lowSide() == roofWindow.slopeSide())
+                    .findFirst()
+                    .orElse(null);
+            if (profile == null) {
+                continue;
+            }
+            double angle = room.slopeAngleDegrees(profile);
+            RotationAxis rotationAxis = switch (roofWindow.slopeSide()) {
+                case NORTH, SOUTH -> RotationAxis.X;
+                case EAST, WEST -> RotationAxis.Z;
+            };
+            double signedAngle = switch (roofWindow.slopeSide()) {
+                case NORTH, EAST -> -angle;
+                case SOUTH, WEST -> angle;
+            };
+            boxes.add(new RenderableBox(
+                    new SelectionKey(RenderableKind.ROOF_WINDOW, level.name(), roofWindow.id().toString()),
+                    level.name(), RenderableKind.ROOF_WINDOW,
+                    roofWindow.center().xMillimeters(),
+                    baseHeight + room.ceilingHeightAt(roofWindow.center()) + 18.0,
+                    roofWindow.center().yMillimeters(),
+                    roofWindow.width().toMillimeters(), 30.0, roofWindow.depth().toMillimeters(),
+                    rotationAxis, signedAngle, "window", 0.76
+            ));
         }
         return boxes;
     }

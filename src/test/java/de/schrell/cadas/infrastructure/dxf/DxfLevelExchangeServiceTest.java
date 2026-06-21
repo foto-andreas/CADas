@@ -16,6 +16,7 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
@@ -541,6 +542,23 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1100.0, imported.rooms().getFirst().slopedCeilingProfiles().getFirst().kneeWallHeight().toMillimeters(), 0.001);
         assertEquals(1400.0, imported.rooms().getFirst().slopedCeilingProfiles().getFirst().horizontalRun().toMillimeters(), 0.001);
         assertEquals(SlopedCeilingSide.WEST, imported.rooms().getFirst().slopedCeilingProfiles().get(1).lowSide());
+    }
+
+    @Test
+    void exportiertUndImportiertDachfenster() throws Exception {
+        Level level = new Level("Dachgeschoss");
+        java.util.UUID roomId = java.util.UUID.randomUUID();
+        RoofWindow roofWindow = RoofWindow.create(
+                roomId, new PlanPoint(2_000, 700),
+                Length.ofMillimeters(900), Length.ofMillimeters(1_200), SlopedCeilingSide.NORTH
+        );
+        level.addRoofWindow(roofWindow);
+
+        Path file = tempDir.resolve("dachfenster.dxf");
+        exchangeService.exportLevel(level, file);
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertEquals(roofWindow, imported.roofWindows().getFirst());
     }
 
     @Test

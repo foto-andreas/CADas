@@ -23,6 +23,7 @@ import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.Roof;
+import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoofType;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
@@ -181,6 +182,29 @@ class ThreeDSceneModelBuilderTest {
         assertEquals(400.0, box.width(), 0.001);
         assertEquals(700.0, box.depth(), 0.001);
         assertEquals(37.5, box.rotationDegrees(), 0.001);
+    }
+
+    @Test
+    void rendertDachfensterMitNeigungDerRaumschraege() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
+        Room room = Room.rectangular(
+                "Studio", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                Length.ofMillimeters(2_800), Length.ofMillimeters(180), Length.ofMillimeters(200),
+                new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.ofMillimeters(1_000), Length.ofMillimeters(1_200))
+        );
+        project.primaryLevel().addRoom(room);
+        project.primaryLevel().addRoofWindow(RoofWindow.create(
+                room.id(), new PlanPoint(2_000, 600),
+                Length.ofMillimeters(900), Length.ofMillimeters(1_200), SlopedCeilingSide.NORTH
+        ));
+
+        RenderableBox roofWindow = builder.build(project, Set.of("Dachgeschoss"), false).boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.ROOF_WINDOW)
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(RotationAxis.X, roofWindow.rotationAxis());
+        assertTrue(Math.abs(roofWindow.rotationDegrees()) > 1.0);
     }
 
     @Test

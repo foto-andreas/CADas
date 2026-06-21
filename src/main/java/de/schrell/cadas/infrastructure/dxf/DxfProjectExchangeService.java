@@ -14,6 +14,7 @@ import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
@@ -215,6 +216,15 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 UUID.fromString(parts[2]), UUID.fromString(parts[3]), FloorOpeningShape.valueOf(parts[4]),
                                 new PlanPoint(parseDouble(parts[5]), parseDouble(parts[6])),
                                 Length.ofMillimeters(parseDouble(parts[7])), Length.ofMillimeters(parseDouble(parts[8]))
+                        ));
+                    }
+                    case "ROOF_WINDOW" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        level.addRoofWindow(new RoofWindow(
+                                UUID.fromString(parts[2]), UUID.fromString(parts[3]),
+                                new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
+                                Length.ofMillimeters(parseDouble(parts[6])), Length.ofMillimeters(parseDouble(parts[7])),
+                                SlopedCeilingSide.valueOf(parts[8])
                         ));
                     }
                     case "ROOF" -> importedRoof = new Roof(
@@ -476,6 +486,15 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     DxfMetadataCodec.encode(level.name()), opening.id(), opening.roomId(), opening.shape().name(),
                     opening.center().xMillimeters(), opening.center().yMillimeters(),
                     opening.width().toMillimeters(), opening.depth().toMillimeters()
+            ));
+        }
+        for (RoofWindow roofWindow : level.roofWindows()) {
+            appendMetadataText(dxf, context, roofWindow.center(), String.format(
+                    Locale.US,
+                    "ROOF_WINDOW|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%s",
+                    DxfMetadataCodec.encode(level.name()), roofWindow.id(), roofWindow.roomId(),
+                    roofWindow.center().xMillimeters(), roofWindow.center().yMillimeters(),
+                    roofWindow.width().toMillimeters(), roofWindow.depth().toMillimeters(), roofWindow.slopeSide().name()
             ));
         }
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {

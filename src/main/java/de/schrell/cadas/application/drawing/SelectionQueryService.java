@@ -27,6 +27,7 @@ public final class SelectionQueryService {
         List<SelectionKey> selections = new ArrayList<>();
         selections.addAll(findDoorSelections(level, point, tolerance));
         selections.addAll(findWindowSelections(level, point, tolerance));
+        selections.addAll(findRoofWindowSelections(level, point));
         selections.addAll(findStairSelections(level, point));
         selections.addAll(findFloorExtensionSelections(level, point));
         selections.addAll(findFloorOpeningSelections(level, point));
@@ -64,6 +65,13 @@ public final class SelectionQueryService {
             }
         }
         return selections;
+    }
+
+    private List<SelectionKey> findRoofWindowSelections(Level level, PlanPoint point) {
+        return level.roofWindows().stream()
+                .filter(roofWindow -> roofWindow.contains(point))
+                .map(roofWindow -> new SelectionKey(RenderableKind.ROOF_WINDOW, level.name(), roofWindow.id().toString()))
+                .toList();
     }
 
     private List<SelectionKey> findRoomSelections(Level level, PlanPoint point) {

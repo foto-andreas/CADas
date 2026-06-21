@@ -59,6 +59,7 @@ import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
 import de.schrell.cadas.application.reports.ConstructionDrawingPdfService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService;
 import de.schrell.cadas.application.roof.RoofSlopeWallService;
+import de.schrell.cadas.application.roof.RoofWindowPlacementService;
 import de.schrell.cadas.application.stairs.StairUnderbuildService;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
 import de.schrell.cadas.application.terrain.TerrainCornerService;
@@ -84,6 +85,7 @@ import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
@@ -231,6 +233,7 @@ public final class CadWorkbench extends BorderPane {
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     private final TerrainCornerService terrainCornerService = new TerrainCornerService();
     private final RoofSlopeWallService roofSlopeWallService = new RoofSlopeWallService();
+    private final RoofWindowPlacementService roofWindowPlacementService = new RoofWindowPlacementService();
     private final StairUnderbuildService stairUnderbuildService = new StairUnderbuildService();
     private final DraftingService draftingService = new DraftingService();
     private final EdgeResizeService edgeResizeService = new EdgeResizeService();
@@ -1046,6 +1049,7 @@ public final class CadWorkbench extends BorderPane {
                 toolMenuItem(DrawingTool.FLOOR_EXTENSION, KeyCode.G),
                 toolMenuItem(DrawingTool.DOOR, KeyCode.D),
                 toolMenuItem(DrawingTool.WINDOW, KeyCode.F),
+                menuItem(DrawingTool.ROOF_WINDOW.label(), () -> toolSelector.setValue(DrawingTool.ROOF_WINDOW), null),
                 toolMenuItem(DrawingTool.OBJECT, KeyCode.O),
                 new SeparatorMenuItem(),
                 menuItem("Geländehöhen bearbeiten", this::editTerrainElevations, null),
@@ -1291,7 +1295,8 @@ public final class CadWorkbench extends BorderPane {
                 case 2 -> shouldShowSection(DrawingTool.WALL, RenderableKind.WALL);
                 case 3 -> shouldShowRoomSection();
                 case 4 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
-                case 5 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW);
+                case 5 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW)
+                        || shouldShowSection(DrawingTool.ROOF_WINDOW, RenderableKind.ROOF_WINDOW);
                 case 6 -> shouldShowSection(DrawingTool.STAIR, RenderableKind.STAIR);
                 case 7 -> shouldShowSection(DrawingTool.OBJECT, RenderableKind.ROOM_OBJECT);
                 case 8 -> shouldShowSection(DrawingTool.FLOOR_EXTENSION, RenderableKind.FLOOR_EXTENSION);
@@ -1364,6 +1369,7 @@ public final class CadWorkbench extends BorderPane {
             case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> "automatisch abgeleiteter Raum";
             case DOOR -> "Tür";
             case WINDOW -> "Fenster";
+            case ROOF_WINDOW -> "Dachfenster";
             case STAIR -> "Treppe";
             case ROOM_OBJECT -> "Objekt";
             case FLOOR_EXTENSION -> "Balkon/Empore";
@@ -1918,6 +1924,10 @@ public final class CadWorkbench extends BorderPane {
             placeWindow(draftStart);
             draftStart = null;
             previewSegment = null;
+        } else if (currentTool() == DrawingTool.ROOF_WINDOW) {
+            placeRoofWindow(draftStart);
+            draftStart = null;
+            previewSegment = null;
         } else if (currentTool() == DrawingTool.OBJECT) {
             placeRoomObject(draftStart);
             draftStart = null;
@@ -2384,6 +2394,7 @@ public final class CadWorkbench extends BorderPane {
         drawFloorExtensions(graphics);
         drawDoors(graphics);
         drawWindows(graphics);
+        drawRoofWindows(graphics);
         drawRoomObjects(graphics);
         // Raumtexte werden vor den Bemaßungen gerendert, damit ihre Sperrflächen
         // als Seed-Blocker für die kollisionsfreie Maßtext-Platzierung dienen.
@@ -2507,6 +2518,10 @@ public final class CadWorkbench extends BorderPane {
                         .filter(window -> window.id().toString().equals(selection.elementId()))
                         .findFirst()
                         .ifPresent(window -> drawSelectedOpening(graphics, window.wallId(), window.offsetFromStart(), window.width()));
+                case ROOF_WINDOW -> activeLevel.get().roofWindows().stream()
+                        .filter(roofWindow -> roofWindow.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(roofWindow -> drawRoofWindowOutline(graphics, roofWindow));
                 case STAIR -> activeLevel.get().staircases().stream()
                         .filter(staircase -> staircase.id().toString().equals(selection.elementId()))
                         .findFirst()
@@ -3429,6 +3444,48 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
+    private void drawRoofWindows(GraphicsContext graphics) {
+        if (!projectionService.isPlanView(activeView.get())) {
+            return;
+        }
+        for (RoofWindow roofWindow : activeLevel.get().roofWindows()) {
+            boolean selected = isSelected(RenderableKind.ROOF_WINDOW, roofWindow.id().toString());
+            graphics.save();
+            graphics.setFill(selected ? Color.color(0.35, 0.72, 0.92, 0.42) : Color.color(0.35, 0.72, 0.92, 0.25));
+            graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#2c789f"));
+            graphics.setLineWidth(selected ? 2.8 : 1.8);
+            double x = toScreenProjectedX(new PlanPoint(
+                    roofWindow.center().xMillimeters() - roofWindow.width().toMillimeters() / 2.0,
+                    roofWindow.center().yMillimeters() - roofWindow.depth().toMillimeters() / 2.0
+            ), 0.0);
+            double y = toScreenProjectedY(new PlanPoint(
+                    roofWindow.center().xMillimeters() - roofWindow.width().toMillimeters() / 2.0,
+                    roofWindow.center().yMillimeters() - roofWindow.depth().toMillimeters() / 2.0
+            ), 0.0);
+            double width = roofWindow.width().toMillimeters() * scale();
+            double depth = roofWindow.depth().toMillimeters() * scale();
+            graphics.fillRect(x, y, width, depth);
+            graphics.strokeRect(x, y, width, depth);
+            graphics.strokeLine(x, y, x + width, y + depth);
+            graphics.strokeLine(x + width, y, x, y + depth);
+            graphics.restore();
+        }
+    }
+
+    private void drawRoofWindowOutline(GraphicsContext graphics, RoofWindow roofWindow) {
+        double x = toScreenProjectedX(new PlanPoint(
+                roofWindow.center().xMillimeters() - roofWindow.width().toMillimeters() / 2.0,
+                roofWindow.center().yMillimeters() - roofWindow.depth().toMillimeters() / 2.0
+        ), 0.0);
+        double y = toScreenProjectedY(new PlanPoint(
+                roofWindow.center().xMillimeters() - roofWindow.width().toMillimeters() / 2.0,
+                roofWindow.center().yMillimeters() - roofWindow.depth().toMillimeters() / 2.0
+        ), 0.0);
+        graphics.strokeRect(x, y,
+                roofWindow.width().toMillimeters() * scale(),
+                roofWindow.depth().toMillimeters() * scale());
+    }
+
     private void drawEditablePoints(GraphicsContext graphics) {
         if (currentTool() != DrawingTool.EDIT || !projectionService.isPlanView(activeView.get())) {
             return;
@@ -4340,6 +4397,7 @@ public final class CadWorkbench extends BorderPane {
             case WALL -> "Werkzeug: Wand | Linksklick startet und beendet Wände, Shift erlaubt freie Winkel.";
             case DOOR -> "Werkzeug: Tür | Linksklick auf eine Wand platziert die Tür mit den aktuellen Maßen.";
             case WINDOW -> "Werkzeug: Fenster | Linksklick auf eine Wand platziert das Fenster mit den aktuellen Maßen.";
+            case ROOF_WINDOW -> "Werkzeug: Dachfenster | Linksklick in einem Raum mit Dachschräge platziert das Dachfenster mit Fensterbreite und Fensterhöhe.";
             case STAIR -> "Werkzeug: Treppe | Rechteck aufziehen platziert die Treppe mit dem gewählten Preset.";
             case FLOOR_EXTENSION -> "Werkzeug: Balkon/Empore | Rechteck aufziehen fügt die Fußbodenplatte innen oder außen an die aktive Etage an.";
             case FLOOR_OPENING_RECTANGLE -> "Werkzeug: Bodenloch rechteckig | Rechteck innerhalb eines Raums aufziehen.";
@@ -4584,6 +4642,19 @@ public final class CadWorkbench extends BorderPane {
                     selectSingle(new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString()));
                     markThreeDDirty();
                 });
+    }
+
+    private void placeRoofWindow(PlanPoint clickPoint) {
+        roofWindowPlacementService.place(
+                        activeLevel.get(), clickPoint, currentWindowWidth(), currentWindowHeight()
+                )
+                .ifPresentOrElse(roofWindow -> {
+                    rememberStateForUndo();
+                    activeLevel.get().addRoofWindow(roofWindow);
+                    selectSingle(new SelectionKey(RenderableKind.ROOF_WINDOW, activeLevel.get().name(), roofWindow.id().toString()));
+                    markThreeDDirty();
+                    draftLabel.setText("Dachfenster auf Dachschräge platziert.");
+                }, () -> draftLabel.setText("Dachfenster können nur innerhalb eines Raums mit Dachschräge platziert werden."));
     }
 
     private void placeRoomObject(PlanPoint clickPoint) {
@@ -6344,6 +6415,7 @@ public final class CadWorkbench extends BorderPane {
                 case ROOM_VOLUME, ROOM_FLOOR, ROOM_CEILING -> false;
                 case DOOR -> activeLevel.get().removeDoor(id);
                 case WINDOW -> activeLevel.get().removeWindow(id);
+                case ROOF_WINDOW -> activeLevel.get().removeRoofWindow(id);
                 case STAIR -> removeStaircaseWithUnderbuild(id);
                 case ROOM_OBJECT -> activeLevel.get().removeRoomObject(id);
                 case FLOOR_EXTENSION -> activeLevel.get().removeFloorExtension(id);
@@ -6636,6 +6708,13 @@ public final class CadWorkbench extends BorderPane {
                         syncLengthInput(windowHeightField, windowHeightUnit, window.windowHeight(), LengthUnit.CENTIMETER);
                         syncLengthInput(sillHeightField, sillHeightUnit, window.sillHeight(), LengthUnit.CENTIMETER);
                     });
+            case ROOF_WINDOW -> activeLevel.get().roofWindows().stream()
+                    .filter(roofWindow -> roofWindow.id().toString().equals(selectedSelection.get().elementId()))
+                    .findFirst()
+                    .ifPresent(roofWindow -> {
+                        syncLengthInput(windowWidthField, windowWidthUnit, roofWindow.width(), LengthUnit.CENTIMETER);
+                        syncLengthInput(windowHeightField, windowHeightUnit, roofWindow.depth(), LengthUnit.CENTIMETER);
+                    });
             case STAIR -> activeLevel.get().staircases().stream()
                     .filter(stair -> stair.id().toString().equals(selectedSelection.get().elementId()))
                     .findFirst()
@@ -6709,6 +6788,12 @@ public final class CadWorkbench extends BorderPane {
                     .map(window -> selectedIds().contains(window.id().toString())
                             ? new WindowElement(window.id(), window.wallId(), window.offsetFromStart(), currentWindowWidth(), currentSillHeight(), currentWindowHeight())
                             : window)
+                    .toList());
+            case ROOF_WINDOW -> activeLevel.get().replaceRoofWindows(activeLevel.get().roofWindows().stream()
+                    .map(roofWindow -> selectedIds().contains(roofWindow.id().toString())
+                            ? new RoofWindow(roofWindow.id(), roofWindow.roomId(), roofWindow.center(),
+                            currentWindowWidth(), currentWindowHeight(), roofWindow.slopeSide())
+                            : roofWindow)
                     .toList());
             case STAIR -> {
                 List<Staircase> updatedStaircases = activeLevel.get().staircases().stream()
@@ -7162,6 +7247,15 @@ public final class CadWorkbench extends BorderPane {
 
     public int automationFloorOpeningCount() {
         return activeLevel.get().floorOpenings().size();
+    }
+
+    public int automationRoofWindowCount() {
+        return activeLevel.get().roofWindows().size();
+    }
+
+    public void automationPlaceRoofWindow(double worldXMillimeters, double worldYMillimeters) {
+        placeRoofWindow(new PlanPoint(worldXMillimeters, worldYMillimeters));
+        render();
     }
 
     public FloorOpening automationFloorOpening(int index) {

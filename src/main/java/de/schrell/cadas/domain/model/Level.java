@@ -12,6 +12,7 @@ public final class Level {
     private final List<Room> rooms = new ArrayList<>();
     private final List<Door> doors = new ArrayList<>();
     private final List<WindowElement> windows = new ArrayList<>();
+    private final List<RoofWindow> roofWindows = new ArrayList<>();
     private final List<Staircase> staircases = new ArrayList<>();
     private final List<RoomObject> roomObjects = new ArrayList<>();
     private final List<FloorExtension> floorExtensions = new ArrayList<>();
@@ -115,6 +116,24 @@ public final class Level {
     public void replaceWindows(List<WindowElement> updatedWindows) {
         windows.clear();
         windows.addAll(Objects.requireNonNull(updatedWindows, "updatedWindows darf nicht null sein."));
+    }
+
+    public List<RoofWindow> roofWindows() {
+        return List.copyOf(roofWindows);
+    }
+
+    public void addRoofWindow(RoofWindow roofWindow) {
+        roofWindows.add(Objects.requireNonNull(roofWindow, "roofWindow darf nicht null sein."));
+    }
+
+    public boolean removeRoofWindow(UUID roofWindowId) {
+        Objects.requireNonNull(roofWindowId, "roofWindowId darf nicht null sein.");
+        return roofWindows.removeIf(roofWindow -> roofWindow.id().equals(roofWindowId));
+    }
+
+    public void replaceRoofWindows(List<RoofWindow> updatedRoofWindows) {
+        roofWindows.clear();
+        roofWindows.addAll(Objects.requireNonNull(updatedRoofWindows, "updatedRoofWindows darf nicht null sein."));
     }
 
     public List<Staircase> staircases() {
@@ -232,6 +251,7 @@ public final class Level {
         copy.rooms.addAll(rooms);
         copy.doors.addAll(doors);
         copy.windows.addAll(windows);
+        copy.roofWindows.addAll(roofWindows);
         copy.staircases.addAll(staircases);
         copy.roomObjects.addAll(roomObjects);
         copy.floorExtensions.addAll(floorExtensions);

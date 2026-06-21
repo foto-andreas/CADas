@@ -12,6 +12,7 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
@@ -232,6 +233,15 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     opening.width().toMillimeters(), opening.depth().toMillimeters()
             ));
         }
+        for (RoofWindow roofWindow : level.roofWindows()) {
+            appendMetadataText(dxf, context, roofWindow.center(), String.format(
+                    Locale.US,
+                    "ROOF_WINDOW|%s|%s|%.3f|%.3f|%.3f|%.3f|%s",
+                    roofWindow.id(), roofWindow.roomId(),
+                    roofWindow.center().xMillimeters(), roofWindow.center().yMillimeters(),
+                    roofWindow.width().toMillimeters(), roofWindow.depth().toMillimeters(), roofWindow.slopeSide().name()
+            ));
+        }
 
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
@@ -377,6 +387,12 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             UUID.fromString(parts[1]), UUID.fromString(parts[2]), FloorOpeningShape.valueOf(parts[3]),
                             new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
                             Length.ofMillimeters(parseDouble(parts[6])), Length.ofMillimeters(parseDouble(parts[7]))
+                    ));
+                    case "ROOF_WINDOW" -> level.addRoofWindow(new RoofWindow(
+                            UUID.fromString(parts[1]), UUID.fromString(parts[2]),
+                            new PlanPoint(parseDouble(parts[3]), parseDouble(parts[4])),
+                            Length.ofMillimeters(parseDouble(parts[5])), Length.ofMillimeters(parseDouble(parts[6])),
+                            SlopedCeilingSide.valueOf(parts[7])
                     ));
                     case "SLS" -> {
                         SurfaceLayerStack stack = new SurfaceLayerStack(

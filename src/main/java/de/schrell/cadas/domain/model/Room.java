@@ -303,7 +303,7 @@ public final class Room {
                 .orElse(roomHeight.toMillimeters());
     }
 
-    private double ceilingHeightAt(PlanPoint point, SlopedCeilingProfile profile) {
+    public double ceilingHeightAt(PlanPoint point, SlopedCeilingProfile profile) {
         double lowHeight = profile.kneeWallHeight().toMillimeters();
         double highHeight = roomHeight.toMillimeters();
         double run = runMillimeters(profile);
