@@ -721,6 +721,13 @@ public final class CadWorkbench extends BorderPane {
         );
         this.moveLevelDownButton = moveLevelDownButton;
 
+        Button terrainButton = createActionButton(
+                "Gelände",
+                null,
+                this::editTerrainElevations,
+                "Öffnet die Geländehöhen aller äußeren Gebäudeecken relativ zum Boden der untersten Etage. Die Werte steuern Grundriss, Seitenansichten und 3D-Darstellung."
+        );
+
         settingsBarStyling();
         return new ToolBar(
                 labelledNode("Werkzeug", toolSelector),
@@ -730,6 +737,7 @@ public final class CadWorkbench extends BorderPane {
                 renameLevelButton,
                 moveLevelUpButton,
                 moveLevelDownButton,
+                terrainButton,
                 new Separator(Orientation.VERTICAL),
                 undoButton,
                 redoButton,
@@ -2383,6 +2391,7 @@ public final class CadWorkbench extends BorderPane {
         graphics.setFill(Color.web("#fcfaf5"));
         graphics.fillRect(0, 0, drawingCanvas.getWidth(), drawingCanvas.getHeight());
 
+        drawTerrainPlanArea(graphics);
         drawLowerLevel(graphics);
 
         if (showGrid.get()) {
@@ -2410,6 +2419,7 @@ public final class CadWorkbench extends BorderPane {
             drawPreview(graphics);
         }
         drawViewOverlay(graphics);
+        drawTerrainPlanMarkers(graphics);
         if (showCompass.get()) {
             drawCompass(graphics);
         }
@@ -3050,6 +3060,41 @@ public final class CadWorkbench extends BorderPane {
                 );
             }
             previous = current;
+        }
+    }
+
+    private void drawTerrainPlanArea(GraphicsContext graphics) {
+        if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured()) {
+            return;
+        }
+        double[] xPoints = project.terrain().vertices().stream()
+                .mapToDouble(vertex -> toScreenProjectedX(vertex.position(), 0.0))
+                .toArray();
+        double[] yPoints = project.terrain().vertices().stream()
+                .mapToDouble(vertex -> toScreenProjectedY(vertex.position(), 0.0))
+                .toArray();
+        graphics.setFill(Color.color(0.65, 0.49, 0.27, 0.16));
+        graphics.fillPolygon(xPoints, yPoints, xPoints.length);
+    }
+
+    private void drawTerrainPlanMarkers(GraphicsContext graphics) {
+        if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured()) {
+            return;
+        }
+        graphics.setStroke(Color.web("#8a6337"));
+        graphics.setFill(Color.web("#6f4e2c"));
+        graphics.setLineWidth(2.0);
+        List<TerrainVertex> vertices = project.terrain().vertices();
+        for (int index = 0; index < vertices.size(); index++) {
+            TerrainVertex vertex = vertices.get(index);
+            TerrainVertex next = vertices.get((index + 1) % vertices.size());
+            double x = toScreenProjectedX(vertex.position(), 0.0);
+            double y = toScreenProjectedY(vertex.position(), 0.0);
+            graphics.strokeLine(x, y,
+                    toScreenProjectedX(next.position(), 0.0),
+                    toScreenProjectedY(next.position(), 0.0));
+            graphics.fillOval(x - 4.0, y - 4.0, 8.0, 8.0);
+            graphics.fillText(vertex.elevationAboveLowestFloor().format(LengthUnit.METER, 2), x + 7.0, y - 7.0);
         }
     }
 

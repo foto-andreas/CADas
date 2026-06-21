@@ -1259,6 +1259,11 @@ class CadWorkbenchTest {
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
                     .anyMatch("ISO 7519"::equals));
+            Assertions.assertTrue(settingsBar.getItems().stream()
+                    .filter(javafx.scene.control.Button.class::isInstance)
+                    .map(javafx.scene.control.Button.class::cast)
+                    .map(javafx.scene.control.Button::getText)
+                    .anyMatch("Gelände"::equals));
 
             Menu optionenMenu = menuBar.getMenus().stream()
                     .filter(menu -> "Optionen".equals(menu.getText()))

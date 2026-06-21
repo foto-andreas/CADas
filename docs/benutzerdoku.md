@@ -508,7 +508,7 @@ Zusätzliche `DWG`-Objektdateien unter `~/.config/CADas/Objekte` erscheinen beim
 
 ### Hanggelände
 
-Über `Werkzeuge` > `Geländehöhen bearbeiten` erfasst du für jede äußere Ecke des Gebäudes die Geländehöhe in Zentimetern relativ zum Boden der untersten Etage. CADas leitet die äußeren Ecken automatisch aus dem Grundriss ab und erhält vorhandene Höhen beim erneuten Öffnen des Dialogs.
+Über **Gelände** in der Werkzeugleiste beziehungsweise `Werkzeuge` > `Geländehöhen bearbeiten` erfasst du für jede äußere Ecke des Gebäudes die Geländehöhe in Zentimetern relativ zum Boden der untersten Etage. CADas leitet die äußeren Ecken automatisch aus dem Grundriss ab und erhält vorhandene Höhen beim erneuten Öffnen des Dialogs. Der Grundriss zeigt Kontur, Eckpunkte und Höhenwerte direkt an.
 
 Die 3D-Ansicht zeigt das Gelände hellbraun als zusammenhängende Fläche. In den orthogonalen Seitenansichten erscheint die Geländeaußenkante, sodass Gefälle und Steigungen kontrollierbar bleiben.
 
