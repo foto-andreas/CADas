@@ -13,6 +13,10 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
@@ -77,6 +81,41 @@ class ConstructionDrawingPdfServiceTest {
             assertTrue(text.contains("Seitenansichten - gesamtes Gebäude"));
             assertFalse(text.contains("Seitenaufrisse - Erdgeschoss"));
             assertFalse(text.contains("Seitenaufrisse - Obergeschoss"));
+        }
+    }
+
+    @Test
+    void exportiertGetrennteHeizpläneFürEtageBodenUndDecke() throws Exception {
+        ProjectModel project = sampleProject();
+        Room groundFloorRoom = project.primaryLevel().rooms().getFirst();
+        project.primaryLevel().addHydronicHeating(heating(
+                groundFloorRoom, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, "FBH 1"
+        ));
+        project.primaryLevel().addHydronicHeating(heating(
+                groundFloorRoom, HeatingSurfacePosition.CEILING, HeatingLayoutPattern.SPIRAL, "DH 1"
+        ));
+        var upperLevel = project.createLevel("Obergeschoss");
+        Room upperRoom = Room.rectangular(
+                "Kind", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        upperLevel.addRoom(upperRoom);
+        upperLevel.addHydronicHeating(heating(
+                upperRoom, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, "FBH OG"
+        ));
+        Path target = tempDir.resolve("heizplaene.pdf");
+
+        new ConstructionDrawingPdfService().export(project, target);
+
+        try (var document = Loader.loadPDF(target.toFile())) {
+            assertEquals(7, document.getNumberOfPages());
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("Heizflächen Fußboden - Erdgeschoss"));
+            assertTrue(text.contains("Heizflächen Decke - Erdgeschoss"));
+            assertTrue(text.contains("Heizflächen Fußboden - Obergeschoss"));
+            assertTrue(text.contains("FBH 1"));
+            assertTrue(text.contains("DH 1"));
+            assertTrue(text.contains("FBH OG"));
         }
     }
 
@@ -191,5 +230,18 @@ class ConstructionDrawingPdfServiceTest {
                 Length.ofMillimeters(1_000), Length.ofMillimeters(1_500)
         ));
         return project;
+    }
+
+    private HydronicHeating heating(
+            Room room,
+            HeatingSurfacePosition surfacePosition,
+            HeatingLayoutPattern layoutPattern,
+            String zoneName
+    ) {
+        return HydronicHeating.create(
+                room.id(), surfacePosition, layoutPattern,
+                Length.ofMillimeters(200), Length.ofMillimeters(16), Length.ofMillimeters(300_000),
+                Length.ofMillimeters(150), room.outline().getFirst(), new PlanPoint(200, 0)
+        ).withZones(java.util.List.of(HeatingZone.create(zoneName, room.outline())));
     }
 }

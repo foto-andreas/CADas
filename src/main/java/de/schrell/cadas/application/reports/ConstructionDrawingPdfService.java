@@ -8,11 +8,15 @@ import de.schrell.cadas.application.drawing.TextBlockingBox;
 import de.schrell.cadas.application.drawing.WallDimensionPlacementService;
 import de.schrell.cadas.application.drawing.WallDimensionService;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
+import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
@@ -59,6 +63,7 @@ public final class ConstructionDrawingPdfService {
     private final DimensionLabelService dimensionLabelService = new DimensionLabelService();
     private final DimensionLabelPlacementService dimensionLabelPlacementService = new DimensionLabelPlacementService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
+    private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
 
     public void export(ProjectModel project, Path targetFile) throws IOException {
         export(project, targetFile, ConstructionDrawingOptions.defaults());
@@ -75,6 +80,11 @@ public final class ConstructionDrawingPdfService {
         try (PDDocument document = new PDDocument()) {
             for (Level level : project.levels()) {
                 addPlanPage(document, project, level, options);
+                for (HeatingSurfacePosition surfacePosition : HeatingSurfacePosition.values()) {
+                    if (level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == surfacePosition)) {
+                        addHeatingPage(document, project, level, surfacePosition);
+                    }
+                }
             }
             addSpatialViewsPage(document, project, true);
             addSpatialViewsPage(document, project, false);
@@ -120,6 +130,103 @@ public final class ConstructionDrawingPdfService {
                 drawWallDimensions(canvas, viewport, level, options, roomBlockers);
             }
         }
+    }
+
+    private void addHeatingPage(
+            PDDocument document,
+            ProjectModel project,
+            Level level,
+            HeatingSurfacePosition surfacePosition
+    ) throws IOException {
+        List<HydronicHeating> heatings = level.hydronicHeatings().stream()
+                .filter(heating -> heating.surfacePosition() == surfacePosition)
+                .toList();
+        Viewport viewport = heatingViewport(level, heatings);
+        String title = "Heizflächen " + surfacePosition + " – " + level.name();
+        try (PageCanvas canvas = addPage(document, project.name(), title, "M 1:" + viewport.scale())) {
+            for (Room room : level.rooms()) {
+                drawPolygon(canvas, viewport, room.outline(), new Color(247, 247, 244), 0.35f);
+            }
+            for (FloorOpening opening : level.floorOpenings()) {
+                drawFloorOpening(canvas, viewport, opening);
+            }
+            for (Wall wall : level.walls()) {
+                canvas.line(
+                        viewport.x(wall.axis().start().xMillimeters()), viewport.y(wall.axis().start().yMillimeters()),
+                        viewport.x(wall.axis().end().xMillimeters()), viewport.y(wall.axis().end().yMillimeters()),
+                        0.8f, new Color(120, 120, 120)
+                );
+            }
+            Color pipeColor = surfacePosition == HeatingSurfacePosition.FLOOR
+                    ? new Color(180, 45, 38)
+                    : new Color(35, 105, 160);
+            for (HydronicHeating heating : heatings) {
+                List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layout(heating);
+                for (HeatingZone zone : heating.zones()) {
+                    drawHeatingZone(canvas, viewport, zone, circuits, pipeColor);
+                }
+                for (HydronicHeatingLayoutService.CircuitLayout circuit : circuits) {
+                    List<ScreenPoint> path = circuit.pipePath().stream()
+                            .map(point -> new ScreenPoint(viewport.x(point.xMillimeters()), viewport.y(point.yMillimeters())))
+                            .toList();
+                    canvas.roundedPolyline(
+                            path,
+                            (float) Math.max(0.8, heating.pipeDiameter().toMillimeters() * viewport.factor()),
+                            pipeColor,
+                            circuit.bendRadius().toMillimeters() * viewport.factor()
+                    );
+                }
+                drawHeatingConnectorLabel(canvas, viewport, heating.supplyPoint(), "V", pipeColor);
+                drawHeatingConnectorLabel(canvas, viewport, heating.returnPoint(), "R", pipeColor);
+            }
+        }
+    }
+
+    private void drawHeatingZone(
+            PageCanvas canvas,
+            Viewport viewport,
+            HeatingZone zone,
+            List<HydronicHeatingLayoutService.CircuitLayout> circuits,
+            Color color
+    ) throws IOException {
+        float[] coordinates = new float[zone.outline().size() * 2];
+        for (int index = 0; index < zone.outline().size(); index++) {
+            coordinates[index * 2] = (float) viewport.x(zone.outline().get(index).xMillimeters());
+            coordinates[index * 2 + 1] = (float) viewport.y(zone.outline().get(index).yMillimeters());
+        }
+        canvas.polygon(coordinates, 0.45f, color, new Color(255, 255, 255));
+        PlanPoint center = polygonCenter(zone.outline());
+        double pipeLength = circuits.stream()
+                .filter(circuit -> circuit.zoneId().equals(zone.id()))
+                .findFirst()
+                .map(circuit -> circuit.pipeLength().toMillimeters())
+                .orElse(0.0);
+        canvas.text(
+                viewport.x(center.xMillimeters()) + 4.0,
+                viewport.y(center.yMillimeters()) + 4.0,
+                6.5f,
+                String.format(Locale.GERMAN, "%s | %.1f m", zone.name(), pipeLength / 1_000.0)
+        );
+    }
+
+    private void drawHeatingConnectorLabel(
+            PageCanvas canvas,
+            Viewport viewport,
+            PlanPoint point,
+            String label,
+            Color color
+    ) throws IOException {
+        double x = viewport.x(point.xMillimeters());
+        double y = viewport.y(point.yMillimeters());
+        canvas.rectangle(x - 5.0, y - 5.0, 10.0, 10.0, 0.8f, color, Color.WHITE);
+        canvas.text(x - 2.2, y - 2.3, 6.0f, label);
+    }
+
+    private PlanPoint polygonCenter(List<PlanPoint> points) {
+        return new PlanPoint(
+                points.stream().mapToDouble(PlanPoint::xMillimeters).average().orElse(0.0),
+                points.stream().mapToDouble(PlanPoint::yMillimeters).average().orElse(0.0)
+        );
     }
 
     private List<TextBlockingBox> drawRoomLabels(PageCanvas canvas, Viewport viewport, Level level, ConstructionDrawingOptions options) throws IOException {
@@ -445,6 +552,28 @@ public final class ConstructionDrawingPdfService {
         return lastViewport;
     }
 
+    private Viewport heatingViewport(Level level, List<HydronicHeating> heatings) {
+        List<PlanPoint> points = new ArrayList<>();
+        level.rooms().forEach(room -> points.addAll(room.outline()));
+        heatings.forEach(heating -> {
+            points.add(heating.supplyPoint());
+            points.add(heating.returnPoint());
+            heating.zones().forEach(zone -> points.addAll(zone.outline()));
+        });
+        Bounds bounds = points.isEmpty() ? levelBounds(level) : new Bounds(
+                points.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0),
+                points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0),
+                points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(10_000.0),
+                points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(7_000.0)
+        );
+        Bounds expandedBounds = bounds.expanded(400.0);
+        int scale = chooseScale(
+                expandedBounds.width(), expandedBounds.height(),
+                PAGE_WIDTH - 2 * MARGIN, PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT
+        );
+        return centeredViewport(expandedBounds, scale);
+    }
+
     private Viewport centeredViewport(Bounds bounds, int scale) {
         return new Viewport(
                 MARGIN,
@@ -701,6 +830,9 @@ public final class ConstructionDrawingPdfService {
     private record SpatialPoint(double x, double y) {
     }
 
+    private record ScreenPoint(double x, double y) {
+    }
+
     private record SpatialLine(double x1, double y1, double x2, double y2, boolean top, boolean terrain) {
 
         private SpatialLine(double x1, double y1, double x2, double y2, boolean top) {
@@ -751,6 +883,48 @@ public final class ConstructionDrawingPdfService {
             stream.setStrokingColor(stroke);
             stream.setNonStrokingColor(fill);
             stream.fillAndStroke();
+        }
+
+        void roundedPolyline(List<ScreenPoint> points, float lineWidth, Color color, double radius) throws IOException {
+            if (points.size() < 2) {
+                return;
+            }
+            stream.setStrokingColor(color);
+            stream.setLineWidth(lineWidth);
+            stream.moveTo((float) points.getFirst().x(), (float) points.getFirst().y());
+            for (int index = 1; index + 1 < points.size(); index++) {
+                ScreenPoint previous = points.get(index - 1);
+                ScreenPoint current = points.get(index);
+                ScreenPoint next = points.get(index + 1);
+                double firstLength = Math.hypot(current.x() - previous.x(), current.y() - previous.y());
+                double secondLength = Math.hypot(next.x() - current.x(), next.y() - current.y());
+                double trim = Math.min(radius, Math.min(firstLength, secondLength) / 2.0);
+                if (trim <= 0.001) {
+                    stream.lineTo((float) current.x(), (float) current.y());
+                    continue;
+                }
+                ScreenPoint before = interpolate(current, previous, trim / firstLength);
+                ScreenPoint after = interpolate(current, next, trim / secondLength);
+                stream.lineTo((float) before.x(), (float) before.y());
+                double firstControlX = before.x() + (current.x() - before.x()) * 2.0 / 3.0;
+                double firstControlY = before.y() + (current.y() - before.y()) * 2.0 / 3.0;
+                double secondControlX = after.x() + (current.x() - after.x()) * 2.0 / 3.0;
+                double secondControlY = after.y() + (current.y() - after.y()) * 2.0 / 3.0;
+                stream.curveTo(
+                        (float) firstControlX, (float) firstControlY,
+                        (float) secondControlX, (float) secondControlY,
+                        (float) after.x(), (float) after.y()
+                );
+            }
+            stream.lineTo((float) points.getLast().x(), (float) points.getLast().y());
+            stream.stroke();
+        }
+
+        private ScreenPoint interpolate(ScreenPoint start, ScreenPoint target, double ratio) {
+            return new ScreenPoint(
+                    start.x() + (target.x() - start.x()) * ratio,
+                    start.y() + (target.y() - start.y()) * ratio
+            );
         }
 
         void text(double x, double y, float size, String text) throws IOException {
