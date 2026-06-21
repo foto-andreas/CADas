@@ -8,6 +8,8 @@ import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
+import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
@@ -15,6 +17,8 @@ import de.schrell.cadas.domain.model.WindowElement;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,7 +43,10 @@ public final class RoofSlopeWallService {
         List<Room> rooms = level.rooms().stream()
                 .map(candidate -> candidate.id().equals(room.id()) ? withSlope(candidate, slope) : candidate)
                 .toList();
-        return new RoofSlopeResult(splitResult.walls(), rooms, splitResult.doors(), splitResult.windows(), room.id());
+        return new RoofSlopeResult(
+                splitResult.walls(), rooms, splitResult.doors(), splitResult.windows(),
+                splitResult.surfaceLayerStacks(), room.id()
+        );
     }
 
     private Optional<Room> adjacentRoom(Level level, Wall wall) {
@@ -79,6 +86,7 @@ public final class RoofSlopeWallService {
         List<Wall> walls = new ArrayList<>();
         List<Door> doors = new ArrayList<>(level.doors());
         List<WindowElement> windows = new ArrayList<>(level.windows());
+        Map<UUID, UUID> splitWallIds = new LinkedHashMap<>();
         for (Wall wall : level.walls()) {
             if (wall.id().equals(selectedWall.id())) {
                 walls.add(new Wall(wall.id(), wall.axis(), wall.thickness(), kneeWallHeight));
@@ -89,9 +97,13 @@ public final class RoofSlopeWallService {
                 walls.add(wall);
                 continue;
             }
-            splitSideWall(wall, connectedEnd, room.roomHeight(), kneeWallHeight, slopeWidth, walls, doors, windows);
+            splitSideWall(wall, connectedEnd, room.roomHeight(), kneeWallHeight, slopeWidth,
+                    walls, doors, windows, splitWallIds);
         }
-        return new WallSplitResult(List.copyOf(walls), List.copyOf(doors), List.copyOf(windows));
+        return new WallSplitResult(
+                List.copyOf(walls), List.copyOf(doors), List.copyOf(windows),
+                splitSurfaceLayerStacks(level.surfaceLayerStacks(), splitWallIds)
+        );
     }
 
     private void splitSideWall(
@@ -102,7 +114,8 @@ public final class RoofSlopeWallService {
             Length slopeWidth,
             List<Wall> walls,
             List<Door> doors,
-            List<WindowElement> windows
+            List<WindowElement> windows,
+            Map<UUID, UUID> splitWallIds
     ) {
         double length = wall.axis().length().toMillimeters();
         double run = Math.min(length, slopeWidth.toMillimeters());
@@ -133,7 +146,33 @@ public final class RoofSlopeWallService {
         }
         walls.add(firstWall);
         walls.add(secondWall);
+        splitWallIds.put(wall.id(), secondWallId);
         rebindOpeningsAfterSplit(wall.id(), secondWallId, splitOffset, doors, windows);
+    }
+
+    private List<SurfaceLayerStack> splitSurfaceLayerStacks(
+            List<SurfaceLayerStack> existingStacks,
+            Map<UUID, UUID> splitWallIds
+    ) {
+        List<SurfaceLayerStack> stacks = new ArrayList<>(existingStacks);
+        for (Map.Entry<UUID, UUID> split : splitWallIds.entrySet()) {
+            String originalPrefix = split.getKey().toString();
+            existingStacks.stream()
+                    .filter(stack -> stack.surfaceType() == SurfaceType.WALL_INTERIOR
+                            || stack.surfaceType() == SurfaceType.WALL_EXTERIOR)
+                    .filter(stack -> stack.targetKey().equals(originalPrefix)
+                            || stack.targetKey().startsWith(originalPrefix + "@"))
+                    .map(stack -> duplicateStack(stack,
+                            split.getValue() + stack.targetKey().substring(originalPrefix.length())))
+                    .forEach(stacks::add);
+        }
+        return List.copyOf(stacks);
+    }
+
+    private SurfaceLayerStack duplicateStack(SurfaceLayerStack source, String targetKey) {
+        SurfaceLayerStack duplicate = new SurfaceLayerStack(source.surfaceType(), targetKey);
+        source.layers().forEach(duplicate::addLayer);
+        return duplicate;
     }
 
     private List<WallProfilePoint> sideWallProfile(
@@ -263,7 +302,12 @@ public final class RoofSlopeWallService {
     private record RoomDistance(Room room, double distance) {
     }
 
-    private record WallSplitResult(List<Wall> walls, List<Door> doors, List<WindowElement> windows) {
+    private record WallSplitResult(
+            List<Wall> walls,
+            List<Door> doors,
+            List<WindowElement> windows,
+            List<SurfaceLayerStack> surfaceLayerStacks
+    ) {
     }
 
     public record RoofSlopeResult(
@@ -271,6 +315,7 @@ public final class RoofSlopeWallService {
             List<Room> rooms,
             List<Door> doors,
             List<WindowElement> windows,
+            List<SurfaceLayerStack> surfaceLayerStacks,
             UUID roomId
     ) {
     }

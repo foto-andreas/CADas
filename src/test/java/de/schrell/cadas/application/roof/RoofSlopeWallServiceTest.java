@@ -12,6 +12,8 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
+import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 import java.util.List;
@@ -87,6 +89,22 @@ class RoofSlopeWallServiceTest {
         assertNotEquals(sideWall.id(), rebound.wallId());
         assertEquals(600.0, rebound.offsetFromStart().toMillimeters(), 0.001);
         assertTrue(result.walls().stream().anyMatch(wall -> wall.id().equals(rebound.wallId())));
+    }
+
+    @Test
+    void führtWandbelägeAufBeidenTeilsegmentenFort() {
+        Level level = rectangularLevel();
+        Wall sideWall = level.walls().get(1);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_EXTERIOR, sideWall.id().toString());
+        level.addSurfaceLayerStack(stack);
+
+        RoofSlopeWallService.RoofSlopeResult result = service.apply(
+                level, level.walls().getFirst().id(), Length.ofMillimeters(1_000), Length.ofMillimeters(1_200)
+        );
+
+        assertEquals(2, result.surfaceLayerStacks().size());
+        assertTrue(result.surfaceLayerStacks().stream().anyMatch(candidate -> candidate.targetKey().equals(sideWall.id().toString())));
+        assertTrue(result.surfaceLayerStacks().stream().anyMatch(candidate -> !candidate.targetKey().equals(sideWall.id().toString())));
     }
 
     @Test

@@ -6588,6 +6588,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceRooms(result.rooms());
         activeLevel.get().replaceDoors(result.doors());
         activeLevel.get().replaceWindows(result.windows());
+        activeLevel.get().replaceSurfaceLayerStacks(result.surfaceLayerStacks());
         markThreeDDirty();
         draftLabel.setText("Dachschräge aus Wandinnenkante erzeugt.");
         render();
