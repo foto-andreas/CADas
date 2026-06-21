@@ -2,6 +2,7 @@ package de.schrell.cadas.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.domain.geometry.Length;
@@ -126,6 +127,59 @@ class LevelTest {
         assertEquals(second, level.roofWindows().getFirst());
         assertTrue(level.removeRoofWindow(second.id()));
         assertFalse(level.removeRoofWindow(UUID.randomUUID()));
+    }
+
+    @Test
+    void verwaltetJeRaumGetrennteBodenUndDeckenheizungen() {
+        Level level = new Level("Erdgeschoss");
+        Room room = Room.rectangular(
+                "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        level.addRoom(room);
+        HydronicHeating floorHeating = heating(room.id(), HeatingSurfacePosition.FLOOR);
+        HydronicHeating ceilingHeating = heating(room.id(), HeatingSurfacePosition.CEILING);
+
+        level.addHydronicHeating(floorHeating);
+        level.addHydronicHeating(ceilingHeating);
+
+        assertEquals(floorHeating, level.findHydronicHeating(room.id(), HeatingSurfacePosition.FLOOR));
+        assertEquals(ceilingHeating, level.copy().findHydronicHeating(room.id(), HeatingSurfacePosition.CEILING));
+        assertThrows(IllegalArgumentException.class, () -> level.addHydronicHeating(
+                heating(room.id(), HeatingSurfacePosition.FLOOR)
+        ));
+        assertTrue(level.removeHydronicHeating(floorHeating.id()));
+        assertFalse(level.removeHydronicHeating(UUID.randomUUID()));
+    }
+
+    @Test
+    void entferntHeizungenNichtMehrVorhandenerRäume() {
+        Level level = new Level("Erdgeschoss");
+        Room retainedRoom = Room.rectangular(
+                "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        Room removedRoom = Room.rectangular(
+                "Küche", new PlanPoint(4_000, 0), new PlanPoint(7_000, 3_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        level.addRoom(retainedRoom);
+        level.addRoom(removedRoom);
+        level.addHydronicHeating(heating(retainedRoom.id(), HeatingSurfacePosition.FLOOR));
+        level.addHydronicHeating(heating(removedRoom.id(), HeatingSurfacePosition.FLOOR));
+
+        level.replaceRooms(java.util.List.of(retainedRoom));
+
+        assertEquals(1, level.hydronicHeatings().size());
+        assertEquals(retainedRoom.id(), level.hydronicHeatings().getFirst().roomId());
+    }
+
+    private HydronicHeating heating(UUID roomId, HeatingSurfacePosition surfacePosition) {
+        return HydronicHeating.create(
+                roomId, surfacePosition, HeatingLayoutPattern.MEANDER,
+                Length.ofMillimeters(150), Length.ofMillimeters(16), Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100), new PlanPoint(0, 0), new PlanPoint(100, 0)
+        );
     }
 
     private Wall wallAt(double yMillimeters) {

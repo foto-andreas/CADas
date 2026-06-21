@@ -18,6 +18,7 @@ public final class Level {
     private final List<FloorExtension> floorExtensions = new ArrayList<>();
     private final List<FloorOpening> floorOpenings = new ArrayList<>();
     private final List<SurfaceLayerStack> surfaceLayerStacks = new ArrayList<>();
+    private final List<HydronicHeating> hydronicHeatings = new ArrayList<>();
 
     public Level(String name) {
         this.name = Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -80,6 +81,7 @@ public final class Level {
     public void replaceRooms(List<Room> updatedRooms) {
         rooms.clear();
         rooms.addAll(Objects.requireNonNull(updatedRooms, "updatedRooms darf nicht null sein."));
+        hydronicHeatings.removeIf(heating -> rooms.stream().noneMatch(room -> room.id().equals(heating.roomId())));
     }
 
     public List<Door> doors() {
@@ -238,6 +240,61 @@ public final class Level {
                 .orElse(null);
     }
 
+    public List<HydronicHeating> hydronicHeatings() {
+        return List.copyOf(hydronicHeatings);
+    }
+
+    public void addHydronicHeating(HydronicHeating heating) {
+        HydronicHeating requiredHeating = Objects.requireNonNull(heating, "heating darf nicht null sein.");
+        if (findHydronicHeating(requiredHeating.roomId(), requiredHeating.surfacePosition()) != null) {
+            throw new IllegalArgumentException("Für Raum und Fläche ist bereits eine Heizung vorhanden.");
+        }
+        hydronicHeatings.add(requiredHeating);
+    }
+
+    public boolean removeHydronicHeating(UUID heatingId) {
+        Objects.requireNonNull(heatingId, "heatingId darf nicht null sein.");
+        return hydronicHeatings.removeIf(heating -> heating.id().equals(heatingId));
+    }
+
+    public void replaceHydronicHeating(HydronicHeating updatedHeating) {
+        Objects.requireNonNull(updatedHeating, "updatedHeating darf nicht null sein.");
+        int index = -1;
+        for (int currentIndex = 0; currentIndex < hydronicHeatings.size(); currentIndex++) {
+            if (hydronicHeatings.get(currentIndex).id().equals(updatedHeating.id())) {
+                index = currentIndex;
+                break;
+            }
+        }
+        if (index < 0) {
+            throw new IllegalArgumentException("Heizung nicht gefunden: " + updatedHeating.id());
+        }
+        HydronicHeating conflictingHeating = findHydronicHeating(
+                updatedHeating.roomId(), updatedHeating.surfacePosition()
+        );
+        if (conflictingHeating != null && !conflictingHeating.id().equals(updatedHeating.id())) {
+            throw new IllegalArgumentException("Für Raum und Fläche ist bereits eine Heizung vorhanden.");
+        }
+        hydronicHeatings.set(index, updatedHeating);
+    }
+
+    public void replaceHydronicHeatings(List<HydronicHeating> updatedHeatings) {
+        hydronicHeatings.clear();
+        for (HydronicHeating heating : Objects.requireNonNull(updatedHeatings, "updatedHeatings darf nicht null sein.")) {
+            addHydronicHeating(heating);
+        }
+    }
+
+    public HydronicHeating findHydronicHeating(UUID roomId, HeatingSurfacePosition surfacePosition) {
+        Objects.requireNonNull(roomId, "roomId darf nicht null sein.");
+        Objects.requireNonNull(surfacePosition, "surfacePosition darf nicht null sein.");
+        return hydronicHeatings.stream()
+                .filter(heating -> heating.roomId().equals(roomId))
+                .filter(heating -> heating.surfacePosition() == surfacePosition)
+                .findFirst()
+                .orElse(null);
+    }
+
     public Wall findWall(UUID wallId) {
         return walls.stream()
                 .filter(wall -> wall.id().equals(wallId))
@@ -259,6 +316,7 @@ public final class Level {
         surfaceLayerStacks.stream()
                 .map(SurfaceLayerStack::copy)
                 .forEach(copy.surfaceLayerStacks::add);
+        copy.hydronicHeatings.addAll(hydronicHeatings);
         return copy;
     }
 
