@@ -29,3 +29,5 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 
 ## Offene Folgeentscheidungen
 * Ob die Verlegeart dauerhaft pro gesamter Flächenheizung oder feiner pro Heizbereich gespeichert wird, bleibt für die nächste Persistenz-Erweiterung zu entscheiden.
+* Hindernisse, Schächte und manuell sperrbare Anschlusskorridore brauchen ein eigenes persistentes Flächenmodell, bevor der FBH-Layouter sie sauber berücksichtigen kann. Bis dahin nutzt CADas Raum-/Heizbereichspolygone und automatisch freigehaltene HKV-Korridore.
+* Die globale Invertierung benachbarter Heizkreise zur Vermeidung gleicher Rollen an gemeinsamen Grenzen wird erst ergänzt, wenn Verlegeart und Rollenorientierung pro Heizbereich gespeichert werden.
