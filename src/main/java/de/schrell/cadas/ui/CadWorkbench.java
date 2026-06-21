@@ -85,6 +85,7 @@ import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
@@ -277,7 +278,6 @@ public final class CadWorkbench extends BorderPane {
     private final ObjectProperty<Level> activeLevel = new SimpleObjectProperty<>(project.primaryLevel());
     private final ObjectProperty<ViewOrientation> activeView = new SimpleObjectProperty<>(ViewOrientation.TOP);
     private final ObjectProperty<WorkspaceMode> activeWorkspaceMode = new SimpleObjectProperty<>(WorkspaceMode.TWO_D);
-    private final BooleanProperty showGrid = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToGrid = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToEndpoints = new SimpleBooleanProperty(true);
     private final BooleanProperty showCompass = new SimpleBooleanProperty(true);
@@ -559,7 +559,6 @@ public final class CadWorkbench extends BorderPane {
 
         applyFormTooltips();
 
-        registerRenderListener(showGrid);
         registerRenderListener(snapToGrid);
         registerRenderListener(snapToEndpoints);
         registerRenderListener(showCompass);
@@ -644,10 +643,6 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private ToolBar buildSettingsBar() {
-        CheckBox rasterBox = new CheckBox("Raster");
-        rasterBox.selectedProperty().bindBidirectional(showGrid);
-        applyTooltip(rasterBox, "Blendet das maßstäbliche Raster der Zeichenfläche ein oder aus.");
-
         CheckBox snapRasterBox = new CheckBox("Raster-Snap");
         snapRasterBox.selectedProperty().bindBidirectional(snapToGrid);
         applyTooltip(snapRasterBox, "Aktiviert das magnetische Einrasten auf das konfigurierte Raster.");
@@ -742,7 +737,6 @@ public final class CadWorkbench extends BorderPane {
                 deleteSelectionButton,
                 clearSelectionButton,
                 new Separator(Orientation.VERTICAL),
-                rasterBox,
                 snapRasterBox,
                 snapPointsBox,
                 guideDistancesBox,
@@ -1061,7 +1055,6 @@ public final class CadWorkbench extends BorderPane {
 
         Menu optionenMenu = new Menu("Optionen");
         optionenMenu.getItems().addAll(
-                checkMenuItem("Raster anzeigen", showGrid),
                 checkMenuItem("Auf Raster einrasten", snapToGrid),
                 checkMenuItem("Auf Punkte einrasten", snapToEndpoints),
                 checkMenuItem("Hilfslinien anzeigen", showGuides),
@@ -2380,9 +2373,6 @@ public final class CadWorkbench extends BorderPane {
         drawTerrainPlanArea(graphics);
         drawLowerLevel(graphics);
 
-        if (showGrid.get()) {
-            drawGrid(graphics);
-        }
         if (showGuides.get()) {
             drawGuides(graphics);
         }
@@ -2399,13 +2389,15 @@ public final class CadWorkbench extends BorderPane {
         // als Seed-Blocker für die kollisionsfreie Maßtext-Platzierung dienen.
         List<TextBlockingBox> roomLabelBlockers = drawRoomLabels(graphics);
         drawWallDimensions(graphics, roomLabelBlockers);
+        drawTerrainPlanMarkers(graphics);
+        drawGrid(graphics);
+        drawSelectionOverlay(graphics);
         drawEditablePoints(graphics);
         drawEdgeResizeHandles(graphics);
         if (previewSegment != null) {
             drawPreview(graphics);
         }
         drawViewOverlay(graphics);
-        drawTerrainPlanMarkers(graphics);
         if (showCompass.get()) {
             drawCompass(graphics);
         }
@@ -2470,8 +2462,8 @@ public final class CadWorkbench extends BorderPane {
         }
         double spacingMillimeters = currentGrid().spacing().toMillimeters();
         double spacingPixels = spacingMillimeters * scale();
-        if (spacingPixels < 8.0) {
-            return;
+        while (spacingPixels < 8.0) {
+            spacingPixels *= 10.0;
         }
 
         graphics.setStroke(Color.web("#d6d0c4"));
@@ -2483,6 +2475,101 @@ public final class CadWorkbench extends BorderPane {
         }
         for (double y = startY; y <= drawingCanvas.getHeight(); y += spacingPixels) {
             graphics.strokeLine(0, y, drawingCanvas.getWidth(), y);
+        }
+    }
+
+    private void drawSelectionOverlay(GraphicsContext graphics) {
+        if (!projectionService.isPlanView(activeView.get()) || selectedSelections.isEmpty()) {
+            return;
+        }
+        graphics.save();
+        graphics.setStroke(Color.web("#d97f2f"));
+        graphics.setLineWidth(3.0);
+        for (SelectionKey selection : selectedSelections) {
+            switch (selection.kind()) {
+                case WALL -> activeLevel.get().walls().stream()
+                        .filter(wall -> wall.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(wall -> drawWall(graphics, wall.axis(), wall.thickness(), Color.web("#d97f2f"), 1.0));
+                case ROOM_FLOOR, ROOM_CEILING, ROOM_VOLUME -> activeLevel.get().rooms().stream()
+                        .filter(room -> room.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(room -> graphics.strokePolygon(
+                                room.outline().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray(),
+                                room.outline().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray(),
+                                room.outline().size()
+                        ));
+                case DOOR -> activeLevel.get().doors().stream()
+                        .filter(door -> door.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(door -> drawSelectedOpening(graphics, door.wallId(), door.offsetFromStart(), door.width()));
+                case WINDOW -> activeLevel.get().windows().stream()
+                        .filter(window -> window.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(window -> drawSelectedOpening(graphics, window.wallId(), window.offsetFromStart(), window.width()));
+                case STAIR -> activeLevel.get().staircases().stream()
+                        .filter(staircase -> staircase.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(staircase -> drawStairOutline(graphics, staircase));
+                case ROOM_OBJECT -> activeLevel.get().roomObjects().stream()
+                        .filter(roomObject -> roomObject.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(roomObject -> drawSelectedRoomObjectOutline(graphics, roomObject));
+                case FLOOR_EXTENSION -> activeLevel.get().floorExtensions().stream()
+                        .filter(extension -> extension.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(extension -> graphics.strokeRect(
+                                toScreenX(extension.minX()),
+                                toScreenY(extension.minY()),
+                                extension.widthMillimeters() * scale(),
+                                extension.depthMillimeters() * scale()
+                        ));
+                case FLOOR_OPENING -> activeLevel.get().floorOpenings().stream()
+                        .filter(opening -> opening.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(opening -> drawSelectedFloorOpening(graphics, opening));
+                default -> {
+                }
+            }
+        }
+        graphics.restore();
+    }
+
+    private void drawSelectedOpening(GraphicsContext graphics, UUID wallId, Length offset, Length width) {
+        Wall wall = activeLevel.get().findWall(wallId);
+        PlanPoint start = wall.axis().pointAt(offset);
+        PlanPoint end = wall.axis().pointAt(offset.add(width));
+        graphics.strokeLine(
+                toScreenProjectedX(start, 0.0),
+                toScreenProjectedY(start, 0.0),
+                toScreenProjectedX(end, 0.0),
+                toScreenProjectedY(end, 0.0)
+        );
+    }
+
+    private void drawSelectedRoomObjectOutline(GraphicsContext graphics, RoomObject roomObject) {
+        double width = roomObject.width().toMillimeters() * scale();
+        double depth = roomObject.depth().toMillimeters() * scale();
+        graphics.save();
+        graphics.translate(toScreenX(roomObject.center().xMillimeters()), toScreenY(roomObject.center().yMillimeters()));
+        graphics.rotate(-roomObject.rotationDegrees());
+        if (roomObject.shape() == RoomObjectShape.CIRCLE || roomObject.shape() == RoomObjectShape.OVAL) {
+            graphics.strokeOval(-width / 2.0, -depth / 2.0, width, depth);
+        } else {
+            graphics.strokeRect(-width / 2.0, -depth / 2.0, width, depth);
+        }
+        graphics.restore();
+    }
+
+    private void drawSelectedFloorOpening(GraphicsContext graphics, FloorOpening opening) {
+        double x = toScreenProjectedX(new PlanPoint(opening.minXMillimeters(), opening.minYMillimeters()), 0.0);
+        double y = toScreenProjectedY(new PlanPoint(opening.minXMillimeters(), opening.minYMillimeters()), 0.0);
+        double width = opening.width().toMillimeters() * scale();
+        double height = opening.depth().toMillimeters() * scale();
+        if (opening.shape() == FloorOpeningShape.CIRCLE) {
+            graphics.strokeOval(x, y, width, height);
+        } else {
+            graphics.strokeRect(x, y, width, height);
         }
     }
 

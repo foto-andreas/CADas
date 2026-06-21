@@ -1280,6 +1280,41 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void rasterIstDauerhaftSichtbarUndNichtAbschaltbar() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            ToolBar settingsBar = (ToolBar) topArea.getChildren().get(1);
+            Assertions.assertFalse(settingsBar.getItems().stream()
+                    .filter(CheckBox.class::isInstance)
+                    .map(CheckBox.class::cast)
+                    .map(CheckBox::getText)
+                    .anyMatch("Raster"::equals));
+            Assertions.assertTrue(settingsBar.getItems().stream()
+                    .filter(CheckBox.class::isInstance)
+                    .map(CheckBox.class::cast)
+                    .map(CheckBox::getText)
+                    .anyMatch("Raster-Snap"::equals));
+            Menu optionenMenu = menuBar.getMenus().stream()
+                    .filter(menu -> "Optionen".equals(menu.getText()))
+                    .findFirst()
+                    .orElseThrow();
+            Assertions.assertFalse(optionenMenu.getItems().stream()
+                    .map(MenuItem::getText)
+                    .anyMatch("Raster anzeigen"::equals));
+            return null;
+        });
+    }
+
+    @Test
     void einheitenwechselKonvertiertSichtbarenWertOhneLängenänderung() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

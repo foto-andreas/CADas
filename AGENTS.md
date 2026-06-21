@@ -63,6 +63,7 @@ Du entwickelst ein einfach zu benutzendes CAD-Programm für Gebäude-Grundrisse.
 * Die aktuelle DXF-Basis schreibt metrische Header-Werte mit `$INSUNITS = 4`, `$MEASUREMENT = 1`, eigene Handles, `TABLES`, `BLOCKS`, `INSERT`-Referenzen sowie eine einfache `OBJECTS`- und Layout-Grundstruktur.
 * Rotierbare Bauteile werden zunächst über testbare 90°-Drehung für Wände, Räume und Treppen unterstützt.
 * Die 2D-Auswahl lässt sich mit den Cursortasten um genau eine Rasterweite verschieben. Die Kontextaktion `90°-Korrektur` richtet ausgewählte Wände und Objektwinkel bei höchstens 10° Abweichung orthogonal aus, berücksichtigt das Raster und hält gemeinsame Wandenden verbunden.
+* Das 2D-Raster ist dauerhaft sichtbar und wird oberhalb aller Modellinhalte, aber unterhalb der aktuellen Auswahl, ihrer Griffe und Zeichen-Vorschauen gerendert. Bei starkem Herauszoomen wird automatisch ein gröberes Vielfaches der Rasterweite gezeigt.
 * Die 2D- und 3D-Workbench teilen sich einen gemeinsamen Mittelbereich; zwischen beiden wird explizit umgeschaltet, damit die aktive Arbeitsansicht maximalen Platz erhält.
 * In 2D bleiben `Oben` und `Unten` feste Ansichten, während die Pfeile `links`, `rechts`, `oben` und `unten` das Modell relativ zur aktuellen Sicht kippen.
 * Die 3D-Ansicht dreht immer um die Modellmitte, nutzt kamerabezogenes Panning und startet standardmäßig in einer orthografischen räumlichen Kontrollansicht.

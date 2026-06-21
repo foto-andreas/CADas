@@ -733,7 +733,7 @@ Türen und Fenster bleiben wandgebunden. Wenn du eine Wand drehst, folgen ihre �
 
 ### Raster
 
-Blendet das Raster sichtbar ein oder aus.
+Das Raster ist dauerhaft sichtbar. Es liegt oberhalb der Modellinhalte, aber unterhalb der aktuellen Auswahl und ihrer Bearbeitungsgriffe. Beim starken Herauszoomen zeigt CADas automatisch ein gröberes Vielfaches der eingestellten Rasterweite.
 
 ### Snap Raster
 
@@ -743,7 +743,7 @@ Wenn aktiv:
 
 Wenn deaktiviert:
 
-* Das Raster bleibt optional sichtbar, wirkt aber nicht mehr als Fanghilfe.
+* Das Raster bleibt sichtbar, wirkt aber nicht mehr als Fanghilfe.
 
 ### Snap Punkte
 
