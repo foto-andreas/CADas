@@ -65,6 +65,46 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void ordnetJedemHeizkreisEinEigenesHkvPaarZu() {
+        Room room = rectangularRoom();
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 35_000);
+
+        HydronicHeatingLayoutService.PlanningResult result = service.suggest(room, heating);
+
+        assertTrue(result.validationReport().valid());
+        assertTrue(result.circuits().size() > 1);
+        assertEquals(result.circuits().size(), result.circuits().stream()
+                .map(HydronicHeatingLayoutService.CircuitLayout::supplyPort)
+                .distinct()
+                .count());
+        for (HydronicHeatingLayoutService.CircuitLayout circuit : result.circuits()) {
+            assertEquals(circuit.supplyPort(), circuit.supplyConnectorPath().getFirst());
+            assertEquals(circuit.returnPort(), circuit.returnConnectorPath().getLast());
+            assertEquals(circuit.fieldSupplyPath().getFirst(), circuit.supplyConnectorPath().getLast());
+            assertEquals(circuit.fieldReturnPath().getLast(), circuit.returnConnectorPath().getFirst());
+            assertFalse(circuit.fieldSupplyPath().isEmpty());
+            assertFalse(circuit.fieldReturnPath().isEmpty());
+        }
+    }
+
+    @Test
+    void erzeugtMaßstabsgerechtesSvgMitRinnenUndRollenfarben() {
+        Room room = rectangularRoom();
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000)
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline())));
+
+        String svg = service.toSvg(room, heating);
+
+        assertTrue(svg.contains("viewBox=\"-200.000 -200.000 6400.000 4400.000\""));
+        assertTrue(svg.contains("id=\"variotherm-rinnen\""));
+        assertTrue(svg.contains("r=\"44.200\""));
+        assertTrue(svg.contains("class=\"vorlauf\""));
+        assertTrue(svg.contains("class=\"ruecklauf\""));
+        assertTrue(svg.contains("V1"));
+        assertTrue(svg.contains("R1"));
+    }
+
+    @Test
     void erhältLFormAlsVeränderbarenHeizbereich() {
         Room room = lShapedRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.CEILING, HeatingLayoutPattern.MEANDER, 200_000);
