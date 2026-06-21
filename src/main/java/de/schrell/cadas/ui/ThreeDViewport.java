@@ -851,7 +851,9 @@ public final class ThreeDViewport extends BorderPane {
     private Color colorForKey(String materialKey, SelectionKey selectionKey) {
         boolean isSelected = (selectedSelection != null && selectedSelection.equals(selectionKey))
                 || selectedSelections.contains(selectionKey);
-        Color base = switch (materialKey) {
+        Color base = materialKey.startsWith("color:")
+                ? Color.web(materialKey.substring("color:".length()))
+                : switch (materialKey) {
             case "wall" -> Color.web("#5b738a");
             case "door" -> Color.web("#c88349", 0.3);
             case "window" -> Color.web("#7ab9d6", 0.3);
@@ -866,8 +868,8 @@ public final class ThreeDViewport extends BorderPane {
             case "roof" -> Color.web("#8e5f54");
             case "surface-layer" -> Color.web("#8e7b5e");
             case "joint" -> Color.web("#1a1510");
-            default -> Color.web("#8c877f");
-        };
+                    default -> Color.web("#8c877f");
+                };
         if (isSelected) {
             base = base.deriveColor(0, 1.0, 1.2, 1.0);
         }
@@ -907,6 +909,7 @@ public final class ThreeDViewport extends BorderPane {
         meshView.setMaterial(material);
         meshView.setDrawMode(surfaceRenderingMode
                 || "room-object".equals(rm.materialKey())
+                || rm.materialKey().startsWith("color:")
                 || "terrain".equals(rm.materialKey()) ? DrawMode.FILL : DrawMode.LINE);
         meshView.setCullFace(CullFace.NONE);
         meshView.setOpacity(rm.opacity());

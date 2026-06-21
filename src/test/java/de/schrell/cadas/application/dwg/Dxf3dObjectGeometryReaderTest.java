@@ -53,4 +53,14 @@ class Dxf3dObjectGeometryReaderTest {
         assertEquals(12, geometry.solidMeshes().getFirst().triangleCount());
     }
 
+    @Test
+    void übernimmtEchteDxfFarbeInDasNetzmaterial() throws Exception {
+        Path file = tempDir.resolve("farbig.dxf");
+        Files.writeString(file, simpleSolidDxf().replace("70\n1\n", "420\n1193046\n70\n1\n"));
+
+        Dxf3dObjectGeometry geometry = reader.read(file);
+
+        assertEquals("color:#123456", geometry.solidMeshes().getFirst().materialKey());
+    }
+
 }

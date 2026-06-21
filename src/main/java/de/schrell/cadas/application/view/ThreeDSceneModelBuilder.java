@@ -4,6 +4,7 @@ import de.schrell.cadas.application.dwg.Dxf3dBounds;
 import de.schrell.cadas.application.dwg.Dxf3dMesh;
 import de.schrell.cadas.application.dwg.Dxf3dObjectGeometry;
 import de.schrell.cadas.application.dwg.Dxf3dObjectGeometryReader;
+import de.schrell.cadas.application.dwg.Ifc3dObjectGeometryReader;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.layers.TileLayoutRequest;
 import de.schrell.cadas.application.layers.TileLayoutService;
@@ -66,6 +67,7 @@ public final class ThreeDSceneModelBuilder {
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
     private final Dxf3dObjectGeometryReader dxf3dObjectGeometryReader = new Dxf3dObjectGeometryReader();
+    private final Ifc3dObjectGeometryReader ifc3dObjectGeometryReader = new Ifc3dObjectGeometryReader();
     private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
     private final Map<Path, CachedDxf3dGeometry> dxf3dGeometryCache = new LinkedHashMap<>();
     private final List<RenderableMesh> meshes = new ArrayList<>();
@@ -1758,7 +1760,8 @@ public final class ThreeDSceneModelBuilder {
     }
 
     private Optional<Dxf3dObjectGeometry> dxf3dGeometry(RoomObject roomObject) {
-        if (roomObject.type() != RoomObjectType.DXF_3D_REFERENCE || roomObject.source().isBlank()) {
+        if ((roomObject.type() != RoomObjectType.DXF_3D_REFERENCE
+                && roomObject.type() != RoomObjectType.IFC_3D_REFERENCE) || roomObject.source().isBlank()) {
             return Optional.empty();
         }
         Path sourceFile = Path.of(roomObject.source().split("#", 2)[0]).toAbsolutePath().normalize();
@@ -1772,7 +1775,9 @@ public final class ThreeDSceneModelBuilder {
             if (cached != null && cached.modifiedMillis() == modifiedMillis && cached.size() == size) {
                 return Optional.of(cached.geometry());
             }
-            Dxf3dObjectGeometry geometry = dxf3dObjectGeometryReader.read(sourceFile);
+            Dxf3dObjectGeometry geometry = roomObject.type() == RoomObjectType.IFC_3D_REFERENCE
+                    ? ifc3dObjectGeometryReader.read(sourceFile)
+                    : dxf3dObjectGeometryReader.read(sourceFile);
             dxf3dGeometryCache.put(sourceFile, new CachedDxf3dGeometry(modifiedMillis, size, geometry));
             return Optional.of(geometry);
         } catch (IOException | IllegalArgumentException exception) {
@@ -1807,7 +1812,7 @@ public final class ThreeDSceneModelBuilder {
                     sourceMesh.triangleCount(),
                     baseHeight,
                     roomObject.height().toMillimeters(),
-                    "room-object",
+                    sourceMesh.materialKey(),
                     1.0
             ));
         }

@@ -4,6 +4,7 @@ import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.application.dwg.DwgLibraryAnalyzer;
 import de.schrell.cadas.application.dwg.Dxf3dObjectGeometry;
 import de.schrell.cadas.application.dwg.Dxf3dObjectGeometryReader;
+import de.schrell.cadas.application.dwg.Ifc3dObjectGeometryReader;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
@@ -26,6 +27,7 @@ public final class RoomObjectPresetService {
     private final Path objectDirectory;
     private final DwgLibraryAnalyzer dwgLibraryAnalyzer;
     private final Dxf3dObjectGeometryReader dxf3dObjectGeometryReader;
+    private final Ifc3dObjectGeometryReader ifc3dObjectGeometryReader;
 
     public RoomObjectPresetService() {
         this(defaultObjectDirectory());
@@ -39,10 +41,11 @@ public final class RoomObjectPresetService {
         this.objectDirectory = Objects.requireNonNull(objectDirectory, "objectDirectory darf nicht null sein.");
         this.dwgLibraryAnalyzer = Objects.requireNonNull(dwgLibraryAnalyzer, "dwgLibraryAnalyzer darf nicht null sein.");
         this.dxf3dObjectGeometryReader = new Dxf3dObjectGeometryReader();
+        this.ifc3dObjectGeometryReader = new Ifc3dObjectGeometryReader();
     }
 
     public List<RoomObjectPreset> presets() {
-        return Stream.of(defaults(), loadDwgPresets(), loadDxf3dPresets()).flatMap(List::stream).toList();
+        return Stream.of(defaults(), loadDwgPresets(), loadCad3dPresets()).flatMap(List::stream).toList();
     }
 
     public List<RoomObjectPreset> defaults() {
@@ -77,14 +80,18 @@ public final class RoomObjectPresetService {
     }
 
     public List<RoomObjectPreset> loadDxf3dPresets() {
+        return loadCad3dPresets();
+    }
+
+    public List<RoomObjectPreset> loadCad3dPresets() {
         if (!Files.isDirectory(objectDirectory)) {
             return List.of();
         }
         try (Stream<Path> files = Files.list(objectDirectory)) {
             return files
-                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".dxf"))
+                    .filter(this::isSupportedCad3dFile)
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
-                    .map(this::readDxf3dPreset)
+                    .map(this::readCad3dPreset)
                     .flatMap(Optional::stream)
                     .toList();
         } catch (IOException exception) {
@@ -93,6 +100,10 @@ public final class RoomObjectPresetService {
     }
 
     public RoomObjectPreset importDxf3dObject(Path sourceFile) throws IOException {
+        return importCad3dObject(sourceFile);
+    }
+
+    public RoomObjectPreset importCad3dObject(Path sourceFile) throws IOException {
         Objects.requireNonNull(sourceFile, "sourceFile darf nicht null sein.");
         Files.createDirectories(objectDirectory);
         Path targetFile = importTarget(sourceFile);
@@ -100,7 +111,7 @@ public final class RoomObjectPresetService {
         if (!Files.exists(targetFile) || !Files.isSameFile(normalizedSource, targetFile)) {
             Files.copy(normalizedSource, targetFile, StandardCopyOption.REPLACE_EXISTING);
         }
-        return dxf3dPreset(targetFile);
+        return cad3dPreset(targetFile);
     }
 
     public Path importTarget(Path sourceFile) {
@@ -135,22 +146,30 @@ public final class RoomObjectPresetService {
         return blockPresets.isEmpty() ? List.of(dwgPreset(path)) : blockPresets;
     }
 
-    private Optional<RoomObjectPreset> readDxf3dPreset(Path path) {
+    private Optional<RoomObjectPreset> readCad3dPreset(Path path) {
         try {
-            return Optional.of(dxf3dPreset(path));
+            return Optional.of(cad3dPreset(path));
         } catch (IOException | IllegalArgumentException exception) {
             return Optional.empty();
         }
     }
 
     private RoomObjectPreset dxf3dPreset(Path path) throws IOException {
-        Dxf3dObjectGeometry geometry = dxf3dObjectGeometryReader.read(path);
+        return cad3dPreset(path);
+    }
+
+    private RoomObjectPreset cad3dPreset(Path path) throws IOException {
+        String extension = extension(path);
+        Dxf3dObjectGeometry geometry = extension.equals("ifc")
+                ? ifc3dObjectGeometryReader.read(path)
+                : dxf3dObjectGeometryReader.read(path);
         String fileName = path.getFileName().toString();
-        String baseName = fileName.substring(0, fileName.length() - 4);
+        String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
+        boolean ifc = extension.equals("ifc");
         return new RoomObjectPreset(
-                "dxf-3d-" + normalizedId(baseName),
-                "3D-DXF: " + baseName,
-                RoomObjectType.DXF_3D_REFERENCE,
+                (ifc ? "ifc-3d-" : "dxf-3d-") + normalizedId(baseName),
+                (ifc ? "3D-IFC: " : "3D-DXF: ") + baseName,
+                ifc ? RoomObjectType.IFC_3D_REFERENCE : RoomObjectType.DXF_3D_REFERENCE,
                 RoomObjectShape.RECTANGLE,
                 Length.ofMillimeters(Math.max(1.0, geometry.bounds().widthMillimeters())),
                 Length.ofMillimeters(Math.max(1.0, geometry.bounds().depthMillimeters())),
@@ -158,6 +177,17 @@ public final class RoomObjectPresetService {
                 RoomObjectMountingMode.STANDS_ON_COVERING,
                 path.toAbsolutePath().normalize().toString()
         );
+    }
+
+    private boolean isSupportedCad3dFile(Path path) {
+        String extension = extension(path);
+        return extension.equals("dxf") || extension.equals("ifc");
+    }
+
+    private String extension(Path path) {
+        String fileName = path.getFileName().toString();
+        int separator = fileName.lastIndexOf('.');
+        return separator < 0 ? "" : fileName.substring(separator + 1).toLowerCase(Locale.ROOT);
     }
 
     private RoomObjectPreset preset(String id, String name, RoomObjectType type, RoomObjectShape shape, double widthCentimeters, double depthCentimeters, double heightCentimeters, boolean cutsFloorCovering) {

@@ -1009,7 +1009,7 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Etage sichern als ...", this::saveCurrentLevelAs, null),
                 menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
-                menuItem("3D-Objekt aus DXF laden", this::importThreeDObjectFromDxf, null),
+                menuItem("3D-Objekt aus DXF/IFC laden", this::importThreeDObjectFromDxf, null),
                 menuItem("Beenden", this::requestApplicationExit, shortcutKey(KeyCode.Q))
         );
 
@@ -5078,8 +5078,9 @@ public final class CadWorkbench extends BorderPane {
 
     private void importThreeDObjectFromDxf() {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("3D-Objekt aus DXF laden");
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("3D-DXF-Dateien", "*.dxf", "*.DXF"));
+        fileChooser.setTitle("3D-Objekt aus DXF oder IFC laden");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                "3D-CAD-Dateien", "*.dxf", "*.DXF", "*.ifc", "*.IFC"));
         Window window = currentWindow();
         java.io.File file = fileChooser.showOpenDialog(window);
         if (file == null) {
@@ -5094,19 +5095,19 @@ public final class CadWorkbench extends BorderPane {
             if (Files.exists(targetFile)
                     && !isSameFile(sourceFile, targetFile)
                     && !confirmOverwrite(
-                    "3D-DXF-Objekt überschreiben",
-                    "Ein 3D-DXF-Objekt mit dem Namen `" + sourceFile.getFileName() + "` ist bereits registriert.",
+                    "3D-CAD-Objekt überschreiben",
+                    "Ein 3D-CAD-Objekt mit dem Namen `" + sourceFile.getFileName() + "` ist bereits registriert.",
                     "Soll die vorhandene Objektdatei ersetzt werden?"
             )) {
                 return;
             }
-            RoomObjectPreset preset = roomObjectPresetService.importDxf3dObject(sourceFile);
+            RoomObjectPreset preset = roomObjectPresetService.importCad3dObject(sourceFile);
             registerRoomObjectPreset(preset);
             roomObjectPresetSelector.setValue(preset);
             toolSelector.setValue(DrawingTool.OBJECT);
-            draftLabel.setText("3D-DXF-Objekt geladen: " + sourceFile.getFileName());
+            draftLabel.setText("3D-CAD-Objekt geladen: " + sourceFile.getFileName());
         } catch (IOException | IllegalArgumentException exception) {
-            showOperationException("3D-DXF-Import fehlgeschlagen", exception);
+            showOperationException("3D-CAD-Import fehlgeschlagen", exception);
         }
     }
 

@@ -608,7 +608,7 @@ class CadWorkbenchTest {
     }
 
     @Test
-    void dateimenueBietetImportFürDreidimensionaleDxfObjekte() throws Exception {
+    void dateimenueBietetImportFürDreidimensionaleDxfUndIfcObjekte() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
             new Scene(instanz, 1200, 800);
@@ -624,7 +624,7 @@ class CadWorkbenchTest {
                     .filter(menu -> "Datei".equals(menu.getText()))
                     .flatMap(menu -> menu.getItems().stream())
                     .map(MenuItem::getText)
-                    .anyMatch("3D-Objekt aus DXF laden"::equals);
+                    .anyMatch("3D-Objekt aus DXF/IFC laden"::equals);
         }));
     }
 

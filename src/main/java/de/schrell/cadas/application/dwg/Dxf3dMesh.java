@@ -2,10 +2,11 @@ package de.schrell.cadas.application.dwg;
 
 import java.util.Arrays;
 
-public record Dxf3dMesh(int sourceSolidIndex, Dxf3dBounds bounds, double[] triangleCoordinates) {
+public record Dxf3dMesh(int sourceSolidIndex, Dxf3dBounds bounds, double[] triangleCoordinates, String materialKey) {
 
     public Dxf3dMesh {
         triangleCoordinates = Arrays.copyOf(triangleCoordinates, triangleCoordinates.length);
+        materialKey = materialKey == null || materialKey.isBlank() ? "room-object" : materialKey;
         if (sourceSolidIndex < 0) {
             throw new IllegalArgumentException("Der Quellkörper-Index darf nicht negativ sein.");
         }
@@ -17,6 +18,10 @@ public record Dxf3dMesh(int sourceSolidIndex, Dxf3dBounds bounds, double[] trian
                 throw new IllegalArgumentException("3D-DXF-Netzkoordinaten müssen endlich sein.");
             }
         }
+    }
+
+    public Dxf3dMesh(int sourceSolidIndex, Dxf3dBounds bounds, double[] triangleCoordinates) {
+        this(sourceSolidIndex, bounds, triangleCoordinates, "room-object");
     }
 
     @Override
@@ -48,7 +53,7 @@ public record Dxf3dMesh(int sourceSolidIndex, Dxf3dBounds bounds, double[] trian
                 x0, y0, z0, x1, y0, z1, x1, y0, z0,
                 x0, y1, z0, x1, y1, z0, x1, y1, z1,
                 x0, y1, z0, x1, y1, z1, x0, y1, z1
-        });
+        }, "room-object");
     }
 
     public Dxf3dMesh scale(double factor) {
@@ -56,6 +61,10 @@ public record Dxf3dMesh(int sourceSolidIndex, Dxf3dBounds bounds, double[] trian
         for (int index = 0; index < scaled.length; index++) {
             scaled[index] *= factor;
         }
-        return new Dxf3dMesh(sourceSolidIndex, bounds.scale(factor), scaled);
+        return new Dxf3dMesh(sourceSolidIndex, bounds.scale(factor), scaled, materialKey);
+    }
+
+    public Dxf3dMesh withMaterialKey(String newMaterialKey) {
+        return new Dxf3dMesh(sourceSolidIndex, bounds, triangleCoordinates, newMaterialKey);
     }
 }

@@ -32,8 +32,10 @@ public final class Dxf3dObjectGeometryReader {
             String sat = decryptedSat(entityPairs);
             Optional<Dxf3dBounds> bounds = solidBounds(sat);
             bounds.ifPresent(rawSolids::add);
+            String materialKey = materialKey(entityPairs);
             meshTessellator.tessellate(sat, sourceSolidIndex)
                     .or(() -> bounds.map(value -> Dxf3dMesh.box(sourceSolidIndex, value)))
+                    .map(mesh -> mesh.withMaterialKey(materialKey))
                     .ifPresent(rawMeshes::add);
         }
         if (sourceSolidCount == 0) {
@@ -74,6 +76,46 @@ public final class Dxf3dObjectGeometryReader {
 
     private String stripLineEnding(String value) {
         return value.endsWith("\r") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private String materialKey(List<Pair> entityPairs) {
+        Optional<Integer> trueColor = entityPairs.stream()
+                .filter(pair -> pair.code() == 420)
+                .map(Pair::trimmedValue)
+                .map(this::parseInteger)
+                .flatMap(Optional::stream)
+                .findFirst();
+        if (trueColor.isPresent()) {
+            return String.format("color:#%06X", trueColor.orElseThrow() & 0xFFFFFF);
+        }
+        int aci = entityPairs.stream()
+                .filter(pair -> pair.code() == 62)
+                .map(Pair::trimmedValue)
+                .map(this::parseInteger)
+                .flatMap(Optional::stream)
+                .map(Math::abs)
+                .findFirst()
+                .orElse(0);
+        return switch (aci) {
+            case 1 -> "color:#FF0000";
+            case 2 -> "color:#FFFF00";
+            case 3 -> "color:#00FF00";
+            case 4 -> "color:#00FFFF";
+            case 5 -> "color:#0000FF";
+            case 6 -> "color:#FF00FF";
+            case 7 -> "color:#FFFFFF";
+            case 8 -> "color:#808080";
+            case 9 -> "color:#C0C0C0";
+            default -> "room-object";
+        };
+    }
+
+    private Optional<Integer> parseInteger(String value) {
+        try {
+            return Optional.of(Integer.parseInt(value));
+        } catch (NumberFormatException exception) {
+            return Optional.empty();
+        }
     }
 
     private DwgUnit readUnit(List<Pair> pairs) {

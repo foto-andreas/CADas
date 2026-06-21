@@ -103,6 +103,34 @@ class RoomObjectPresetServiceTest {
         assertEquals(1, service.loadDxf3dPresets().size());
     }
 
+    @Test
+    void importiertIfcDateiAlsSkalierbaresPreset() throws Exception {
+        Path sourceFile = tempDir.resolve("Wärmepumpe.ifc");
+        Files.writeString(sourceFile, """
+                ISO-10303-21;
+                DATA;
+                #1=IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.);
+                #2=IFCCARTESIANPOINT((0.,0.,0.));
+                #3=IFCCARTESIANPOINT((100.,0.,0.));
+                #4=IFCCARTESIANPOINT((100.,50.,0.));
+                #5=IFCPOLYLOOP((#2,#3,#4));
+                #6=IFCFACEOUTERBOUND(#5,.T.);
+                #7=IFCFACE((#6));
+                #8=IFCCLOSEDSHELL((#7));
+                #9=IFCFACETEDBREP(#8);
+                ENDSEC;
+                END-ISO-10303-21;
+                """);
+        Path objectDirectory = tempDir.resolve("Objekte");
+        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, new DwgLibraryAnalyzer(new UnavailableConverter()));
+
+        RoomObjectPreset preset = service.importCad3dObject(sourceFile);
+
+        assertEquals(RoomObjectType.IFC_3D_REFERENCE, preset.type());
+        assertTrue(Files.exists(objectDirectory.resolve("Wärmepumpe.ifc")));
+        assertTrue(service.loadCad3dPresets().stream().anyMatch(candidate -> candidate.type() == RoomObjectType.IFC_3D_REFERENCE));
+    }
+
     private static final class UnavailableConverter implements DwgToDxfConverter {
 
         @Override
