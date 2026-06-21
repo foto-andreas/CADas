@@ -48,6 +48,7 @@ class HydronicHeatingLayoutServiceTest {
 
         assertFalse(spiralPath.isEmpty());
         assertNotEquals(meanderPath, spiralPath);
+        assertNoSelfIntersections(spiralPath.subList(1, spiralPath.size() - 1));
     }
 
     @Test
@@ -151,6 +152,32 @@ class HydronicHeatingLayoutServiceTest {
             previousIndex = index;
         }
         return inside || polygon.stream().anyMatch(vertex -> vertex.distanceTo(point).toMillimeters() < 0.001);
+    }
+
+    private void assertNoSelfIntersections(List<PlanPoint> path) {
+        for (int firstIndex = 1; firstIndex < path.size(); firstIndex++) {
+            PlanPoint firstStart = path.get(firstIndex - 1);
+            PlanPoint firstEnd = path.get(firstIndex);
+            for (int secondIndex = firstIndex + 2; secondIndex < path.size(); secondIndex++) {
+                PlanPoint secondStart = path.get(secondIndex - 1);
+                PlanPoint secondEnd = path.get(secondIndex);
+                assertFalse(segmentsIntersect(firstStart, firstEnd, secondStart, secondEnd),
+                        () -> "Schneckenrohre kreuzen sich: " + firstStart + " / " + secondStart);
+            }
+        }
+    }
+
+    private boolean segmentsIntersect(PlanPoint firstStart, PlanPoint firstEnd, PlanPoint secondStart, PlanPoint secondEnd) {
+        double firstOrientation = orientation(firstStart, firstEnd, secondStart);
+        double secondOrientation = orientation(firstStart, firstEnd, secondEnd);
+        double thirdOrientation = orientation(secondStart, secondEnd, firstStart);
+        double fourthOrientation = orientation(secondStart, secondEnd, firstEnd);
+        return firstOrientation * secondOrientation < -0.001 && thirdOrientation * fourthOrientation < -0.001;
+    }
+
+    private double orientation(PlanPoint first, PlanPoint second, PlanPoint third) {
+        return (second.xMillimeters() - first.xMillimeters()) * (third.yMillimeters() - first.yMillimeters())
+                - (second.yMillimeters() - first.yMillimeters()) * (third.xMillimeters() - first.xMillimeters());
     }
 
     private Room rectangularRoom() {

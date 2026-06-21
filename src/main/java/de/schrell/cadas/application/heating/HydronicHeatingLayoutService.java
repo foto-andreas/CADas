@@ -117,15 +117,23 @@ public final class HydronicHeatingLayoutService {
 
     private List<PlanPoint> spiralPath(List<PlanPoint> polygon, double clearance, double spacing) {
         List<List<PlanPoint>> contours = new ArrayList<>();
+        double originalOrientation = Math.signum(signedDoubleArea(polygon));
+        double previousArea = Double.POSITIVE_INFINITY;
         for (double offset = clearance; contours.size() < 256; offset += spacing) {
             List<PlanPoint> contour = offsetPolygon(polygon, offset);
-            if (contour.size() < 3 || Math.abs(signedDoubleArea(contour)) < spacing * spacing * 2.0) {
+            double signedArea = signedDoubleArea(contour);
+            double area = Math.abs(signedArea);
+            if (contour.size() < 3
+                    || Math.signum(signedArea) != originalOrientation
+                    || area >= previousArea - EPSILON
+                    || area < spacing * spacing * 2.0) {
                 break;
             }
             if (contour.stream().anyMatch(point -> !containsPoint(polygon, point))) {
                 break;
             }
             contours.add(contour);
+            previousArea = area;
         }
         if (contours.size() < 2) {
             return meanderPath(polygon, clearance, spacing);
