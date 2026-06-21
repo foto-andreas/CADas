@@ -14,6 +14,10 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoofWindow;
@@ -100,6 +104,15 @@ class DxfLevelExchangeServiceTest {
                 level.rooms().getFirst().id(), FloorOpeningShape.RECTANGLE,
                 new PlanPoint(2_000, 1_500), Length.ofMillimeters(1_000), Length.ofMillimeters(800)
         ));
+        HydronicHeating ceilingHeating = HydronicHeating.create(
+                level.rooms().getFirst().id(), HeatingSurfacePosition.CEILING, HeatingLayoutPattern.MEANDER,
+                Length.ofMillimeters(200), Length.ofMillimeters(18), Length.ofMillimeters(75_000),
+                Length.ofMillimeters(100), new PlanPoint(150, 200), new PlanPoint(350, 200)
+        ).withZones(java.util.List.of(HeatingZone.create("L-Heizkreis", java.util.List.of(
+                new PlanPoint(100, 100), new PlanPoint(3_800, 100), new PlanPoint(3_800, 1_600),
+                new PlanPoint(2_000, 1_600), new PlanPoint(2_000, 3_300), new PlanPoint(100, 3_300)
+        ))));
+        level.addHydronicHeating(ceilingHeating);
 
         Path file = tempDir.resolve("grundriss.dxf");
         exchangeService.exportLevel(level, file);
@@ -126,6 +139,12 @@ class DxfLevelExchangeServiceTest {
         assertEquals(120, imported.staircases().getFirst().leftUnderbuildWidth().toMillimeters(), 0.001);
         assertEquals(150, imported.staircases().getFirst().rightUnderbuildWidth().toMillimeters(), 0.001);
         assertEquals(80, imported.staircases().getFirst().undersideThickness().toMillimeters(), 0.001);
+        HydronicHeating importedHeating = imported.hydronicHeatings().getFirst();
+        assertEquals(ceilingHeating.id(), importedHeating.id());
+        assertEquals(HeatingSurfacePosition.CEILING, importedHeating.surfacePosition());
+        assertEquals(18.0, importedHeating.pipeDiameter().toMillimeters(), 0.001);
+        assertEquals("L-Heizkreis", importedHeating.zones().getFirst().name());
+        assertEquals(6, importedHeating.zones().getFirst().outline().size());
     }
 
     @Test

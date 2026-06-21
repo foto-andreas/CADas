@@ -10,6 +10,10 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoofWindow;
@@ -242,6 +246,24 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     roofWindow.width().toMillimeters(), roofWindow.depth().toMillimeters(), roofWindow.slopeSide().name()
             ));
         }
+        for (HydronicHeating heating : level.hydronicHeatings()) {
+            appendMetadataText(dxf, context, heating.supplyPoint(), String.format(
+                    Locale.US,
+                    "HEAT|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
+                    heating.id(), heating.roomId(), heating.surfacePosition().name(), heating.layoutPattern().name(),
+                    heating.pipeSpacing().toMillimeters(), heating.pipeDiameter().toMillimeters(),
+                    heating.maximumPipeLength().toMillimeters(), heating.wallClearance().toMillimeters(),
+                    heating.supplyPoint().xMillimeters(), heating.supplyPoint().yMillimeters(),
+                    heating.returnPoint().xMillimeters(), heating.returnPoint().yMillimeters()
+            ));
+            for (HeatingZone zone : heating.zones()) {
+                appendMetadataText(dxf, context, zone.outline().getFirst(), String.format(
+                        Locale.US,
+                        "HZONE|%s|%s|%s|%s",
+                        heating.id(), zone.id(), DxfMetadataCodec.encode(zone.name()), serializePoints(zone.outline())
+                ));
+            }
+        }
 
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
@@ -305,6 +327,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         List<WindowElement> pendingWindows = new ArrayList<>();
         List<Staircase> importedStaircases = new ArrayList<>();
         List<SurfaceLayerStack> importedStacks = new ArrayList<>();
+        Map<UUID, HydronicHeating> importedHeatings = new LinkedHashMap<>();
+        Map<UUID, List<HeatingZone>> importedHeatingZones = new LinkedHashMap<>();
         boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadataEntries);
         boolean objectRotationDegrees = DxfMetadataCodec.usesObjectRotationDegrees(metadataEntries);
 
@@ -394,6 +418,17 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             Length.ofMillimeters(parseDouble(parts[5])), Length.ofMillimeters(parseDouble(parts[6])),
                             SlopedCeilingSide.valueOf(parts[7])
                     ));
+                    case "HEAT" -> {
+                        HydronicHeating heating = deserializeHeating(parts);
+                        importedHeatings.put(heating.id(), heating);
+                    }
+                    case "HZONE" -> importedHeatingZones
+                            .computeIfAbsent(UUID.fromString(parts[1]), ignored -> new ArrayList<>())
+                            .add(new HeatingZone(
+                                    UUID.fromString(parts[2]),
+                                    DxfMetadataCodec.decode(parts[3], encodedFields),
+                                    deserializePoints(parts[4])
+                            ));
                     case "SLS" -> {
                         SurfaceLayerStack stack = new SurfaceLayerStack(
                                 UUID.fromString(parts[1]),
@@ -451,6 +486,10 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         level.replaceRooms(importedRooms);
         level.replaceStaircases(importedStaircases);
         level.replaceSurfaceLayerStacks(importedStacks);
+        level.replaceHydronicHeatings(importedHeatings.values().stream()
+                .map(heating -> heating.withZones(importedHeatingZones.getOrDefault(heating.id(), List.of())))
+                .filter(heating -> importedRooms.stream().anyMatch(room -> room.id().equals(heating.roomId())))
+                .toList());
         pendingDoors.stream()
                 .filter(door -> wallsById.containsKey(door.wallId()))
                 .forEach(level::addDoor);
@@ -603,6 +642,17 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             points.add(new PlanPoint(parseDouble(coordinates[0]), parseDouble(coordinates[1])));
         }
         return points;
+    }
+
+    private static HydronicHeating deserializeHeating(String[] parts) {
+        return new HydronicHeating(
+                UUID.fromString(parts[1]), UUID.fromString(parts[2]),
+                HeatingSurfacePosition.valueOf(parts[3]), HeatingLayoutPattern.valueOf(parts[4]),
+                Length.ofMillimeters(parseDouble(parts[5])), Length.ofMillimeters(parseDouble(parts[6])),
+                Length.ofMillimeters(parseDouble(parts[7])), Length.ofMillimeters(parseDouble(parts[8])),
+                new PlanPoint(parseDouble(parts[9]), parseDouble(parts[10])),
+                new PlanPoint(parseDouble(parts[11]), parseDouble(parts[12])), List.of()
+        );
     }
 
     private static double parseDouble(String value) {

@@ -15,6 +15,10 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -88,6 +92,16 @@ class DxfProjectExchangeServiceTest {
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER)
         ));
+        Room heatedRoom = project.primaryLevel().rooms().getFirst();
+        HydronicHeating floorHeating = HydronicHeating.create(
+                heatedRoom.id(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(150), Length.ofMillimeters(16), Length.ofMillimeters(90_000),
+                Length.ofMillimeters(120), new PlanPoint(200, 300), new PlanPoint(400, 300)
+        ).withZones(java.util.List.of(HeatingZone.create("Heizkreis Süd", java.util.List.of(
+                new PlanPoint(120, 120), new PlanPoint(4_800, 120),
+                new PlanPoint(4_800, 3_800), new PlanPoint(120, 3_800)
+        ))));
+        project.primaryLevel().addHydronicHeating(floorHeating);
         project.primaryLevel().addFloorOpening(FloorOpening.create(
                 project.primaryLevel().rooms().getFirst().id(), FloorOpeningShape.CIRCLE,
                 new PlanPoint(2_000, 2_000), Length.ofMillimeters(1_000), Length.ofMillimeters(1_000)
@@ -145,6 +159,13 @@ class DxfProjectExchangeServiceTest {
         assertEquals(3100.0, imported.primaryLevel().walls().getFirst().endHeight().toMillimeters(), 0.001);
         assertEquals(3, imported.primaryLevel().walls().getFirst().profile().size());
         assertEquals(3000.0, imported.primaryLevel().walls().getFirst().profile().get(1).offset().toMillimeters(), 0.001);
+        HydronicHeating importedHeating = imported.primaryLevel().hydronicHeatings().getFirst();
+        assertEquals(floorHeating.id(), importedHeating.id());
+        assertEquals(HeatingSurfacePosition.FLOOR, importedHeating.surfacePosition());
+        assertEquals(HeatingLayoutPattern.SPIRAL, importedHeating.layoutPattern());
+        assertEquals(new PlanPoint(200, 300), importedHeating.supplyPoint());
+        assertEquals("Heizkreis Süd", importedHeating.zones().getFirst().name());
+        assertEquals(floorHeating.zones().getFirst().outline(), importedHeating.zones().getFirst().outline());
     }
 
     @Test

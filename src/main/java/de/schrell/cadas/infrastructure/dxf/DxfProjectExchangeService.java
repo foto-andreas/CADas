@@ -11,6 +11,10 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
@@ -110,6 +114,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         Map<String, SurfaceLayerStack> lastStackByLevel = new LinkedHashMap<>();
         Map<String, List<Door>> pendingDoorsByLevel = new LinkedHashMap<>();
         Map<String, List<WindowElement>> pendingWindowsByLevel = new LinkedHashMap<>();
+        Map<String, Map<UUID, HydronicHeating>> pendingHeatingsByLevel = new LinkedHashMap<>();
+        Map<UUID, List<HeatingZone>> pendingHeatingZones = new LinkedHashMap<>();
         String importedProjectName = projectName;
         Roof importedRoof = null;
         List<TerrainVertex> importedTerrainVertices = new ArrayList<>();
@@ -227,6 +233,20 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 SlopedCeilingSide.valueOf(parts[8])
                         ));
                     }
+                    case "HEAT" -> {
+                        String levelName = DxfMetadataCodec.decode(parts[1], encodedFields);
+                        levels.computeIfAbsent(levelName, Level::new);
+                        HydronicHeating heating = deserializeProjectHeating(parts);
+                        pendingHeatingsByLevel.computeIfAbsent(levelName, ignored -> new LinkedHashMap<>())
+                                .put(heating.id(), heating);
+                    }
+                    case "HZONE" -> pendingHeatingZones
+                            .computeIfAbsent(UUID.fromString(parts[2]), ignored -> new ArrayList<>())
+                            .add(new HeatingZone(
+                                    UUID.fromString(parts[3]),
+                                    DxfMetadataCodec.decode(parts[4], encodedFields),
+                                    deserializePoints(parts[5])
+                            ));
                     case "ROOF" -> importedRoof = new Roof(
                             RoofType.valueOf(parts[1]),
                             Angle.ofDegrees(parseDouble(parts[2])),
@@ -294,6 +314,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         }
 
         addValidOpenings(levels, pendingDoorsByLevel, pendingWindowsByLevel);
+        addHydronicHeatings(levels, pendingHeatingsByLevel, pendingHeatingZones);
 
         if (levels.isEmpty()) {
             return ProjectModel.withDefaultLevel(importedProjectName, "Erdgeschoss");
@@ -497,6 +518,26 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     roofWindow.width().toMillimeters(), roofWindow.depth().toMillimeters(), roofWindow.slopeSide().name()
             ));
         }
+        for (HydronicHeating heating : level.hydronicHeatings()) {
+            appendMetadataText(dxf, context, heating.supplyPoint(), String.format(
+                    Locale.US,
+                    "HEAT|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
+                    DxfMetadataCodec.encode(level.name()), heating.id(), heating.roomId(),
+                    heating.surfacePosition().name(), heating.layoutPattern().name(),
+                    heating.pipeSpacing().toMillimeters(), heating.pipeDiameter().toMillimeters(),
+                    heating.maximumPipeLength().toMillimeters(), heating.wallClearance().toMillimeters(),
+                    heating.supplyPoint().xMillimeters(), heating.supplyPoint().yMillimeters(),
+                    heating.returnPoint().xMillimeters(), heating.returnPoint().yMillimeters()
+            ));
+            for (HeatingZone zone : heating.zones()) {
+                appendMetadataText(dxf, context, zone.outline().getFirst(), String.format(
+                        Locale.US,
+                        "HZONE|%s|%s|%s|%s|%s",
+                        DxfMetadataCodec.encode(level.name()), heating.id(), zone.id(),
+                        DxfMetadataCodec.encode(zone.name()), serializePoints(zone.outline())
+                ));
+            }
+        }
         for (SurfaceLayerStack sls : level.surfaceLayerStacks()) {
             appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                     Locale.US,
@@ -600,6 +641,24 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         target.replaceSurfaceLayerStacks(source.surfaceLayerStacks().stream()
                 .map(SurfaceLayerStack::copy)
                 .toList());
+        target.replaceHydronicHeatings(source.hydronicHeatings());
+    }
+
+    private void addHydronicHeatings(
+            Map<String, Level> levels,
+            Map<String, Map<UUID, HydronicHeating>> pendingHeatingsByLevel,
+            Map<UUID, List<HeatingZone>> pendingHeatingZones
+    ) {
+        for (Map.Entry<String, Map<UUID, HydronicHeating>> levelEntry : pendingHeatingsByLevel.entrySet()) {
+            Level level = levels.get(levelEntry.getKey());
+            if (level == null) {
+                continue;
+            }
+            levelEntry.getValue().values().stream()
+                    .map(heating -> heating.withZones(pendingHeatingZones.getOrDefault(heating.id(), List.of())))
+                    .filter(heating -> level.rooms().stream().anyMatch(room -> room.id().equals(heating.roomId())))
+                    .forEach(level::addHydronicHeating);
+        }
     }
 
     private void addValidOpenings(
@@ -671,6 +730,17 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             points.add(new PlanPoint(parseDouble(values[0]), parseDouble(values[1])));
         }
         return points;
+    }
+
+    private HydronicHeating deserializeProjectHeating(String[] parts) {
+        return new HydronicHeating(
+                UUID.fromString(parts[2]), UUID.fromString(parts[3]),
+                HeatingSurfacePosition.valueOf(parts[4]), HeatingLayoutPattern.valueOf(parts[5]),
+                Length.ofMillimeters(parseDouble(parts[6])), Length.ofMillimeters(parseDouble(parts[7])),
+                Length.ofMillimeters(parseDouble(parts[8])), Length.ofMillimeters(parseDouble(parts[9])),
+                new PlanPoint(parseDouble(parts[10]), parseDouble(parts[11])),
+                new PlanPoint(parseDouble(parts[12]), parseDouble(parts[13])), List.of()
+        );
     }
 
     private double parseDouble(String text) {
