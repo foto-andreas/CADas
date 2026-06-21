@@ -426,13 +426,13 @@ Räume werden nicht mehr mit einem eigenen Zeichenwerkzeug erstellt.
 Wähle im Werkzeug `Bearbeiten` genau einen Raum. Der Bereich `Flächenheizung` erscheint in der Eigenschaftenleiste und bietet für `Fußboden` und `Decke` dieselben Funktionen.
 
 1. Wähle die Fläche und als Verlegung `Meander` oder `Schnecke`.
-2. Gib Verlegeabstand, Rohrdurchmesser, maximale Rohrlänge und Mindestabstand zur Wand ein. Der Kurvenradius entspricht automatisch dem halben Verlegeabstand.
-3. Gib die X-/Y-Koordinaten von Vorlauf und Rücklauf am Verteiler ein.
+2. Gib Verlegeabstand, Rohrdurchmesser, maximale Rohrlänge und Mindestabstand zur Wand ein. Die Startwerte passen zum Variotherm-Trockenbau-System mit 100 mm Verlegeabstand, 11,6 mm Rohr und 18 mm Plattenstärke.
+3. Gib die X-/Y-Koordinaten von Vorlauf und Rücklauf am Verteiler ein. Ein HKV-Anschlusspaar ist 5 cm breit.
 4. Wähle `Heizkreise planen`. CADas schlägt die nötige Aufteilung vor und trennt einen Raum so lange, bis jeder Heizkreis die maximale Rohrlänge einhält.
 5. Wähle einen Heizkreis in der Liste. Mit `Bereich bearbeiten` änderst du Name und Polygon-Eckpunkte als `X; Y` in Zentimetern. Dadurch sind auch L- und U-förmige Bereiche möglich.
 6. Ergänze oder entferne Bereiche bei Bedarf. Bereiche außerhalb des Raums und bearbeitete Kreise oberhalb der maximalen Rohrlänge werden abgelehnt.
 
-Die 2D-Ansicht zeichnet Fußbodenheizungen rot und Deckenheizungen blau. `V` und `R` markieren Vorlauf und Rücklauf. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen und berechneter Rohrlänge.
+Die 2D-Ansicht zeichnet Heizbereiche als Umriss, Vorläufe blau und Rückläufe rot. Gestrichelte Leitungen führen zum HKV, durchgezogene Leitungen liegen in der Heizfläche. `V` und `R` markieren Vorlauf und Rücklauf. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen und berechneter Rohrlänge. Die Materialliste enthält zusätzlich je Raum eine maßstäbliche SVG-Zeichnung der geplanten Flächenheizung.
 
 ### Ebenen auf Flächen
 
@@ -441,7 +441,7 @@ Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepfleg
 * Wähle im Werkzeug `Bearbeiten` zuerst eine Wand oder einen Raum aus.
 * Öffne links den Bereich `Ebenen`.
 * Wähle den Flächentyp, zum Beispiel `WALL_INTERIOR`, `WALL_EXTERIOR`, `FLOOR` oder `CEILING`.
-* Wähle optional ein Preset wie `Fliese`, `Dämmplatte`, `Rigipsplatte`, `OSB-Platte`, `Tapete` oder eine registrierte `DWG-Referenz`.
+* Wähle optional ein Preset wie `Fliese`, `Variotherm Trockenbau-FBH-Platte 60 x 100 cm`, `Dämmplatte`, `Rigipsplatte`, `OSB-Platte`, `Tapete` oder eine registrierte `DWG-Referenz`.
 * Lege Name, Dicke, Platten- oder Fliesenmaß, Verlegeart, Mindestversatz und Mindestbreite fest.
 * Lege die Schnittbeschränkung fest: `frei`, `Schnitt nur außen` oder `Verlegerichtung, Schnitt nur außen`.
 * `Speichern` neben dem Namen legt die aktuell eingetragenen Belagswerte als eigenes Preset ab.

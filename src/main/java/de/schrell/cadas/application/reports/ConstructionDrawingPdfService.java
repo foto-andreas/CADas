@@ -157,29 +157,45 @@ public final class ConstructionDrawingPdfService {
                         0.8f, new Color(120, 120, 120)
                 );
             }
-            Color pipeColor = surfacePosition == HeatingSurfacePosition.FLOOR
+            Color zoneColor = surfacePosition == HeatingSurfacePosition.FLOOR
                     ? new Color(180, 45, 38)
                     : new Color(35, 105, 160);
+            Color supplyColor = new Color(31, 98, 208);
+            Color returnColor = new Color(211, 59, 50);
             for (HydronicHeating heating : heatings) {
                 List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layout(heating);
                 for (HeatingZone zone : heating.zones()) {
-                    drawHeatingZone(canvas, viewport, zone, circuits, pipeColor);
+                    drawHeatingZone(canvas, viewport, zone, circuits, zoneColor);
                 }
                 for (HydronicHeatingLayoutService.CircuitLayout circuit : circuits) {
-                    List<ScreenPoint> path = circuit.pipePath().stream()
-                            .map(point -> new ScreenPoint(viewport.x(point.xMillimeters()), viewport.y(point.yMillimeters())))
-                            .toList();
-                    canvas.roundedPolyline(
-                            path,
-                            (float) Math.max(0.8, heating.pipeDiameter().toMillimeters() * viewport.factor()),
-                            pipeColor,
-                            circuit.bendRadius().toMillimeters() * viewport.factor()
-                    );
+                    drawHeatingPath(canvas, viewport, heating, circuit.supplyConnectorPath(), circuit, supplyColor);
+                    drawHeatingPath(canvas, viewport, heating, circuit.returnConnectorPath(), circuit, returnColor);
+                    drawHeatingPath(canvas, viewport, heating, circuit.fieldSupplyPath(), circuit, supplyColor);
+                    drawHeatingPath(canvas, viewport, heating, circuit.fieldReturnPath(), circuit, returnColor);
+                    drawHeatingConnectorLabel(canvas, viewport, circuit.supplyPort(), "V", supplyColor);
+                    drawHeatingConnectorLabel(canvas, viewport, circuit.returnPort(), "R", returnColor);
                 }
-                drawHeatingConnectorLabel(canvas, viewport, heating.supplyPoint(), "V", pipeColor);
-                drawHeatingConnectorLabel(canvas, viewport, heating.returnPoint(), "R", pipeColor);
             }
         }
+    }
+
+    private void drawHeatingPath(
+            PageCanvas canvas,
+            Viewport viewport,
+            HydronicHeating heating,
+            List<PlanPoint> path,
+            HydronicHeatingLayoutService.CircuitLayout circuit,
+            Color color
+    ) throws IOException {
+        List<ScreenPoint> screenPath = path.stream()
+                .map(point -> new ScreenPoint(viewport.x(point.xMillimeters()), viewport.y(point.yMillimeters())))
+                .toList();
+        canvas.roundedPolyline(
+                screenPath,
+                (float) Math.max(0.8, heating.pipeDiameter().toMillimeters() * viewport.factor()),
+                color,
+                circuit.bendRadius().toMillimeters() * viewport.factor()
+        );
     }
 
     private void drawHeatingZone(

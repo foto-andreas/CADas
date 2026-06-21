@@ -86,21 +86,21 @@ class CadWorkbenchTest {
                 Map.entry("roomObjectHeight", "200"),
                 Map.entry("roomObjectBaseElevation", "0"),
                 Map.entry("floorExtensionThickness", "18"),
-                Map.entry("surfaceLayerThickness", "1,2"),
+                Map.entry("surfaceLayerThickness", "1,8"),
                 Map.entry("surfaceTileWidth", "60"),
-                Map.entry("surfaceTileHeight", "30"),
+                Map.entry("surfaceTileHeight", "100"),
                 Map.entry("surfaceLayoutOffset", "0"),
-                Map.entry("surfaceMinimumOffset", "10"),
-                Map.entry("surfaceMinimumEdgeWidth", "8"),
-                Map.entry("surfaceMinimumStartEndMargin", "8"),
-                Map.entry("surfaceJointWidth", "0,2"),
-                Map.entry("heatingPipeSpacing", "15"),
-                Map.entry("heatingPipeDiameter", "1,6"),
+                Map.entry("surfaceMinimumOffset", "0"),
+                Map.entry("surfaceMinimumEdgeWidth", "10"),
+                Map.entry("surfaceMinimumStartEndMargin", "10"),
+                Map.entry("surfaceJointWidth", "0"),
+                Map.entry("heatingPipeSpacing", "10"),
+                Map.entry("heatingPipeDiameter", "1,16"),
                 Map.entry("heatingMaximumPipeLength", "8000"),
                 Map.entry("heatingWallClearance", "10"),
                 Map.entry("heatingSupplyX", "0"),
                 Map.entry("heatingSupplyY", "0"),
-                Map.entry("heatingReturnX", "20"),
+                Map.entry("heatingReturnX", "5"),
                 Map.entry("heatingReturnY", "0")
         );
 
@@ -1402,23 +1402,23 @@ class CadWorkbenchTest {
 
         aufFxThread(() -> {
             Assertions.assertEquals("CENTIMETER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
-            Assertions.assertEquals("8", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("10", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
 
             workbench.automationSetUnit("surfaceMinimumEdgeWidth", "MILLIMETER");
             Assertions.assertEquals("MILLIMETER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
-            Assertions.assertEquals("80", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("100", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
 
             workbench.automationSetUnit("surfaceMinimumEdgeWidth", "METER");
             Assertions.assertEquals("METER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
-            Assertions.assertEquals("0,08", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("0,1", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
 
             workbench.automationSetUnit("surfaceMinimumEdgeWidth", "CENTIMETER");
             Assertions.assertEquals("CENTIMETER", workbench.automationUnit("surfaceMinimumEdgeWidth"));
-            Assertions.assertEquals("8", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
+            Assertions.assertEquals("10", workbench.automationFieldValue("surfaceMinimumEdgeWidth"));
 
             workbench.automationSetUnit("surfaceJointWidth", "CENTIMETER");
             Assertions.assertEquals("CENTIMETER", workbench.automationUnit("surfaceJointWidth"));
-            Assertions.assertEquals("0,2", workbench.automationFieldValue("surfaceJointWidth"));
+            Assertions.assertEquals("0", workbench.automationFieldValue("surfaceJointWidth"));
             return null;
         });
     }

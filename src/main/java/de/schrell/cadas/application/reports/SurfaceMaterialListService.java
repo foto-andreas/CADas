@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.reports;
 
+import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.application.layers.TileLayoutRequest;
 import de.schrell.cadas.application.layers.TileLayoutService;
 import de.schrell.cadas.application.layers.TilePlacement;
@@ -15,6 +16,8 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.FloorExtension;
 import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -41,6 +44,7 @@ public final class SurfaceMaterialListService {
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final ResidentialAreaService residentialAreaService = new ResidentialAreaService();
     private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
+    private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
 
     public SurfaceMaterialReport create(ProjectModel project) {
         Map<String, MaterialAccumulator> materials = new LinkedHashMap<>();
@@ -68,8 +72,45 @@ public final class SurfaceMaterialListService {
                 rooms.values().stream().map(RoomAccumulator::toSummary).toList(),
                 project.levels().stream()
                         .flatMap(level -> level.rooms().stream().map(room -> roomSummary(level, room)))
-                        .toList()
+                        .toList(),
+                heatingPlans(project)
         );
+    }
+
+    private List<HeatingPlanSummary> heatingPlans(ProjectModel project) {
+        List<HeatingPlanSummary> summaries = new ArrayList<>();
+        for (Level level : project.levels()) {
+            for (HydronicHeating heating : level.hydronicHeatings()) {
+                Room room = level.rooms().stream()
+                        .filter(candidate -> candidate.id().equals(heating.roomId()))
+                        .findFirst()
+                        .orElse(null);
+                if (room == null) {
+                    continue;
+                }
+                List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layout(heating);
+                String svg = hydronicHeatingLayoutService.toSvg(room, heating);
+                for (HeatingZone zone : heating.zones()) {
+                    double pipeLength = circuits.stream()
+                            .filter(circuit -> circuit.zoneId().equals(zone.id()))
+                            .findFirst()
+                            .map(circuit -> circuit.pipeLength().toMillimeters())
+                            .orElse(0.0);
+                    summaries.add(new HeatingPlanSummary(
+                            level.name(),
+                            room.name(),
+                            heating.surfacePosition().toString(),
+                            heating.layoutPattern().toString(),
+                            zone.name(),
+                            zone.areaSquareMillimeters() / 1_000_000.0,
+                            pipeLength / 1_000.0,
+                            heating.maximumPipeLength().toMillimeters() / 1_000.0,
+                            svg
+                    ));
+                }
+            }
+        }
+        return List.copyOf(summaries);
     }
 
     private RoomSummary roomSummary(Level level, Room room) {
@@ -791,13 +832,15 @@ public final class SurfaceMaterialListService {
             String projectName,
             List<MaterialSummary> materials,
             List<RoomComplexitySummary> roomComplexities,
-            List<RoomSummary> rooms
+            List<RoomSummary> rooms,
+            List<HeatingPlanSummary> heatingPlans
     ) {
 
         public String toMarkdown() {
             StringBuilder markdown = new StringBuilder();
             markdown.append("# Materialliste Beläge – ").append(projectName).append("\n\n");
             appendRooms(markdown);
+            appendHeatingPlans(markdown);
             if (materials.isEmpty()) {
                 markdown.append("## Beläge\n\nKeine sichtbaren Beläge vorhanden.\n");
                 return markdown.toString();
@@ -836,6 +879,49 @@ public final class SurfaceMaterialListService {
                         .append(" |\n");
             }
             markdown.append("\nDie Mietfläche gewichtet lichte Höhen ab 2 m vollständig, zwischen 1 m und 2 m zur Hälfte und unter 1 m nicht. Sichtbare Boden- und Deckenbeläge reduzieren die lichte Höhe.\n\n");
+        }
+
+        private void appendHeatingPlans(StringBuilder markdown) {
+            markdown.append("## Flächenheizungen\n\n");
+            if (heatingPlans.isEmpty()) {
+                markdown.append("Keine Flächenheizungen vorhanden.\n\n");
+                return;
+            }
+            markdown.append("| Raum | Fläche | Verlegung | Heizkreis | Heizfläche | Rohrlänge | Maximum |\n");
+            markdown.append("|---|---|---|---|---:|---:|---:|\n");
+            for (HeatingPlanSummary plan : heatingPlans) {
+                markdown.append("| ")
+                        .append(markdownCell(plan.levelName() + " / " + plan.roomName()))
+                        .append(" | ")
+                        .append(markdownCell(plan.surfacePosition()))
+                        .append(" | ")
+                        .append(markdownCell(plan.layoutPattern()))
+                        .append(" | ")
+                        .append(markdownCell(plan.zoneName()))
+                        .append(" | ")
+                        .append(decimal(plan.areaSquareMeters(), 2)).append(" m²")
+                        .append(" | ")
+                        .append(decimal(plan.pipeLengthMeters(), 1)).append(" m")
+                        .append(" | ")
+                        .append(decimal(plan.maximumPipeLengthMeters(), 1)).append(" m")
+                        .append(" |\n");
+            }
+            markdown.append('\n');
+            heatingPlans.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            plan -> plan.levelName() + "\u0000" + plan.roomName() + "\u0000" + plan.surfacePosition(),
+                            LinkedHashMap::new,
+                            java.util.stream.Collectors.toList()
+                    ))
+                    .values()
+                    .forEach(plans -> {
+                        HeatingPlanSummary first = plans.getFirst();
+                        markdown.append("### Heizplan ")
+                                .append(first.levelName()).append(" / ")
+                                .append(first.roomName()).append(" / ")
+                                .append(first.surfacePosition()).append("\n\n")
+                                .append(first.svg()).append("\n\n");
+                    });
         }
 
         private void appendMaterialSummary(StringBuilder markdown) {
@@ -951,6 +1037,19 @@ public final class SurfaceMaterialListService {
             double complexityScore,
             List<MaterialRoomEntry> roomEntries,
             List<RestPieceSummary> restPieces
+    ) {
+    }
+
+    public record HeatingPlanSummary(
+            String levelName,
+            String roomName,
+            String surfacePosition,
+            String layoutPattern,
+            String zoneName,
+            double areaSquareMeters,
+            double pipeLengthMeters,
+            double maximumPipeLengthMeters,
+            String svg
     ) {
     }
 

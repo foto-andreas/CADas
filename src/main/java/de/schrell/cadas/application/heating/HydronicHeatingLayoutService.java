@@ -28,6 +28,8 @@ public final class HydronicHeatingLayoutService {
     private static final double EPSILON = 0.001;
     private static final int MAXIMUM_ZONE_COUNT = 64;
     private static final double MANIFOLD_PAIR_PITCH_MILLIMETERS = 50.0;
+    private static final double MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS = 600.0;
+    private static final double MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS = 1_000.0;
 
     public PlanningResult suggest(Room room, HydronicHeating heating) {
         Objects.requireNonNull(room, "room darf nicht null sein.");
@@ -92,7 +94,10 @@ public final class HydronicHeatingLayoutService {
         Objects.requireNonNull(room, "room darf nicht null sein.");
         Objects.requireNonNull(heating, "heating darf nicht null sein.");
         List<CircuitLayout> circuits = layout(heating);
-        Bounds bounds = bounds(room.outline());
+        List<PlanPoint> svgPoints = new ArrayList<>(room.outline());
+        heating.zones().forEach(zone -> svgPoints.addAll(zone.outline()));
+        circuits.forEach(circuit -> svgPoints.addAll(circuit.pipePath()));
+        Bounds bounds = bounds(svgPoints);
         double padding = Math.max(heating.pipeSpacing().toMillimeters(), 100.0);
         double minX = bounds.minX() - padding;
         double minY = bounds.minY() - padding;
@@ -158,7 +163,7 @@ public final class HydronicHeatingLayoutService {
     }
 
     private LayoutComputation compute(HydronicHeating heating) {
-        GeometryScope scope = new GeometryScope(heating.zones().stream().map(HeatingZone::outline).toList());
+        GeometryScope scope = scopeFor(heating);
         GridGraph graph = GridGraph.create(scope, heating.pipeSpacing().toMillimeters());
         List<ValidationIssue> errors = new ArrayList<>();
         List<CircuitLayout> circuits = new ArrayList<>();
@@ -184,8 +189,6 @@ public final class HydronicHeatingLayoutService {
                 ));
                 connectors = ConnectorPlan.failed(pair, pattern);
             }
-            blocked.addAll(edgesOf(connectors.supplyPath(), heating.pipeSpacing().toMillimeters()));
-            blocked.addAll(edgesOf(connectors.returnPath(), heating.pipeSpacing().toMillimeters()));
             List<PlanPoint> fullPath = concatenate(connectors.supplyPath(), pattern.fullPath(), connectors.returnPath());
             Length length = Length.ofMillimeters(roundedLength(fullPath, heating.bendRadius().toMillimeters()));
             circuits.add(new CircuitLayout(
@@ -208,6 +211,58 @@ public final class HydronicHeatingLayoutService {
         return new LayoutComputation(circuits.stream()
                 .map(circuit -> circuit.withValidationReport(report))
                 .toList(), report);
+    }
+
+    private GeometryScope scopeFor(HydronicHeating heating) {
+        List<List<PlanPoint>> polygons = new ArrayList<>(heating.zones().stream()
+                .map(HeatingZone::outline)
+                .toList());
+        List<PlanPoint> ports = new ArrayList<>();
+        for (int index = 0; index < heating.zones().size(); index++) {
+            ManifoldPair pair = manifoldPair(heating, index);
+            ports.add(pair.supplyPort());
+            ports.add(pair.returnPort());
+        }
+        boolean needsConnectorCorridor = heating.zones().size() > 1
+                || ports.stream().anyMatch(port -> !strictlyInsideAny(polygons, port));
+        if (needsConnectorCorridor) {
+            polygons.add(connectorCorridor(polygons, ports, heating.pipeSpacing().toMillimeters()));
+        }
+        return new GeometryScope(polygons);
+    }
+
+    private boolean strictlyInsideAny(List<List<PlanPoint>> polygons, PlanPoint point) {
+        return polygons.stream().anyMatch(polygon -> containsPoint(polygon, point) && !onBoundary(polygon, point));
+    }
+
+    private boolean onBoundary(List<PlanPoint> polygon, PlanPoint point) {
+        for (int index = 0; index < polygon.size(); index++) {
+            if (pointOnSegment(point, polygon.get(index), polygon.get((index + 1) % polygon.size()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<PlanPoint> connectorCorridor(List<List<PlanPoint>> polygons, List<PlanPoint> ports, double pitch) {
+        List<PlanPoint> zonePoints = polygons.stream()
+                .flatMap(List::stream)
+                .toList();
+        Bounds zoneBounds = bounds(zonePoints);
+        Bounds portBounds = bounds(ports);
+        double centerX = (portBounds.minX() + portBounds.maxX()) / 2.0;
+        double centerY = (portBounds.minY() + portBounds.maxY()) / 2.0;
+        double freeMinX = centerX - MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS / 2.0;
+        double freeMaxX = centerX + MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS / 2.0;
+        double freeMinY = centerY - MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS / 2.0;
+        double freeMaxY = centerY + MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS / 2.0;
+        double padding = Math.max(pitch, MANIFOLD_PAIR_PITCH_MILLIMETERS);
+        return rectangle(
+                Math.min(zoneBounds.minX(), freeMinX) - padding,
+                Math.min(zoneBounds.minY(), freeMinY) - padding,
+                Math.max(zoneBounds.maxX(), freeMaxX) + padding,
+                Math.max(zoneBounds.maxY(), freeMaxY) + padding
+        );
     }
 
     private FieldPattern createPattern(HydronicHeating heating, HeatingZone zone) {
@@ -349,7 +404,7 @@ public final class HydronicHeatingLayoutService {
             }
         }
         List<PlanPoint> direct = allowDirect ? directConnector(start, goal, scope) : List.of();
-        if (!direct.isEmpty() && edgesDisjoint(direct, blocked, pitch)) {
+        if (!direct.isEmpty() && pathAvoidsBlocked(direct, blocked, pitch)) {
             return direct;
         }
         Set<GridPoint> forbiddenNodes = graph.blockedNodes(blocked, null, null);
@@ -369,9 +424,6 @@ public final class HydronicHeatingLayoutService {
             gridPath = graph.shortestPath(startGrid.orElseThrow(), goalGrid.orElseThrow(), blocked, false);
         }
         if (gridPath.isEmpty()) {
-            if (!blocked.isEmpty()) {
-                return routePath(graph, scope, start, goal, Set.of(), pitch, allowDirect, perimeterReference);
-            }
             throw new IllegalArgumentException("kein kreuzungsfreier Anschlussweg gefunden");
         }
         List<PlanPoint> path = new ArrayList<>();
@@ -380,7 +432,11 @@ public final class HydronicHeatingLayoutService {
             appendDistinct(path, gridPoint.toPlanPoint(pitch));
         }
         appendDistinct(path, goal);
-        return simplifyPath(path);
+        List<PlanPoint> result = simplifyPath(path);
+        if (!pathAvoidsBlocked(result, blocked, pitch)) {
+            throw new IllegalArgumentException("kein kreuzungsfreier Anschlussweg gefunden");
+        }
+        return result;
     }
 
     private List<PlanPoint> perimeterConnector(
@@ -392,23 +448,28 @@ public final class HydronicHeatingLayoutService {
             PlanPoint reference
     ) {
         Bounds bounds = scope.bounds();
+        double minX = bounds.minX() + pitch / 2.0;
+        double maxX = bounds.maxX() - pitch / 2.0;
+        double minY = bounds.minY() + pitch / 2.0;
+        double maxY = bounds.maxY() - pitch / 2.0;
         PlanPoint sideReference = reference == null ? centroid(List.of(start, goal, new PlanPoint(start.xMillimeters(), goal.yMillimeters()))) : reference;
         record Candidate(List<PlanPoint> path, double sideDistance) {
         }
         List<Candidate> candidates = List.of(
-                new Candidate(List.of(start, new PlanPoint(start.xMillimeters(), bounds.minY()), new PlanPoint(goal.xMillimeters(), bounds.minY()), goal),
-                        Math.abs(sideReference.yMillimeters() - bounds.minY())),
-                new Candidate(List.of(start, new PlanPoint(start.xMillimeters(), bounds.maxY()), new PlanPoint(goal.xMillimeters(), bounds.maxY()), goal),
-                        Math.abs(sideReference.yMillimeters() - bounds.maxY())),
-                new Candidate(List.of(start, new PlanPoint(bounds.minX(), start.yMillimeters()), new PlanPoint(bounds.minX(), goal.yMillimeters()), goal),
-                        Math.abs(sideReference.xMillimeters() - bounds.minX())),
-                new Candidate(List.of(start, new PlanPoint(bounds.maxX(), start.yMillimeters()), new PlanPoint(bounds.maxX(), goal.yMillimeters()), goal),
-                        Math.abs(sideReference.xMillimeters() - bounds.maxX()))
+                new Candidate(List.of(start, new PlanPoint(start.xMillimeters(), minY), new PlanPoint(goal.xMillimeters(), minY), goal),
+                        Math.abs(sideReference.yMillimeters() - minY)),
+                new Candidate(List.of(start, new PlanPoint(start.xMillimeters(), maxY), new PlanPoint(goal.xMillimeters(), maxY), goal),
+                        Math.abs(sideReference.yMillimeters() - maxY)),
+                new Candidate(List.of(start, new PlanPoint(minX, start.yMillimeters()), new PlanPoint(minX, goal.yMillimeters()), goal),
+                        Math.abs(sideReference.xMillimeters() - minX)),
+                new Candidate(List.of(start, new PlanPoint(maxX, start.yMillimeters()), new PlanPoint(maxX, goal.yMillimeters()), goal),
+                        Math.abs(sideReference.xMillimeters() - maxX))
         );
         return candidates.stream()
                 .sorted(Comparator.comparingDouble(Candidate::sideDistance))
                 .map(candidate -> simplifyPath(candidate.path()))
                 .filter(candidate -> connectorInside(candidate, scope))
+                .filter(candidate -> pathAvoidsBlocked(candidate, blocked, pitch))
                 .findFirst()
                 .orElse(List.of());
     }
@@ -441,6 +502,27 @@ public final class HydronicHeatingLayoutService {
         for (GridEdge edge : edgesOf(path, pitch)) {
             if (blocked.contains(edge)) {
                 return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean pathAvoidsBlocked(List<PlanPoint> path, Set<GridEdge> blocked, double pitch) {
+        if (!edgesDisjoint(path, blocked, pitch)) {
+            return false;
+        }
+        for (int index = 1; index < path.size(); index++) {
+            PlanPoint start = path.get(index - 1);
+            PlanPoint end = path.get(index);
+            for (GridEdge blockedEdge : blocked) {
+                if (segmentsIntersect(
+                        start,
+                        end,
+                        blockedEdge.a().toPlanPoint(pitch),
+                        blockedEdge.b().toPlanPoint(pitch)
+                )) {
+                    return false;
+                }
             }
         }
         return true;
@@ -842,6 +924,17 @@ public final class HydronicHeatingLayoutService {
             if (!axisAligned(start, end)) {
                 continue;
             }
+            if (Math.abs(start.xMillimeters() - end.xMillimeters()) < EPSILON) {
+                if (!onGrid(start.xMillimeters(), pitch)
+                        || !onGrid(start.yMillimeters(), pitch)
+                        || !onGrid(end.yMillimeters(), pitch)) {
+                    continue;
+                }
+            } else if (!onGrid(start.yMillimeters(), pitch)
+                    || !onGrid(start.xMillimeters(), pitch)
+                    || !onGrid(end.xMillimeters(), pitch)) {
+                continue;
+            }
             int sx = toGrid(start.xMillimeters(), pitch);
             int sy = toGrid(start.yMillimeters(), pitch);
             int ex = toGrid(end.xMillimeters(), pitch);
@@ -856,6 +949,10 @@ public final class HydronicHeatingLayoutService {
             }
         }
         return edges;
+    }
+
+    private boolean onGrid(double coordinate, double pitch) {
+        return Math.abs(coordinate - Math.round(coordinate / pitch) * pitch) <= EPSILON;
     }
 
     private boolean axisAligned(PlanPoint start, PlanPoint end) {
@@ -949,6 +1046,15 @@ public final class HydronicHeatingLayoutService {
                 polygon.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0),
                 polygon.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0),
                 polygon.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0)
+        );
+    }
+
+    private List<PlanPoint> rectangle(double minX, double minY, double maxX, double maxY) {
+        return List.of(
+                new PlanPoint(minX, minY),
+                new PlanPoint(maxX, minY),
+                new PlanPoint(maxX, maxY),
+                new PlanPoint(minX, maxY)
         );
     }
 

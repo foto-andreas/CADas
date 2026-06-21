@@ -24,6 +24,8 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * Erste Raumobjekte werden als Fachobjekte gespeichert, in 2D, Innenansicht und 3D gemeinsam ein-/ausblendbar gemacht und über DXF-Metadaten rundgeführt.
 * Für `DWG`-Bibliotheken ist `libredwg` per `brew install libredwg` der bevorzugte lokale Konverter. CADas erkennt `dwg2dxf`, `dwgread` oder `CADAS_DWG_CONVERTER`.
 * Analysierte `DWG`-Blöcke können als Belag oder als Raumobjekt übernommen werden. Raumobjekte speichern zusätzlich den Montagemodus: auf Bodenbelag, Bodenbelag ausgespart oder wandmontiert.
+* Die Standard-FBH basiert auf der Variotherm-Trockenbauplatte 60 x 100 cm mit 18 mm Dicke, 100 mm Verlegeabstand und 11,6 mm Heizrohr.
+* Ein HKV-Anschlusspaar bleibt fachlich 50 mm breit. Automatisch erzeugte weitere Kreise werden bis zur eigenen HKV-Geometrieverwaltung mindestens um eine Rasterweite versetzt, damit Zuleitungen in der CAD-Darstellung unterscheidbar und prüfbar bleiben.
 
 ## Offene Folgeentscheidungen
-* Keine offenen Folgeentscheidungen für die aktuelle DWG-Konverter-Anbindung.
+* Ob die Verlegeart dauerhaft pro gesamter Flächenheizung oder feiner pro Heizbereich gespeichert wird, bleibt für die nächste Persistenz-Erweiterung zu entscheiden.

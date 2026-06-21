@@ -375,9 +375,9 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> floorExtensionThicknessUnit = new ComboBox<>();
     private final ComboBox<HeatingSurfacePosition> heatingSurfacePositionSelector = new ComboBox<>();
     private final ComboBox<HeatingLayoutPattern> heatingLayoutPatternSelector = new ComboBox<>();
-    private final TextField heatingPipeSpacingField = new TextField("15");
+    private final TextField heatingPipeSpacingField = new TextField("10");
     private final ComboBox<LengthUnit> heatingPipeSpacingUnit = new ComboBox<>();
-    private final TextField heatingPipeDiameterField = new TextField("1,6");
+    private final TextField heatingPipeDiameterField = new TextField("1,16");
     private final ComboBox<LengthUnit> heatingPipeDiameterUnit = new ComboBox<>();
     private final TextField heatingMaximumPipeLengthField = new TextField("8000");
     private final ComboBox<LengthUnit> heatingMaximumPipeLengthUnit = new ComboBox<>();
@@ -387,7 +387,7 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> heatingSupplyXUnit = new ComboBox<>();
     private final TextField heatingSupplyYField = new TextField("0");
     private final ComboBox<LengthUnit> heatingSupplyYUnit = new ComboBox<>();
-    private final TextField heatingReturnXField = new TextField("20");
+    private final TextField heatingReturnXField = new TextField("5");
     private final ComboBox<LengthUnit> heatingReturnXUnit = new ComboBox<>();
     private final TextField heatingReturnYField = new TextField("0");
     private final ComboBox<LengthUnit> heatingReturnYUnit = new ComboBox<>();
@@ -3231,14 +3231,23 @@ public final class CadWorkbench extends BorderPane {
                 graphics.strokePolygon(xPoints, yPoints, xPoints.length);
             }
             graphics.setLineDashes();
-            graphics.setStroke(color);
             graphics.setLineWidth(clamp(heating.pipeDiameter().toMillimeters() * scale(), 1.2, 5.0));
             for (HydronicHeatingLayoutService.CircuitLayout circuit : hydronicHeatingLayoutService.layout(heating)) {
-                drawRoundedHeatingPath(graphics, circuit.pipePath(), circuit.bendRadius().toMillimeters());
+                drawHeatingRolePath(graphics, circuit.supplyConnectorPath(), circuit.bendRadius().toMillimeters(), Color.web("#1f62d0"), true);
+                drawHeatingRolePath(graphics, circuit.returnConnectorPath(), circuit.bendRadius().toMillimeters(), Color.web("#d33b32"), true);
+                drawHeatingRolePath(graphics, circuit.fieldSupplyPath(), circuit.bendRadius().toMillimeters(), Color.web("#1f62d0"), false);
+                drawHeatingRolePath(graphics, circuit.fieldReturnPath(), circuit.bendRadius().toMillimeters(), Color.web("#d33b32"), false);
+                drawHeatingConnectionMarker(graphics, circuit.supplyPort(), "V", Color.web("#1f62d0"));
+                drawHeatingConnectionMarker(graphics, circuit.returnPort(), "R", Color.web("#d33b32"));
             }
-            drawHeatingConnectionMarker(graphics, heating.supplyPoint(), "V", color);
-            drawHeatingConnectionMarker(graphics, heating.returnPoint(), "R", color);
         }
+    }
+
+    private void drawHeatingRolePath(GraphicsContext graphics, List<PlanPoint> path, double radiusMillimeters, Color color, boolean connector) {
+        graphics.setStroke(color);
+        graphics.setLineDashes(connector ? new double[]{6.0, 4.0} : new double[0]);
+        drawRoundedHeatingPath(graphics, path, radiusMillimeters);
+        graphics.setLineDashes();
     }
 
     private void drawRoundedHeatingPath(GraphicsContext graphics, List<PlanPoint> path, double radiusMillimeters) {

@@ -13,6 +13,10 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectShape;
@@ -24,6 +28,8 @@ import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
+
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +57,47 @@ class SurfaceMaterialListServiceTest {
         assertEquals(12.0, report.rooms().getFirst().residentialAreaSquareMeters(), 0.001);
         assertTrue(report.toMarkdown().contains("Räume und Mietflächen nach WoFlV"));
         assertTrue(report.toMarkdown().contains("4,00 × 3,00 m"));
+    }
+
+    @Test
+    void erzeugtHeizplanMitSvgInDerMaterialliste() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Bad",
+                new PlanPoint(0, 0),
+                new PlanPoint(2_000, 1_500),
+                Length.ofMillimeters(2_600),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200)
+        );
+        project.primaryLevel().addRoom(room);
+        HydronicHeating heating = HydronicHeating.create(
+                        room.id(),
+                        HeatingSurfacePosition.FLOOR,
+                        HeatingLayoutPattern.MEANDER,
+                        Length.ofMillimeters(100),
+                        Length.ofMillimeters(11.6),
+                        Length.ofMillimeters(50_000),
+                        Length.ofMillimeters(100),
+                        new PlanPoint(0, 0),
+                        new PlanPoint(50, 0)
+                )
+                .withZones(List.of(HeatingZone.create("FBH 1", List.of(
+                        new PlanPoint(100, 100),
+                        new PlanPoint(1_900, 100),
+                        new PlanPoint(1_900, 1_400),
+                        new PlanPoint(100, 1_400)
+                ))));
+        project.primaryLevel().addHydronicHeating(heating);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        assertEquals(1, report.heatingPlans().size());
+        assertEquals("FBH 1", report.heatingPlans().getFirst().zoneName());
+        assertTrue(report.heatingPlans().getFirst().svg().contains("<svg"));
+        assertTrue(report.heatingPlans().getFirst().svg().contains("V1"));
+        assertTrue(report.toMarkdown().contains("## Flächenheizungen"));
+        assertTrue(report.toMarkdown().contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
     }
 
     @Test
