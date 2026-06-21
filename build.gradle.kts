@@ -10,6 +10,8 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.Comparator
 import java.util.zip.ZipFile
 
@@ -197,6 +199,7 @@ val jlinkExecutable = javaToolchains.launcherFor {
 val installLibDirectory = layout.buildDirectory.dir("install/CADas/lib").get().asFile
 val appImageOutputDirectory = layout.buildDirectory.dir("installer/macos/app-image").get().asFile
 val dmgOutputDirectory = layout.buildDirectory.dir("installer/macos/dmg").get().asFile
+val pkgOutputDirectory = layout.buildDirectory.dir("installer/macos/pkg").get().asFile
 // Laufzeitimage mit nur echten Modulen (JDK + JavaFX + modulare Drittabhängigkeiten), per jlink erzeugt.
 val runtimeImageDirectory = layout.buildDirectory.dir("installer/macos/runtime-image").get().asFile
 // Bereinigter Modulpfad für jlink: nur proper modules (echte Java-Module), sodass jlink keine
@@ -361,6 +364,94 @@ abstract class JpackageAppImageTask : DefaultTask() {
     }
 }
 
+abstract class InstallMacOsAppTask : DefaultTask() {
+
+    @get:InputDirectory
+    abstract val sourceAppBundle: DirectoryProperty
+
+    @get:InputDirectory
+    abstract val allowedSourceRoot: DirectoryProperty
+
+    @get:Input
+    abstract val targetApplicationPath: Property<String>
+
+    @TaskAction
+    fun install() {
+        val source = sourceAppBundle.get().asFile.toPath().toAbsolutePath().normalize()
+        val sourceRoot = allowedSourceRoot.get().asFile.toPath().toAbsolutePath().normalize()
+        val target = Path.of(targetApplicationPath.get()).toAbsolutePath().normalize()
+        val allowedTarget = Path.of("/Applications", "CADas.app").toAbsolutePath().normalize()
+        require(source.startsWith(sourceRoot)) { "Das App-Image muss aus dem Build-Verzeichnis stammen." }
+        require(source.fileName.toString() == "CADas.app") { "Das Quell-App-Bundle muss CADas.app heißen." }
+        require(target == allowedTarget) { "Installationsziel darf ausschließlich /Applications/CADas.app sein." }
+        require(Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS)) { "Das gebaute CADas.app-Bundle fehlt." }
+        require(Files.isExecutable(source.resolve("Contents/MacOS/CADas"))) { "Das gebaute App-Bundle ist nicht ausführbar." }
+        require(hasExpectedBundleIdentifier(source.resolve("Contents/Info.plist"))) {
+            "Das gebaute App-Bundle besitzt nicht die erwartete Bundle-ID."
+        }
+        require(Files.isDirectory(target.parent, LinkOption.NOFOLLOW_LINKS)
+                && !Files.isSymbolicLink(target.parent)) { "/Applications ist kein sicheres Installationsverzeichnis." }
+
+        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            require(!Files.isSymbolicLink(target)) { "Ein symbolisches CADas.app-Ziel wird nicht überschrieben." }
+            require(hasExpectedBundleIdentifier(target.resolve("Contents/Info.plist"))) {
+                "Vorhandenes Ziel ist keine CADas-App und wird nicht überschrieben."
+            }
+        }
+
+        val operationId = ProcessHandle.current().pid().toString() + "-" + System.nanoTime()
+        val staging = target.parent.resolve(".CADas.app.installing-$operationId")
+        val backup = target.parent.resolve(".CADas.app.backup-$operationId")
+        require(!Files.exists(staging, LinkOption.NOFOLLOW_LINKS)
+                && !Files.exists(backup, LinkOption.NOFOLLOW_LINKS)) { "Temporäres Installationsziel ist bereits belegt." }
+
+        var previousMoved = false
+        try {
+            val copyProcess = ProcessBuilder("ditto", source.toString(), staging.toString())
+                .redirectErrorStream(true)
+                .start()
+            val copyOutput = copyProcess.inputStream.bufferedReader().readText()
+            val copyExitCode = copyProcess.waitFor()
+            require(copyExitCode == 0) { "App-Kopie fehlgeschlagen: $copyOutput" }
+            require(Files.isExecutable(staging.resolve("Contents/MacOS/CADas"))) {
+                "Temporär kopierte App ist nicht ausführbar."
+            }
+            if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+                Files.move(target, backup, StandardCopyOption.ATOMIC_MOVE)
+                previousMoved = true
+            }
+            Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE)
+            if (previousMoved) {
+                deleteTreeWithoutFollowingLinks(backup)
+            }
+        } catch (exception: Exception) {
+            if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)
+                    && Files.exists(backup, LinkOption.NOFOLLOW_LINKS)) {
+                Files.move(backup, target, StandardCopyOption.ATOMIC_MOVE)
+            }
+            deleteTreeWithoutFollowingLinks(staging)
+            throw exception
+        }
+    }
+
+    private fun deleteTreeWithoutFollowingLinks(root: Path) {
+        if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
+            return
+        }
+        Files.walk(root).use { paths ->
+            paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists)
+        }
+    }
+
+    private fun hasExpectedBundleIdentifier(infoPlist: Path): Boolean {
+        if (!Files.isRegularFile(infoPlist, LinkOption.NOFOLLOW_LINKS)) {
+            return false
+        }
+        return Regex("""<key>\s*CFBundleIdentifier\s*</key>\s*<string>\s*de\.schrell\.cadas\s*</string>""")
+            .containsMatchIn(Files.readString(infoPlist))
+    }
+}
+
 val commonJpackageArguments = listOf(
     "--name", "CADas",
     "--app-version", normalizedAppVersion(),
@@ -381,6 +472,10 @@ val cleanMacOsAppImage by tasks.registering(Delete::class) {
 
 val cleanMacOsDmg by tasks.registering(Delete::class) {
     delete(dmgOutputDirectory)
+}
+
+val cleanMacOsPkg by tasks.registering(Delete::class) {
+    delete(pkgOutputDirectory)
 }
 
 // Bereinigter Modulpfad für jlink: kopiert nur proper modules (echte Java-Module) aus dem
@@ -416,6 +511,7 @@ val jlinkRuntimeImage by tasks.registering(JlinkRuntimeImageTask::class) {
 }
 
 val renameMacOsAppImage by tasks.registering(RenamePackagedDirectoryTask::class) {
+    dependsOn("packageMacOsAppImage")
     outputDirectory.set(appImageOutputDirectory)
     generatedDirectoryName.set("CADas.app")
     targetDirectoryName.set(snapshotAppImageName())
@@ -522,15 +618,39 @@ tasks.register<DefaultTask>("packageMacOsDmg") {
     dependsOn(buildMacOsDmg)
 }
 
-// Aus Sicherheitsgründen bleibt der historische Taskname als reiner Paketierungsalias erhalten.
-// Eine Installation außerhalb des Workspace erfolgt niemals automatisch.
-tasks.register<DefaultTask>("macosInstall") {
+tasks.register<JpackageAppImageTask>("packageMacOsPkg") {
     group = "distribution"
-    description = "Veralteter Alias: Baut ausschließlich das DMG im Workspace; installiert nichts."
+    description = "Erstellt ein macOS-PKG-Installationspaket für CADas im Build-Verzeichnis."
     enabled = macOsPackagingSupported.get()
-    dependsOn("packageMacOsDmg")
+    dependsOn(jlinkRuntimeImage, cleanMacOsPkg)
+    inputs.dir(installLibDirectory)
+    jpackageExecutable.set(file(jpackageExecutablePath))
+    arguments.set(listOf(
+        "--type", "pkg",
+        "--dest", pkgOutputDirectory.absolutePath,
+        "--mac-package-identifier", "de.schrell.cadas"
+    ) + commonJpackageArguments)
+    runtimeImage.set(runtimeImageDirectory)
+    outputDirectory.set(pkgOutputDirectory)
+}
+
+tasks.register<DefaultTask>("packageMacOsInstallers") {
+    group = "distribution"
+    description = "Erstellt DMG und PKG für macOS."
+    enabled = macOsPackagingSupported.get()
+    dependsOn("packageMacOsDmg", "packageMacOsPkg")
+}
+
+tasks.register<InstallMacOsAppTask>("macosInstall") {
+    group = "distribution"
+    description = "Installiert das gebaute CADas.app atomar nach /Applications/CADas.app."
+    enabled = macOsPackagingSupported.get()
+    dependsOn(renameMacOsAppImage)
+    sourceAppBundle.set(layout.dir(provider { appImageOutputDirectory.resolve("CADas.app") }))
+    allowedSourceRoot.set(layout.buildDirectory)
+    targetApplicationPath.set("/Applications/CADas.app")
     doLast {
-        logger.lifecycle("DMG erstellt. CADas wurde außerhalb des Workspace nicht verändert.")
+        logger.lifecycle("CADas.app wurde sicher nach /Applications installiert.")
     }
 }
 

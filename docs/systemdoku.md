@@ -25,7 +25,9 @@ Für macOS gibt es zusätzlich Gradle-Aufgaben auf Basis von `jpackage`:
 * `installDist` für ein lokales Startverzeichnis
 * `packageMacOsAppImage` für ein App-Image
 * `packageMacOsDmg` für ein DMG-Installationspaket
-* `macosInstall` als kompatibler Alias für den DMG-Bau ausschließlich im Workspace; Installation und externe Verzeichnislinks sind bewusst ausgeschlossen
+* `packageMacOsPkg` für ein natives PKG-Installationspaket
+* `packageMacOsInstallers` für DMG und PKG gemeinsam
+* `macosInstall` für die atomare Installation ausschließlich nach `/Applications/CADas.app`; Quelle, Bundle-ID und Ziel werden validiert, symbolische Ziele abgelehnt
 
 ### Paketstruktur
 

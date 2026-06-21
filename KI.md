@@ -9,7 +9,7 @@ Kompakte Orientierung für KI-Assistenten. Diese Datei ergänzt `AGENTS.md`, `do
 ./gradlew run               # App direkt über den modularen JavaFX-Launcher starten
 ./gradlew runMitAutomatisierung  # App mit HTTP-Testzugriff auf 127.0.0.1:17845
 ./gradlew installDist       # Startskripte und Libs nach build/install/CADas
-./gradlew macosInstall      # Kompatibler Alias: DMG ausschließlich im Workspace bauen
+./gradlew macosInstall      # App sicher und atomar nach /Applications installieren
 ```
 
 ## Architektur in einem Satz
@@ -49,7 +49,7 @@ Vier-Schicht-Architektur: `domain` (Fachmodell, Geometrie) → `application` (Se
 | Markdown | commonmark + gfm-tables |
 | PDF | Apache PDFBox 3.0.7 |
 | Module | `de.schrell.cadas` mit `module-info.java` |
-| macOS-Pakete | `jpackage` über `packageMacOsAppImage` / `packageMacOsDmg` |
+| macOS-Pakete | `jpackage` über `packageMacOsAppImage`, `packageMacOsDmg` und `packageMacOsPkg` |
 
 Test-JVM-Arg: `--enable-native-access=ALL-UNNAMED` (unterdrückt Glass-Nativelibrary-Warnung).
 
@@ -71,7 +71,7 @@ Test-JVM-Arg: `--enable-native-access=ALL-UNNAMED` (unterdrückt Glass-Nativelib
 * Menüleiste nutzt `setUseSystemMenuBar(true)` und ist unter macOS ausgeblendet (`setManaged(false)`/`setVisible(false)`).
 * Hilfe zeigt die vollständige Benutzerdokumentation aus `src/main/resources/docs/benutzerdoku.md`; Keymap ist separater Menüpunkt.
 * `./gradlew run` startet die modulare JavaFX-Anwendung direkt.
-* `./gradlew macosInstall` baut App-Bundle und DMG ausschließlich im Workspace. Installation und externe Verzeichnislinks sind absichtlich nicht Teil des Builds.
+* `./gradlew packageMacOsInstallers` baut DMG und PKG im Workspace. `./gradlew macosInstall` validiert Quelle, Bundle-ID und Ziel und ersetzt ausschließlich `/Applications/CADas.app` atomar; symbolische Ziele werden abgelehnt.
 
 ## Wo steht was
 

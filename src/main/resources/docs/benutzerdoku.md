@@ -27,10 +27,12 @@ Danach kann die Anwendung über das erzeugte Startskript im Verzeichnis `build/i
 ```bash
 ./gradlew packageMacOsAppImage
 ./gradlew packageMacOsDmg
+./gradlew packageMacOsPkg
+./gradlew packageMacOsInstallers
 ./gradlew macosInstall
 ```
 
-Diese Aufgaben laufen nur auf `macOS`. `macosInstall` ist ein kompatibler Alias für den DMG-Build und verändert nichts außerhalb des Workspace. Öffne das erzeugte DMG und installiere CADas anschließend manuell.
+Diese Aufgaben laufen nur auf `macOS`. `packageMacOsInstallers` erzeugt DMG und PKG gemeinsam. `macosInstall` baut das App-Bundle und ersetzt ausschließlich eine vorhandene CADas-App mit passender Bundle-ID atomar unter `/Applications/CADas.app`. Symbolische Ziele und fremde App-Bundles werden abgelehnt.
 
 ### Anwendung mit lokalem Automatisierungszugriff starten
 
