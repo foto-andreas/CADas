@@ -49,6 +49,22 @@ public final class HydronicHeatingLayoutService {
         return heating.zones().stream().map(zone -> layoutZone(heating, zone)).toList();
     }
 
+    public void validateZones(Room room, HydronicHeating heating) {
+        if (!room.id().equals(heating.roomId())) {
+            throw new IllegalArgumentException("Die Heizung gehört nicht zum ausgewählten Raum.");
+        }
+        for (HeatingZone zone : heating.zones()) {
+            for (int index = 0; index < zone.outline().size(); index++) {
+                PlanPoint start = zone.outline().get(index);
+                PlanPoint end = zone.outline().get((index + 1) % zone.outline().size());
+                if (!segmentInside(start, end, room.outline())) {
+                    throw new IllegalArgumentException("Der Heizbereich `" + zone.name() + "` liegt nicht vollständig im Raum.");
+                }
+            }
+        }
+        layout(heating);
+    }
+
     private CircuitLayout layoutZone(HydronicHeating heating, HeatingZone zone) {
         List<PlanPoint> path = heating.layoutPattern() == HeatingLayoutPattern.SPIRAL
                 ? spiralPath(zone.outline(), heating.wallClearance().toMillimeters(), heating.pipeSpacing().toMillimeters())
@@ -91,7 +107,7 @@ public final class HydronicHeatingLayoutService {
                 PlanPoint second = horizontal
                         ? new PlanPoint(reverse ? start : end, lane)
                         : new PlanPoint(lane, reverse ? start : end);
-                appendConnected(path, first, polygon);
+                appendConnected(path, first, polygon, spacing);
                 appendDistinct(path, second);
             }
             reverse = !reverse;
@@ -116,20 +132,31 @@ public final class HydronicHeatingLayoutService {
         }
         List<PlanPoint> path = new ArrayList<>();
         for (int index = 0; index < contours.size(); index += 2) {
-            appendOpenContour(path, contours.get(index), false);
+            appendOpenContour(path, contours.get(index), false, polygon, spacing);
         }
         int returnIndex = contours.size() % 2 == 0 ? contours.size() - 1 : contours.size() - 2;
         for (int index = returnIndex; index >= 1; index -= 2) {
-            appendOpenContour(path, contours.get(index), true);
+            appendOpenContour(path, contours.get(index), true, polygon, spacing);
         }
         return List.copyOf(path);
     }
 
-    private void appendOpenContour(List<PlanPoint> path, List<PlanPoint> contour, boolean reverse) {
+    private void appendOpenContour(
+            List<PlanPoint> path,
+            List<PlanPoint> contour,
+            boolean reverse,
+            List<PlanPoint> polygon,
+            double spacing
+    ) {
         List<PlanPoint> ordered = reverse ? contour.reversed() : contour;
         int startIndex = nearestIndex(ordered, path.isEmpty() ? centroid(contour) : path.getLast());
         for (int offset = 0; offset < ordered.size(); offset++) {
-            appendDistinct(path, ordered.get((startIndex + offset) % ordered.size()));
+            PlanPoint point = ordered.get((startIndex + offset) % ordered.size());
+            if (offset == 0) {
+                appendConnected(path, point, polygon, spacing);
+            } else {
+                appendDistinct(path, point);
+            }
         }
     }
 
@@ -216,25 +243,85 @@ public final class HydronicHeatingLayoutService {
         return intervals;
     }
 
-    private void appendConnected(List<PlanPoint> path, PlanPoint target, List<PlanPoint> polygon) {
+    private void appendConnected(List<PlanPoint> path, PlanPoint target, List<PlanPoint> polygon, double spacing) {
         if (path.isEmpty()) {
             path.add(target);
             return;
         }
         PlanPoint previous = path.getLast();
+        if (segmentInside(previous, target, polygon)) {
+            appendDistinct(path, target);
+            return;
+        }
         PlanPoint firstCorner = new PlanPoint(previous.xMillimeters(), target.yMillimeters());
         PlanPoint secondCorner = new PlanPoint(target.xMillimeters(), previous.yMillimeters());
         if (segmentInside(previous, firstCorner, polygon) && segmentInside(firstCorner, target, polygon)) {
             appendDistinct(path, firstCorner);
-        } else if (segmentInside(previous, secondCorner, polygon) && segmentInside(secondCorner, target, polygon)) {
-            appendDistinct(path, secondCorner);
+            appendDistinct(path, target);
+            return;
         }
+        if (segmentInside(previous, secondCorner, polygon) && segmentInside(secondCorner, target, polygon)) {
+            appendDistinct(path, secondCorner);
+            appendDistinct(path, target);
+            return;
+        }
+        List<List<PlanPoint>> connectors = new ArrayList<>();
+        for (PlanPoint pathPoint : List.copyOf(path)) {
+            addHorizontalBridge(connectors, previous, target, pathPoint.yMillimeters() - spacing / 2.0, polygon);
+            addHorizontalBridge(connectors, previous, target, pathPoint.yMillimeters() + spacing / 2.0, polygon);
+            addVerticalBridge(connectors, previous, target, pathPoint.xMillimeters() - spacing / 2.0, polygon);
+            addVerticalBridge(connectors, previous, target, pathPoint.xMillimeters() + spacing / 2.0, polygon);
+        }
+        List<PlanPoint> connector = connectors.stream()
+                .min(Comparator.comparingDouble(points -> connectorLength(previous, points, target)))
+                .orElseThrow(() -> new IllegalArgumentException("Der Heizbereich kann nicht durchgehend verlegt werden."));
+        connector.forEach(point -> appendDistinct(path, point));
         appendDistinct(path, target);
     }
 
+    private void addHorizontalBridge(
+            List<List<PlanPoint>> connectors,
+            PlanPoint start,
+            PlanPoint target,
+            double y,
+            List<PlanPoint> polygon
+    ) {
+        PlanPoint first = new PlanPoint(start.xMillimeters(), y);
+        PlanPoint second = new PlanPoint(target.xMillimeters(), y);
+        if (segmentInside(start, first, polygon)
+                && segmentInside(first, second, polygon)
+                && segmentInside(second, target, polygon)) {
+            connectors.add(List.of(first, second));
+        }
+    }
+
+    private void addVerticalBridge(
+            List<List<PlanPoint>> connectors,
+            PlanPoint start,
+            PlanPoint target,
+            double x,
+            List<PlanPoint> polygon
+    ) {
+        PlanPoint first = new PlanPoint(x, start.yMillimeters());
+        PlanPoint second = new PlanPoint(x, target.yMillimeters());
+        if (segmentInside(start, first, polygon)
+                && segmentInside(first, second, polygon)
+                && segmentInside(second, target, polygon)) {
+            connectors.add(List.of(first, second));
+        }
+    }
+
+    private double connectorLength(PlanPoint start, List<PlanPoint> points, PlanPoint target) {
+        double length = start.distanceTo(points.getFirst()).toMillimeters();
+        for (int index = 1; index < points.size(); index++) {
+            length += points.get(index - 1).distanceTo(points.get(index)).toMillimeters();
+        }
+        return length + points.getLast().distanceTo(target).toMillimeters();
+    }
+
     private boolean segmentInside(PlanPoint start, PlanPoint end, List<PlanPoint> polygon) {
-        for (int step = 0; step <= 8; step++) {
-            double ratio = step / 8.0;
+        for (int step = 0; step <= 32; step++) {
+            double ratio = step / 32.0;
             PlanPoint point = new PlanPoint(
                     start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
                     start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio

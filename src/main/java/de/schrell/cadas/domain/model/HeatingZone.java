@@ -19,6 +19,9 @@ public record HeatingZone(UUID id, String name, List<PlanPoint> outline) {
             throw new IllegalArgumentException("Ein Heizbereich braucht mindestens drei Eckpunkte.");
         }
         outline = List.copyOf(outline);
+        if (areaSquareMillimeters(outline) < 0.001) {
+            throw new IllegalArgumentException("Ein Heizbereich muss eine positive Fläche besitzen.");
+        }
     }
 
     public static HeatingZone create(String name, List<PlanPoint> outline) {
@@ -26,10 +29,14 @@ public record HeatingZone(UUID id, String name, List<PlanPoint> outline) {
     }
 
     public double areaSquareMillimeters() {
+        return areaSquareMillimeters(outline);
+    }
+
+    private static double areaSquareMillimeters(List<PlanPoint> points) {
         double doubleArea = 0.0;
-        for (int index = 0; index < outline.size(); index++) {
-            PlanPoint current = outline.get(index);
-            PlanPoint next = outline.get((index + 1) % outline.size());
+        for (int index = 0; index < points.size(); index++) {
+            PlanPoint current = points.get(index);
+            PlanPoint next = points.get((index + 1) % points.size());
             doubleArea += current.xMillimeters() * next.yMillimeters()
                     - next.xMillimeters() * current.yMillimeters();
         }

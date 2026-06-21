@@ -54,6 +54,9 @@ class HydronicHeatingTest {
         assertThrows(IllegalArgumentException.class, () -> HeatingZone.create("Leer", List.of(
                 new PlanPoint(0, 0), new PlanPoint(1, 0)
         )));
+        assertThrows(IllegalArgumentException.class, () -> HeatingZone.create("Ohne Fläche", List.of(
+                new PlanPoint(0, 0), new PlanPoint(1, 0), new PlanPoint(2, 0)
+        )));
     }
 
     private HydronicHeating heating(HeatingSurfacePosition position, Length spacing) {

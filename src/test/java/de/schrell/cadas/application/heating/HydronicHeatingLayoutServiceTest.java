@@ -14,6 +14,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HydronicHeatingLayoutServiceTest {
@@ -91,6 +92,65 @@ class HydronicHeatingLayoutServiceTest {
                 floorResult.circuits().stream().map(HydronicHeatingLayoutService.CircuitLayout::pipePath).toList(),
                 ceilingResult.circuits().stream().map(HydronicHeatingLayoutService.CircuitLayout::pipePath).toList()
         );
+    }
+
+    @Test
+    void führtRohreAuchInUFormNurDurchDenHeizbereich() {
+        Room room = new Room(
+                java.util.UUID.randomUUID(), "U-Raum", List.of(
+                new PlanPoint(0, 0), new PlanPoint(6_000, 0), new PlanPoint(6_000, 5_000),
+                new PlanPoint(4_000, 5_000), new PlanPoint(4_000, 2_000), new PlanPoint(2_000, 2_000),
+                new PlanPoint(2_000, 5_000), new PlanPoint(0, 5_000)
+        ), Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200), null);
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 300_000)
+                .withZones(List.of(HeatingZone.create("U-Heizkreis", room.outline())));
+
+        List<PlanPoint> pipePath = service.layout(heating).getFirst().pipePath();
+
+        for (int index = 2; index + 2 < pipePath.size(); index++) {
+            assertSegmentInside(room.outline(), pipePath.get(index - 1), pipePath.get(index));
+        }
+    }
+
+    @Test
+    void lehntManuellÜberRaumgrenzeGezogenenHeizbereichAb() {
+        Room room = rectangularRoom();
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 300_000)
+                .withZones(List.of(HeatingZone.create("Zu groß", List.of(
+                        new PlanPoint(100, 100), new PlanPoint(6_100, 100),
+                        new PlanPoint(6_100, 3_900), new PlanPoint(100, 3_900)
+                ))));
+
+        assertThrows(IllegalArgumentException.class, () -> service.validateZones(room, heating));
+    }
+
+    private void assertSegmentInside(List<PlanPoint> outline, PlanPoint start, PlanPoint end) {
+        for (int step = 0; step <= 20; step++) {
+            double ratio = step / 20.0;
+            PlanPoint point = new PlanPoint(
+                    start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
+                    start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
+            );
+            assertTrue(contains(outline, point), () -> "Rohr außerhalb bei " + point);
+        }
+    }
+
+    private boolean contains(List<PlanPoint> polygon, PlanPoint point) {
+        boolean inside = false;
+        int previousIndex = polygon.size() - 1;
+        for (int index = 0; index < polygon.size(); index++) {
+            PlanPoint current = polygon.get(index);
+            PlanPoint previous = polygon.get(previousIndex);
+            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
+                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
+                    * (point.yMillimeters() - current.yMillimeters())
+                    / (previous.yMillimeters() - current.yMillimeters()) + current.xMillimeters();
+            if (intersects) {
+                inside = !inside;
+            }
+            previousIndex = index;
+        }
+        return inside || polygon.stream().anyMatch(vertex -> vertex.distanceTo(point).toMillimeters() < 0.001);
     }
 
     private Room rectangularRoom() {
