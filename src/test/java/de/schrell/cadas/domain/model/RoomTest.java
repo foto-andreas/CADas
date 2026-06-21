@@ -158,6 +158,9 @@ class RoomTest {
         assertEquals(room.roomHeight(), renamed.roomHeight());
         assertEquals(room.floorThickness(), renamed.floorThickness());
         assertEquals(room.ceilingThickness(), renamed.ceilingThickness());
+        assertThrows(IllegalArgumentException.class, () -> room.withName("  "));
+        assertEquals(room.hashCode(), room.hashCode());
+        assertTrue(room.toString().contains("Alt"));
     }
 
     @Test
@@ -188,6 +191,11 @@ class RoomTest {
                 Length.of(20, LengthUnit.CENTIMETER),
                 new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.of(2.7, LengthUnit.METER)),
                 null
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new Room(
+                UUID.randomUUID(), "Zu klein",
+                List.of(new PlanPoint(0, 0), new PlanPoint(1_000, 0)),
+                Length.ofMillimeters(2_600), Length.ofMillimeters(180), Length.ofMillimeters(200), null
         ));
     }
 

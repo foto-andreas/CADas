@@ -108,6 +108,26 @@ class LevelTest {
         assertFalse(level.removeFloorExtension(UUID.randomUUID()));
     }
 
+    @Test
+    void verwaltetDachfensterUndÜbernimmtSieInKopien() {
+        Level level = new Level("Dachgeschoss");
+        RoofWindow first = RoofWindow.create(
+                UUID.randomUUID(), new PlanPoint(1_000, 500),
+                Length.ofMillimeters(800), Length.ofMillimeters(1_200), SlopedCeilingSide.NORTH
+        );
+        RoofWindow second = RoofWindow.create(
+                UUID.randomUUID(), new PlanPoint(2_000, 500),
+                Length.ofMillimeters(900), Length.ofMillimeters(1_100), SlopedCeilingSide.SOUTH
+        );
+
+        level.addRoofWindow(first);
+        assertEquals(first, level.copy().roofWindows().getFirst());
+        level.replaceRoofWindows(java.util.List.of(second));
+        assertEquals(second, level.roofWindows().getFirst());
+        assertTrue(level.removeRoofWindow(second.id()));
+        assertFalse(level.removeRoofWindow(UUID.randomUUID()));
+    }
+
     private Wall wallAt(double yMillimeters) {
         return Wall.create(
                 new PlanSegment(new PlanPoint(0, yMillimeters), new PlanPoint(4_000, yMillimeters)),

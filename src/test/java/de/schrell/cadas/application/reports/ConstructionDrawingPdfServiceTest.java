@@ -7,8 +7,17 @@ import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
+import de.schrell.cadas.domain.model.Door;
+import de.schrell.cadas.domain.model.FloorExtension;
+import de.schrell.cadas.domain.model.FloorExtensionPlacement;
+import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.StairType;
+import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WindowElement;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -146,18 +155,40 @@ class ConstructionDrawingPdfServiceTest {
 
     private ProjectModel sampleProject() {
         ProjectModel project = ProjectModel.withDefaultLevel("Wohnhaus", "Erdgeschoss");
-        project.primaryLevel().addWall(Wall.create(
+        Wall wall = Wall.create(
                 new PlanSegment(new PlanPoint(0, 0), new PlanPoint(8_000, 0)),
                 Length.of(24, LengthUnit.CENTIMETER),
                 Length.of(2.75, LengthUnit.METER)
-        ));
-        project.primaryLevel().addRoom(Room.rectangular(
+        );
+        project.primaryLevel().addWall(wall);
+        Room room = Room.rectangular(
                 "Wohnen",
                 new PlanPoint(0, 0),
                 new PlanPoint(8_000, 5_000),
                 Length.of(2.60, LengthUnit.METER),
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER)
+        );
+        project.primaryLevel().addRoom(room);
+        project.primaryLevel().addDoor(Door.create(
+                wall.id(), Length.ofMillimeters(800), Length.ofMillimeters(1_000),
+                Length.ofMillimeters(2_010), Length.zero()
+        ));
+        project.primaryLevel().addWindow(WindowElement.create(
+                wall.id(), Length.ofMillimeters(2_800), Length.ofMillimeters(1_200),
+                Length.ofMillimeters(900), Length.ofMillimeters(1_200)
+        ));
+        project.primaryLevel().addStaircase(Staircase.create(
+                StairType.STRAIGHT, new PlanPoint(500, 1_000), new PlanPoint(1_500, 3_500),
+                Length.ofMillimeters(2_600), 13
+        ));
+        project.primaryLevel().addFloorExtension(FloorExtension.create(
+                FloorExtensionType.BALCONY, FloorExtensionPlacement.EXTERIOR,
+                new PlanPoint(8_000, 1_000), new PlanPoint(10_000, 3_000), Length.ofMillimeters(180)
+        ));
+        project.primaryLevel().addFloorOpening(FloorOpening.create(
+                room.id(), FloorOpeningShape.RECTANGLE, new PlanPoint(6_000, 3_000),
+                Length.ofMillimeters(1_000), Length.ofMillimeters(1_500)
         ));
         return project;
     }
