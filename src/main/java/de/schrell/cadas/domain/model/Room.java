@@ -106,6 +106,17 @@ public record Room(
         return Optional.ofNullable(slopedCeiling);
     }
 
+    public Room withName(String newName) {
+        String trimmedName = Objects.requireNonNull(newName, "newName darf nicht null sein.").trim();
+        if (trimmedName.isEmpty()) {
+            throw new IllegalArgumentException("Der Raumname darf nicht leer sein.");
+        }
+        return new Room(
+                id, trimmedName, outline, roomHeight, floorThickness, ceilingThickness,
+                slopedCeiling, ceilingVertexHeights
+        );
+    }
+
     public Optional<List<Length>> ceilingVertexHeightsProfile() {
         return Optional.ofNullable(ceilingVertexHeights);
     }

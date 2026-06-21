@@ -305,6 +305,49 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void raumkontextBenenntNurAngeklicktenRaumOhneMaßänderungUm() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Links", new PlanPoint(0, 0), new PlanPoint(2_000, 2_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationAddRoom(Room.rectangular(
+                    "Rechts", new PlanPoint(2_500, 0), new PlanPoint(4_500, 3_000),
+                    Length.ofMillimeters(2_700), Length.ofMillimeters(220), Length.ofMillimeters(240)
+            ));
+            instanz.automationSetTool("EDIT");
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSelect("ROOM", 1, true);
+            return instanz;
+        });
+        Room rightBefore = aufFxThread(() -> workbench.automationRoom(1));
+
+        aufFxThread(() -> {
+            workbench.automationPrepareSelectionContextMenu(300, 100);
+            return null;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(() -> workbench.automationSnapshot().selectionCount()));
+        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems).contains("Raum umbenennen …"));
+        aufFxThread(() -> {
+            workbench.automationRenameContextRoom("Arbeitszimmer");
+            return null;
+        });
+        Room rightAfter = aufFxThread(() -> workbench.automationRoom(1));
+        Assertions.assertEquals("Links", aufFxThread(() -> workbench.automationRoom(0).name()));
+        Assertions.assertEquals("Arbeitszimmer", rightAfter.name());
+        Assertions.assertEquals(rightBefore.outline(), rightAfter.outline());
+        Assertions.assertEquals(rightBefore.roomHeight(), rightAfter.roomHeight());
+        Assertions.assertEquals(rightBefore.floorThickness(), rightAfter.floorThickness());
+        Assertions.assertEquals(rightBefore.ceilingThickness(), rightAfter.ceilingThickness());
+    }
+
+    @Test
     void ziehtBalkonAlsRechteckigeFußbodenplatteAuf() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

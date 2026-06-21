@@ -2105,11 +2105,7 @@ public final class CadWorkbench extends BorderPane {
             if (!panningMoved && pendingContextSelection != null && event.getButton() == MouseButton.SECONDARY) {
                 contextMenuSelection = pendingContextSelection;
                 contextMenuWorldPoint = pendingContextWorldPoint;
-                if (!selectedSelections.contains(pendingContextSelection)) {
-                    selectSingle(pendingContextSelection);
-                } else {
-                    rebuildSelectionContextMenu();
-                }
+                selectSingle(pendingContextSelection);
                 selectionContextMenu.show(drawingCanvas, event.getScreenX(), event.getScreenY());
             }
             pendingContextSelection = null;
@@ -6312,11 +6308,14 @@ public final class CadWorkbench extends BorderPane {
         if (selectedSelections.contains(contextMenuSelection)
                 && contextMenuRoom().isPresent()
                 && contextMenuWorldPoint != null) {
-            selectionContextMenu.getItems().add(menuItem(
-                    "Innenansicht ab diesem Standort öffnen",
-                    this::openInteriorViewFromContextLocation,
-                    null
-            ));
+            selectionContextMenu.getItems().addAll(
+                    menuItem("Raum umbenennen …", this::renameContextRoom, null),
+                    menuItem(
+                            "Innenansicht ab diesem Standort öffnen",
+                            this::openInteriorViewFromContextLocation,
+                            null
+                    )
+            );
         }
         if (selectedSelections.stream().anyMatch(selection -> selection.kind() != RenderableKind.ROOM_VOLUME
                 && selection.kind() != RenderableKind.ROOM_FLOOR
@@ -6410,6 +6409,45 @@ public final class CadWorkbench extends BorderPane {
         threeDViewport.activateInteriorView(project, activeLevel.get(), room.orElseThrow(), contextMenuWorldPoint);
         activeWorkspaceMode.set(WorkspaceMode.INTERIOR);
         draftLabel.setText("Innenansicht am gewählten Raumstandort geöffnet.");
+    }
+
+    private void renameContextRoom() {
+        Room room = contextMenuRoom().orElseThrow(() -> new IllegalStateException("Kein Raum im Kontextmenü ausgewählt."));
+        if (!interactiveDialogsEnabled) {
+            return;
+        }
+        TextInputDialog dialog = new TextInputDialog(room.name());
+        dialog.setTitle("Raum umbenennen");
+        dialog.setHeaderText("Neuen Namen für den Raum eingeben");
+        dialog.setContentText("Raumname:");
+        dialog.getDialogPane().setPrefWidth(460);
+        Window owner = currentWindow();
+        if (owner != null) {
+            dialog.initOwner(owner);
+        }
+        applyTooltip(dialog.getEditor(), "Legt ausschließlich den Namen des im Kontextmenü gewählten Raums fest; Maße und weitere Eigenschaften bleiben unverändert.");
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Übernimmt den neuen Namen nur für den gewählten Raum.");
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Schließt den Dialog, ohne den Raumnamen zu ändern.");
+        dialog.showAndWait().ifPresent(name -> renameRoom(room.id(), name));
+    }
+
+    private void renameRoom(UUID roomId, String newName) {
+        Room currentRoom = activeLevel.get().rooms().stream()
+                .filter(room -> room.id().equals(roomId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Raum nicht gefunden: " + roomId));
+        Room renamedRoom = currentRoom.withName(newName);
+        if (renamedRoom.name().equals(currentRoom.name())) {
+            return;
+        }
+        rememberStateForUndo();
+        activeLevel.get().replaceRooms(activeLevel.get().rooms().stream()
+                .map(room -> room.id().equals(roomId) ? renamedRoom : room)
+                .toList());
+        roomNameField.setText(renamedRoom.name());
+        markThreeDDirty();
+        draftLabel.setText("Raum umbenannt: " + renamedRoom.name());
+        render();
     }
 
     private void recognizeRoomFromSelectedWalls() {
@@ -6929,6 +6967,10 @@ public final class CadWorkbench extends BorderPane {
         render();
     }
 
+    public Room automationRoom(int index) {
+        return activeLevel.get().rooms().get(index);
+    }
+
     public void automationPrepareSelectionContextMenu(double screenX, double screenY) {
         contextMenuWorldPoint = screenToWorld(screenX, screenY);
         contextMenuSelection = selectionQueryService.findSelection(
@@ -6953,6 +6995,11 @@ public final class CadWorkbench extends BorderPane {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unbekannter Kontextmenüeintrag: " + label))
                 .fire();
+    }
+
+    public void automationRenameContextRoom(String name) {
+        Room room = contextMenuRoom().orElseThrow(() -> new IllegalStateException("Kein Raum im Kontextmenü ausgewählt."));
+        renameRoom(room.id(), name);
     }
 
     public PlanPoint automationInteriorEyePosition() {

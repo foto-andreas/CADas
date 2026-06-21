@@ -144,6 +144,23 @@ class RoomTest {
     }
 
     @Test
+    void ändertBeimUmbenennenKeineRaummaße() {
+        Room room = Room.rectangular(
+                "Alt", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                Length.ofMillimeters(2_600), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+
+        Room renamed = room.withName("Neu");
+
+        assertEquals(room.id(), renamed.id());
+        assertEquals("Neu", renamed.name());
+        assertEquals(room.outline(), renamed.outline());
+        assertEquals(room.roomHeight(), renamed.roomHeight());
+        assertEquals(room.floorThickness(), renamed.floorThickness());
+        assertEquals(room.ceilingThickness(), renamed.ceilingThickness());
+    }
+
+    @Test
     void lehntUnvollständigeEckhöhenUndZuHoheKniestöckeAb() {
         List<PlanPoint> outline = List.of(
                 new PlanPoint(0, 0),

@@ -421,6 +421,7 @@ Räume werden nicht mehr mit einem eigenen Zeichenwerkzeug erstellt.
 * Raumname, Raumhöhe, Bodenstärke, Deckenstärke und Dachschräge kommen aus den aktuellen Eingaben und können dann auf die Auswahl angewendet werden.
 * Wenn du eine gemeinsame Wandecke verschiebst, wird die Raumkontur automatisch nachgeführt und darf dabei auch schräg oder polygonal werden.
 * Aneinandergereihte Teilwände schließen ebenfalls einen Raum. Kleine Anschlusslücken bis 10 mm behandelt CADas bei der Raumableitung als gemeinsamen Wandknoten.
+* Über `Raum umbenennen …` im Kontextmenü änderst du ausschließlich den Namen des angeklickten Raums. Maße und weitere Raumeigenschaften bleiben unverändert.
 
 ### Ebenen auf Flächen
 
