@@ -16,6 +16,20 @@ class SurfaceCoveringPresetServiceTest {
     private final SurfaceCoveringPresetService service = new SurfaceCoveringPresetService();
 
     @Test
+    void enthältVariothermTrockenbauplatteAlsBodenbelag() {
+        SurfaceCoveringPreset preset = service.defaults().stream()
+                .filter(candidate -> candidate.id().equals("variotherm-trockenbau-fbh-60x100"))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("Variotherm Trockenbau-FBH-Platte 60 x 100 cm", preset.name());
+        assertEquals(18.0, preset.thickness().toMillimeters(), 0.001);
+        assertEquals(600.0, preset.tileWidth().toMillimeters(), 0.001);
+        assertEquals(1_000.0, preset.tileHeight().toMillimeters(), 0.001);
+        assertEquals(SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE, preset.coveringSource());
+    }
+
+    @Test
     void leitetBelagsPresetAusDwgBlockmaßenAb() {
         DwgBlockDefinition block = new DwgBlockDefinition(
                 Path.of("/tmp/Bibliothek.dwg"),

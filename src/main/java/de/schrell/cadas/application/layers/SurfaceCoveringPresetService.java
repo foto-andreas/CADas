@@ -12,8 +12,27 @@ import java.util.Locale;
 
 public final class SurfaceCoveringPresetService {
 
+    public static final String VARIOTHERM_DRY_PANEL_SOURCE = "Standard: Variotherm Trockenbau-FBH-Platte";
+    public static final double VARIOTHERM_GROOVE_PITCH_MILLIMETERS = 100.0;
+    public static final double VARIOTHERM_PIPE_DIAMETER_MILLIMETERS = 11.6;
+
     public List<SurfaceCoveringPreset> defaults() {
         return List.of(
+                new SurfaceCoveringPreset(
+                        "variotherm-trockenbau-fbh-60x100",
+                        "Variotherm Trockenbau-FBH-Platte 60 x 100 cm",
+                        Length.of(18, LengthUnit.MILLIMETER),
+                        Length.of(60, LengthUnit.CENTIMETER),
+                        Length.of(100, LengthUnit.CENTIMETER),
+                        SurfaceLayoutMode.FIXED,
+                        Length.zero(),
+                        Length.zero(),
+                        Length.of(10, LengthUnit.CENTIMETER),
+                        Length.of(10, LengthUnit.CENTIMETER),
+                        Length.zero(),
+                        SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
+                        VARIOTHERM_DRY_PANEL_SOURCE
+                ),
                 new SurfaceCoveringPreset(
                         "tile-60x30",
                         "Fliese 60 x 30 cm",

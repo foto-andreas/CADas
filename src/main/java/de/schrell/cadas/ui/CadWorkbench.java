@@ -3450,8 +3450,29 @@ public final class CadWorkbench extends BorderPane {
                 double screenY = toScreenY(ty);
                 graphics.fillRect(screenX, screenY, jointPx, th * scale());
             }
+            if (SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource())) {
+                drawVariothermPanelGrooves(graphics, tx, ty, tw, th);
+            }
         }
         graphics.restore();
+    }
+
+    private void drawVariothermPanelGrooves(GraphicsContext graphics, double tileX, double tileY, double tileWidth, double tileHeight) {
+        double pitch = SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS;
+        double radius = Math.max(1.0, (pitch - SurfaceCoveringPresetService.VARIOTHERM_PIPE_DIAMETER_MILLIMETERS) / 2.0);
+        graphics.setStroke(Color.color(0.18, 0.36, 0.44, 0.48));
+        graphics.setLineWidth(Math.max(0.45, 1.2 * scale()));
+        for (double x = tileX; x <= tileX + tileWidth + 0.001; x += pitch) {
+            for (double y = tileY; y <= tileY + tileHeight + 0.001; y += pitch) {
+                double screenRadius = radius * scale();
+                graphics.strokeOval(
+                        toScreenX(x - radius),
+                        toScreenY(y - radius),
+                        screenRadius * 2.0,
+                        screenRadius * 2.0
+                );
+            }
+        }
     }
 
     private List<TextBlockingBox> drawRoomLabel(GraphicsContext graphics, Room room, PlanPoint center) {
