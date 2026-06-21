@@ -11,7 +11,7 @@
 ### Direkt aus dem Gradle-Projekt
 
 ```bash
-./gradlew run
+./gradlew runApp
 ```
 
 ### Lokales Startverzeichnis erzeugen
@@ -99,6 +99,7 @@ Links befindet sich eine dauerhaft sichtbare vertikale Liste mit Properties. Dor
 * fachliche Eigenschaften für Wand, Raum, Tür, Fenster und Treppe
 * Objekt-Presets für einfache Raumobjekte
 * Ebenen- und Belagswerte für Innenwand, Außenwand, Boden, Decke und Dachflächen
+* Planung wassergeführter Flächenheizungen für Boden und Decke
 * eine Auswahlzusammenfassung
 * eine Übersicht registrierter externer CAD-Bibliotheken
 
@@ -305,7 +306,7 @@ Die aktuelle Version besitzt einen Projektverlauf für fachliche Bearbeitungssch
 
 ### Bauzeichnung als PDF
 
-Die PDF-Bauzeichnung enthält für jede Etage einen eigenen 2D-Grundriss. Gemeinsame 3D- und orthogonale Seitenansichten zeigen jeweils das gesamte Gebäude mit allen Etagen. Bei langgestreckten oder diagonalen Grundrissen begrenzt CADas den Tiefenversatz der räumlichen Projektion automatisch relativ zur Geschosshöhe. Dadurch bleiben Bauteile derselben Etage als zusammengehörige Ebene erkennbar und werden nicht optisch zu zusätzlichen Geschossen verschoben.
+Die PDF-Bauzeichnung enthält für jede Etage einen eigenen 2D-Grundriss. Für jede beheizte Etage folgen zusätzliche Heizplanseiten; Fußboden und Decke werden dabei getrennt ausgegeben. Gemeinsame 3D- und orthogonale Seitenansichten zeigen jeweils das gesamte Gebäude mit allen Etagen. Bei langgestreckten oder diagonalen Grundrissen begrenzt CADas den Tiefenversatz der räumlichen Projektion automatisch relativ zur Geschosshöhe. Dadurch bleiben Bauteile derselben Etage als zusammengehörige Ebene erkennbar und werden nicht optisch zu zusätzlichen Geschossen verschoben.
 
 ## Tastaturkürzel
 
@@ -419,6 +420,19 @@ Räume werden nicht mehr mit einem eigenen Zeichenwerkzeug erstellt.
 * Wenn du eine gemeinsame Wandecke verschiebst, wird die Raumkontur automatisch nachgeführt und darf dabei auch schräg oder polygonal werden.
 * Aneinandergereihte Teilwände schließen ebenfalls einen Raum. Kleine Anschlusslücken bis 10 mm behandelt CADas bei der Raumableitung als gemeinsamen Wandknoten.
 * Über `Raum umbenennen …` im Kontextmenü änderst du ausschließlich den Namen des angeklickten Raums. Maße und weitere Raumeigenschaften bleiben unverändert.
+
+### Flächenheizungen planen
+
+Wähle im Werkzeug `Bearbeiten` genau einen Raum. Der Bereich `Flächenheizung` erscheint in der Eigenschaftenleiste und bietet für `Fußboden` und `Decke` dieselben Funktionen.
+
+1. Wähle die Fläche und als Verlegung `Meander` oder `Schnecke`.
+2. Gib Verlegeabstand, Rohrdurchmesser, maximale Rohrlänge und Mindestabstand zur Wand ein. Der Kurvenradius entspricht automatisch dem halben Verlegeabstand.
+3. Gib die X-/Y-Koordinaten von Vorlauf und Rücklauf am Verteiler ein.
+4. Wähle `Heizkreise planen`. CADas schlägt die nötige Aufteilung vor und trennt einen Raum so lange, bis jeder Heizkreis die maximale Rohrlänge einhält.
+5. Wähle einen Heizkreis in der Liste. Mit `Bereich bearbeiten` änderst du Name und Polygon-Eckpunkte als `X; Y` in Zentimetern. Dadurch sind auch L- und U-förmige Bereiche möglich.
+6. Ergänze oder entferne Bereiche bei Bedarf. Bereiche außerhalb des Raums und bearbeitete Kreise oberhalb der maximalen Rohrlänge werden abgelehnt.
+
+Die 2D-Ansicht zeichnet Fußbodenheizungen rot und Deckenheizungen blau. `V` und `R` markieren Vorlauf und Rücklauf. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen und berechneter Rohrlänge.
 
 ### Ebenen auf Flächen
 

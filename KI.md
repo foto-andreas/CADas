@@ -6,7 +6,7 @@ Kompakte Orientierung für KI-Assistenten. Diese Datei ergänzt `AGENTS.md`, `do
 
 ```bash
 ./gradlew test              # alle Tests (JUnit 5, JaCoCo)
-./gradlew run               # App direkt über den modularen JavaFX-Launcher starten
+./gradlew runApp            # App als macOS-Bundle starten
 ./gradlew runMitAutomatisierung  # App mit HTTP-Testzugriff auf 127.0.0.1:17845
 ./gradlew installDist       # Startskripte und Libs nach build/install/CADas
 ./gradlew macosInstall      # App sicher und atomar nach /Applications installieren
@@ -25,6 +25,7 @@ Vier-Schicht-Architektur: `domain` (Fachmodell, Geometrie) → `application` (Se
 | `application.drawing` | Zeichnen, Snap, Auswahl, Bearbeitung | `DraftingService`, `SnapService`, `SelectionQueryService`, `EdgeResizeService` |
 | `application.view` | 3D-Szenenmodell, Innenansicht, Kamera | `ThreeDSceneModelBuilder`, `ThreeDInteriorViewService` |
 | `application.layers` | Belags-Presets, Kachelbelegung, Schichtwirkungen | `SurfaceLayerEffectService`, `TileLayoutService` |
+| `application.heating` | Heizkreisaufteilung und Rohrverlegung | `HydronicHeatingLayoutService` |
 | `application.reports` | Materialliste, Markdown-Rendering | `SurfaceMaterialListService`, `MarkdownHtmlRenderer` |
 | `application.help` | Hilfe und Keymap | `HelpContentService` |
 | `application.exchange` | Formatunabhängige Austauschschnittstellen | `ExchangeFileNameService` |
@@ -72,6 +73,7 @@ Test-JVM-Arg: `--enable-native-access=ALL-UNNAMED` (unterdrückt Glass-Nativelib
 * Hilfe zeigt die vollständige Benutzerdokumentation aus `src/main/resources/docs/benutzerdoku.md`; Keymap ist separater Menüpunkt.
 * `./gradlew run` startet die modulare JavaFX-Anwendung direkt.
 * `./gradlew packageMacOsInstallers` baut DMG und PKG im Workspace. `./gradlew macosInstall` validiert Quelle, Bundle-ID und Ziel und ersetzt ausschließlich `/Applications/CADas.app` atomar; symbolische Ziele werden abgelehnt.
+* Boden- und Deckenheizungen verwenden dasselbe `HydronicHeating`-Modell. Heizkreise besitzen frei polygonale Bereiche; `HydronicHeatingLayoutService` plant Meander oder Schnecke und teilt nach maximaler Rohrlänge.
 
 ## Wo steht was
 
