@@ -8,6 +8,9 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -90,7 +93,15 @@ class CadWorkbenchTest {
                 Map.entry("surfaceMinimumOffset", "10"),
                 Map.entry("surfaceMinimumEdgeWidth", "8"),
                 Map.entry("surfaceMinimumStartEndMargin", "8"),
-                Map.entry("surfaceJointWidth", "0,2")
+                Map.entry("surfaceJointWidth", "0,2"),
+                Map.entry("heatingPipeSpacing", "15"),
+                Map.entry("heatingPipeDiameter", "1,6"),
+                Map.entry("heatingMaximumPipeLength", "8000"),
+                Map.entry("heatingWallClearance", "10"),
+                Map.entry("heatingSupplyX", "0"),
+                Map.entry("heatingSupplyY", "0"),
+                Map.entry("heatingReturnX", "20"),
+                Map.entry("heatingReturnY", "0")
         );
 
         for (Map.Entry<String, String> entry : expectedValues.entrySet()) {
@@ -98,6 +109,43 @@ class CadWorkbenchTest {
             Assertions.assertEquals(entry.getValue(), aufFxThread(() -> workbench.automationFieldValue(entry.getKey())), entry.getKey());
         }
         Assertions.assertEquals("0", aufFxThread(() -> workbench.automationFieldValue("roomObjectAngle")));
+    }
+
+    @Test
+    void plantUndBearbeitetBodenUndDeckenheizungen() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instance = new CadWorkbench();
+            Room room = Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            );
+            instance.automationAddRoom(room);
+            instance.automationSelect("ROOM", 0, false);
+            instance.automationSetField("heatingMaximumPipeLength", "20000");
+            instance.automationPlanHydronicHeating("FLOOR", "MEANDER");
+            instance.automationPlanHydronicHeating("CEILING", "SPIRAL");
+            return instance;
+        });
+
+        Assertions.assertEquals(2, aufFxThread(workbench::automationHydronicHeatingCount));
+        HydronicHeating floorHeating = aufFxThread(() -> workbench.automationHydronicHeating(0));
+        HydronicHeating ceilingHeating = aufFxThread(() -> workbench.automationHydronicHeating(1));
+        Assertions.assertEquals(HeatingSurfacePosition.FLOOR, floorHeating.surfacePosition());
+        Assertions.assertEquals(HeatingLayoutPattern.MEANDER, floorHeating.layoutPattern());
+        Assertions.assertEquals(HeatingSurfacePosition.CEILING, ceilingHeating.surfacePosition());
+        Assertions.assertEquals(HeatingLayoutPattern.SPIRAL, ceilingHeating.layoutPattern());
+
+        aufFxThread(() -> {
+            workbench.automationReplaceHeatingZone(0, 0, "L-Bereich", java.util.List.of(
+                    new PlanPoint(100, 100), new PlanPoint(3_900, 100), new PlanPoint(3_900, 1_500),
+                    new PlanPoint(2_000, 1_500), new PlanPoint(2_000, 2_900), new PlanPoint(100, 2_900)
+            ));
+            return null;
+        });
+
+        HydronicHeating editedHeating = aufFxThread(() -> workbench.automationHydronicHeating(0));
+        Assertions.assertEquals("L-Bereich", editedHeating.zones().getFirst().name());
+        Assertions.assertEquals(6, editedHeating.zones().getFirst().outline().size());
     }
 
     @Test

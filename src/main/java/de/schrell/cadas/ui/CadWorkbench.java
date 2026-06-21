@@ -17,6 +17,7 @@ import de.schrell.cadas.application.help.HelpContentService;
 import de.schrell.cadas.application.help.MarkdownNavigationService;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.help.AboutInformation;
+import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.application.drawing.OpeningPlacementService;
 import de.schrell.cadas.application.drawing.OrthogonalCorrectionService;
 import de.schrell.cadas.application.drawing.QuarterTurnRotationService;
@@ -82,6 +83,10 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
@@ -156,6 +161,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.WritableImage;
@@ -232,6 +238,7 @@ public final class CadWorkbench extends BorderPane {
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     private final TerrainCornerService terrainCornerService = new TerrainCornerService();
+    private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final RoofSlopeWallService roofSlopeWallService = new RoofSlopeWallService();
     private final RoofWindowPlacementService roofWindowPlacementService = new RoofWindowPlacementService();
     private final StairUnderbuildService stairUnderbuildService = new StairUnderbuildService();
@@ -366,6 +373,26 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<FloorExtensionPlacement> floorExtensionPlacementSelector = new ComboBox<>();
     private final TextField floorExtensionThicknessField = new TextField("18");
     private final ComboBox<LengthUnit> floorExtensionThicknessUnit = new ComboBox<>();
+    private final ComboBox<HeatingSurfacePosition> heatingSurfacePositionSelector = new ComboBox<>();
+    private final ComboBox<HeatingLayoutPattern> heatingLayoutPatternSelector = new ComboBox<>();
+    private final TextField heatingPipeSpacingField = new TextField("15");
+    private final ComboBox<LengthUnit> heatingPipeSpacingUnit = new ComboBox<>();
+    private final TextField heatingPipeDiameterField = new TextField("1,6");
+    private final ComboBox<LengthUnit> heatingPipeDiameterUnit = new ComboBox<>();
+    private final TextField heatingMaximumPipeLengthField = new TextField("8000");
+    private final ComboBox<LengthUnit> heatingMaximumPipeLengthUnit = new ComboBox<>();
+    private final TextField heatingWallClearanceField = new TextField("10");
+    private final ComboBox<LengthUnit> heatingWallClearanceUnit = new ComboBox<>();
+    private final TextField heatingSupplyXField = new TextField("0");
+    private final ComboBox<LengthUnit> heatingSupplyXUnit = new ComboBox<>();
+    private final TextField heatingSupplyYField = new TextField("0");
+    private final ComboBox<LengthUnit> heatingSupplyYUnit = new ComboBox<>();
+    private final TextField heatingReturnXField = new TextField("20");
+    private final ComboBox<LengthUnit> heatingReturnXUnit = new ComboBox<>();
+    private final TextField heatingReturnYField = new TextField("0");
+    private final ComboBox<LengthUnit> heatingReturnYUnit = new ComboBox<>();
+    private final ListView<String> heatingZoneList = new ListView<>();
+    private final Label heatingSummaryLabel = new Label("Keine Heizfläche angelegt.");
     private final ComboBox<SurfaceType> surfaceTypeSelector = new ComboBox<>();
     private final ComboBox<SurfaceCoveringPreset> surfacePresetSelector = new ComboBox<>();
     private final ListView<String> surfaceLayerList = new ListView<>();
@@ -433,6 +460,11 @@ public final class CadWorkbench extends BorderPane {
     private final Button refreshDwgLibraryButton = new Button("DWG prüfen");
     private final Button addDwgBlockAsSurfaceButton = new Button("Als Belag");
     private final Button addDwgBlockAsObjectButton = new Button("Als Objekt");
+    private final Button planHeatingButton = new Button("Heizkreise planen");
+    private final Button addHeatingZoneButton = new Button("Bereich hinzufügen");
+    private final Button editHeatingZoneButton = new Button("Bereich bearbeiten");
+    private final Button removeHeatingZoneButton = new Button("Bereich entfernen");
+    private final Button removeHeatingButton = new Button("Heizung entfernen");
     private final ContextMenu selectionContextMenu = new ContextMenu();
     private final Label cadLibrarySummaryLabel = new Label("Keine externen CAD-Bibliotheken registriert.");
 
@@ -553,6 +585,7 @@ public final class CadWorkbench extends BorderPane {
         floorExtensionPlacementSelector.setValue(FloorExtensionPlacement.EXTERIOR);
         initializePresetSelectors();
         initializeSurfaceLayerControls();
+        initializeHeatingControls();
         initializeDwgLibraryControls();
         levelSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
@@ -1132,6 +1165,24 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Dachschrägen", roofSlopeManagementLabel)
                 ),
                 createPropertySection(
+                        "Flächenheizung",
+                        heatingSummaryLabel,
+                        propertyRow("Fläche", heatingSurfacePositionSelector),
+                        propertyRow("Verlegung", heatingLayoutPatternSelector),
+                        propertyRow("Verlegeabstand", heatingPipeSpacingField, heatingPipeSpacingUnit),
+                        propertyRow("Rohrdurchmesser", heatingPipeDiameterField, heatingPipeDiameterUnit),
+                        propertyRow("Maximale Rohrlänge", heatingMaximumPipeLengthField, heatingMaximumPipeLengthUnit),
+                        propertyRow("Wandabstand", heatingWallClearanceField, heatingWallClearanceUnit),
+                        propertyRow("Vorlauf X", heatingSupplyXField, heatingSupplyXUnit),
+                        propertyRow("Vorlauf Y", heatingSupplyYField, heatingSupplyYUnit),
+                        propertyRow("Rücklauf X", heatingReturnXField, heatingReturnXUnit),
+                        propertyRow("Rücklauf Y", heatingReturnYField, heatingReturnYUnit),
+                        planHeatingButton,
+                        heatingZoneList,
+                        new HBox(6.0, addHeatingZoneButton, editHeatingZoneButton),
+                        new HBox(6.0, removeHeatingZoneButton, removeHeatingButton)
+                ),
+                createPropertySection(
                         "Tür",
                         propertyRow("Preset", doorPresetSelector),
                         propertyRow("Breite", doorWidthField, doorWidthUnit),
@@ -1260,6 +1311,11 @@ public final class CadWorkbench extends BorderPane {
         refreshDwgLibraryButton.setOnAction(event -> runGuardedAction("DWG prüfen", this::refreshCurrentDwgLibraryAnalysis));
         addDwgBlockAsSurfaceButton.setOnAction(event -> runGuardedAction("DWG-Block als Belag", this::addSelectedDwgBlockAsSurfacePreset));
         addDwgBlockAsObjectButton.setOnAction(event -> runGuardedAction("DWG-Block als Objekt", this::addSelectedDwgBlockAsObjectPreset));
+        planHeatingButton.setOnAction(event -> runGuardedAction("Heizkreise planen", this::planHydronicHeating));
+        addHeatingZoneButton.setOnAction(event -> runGuardedAction("Heizbereich hinzufügen", () -> editHeatingZone(true)));
+        editHeatingZoneButton.setOnAction(event -> runGuardedAction("Heizbereich bearbeiten", () -> editHeatingZone(false)));
+        removeHeatingZoneButton.setOnAction(event -> runGuardedAction("Heizbereich entfernen", this::removeHeatingZone));
+        removeHeatingButton.setOnAction(event -> runGuardedAction("Heizung entfernen", this::removeHydronicHeating));
         rebuildSelectionContextMenu();
         applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
         applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
@@ -1278,6 +1334,11 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(refreshDwgLibraryButton, "Analysiert die aktuell geladene DWG-Bibliothek erneut über einen externen Konverter wie `dwg2dxf` oder `dwgread`.");
         applyTooltip(addDwgBlockAsSurfaceButton, "Übernimmt den ausgewählten DWG-Block mit echten Blockmaßen als Belags-Preset.");
         applyTooltip(addDwgBlockAsObjectButton, "Übernimmt den ausgewählten DWG-Block mit echtem Footprint als Objekt-Preset.");
+        applyTooltip(planHeatingButton, "Berechnet aus Raumkontur, Verlegeart, Abständen und maximaler Rohrlänge einen Vorschlag mit einem oder mehreren getrennten Heizkreisen. Eine vorhandene automatische Aufteilung wird dabei ersetzt.");
+        applyTooltip(addHeatingZoneButton, "Ergänzt einen frei polygonalen Heizbereich. Die Eckpunkte werden in Zentimetern eingegeben und dürfen auch L-förmige Bereiche beschreiben.");
+        applyTooltip(editHeatingZoneButton, "Bearbeitet Name und sämtliche Eckpunkte des in der Liste markierten Heizbereichs. Danach wird dessen Rohrverlauf neu berechnet.");
+        applyTooltip(removeHeatingZoneButton, "Entfernt den in der Liste markierten Heizbereich einschließlich seines berechneten Rohrverlaufs.");
+        applyTooltip(removeHeatingButton, "Entfernt die Flächenheizung der ausgewählten Boden- oder Deckenfläche vollständig aus dem Raum.");
         applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf.");
         applyTooltip(dwgStatusLabel, "Zeigt, welcher externe DWG-Konverter gefunden wurde und ob die letzte Analyse erfolgreich war.");
         applyTooltip(dwgBlockSearchField, "Filtert die analysierten DWG-Blöcke nach Blockname, Layer oder Dateiname.");
@@ -1294,13 +1355,14 @@ public final class CadWorkbench extends BorderPane {
                 case 0, 1 -> true;
                 case 2 -> shouldShowSection(DrawingTool.WALL, RenderableKind.WALL);
                 case 3 -> shouldShowRoomSection();
-                case 4 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
-                case 5 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW)
+                case 4 -> selectedRoom().isPresent();
+                case 5 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
+                case 6 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW)
                         || shouldShowSection(DrawingTool.ROOF_WINDOW, RenderableKind.ROOF_WINDOW);
-                case 6 -> shouldShowSection(DrawingTool.STAIR, RenderableKind.STAIR);
-                case 7 -> shouldShowSection(DrawingTool.OBJECT, RenderableKind.ROOM_OBJECT);
-                case 8 -> shouldShowSection(DrawingTool.FLOOR_EXTENSION, RenderableKind.FLOOR_EXTENSION);
-                case 9 -> shouldShowLayerSection();
+                case 7 -> shouldShowSection(DrawingTool.STAIR, RenderableKind.STAIR);
+                case 8 -> shouldShowSection(DrawingTool.OBJECT, RenderableKind.ROOM_OBJECT);
+                case 9 -> shouldShowSection(DrawingTool.FLOOR_EXTENSION, RenderableKind.FLOOR_EXTENSION);
+                case 10 -> shouldShowLayerSection();
                 default -> true;
             };
             node.setVisible(visible);
@@ -1309,6 +1371,7 @@ public final class CadWorkbench extends BorderPane {
         selectionSummaryLabel.setText(selectionSummary());
         refreshSurfaceTypeSelector();
         refreshSurfaceLayerSection();
+        refreshHeatingSection();
     }
 
     private boolean shouldShowSection(DrawingTool tool, RenderableKind... kinds) {
@@ -1414,6 +1477,13 @@ public final class CadWorkbench extends BorderPane {
         refreshDwgLibraryButton.setDisable(currentDwgLibraryPath().isEmpty());
         addDwgBlockAsSurfaceButton.setDisable(!hasDwgBlock);
         addDwgBlockAsObjectButton.setDisable(!hasDwgBlock);
+        HydronicHeating selectedHeating = selectedHydronicHeating().orElse(null);
+        int selectedZoneIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
+        planHeatingButton.setDisable(selectedRoom().isEmpty());
+        addHeatingZoneButton.setDisable(selectedHeating == null);
+        editHeatingZoneButton.setDisable(selectedHeating == null || selectedZoneIndex < 0);
+        removeHeatingZoneButton.setDisable(selectedHeating == null || selectedZoneIndex < 0);
+        removeHeatingButton.setDisable(selectedHeating == null);
     }
 
     private MenuItem menuItem(String label, Runnable action, KeyCombination accelerator) {
@@ -1527,6 +1597,14 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(roomObjectHeightField, roomObjectHeightUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(roomObjectBaseElevationField, roomObjectBaseElevationUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(floorExtensionThicknessField, floorExtensionThicknessUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(heatingPipeSpacingField, heatingPipeSpacingUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(heatingPipeDiameterField, heatingPipeDiameterUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(heatingMaximumPipeLengthField, heatingMaximumPipeLengthUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(heatingWallClearanceField, heatingWallClearanceUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(heatingSupplyXField, heatingSupplyXUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(heatingSupplyYField, heatingSupplyYUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(heatingReturnXField, heatingReturnXUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(heatingReturnYField, heatingReturnYUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceLayerThicknessField, surfaceLayerThicknessUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceTileWidthField, surfaceTileWidthUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceTileHeightField, surfaceTileHeightUnit, LengthUnit.CENTIMETER);
@@ -1596,6 +1674,21 @@ public final class CadWorkbench extends BorderPane {
         surfacePresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applySurfacePreset(newValue));
         refreshSurfaceTypeSelector();
         applySurfacePreset(surfacePresetSelector.getValue());
+    }
+
+    private void initializeHeatingControls() {
+        heatingSurfacePositionSelector.getItems().setAll(HeatingSurfacePosition.values());
+        heatingSurfacePositionSelector.setValue(HeatingSurfacePosition.FLOOR);
+        heatingLayoutPatternSelector.getItems().setAll(HeatingLayoutPattern.values());
+        heatingLayoutPatternSelector.setValue(HeatingLayoutPattern.MEANDER);
+        heatingZoneList.setPrefHeight(110.0);
+        heatingSummaryLabel.setWrapText(true);
+        heatingSummaryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
+        heatingSurfacePositionSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
+            refreshHeatingSection();
+            render();
+        });
+        heatingZoneList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> updateActionButtons());
     }
 
     private void initializeDwgLibraryControls() {
@@ -1700,6 +1793,26 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(floorExtensionPlacementSelector, "Kennzeichnet die Erweiterung als innen oder außen an die aktive Etage angehängt.");
         applyTooltip(floorExtensionThicknessField, "Legt die Dicke der tragenden rechteckigen Fußbodenplatte des Balkons oder der Empore fest.");
         applyTooltip(floorExtensionThicknessUnit, "Bestimmt die Einheit für die Fußbodendicke des Balkons oder der Empore.");
+        applyTooltip(heatingSurfacePositionSelector, "Wählt unabhängig voneinander die Fußboden- oder Deckenheizung des markierten Raums. Für beide Flächen stehen dieselben Planungs- und Bearbeitungsfunktionen bereit.");
+        applyTooltip(heatingLayoutPatternSelector, "Wählt die Rohrverlegung als parallelen Meander oder gegenläufige Schnecke. Die gewählte Form wird beim nächsten Planen auf alle vorgeschlagenen Heizkreise angewendet.");
+        applyTooltip(heatingPipeSpacingField, "Legt den Achsabstand benachbarter Rohrläufe fest. Der Kurvenradius wird automatisch als halber Verlegeabstand angesetzt.");
+        applyTooltip(heatingPipeSpacingUnit, "Bestimmt die Einheit für den Verlegeabstand der Heizungsrohre.");
+        applyTooltip(heatingPipeDiameterField, "Legt den Außendurchmesser des Heizungsrohrs fest. Er muss kleiner als der Verlegeabstand sein.");
+        applyTooltip(heatingPipeDiameterUnit, "Bestimmt die Einheit für den Rohrdurchmesser.");
+        applyTooltip(heatingMaximumPipeLengthField, "Begrenzt die gesamte Rohrlänge je Heizkreis einschließlich der Verbindung zum Vor- und Rücklauf. Größere Räume werden automatisch in mehrere Bereiche geteilt.");
+        applyTooltip(heatingMaximumPipeLengthUnit, "Bestimmt die Einheit für die maximal zulässige Rohrlänge je Heizkreis.");
+        applyTooltip(heatingWallClearanceField, "Legt den Mindestabstand der Rohrmitte von der Raumwand fest.");
+        applyTooltip(heatingWallClearanceUnit, "Bestimmt die Einheit für den Mindestabstand zur Wand.");
+        applyTooltip(heatingSupplyXField, "Legt die X-Koordinate des Vorlaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
+        applyTooltip(heatingSupplyXUnit, "Bestimmt die Einheit für die X-Koordinate des Vorlaufanschlusses.");
+        applyTooltip(heatingSupplyYField, "Legt die Y-Koordinate des Vorlaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
+        applyTooltip(heatingSupplyYUnit, "Bestimmt die Einheit für die Y-Koordinate des Vorlaufanschlusses.");
+        applyTooltip(heatingReturnXField, "Legt die X-Koordinate des Rücklaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
+        applyTooltip(heatingReturnXUnit, "Bestimmt die Einheit für die X-Koordinate des Rücklaufanschlusses.");
+        applyTooltip(heatingReturnYField, "Legt die Y-Koordinate des Rücklaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
+        applyTooltip(heatingReturnYUnit, "Bestimmt die Einheit für die Y-Koordinate des Rücklaufanschlusses.");
+        applyTooltip(heatingZoneList, "Listet die getrennten Heizkreise der gewählten Boden- oder Deckenfläche mit berechneter Rohrlänge auf. Ein markierter Bereich kann als beliebiges Polygon bearbeitet werden.");
+        applyTooltip(heatingSummaryLabel, "Zeigt Fläche, Verlegeart, Anzahl der Heizkreise und die gesamte berechnete Rohrlänge der gewählten Flächenheizung.");
         applyTooltip(roomObjectPresetSelector, "Wählt ein Objekt zum Platzieren aus und übernimmt dessen Standardmaße. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
         applyTooltip(roomObjectNameField, "Legt die sichtbare Bezeichnung eines neuen oder ausgewählten Objekts fest. Bei Quadern wird sie im Grundriss angezeigt.");
         applyTooltip(roomObjectWidthField, "Legt die Breite eines neuen oder ausgewählten Objekts fest.");
@@ -2396,6 +2509,7 @@ public final class CadWorkbench extends BorderPane {
         drawWindows(graphics);
         drawRoofWindows(graphics);
         drawRoomObjects(graphics);
+        drawHydronicHeatings(graphics);
         // Raumtexte werden vor den Bemaßungen gerendert, damit ihre Sperrflächen
         // als Seed-Blocker für die kollisionsfreie Maßtext-Platzierung dienen.
         List<TextBlockingBox> roomLabelBlockers = drawRoomLabels(graphics);
@@ -3098,6 +3212,81 @@ public final class CadWorkbench extends BorderPane {
             drawRoomTileGrid(graphics, room);
             drawFloorOpenings(graphics, room);
         }
+    }
+
+    private void drawHydronicHeatings(GraphicsContext graphics) {
+        if (!projectionService.isPlanView(activeView.get())) {
+            return;
+        }
+        for (HydronicHeating heating : activeLevel.get().hydronicHeatings()) {
+            Color color = heating.surfacePosition() == HeatingSurfacePosition.FLOOR
+                    ? Color.web("#c53b32")
+                    : Color.web("#2878a8");
+            graphics.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.55));
+            graphics.setLineWidth(1.0);
+            graphics.setLineDashes(5.0, 4.0);
+            for (HeatingZone zone : heating.zones()) {
+                double[] xPoints = zone.outline().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray();
+                double[] yPoints = zone.outline().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray();
+                graphics.strokePolygon(xPoints, yPoints, xPoints.length);
+            }
+            graphics.setLineDashes();
+            graphics.setStroke(color);
+            graphics.setLineWidth(clamp(heating.pipeDiameter().toMillimeters() * scale(), 1.2, 5.0));
+            for (HydronicHeatingLayoutService.CircuitLayout circuit : hydronicHeatingLayoutService.layout(heating)) {
+                drawRoundedHeatingPath(graphics, circuit.pipePath(), circuit.bendRadius().toMillimeters());
+            }
+            drawHeatingConnectionMarker(graphics, heating.supplyPoint(), "V", color);
+            drawHeatingConnectionMarker(graphics, heating.returnPoint(), "R", color);
+        }
+    }
+
+    private void drawRoundedHeatingPath(GraphicsContext graphics, List<PlanPoint> path, double radiusMillimeters) {
+        if (path.size() < 2) {
+            return;
+        }
+        graphics.beginPath();
+        graphics.moveTo(toScreenProjectedX(path.getFirst(), 0.0), toScreenProjectedY(path.getFirst(), 0.0));
+        for (int index = 1; index + 1 < path.size(); index++) {
+            PlanPoint previous = path.get(index - 1);
+            PlanPoint current = path.get(index);
+            PlanPoint next = path.get(index + 1);
+            double firstLength = previous.distanceTo(current).toMillimeters();
+            double secondLength = current.distanceTo(next).toMillimeters();
+            double trim = Math.min(radiusMillimeters, Math.min(firstLength, secondLength) / 2.0);
+            if (trim <= 0.001) {
+                graphics.lineTo(toScreenProjectedX(current, 0.0), toScreenProjectedY(current, 0.0));
+                continue;
+            }
+            PlanPoint before = interpolateToward(current, previous, trim / firstLength);
+            PlanPoint after = interpolateToward(current, next, trim / secondLength);
+            graphics.lineTo(toScreenProjectedX(before, 0.0), toScreenProjectedY(before, 0.0));
+            graphics.quadraticCurveTo(
+                    toScreenProjectedX(current, 0.0), toScreenProjectedY(current, 0.0),
+                    toScreenProjectedX(after, 0.0), toScreenProjectedY(after, 0.0)
+            );
+        }
+        graphics.lineTo(toScreenProjectedX(path.getLast(), 0.0), toScreenProjectedY(path.getLast(), 0.0));
+        graphics.stroke();
+    }
+
+    private PlanPoint interpolateToward(PlanPoint start, PlanPoint target, double ratio) {
+        return new PlanPoint(
+                start.xMillimeters() + (target.xMillimeters() - start.xMillimeters()) * ratio,
+                start.yMillimeters() + (target.yMillimeters() - start.yMillimeters()) * ratio
+        );
+    }
+
+    private void drawHeatingConnectionMarker(GraphicsContext graphics, PlanPoint point, String label, Color color) {
+        double x = toScreenProjectedX(point, 0.0);
+        double y = toScreenProjectedY(point, 0.0);
+        graphics.setFill(Color.web("#fcfaf5"));
+        graphics.fillOval(x - 7.0, y - 7.0, 14.0, 14.0);
+        graphics.setStroke(color);
+        graphics.setLineWidth(2.0);
+        graphics.strokeOval(x - 7.0, y - 7.0, 14.0, 14.0);
+        graphics.setFill(color);
+        graphics.fillText(label, x - 3.5, y + 4.0);
     }
 
     private void drawFloorOpenings(GraphicsContext graphics, Room room) {
@@ -5644,6 +5833,249 @@ public final class CadWorkbench extends BorderPane {
         dwgBlockNameField.setText(extractDwgBlockName(preset.coveringSource()).orElse(""));
     }
 
+    private Optional<HydronicHeating> selectedHydronicHeating() {
+        Room room = selectedRoom().orElse(null);
+        HeatingSurfacePosition surfacePosition = heatingSurfacePositionSelector.getValue();
+        if (room == null || surfacePosition == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(activeLevel.get().findHydronicHeating(room.id(), surfacePosition));
+    }
+
+    private void refreshHeatingSection() {
+        Room room = selectedRoom().orElse(null);
+        HydronicHeating heating = selectedHydronicHeating().orElse(null);
+        if (room == null) {
+            heatingSummaryLabel.setText("Für die Heizflächenplanung zuerst genau einen Raum auswählen.");
+            heatingZoneList.getItems().clear();
+            updateActionButtons();
+            return;
+        }
+        if (heating == null) {
+            heatingSummaryLabel.setText("Für " + heatingSurfacePositionSelector.getValue() + " ist noch keine Heizung angelegt.");
+            heatingZoneList.getItems().clear();
+            updateActionButtons();
+            return;
+        }
+        heatingLayoutPatternSelector.setValue(heating.layoutPattern());
+        syncLengthInput(heatingPipeSpacingField, heatingPipeSpacingUnit, heating.pipeSpacing(), LengthUnit.CENTIMETER);
+        syncLengthInput(heatingPipeDiameterField, heatingPipeDiameterUnit, heating.pipeDiameter(), LengthUnit.CENTIMETER);
+        syncLengthInput(heatingMaximumPipeLengthField, heatingMaximumPipeLengthUnit, heating.maximumPipeLength(), LengthUnit.CENTIMETER);
+        syncLengthInput(heatingWallClearanceField, heatingWallClearanceUnit, heating.wallClearance(), LengthUnit.CENTIMETER);
+        syncLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(heating.supplyPoint().xMillimeters()), LengthUnit.CENTIMETER);
+        syncLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(heating.supplyPoint().yMillimeters()), LengthUnit.CENTIMETER);
+        syncLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(heating.returnPoint().xMillimeters()), LengthUnit.CENTIMETER);
+        syncLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(heating.returnPoint().yMillimeters()), LengthUnit.CENTIMETER);
+        List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layout(heating);
+        int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
+        heatingZoneList.getItems().setAll(heating.zones().stream()
+                .map(zone -> describeHeatingZone(zone, circuits))
+                .toList());
+        if (!heatingZoneList.getItems().isEmpty()) {
+            heatingZoneList.getSelectionModel().select(Math.max(0, Math.min(selectedIndex, heatingZoneList.getItems().size() - 1)));
+        }
+        double totalLength = circuits.stream().mapToDouble(circuit -> circuit.pipeLength().toMillimeters()).sum();
+        heatingSummaryLabel.setText(String.format(
+                Locale.GERMAN,
+                "%s · %s · %d Heizkreis(e) · %.1f m Rohr",
+                heating.surfacePosition(), heating.layoutPattern(), circuits.size(), totalLength / 1_000.0
+        ));
+        updateActionButtons();
+    }
+
+    private String describeHeatingZone(HeatingZone zone, List<HydronicHeatingLayoutService.CircuitLayout> circuits) {
+        double pipeLength = circuits.stream()
+                .filter(circuit -> circuit.zoneId().equals(zone.id()))
+                .findFirst()
+                .map(circuit -> circuit.pipeLength().toMillimeters())
+                .orElse(0.0);
+        return String.format(Locale.GERMAN, "%s · %.1f m · %.2f m²", zone.name(), pipeLength / 1_000.0, zone.areaSquareMillimeters() / 1_000_000.0);
+    }
+
+    private void planHydronicHeating() {
+        Room room = selectedRoom().orElseThrow(() -> new IllegalStateException("Für die Heizflächenplanung muss ein Raum ausgewählt sein."));
+        HydronicHeating existing = selectedHydronicHeating().orElse(null);
+        HydronicHeating unplanned = heatingFromInputs(room, existing == null ? UUID.randomUUID() : existing.id());
+        HydronicHeatingLayoutService.PlanningResult result = hydronicHeatingLayoutService.suggest(room, unplanned);
+        boolean maximumExceeded = result.circuits().stream()
+                .anyMatch(circuit -> circuit.pipeLength().compareTo(result.heating().maximumPipeLength()) > 0);
+        if (maximumExceeded) {
+            throw new IllegalArgumentException("Die maximale Rohrlänge kann mit den gewählten Verteilerpunkten und Abständen nicht eingehalten werden.");
+        }
+        rememberStateForUndo();
+        if (existing == null) {
+            activeLevel.get().addHydronicHeating(result.heating());
+        } else {
+            activeLevel.get().replaceHydronicHeating(result.heating());
+        }
+        refreshHeatingSection();
+        draftLabel.setText(result.heating().zones().size() + " Heizkreis(e) für " + result.heating().surfacePosition() + " geplant.");
+        render();
+    }
+
+    private HydronicHeating heatingFromInputs(Room room, UUID heatingId) {
+        HeatingSurfacePosition surfacePosition = Optional.ofNullable(heatingSurfacePositionSelector.getValue())
+                .orElse(HeatingSurfacePosition.FLOOR);
+        HeatingLayoutPattern layoutPattern = Optional.ofNullable(heatingLayoutPatternSelector.getValue())
+                .orElse(HeatingLayoutPattern.MEANDER);
+        return new HydronicHeating(
+                heatingId, room.id(), surfacePosition, layoutPattern,
+                requiredPositiveLength(heatingPipeSpacingField, heatingPipeSpacingUnit, "Verlegeabstand"),
+                requiredPositiveLength(heatingPipeDiameterField, heatingPipeDiameterUnit, "Rohrdurchmesser"),
+                requiredPositiveLength(heatingMaximumPipeLengthField, heatingMaximumPipeLengthUnit, "maximale Rohrlänge"),
+                requiredNonNegativeLength(heatingWallClearanceField, heatingWallClearanceUnit, "Wandabstand"),
+                new PlanPoint(
+                        requiredCoordinate(heatingSupplyXField, heatingSupplyXUnit, "Vorlauf X"),
+                        requiredCoordinate(heatingSupplyYField, heatingSupplyYUnit, "Vorlauf Y")
+                ),
+                new PlanPoint(
+                        requiredCoordinate(heatingReturnXField, heatingReturnXUnit, "Rücklauf X"),
+                        requiredCoordinate(heatingReturnYField, heatingReturnYUnit, "Rücklauf Y")
+                ),
+                List.of()
+        );
+    }
+
+    private Length requiredPositiveLength(TextField field, ComboBox<LengthUnit> unitSelector, String label) {
+        Length length = parseLength(field, unitSelector.getValue())
+                .orElseThrow(() -> new IllegalArgumentException(label + " ist keine gültige Länge."));
+        if (length.toMillimeters() <= 0.0) {
+            throw new IllegalArgumentException(label + " muss größer als null sein.");
+        }
+        return length;
+    }
+
+    private Length requiredNonNegativeLength(TextField field, ComboBox<LengthUnit> unitSelector, String label) {
+        Length length = parseLength(field, unitSelector.getValue())
+                .orElseThrow(() -> new IllegalArgumentException(label + " ist keine gültige Länge."));
+        if (length.toMillimeters() < 0.0) {
+            throw new IllegalArgumentException(label + " darf nicht negativ sein.");
+        }
+        return length;
+    }
+
+    private double requiredCoordinate(TextField field, ComboBox<LengthUnit> unitSelector, String label) {
+        return parseLength(field, unitSelector.getValue())
+                .map(Length::toMillimeters)
+                .orElseThrow(() -> new IllegalArgumentException(label + " ist keine gültige Koordinate."));
+    }
+
+    private void editHeatingZone(boolean createNewZone) {
+        Room room = selectedRoom().orElseThrow(() -> new IllegalStateException("Für Heizbereiche muss ein Raum ausgewählt sein."));
+        HydronicHeating heating = selectedHydronicHeating()
+                .orElseThrow(() -> new IllegalStateException("Zuerst eine Heizung für die ausgewählte Fläche planen."));
+        int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
+        if (!createNewZone && (selectedIndex < 0 || selectedIndex >= heating.zones().size())) {
+            throw new IllegalStateException("Zuerst einen Heizbereich in der Liste auswählen.");
+        }
+        HeatingZone initialZone = createNewZone
+                ? HeatingZone.create("Heizkreis " + (heating.zones().size() + 1), room.outline())
+                : heating.zones().get(selectedIndex);
+        editHeatingZoneDialog(initialZone).ifPresent(updatedZone -> {
+            List<HeatingZone> zones = new ArrayList<>(heating.zones());
+            if (createNewZone) {
+                zones.add(updatedZone);
+            } else {
+                zones.set(selectedIndex, updatedZone);
+            }
+            applyHeatingZones(heating, zones, createNewZone ? zones.size() - 1 : selectedIndex);
+        });
+    }
+
+    private Optional<HeatingZone> editHeatingZoneDialog(HeatingZone initialZone) {
+        Dialog<HeatingZoneInput> dialog = new Dialog<>();
+        dialog.setTitle("Heizbereich bearbeiten");
+        dialog.setHeaderText("Name und Polygon-Eckpunkte in Zentimetern");
+        TextField nameField = new TextField(initialZone.name());
+        TextArea pointArea = new TextArea(initialZone.outline().stream()
+                .map(point -> String.format(Locale.GERMAN, "%.3f; %.3f", point.xMillimeters() / 10.0, point.yMillimeters() / 10.0))
+                .collect(java.util.stream.Collectors.joining(System.lineSeparator())));
+        pointArea.setPrefRowCount(10);
+        applyTooltip(nameField, "Legt die eindeutige sichtbare Bezeichnung des Heizkreises fest.");
+        applyTooltip(pointArea, "Erfasst pro Zeile einen Polygon-Eckpunkt als `X; Y` in Zentimetern. Die Punkte werden umlaufend verbunden und erlauben Rechtecke, L-Formen sowie weitere Polygone.");
+        dialog.getDialogPane().setContent(new VBox(8.0, propertyRow("Name", nameField), propertyRow("Eckpunkte X; Y in cm", pointArea)));
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        Window owner = currentWindow();
+        if (owner != null) {
+            dialog.initOwner(owner);
+        }
+        dialog.setResultConverter(buttonType -> ButtonType.OK.equals(buttonType)
+                ? new HeatingZoneInput(nameField.getText(), pointArea.getText())
+                : null);
+        return dialog.showAndWait().map(input -> new HeatingZone(
+                initialZone.id(), input.name(), parseHeatingZonePoints(input.pointsText())
+        ));
+    }
+
+    private List<PlanPoint> parseHeatingZonePoints(String text) {
+        List<PlanPoint> points = new ArrayList<>();
+        for (String line : Optional.ofNullable(text).orElse("").lines().toList()) {
+            if (line.isBlank()) {
+                continue;
+            }
+            String[] coordinates = line.trim().split("\\s*;\\s*", 2);
+            if (coordinates.length != 2) {
+                throw new IllegalArgumentException("Jeder Eckpunkt benötigt X und Y, getrennt durch Semikolon.");
+            }
+            try {
+                points.add(new PlanPoint(
+                        Double.parseDouble(coordinates[0].replace(',', '.')) * 10.0,
+                        Double.parseDouble(coordinates[1].replace(',', '.')) * 10.0
+                ));
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Ungültiger Heizbereichs-Eckpunkt: " + line, exception);
+            }
+        }
+        if (points.size() < 3) {
+            throw new IllegalArgumentException("Ein Heizbereich benötigt mindestens drei Eckpunkte.");
+        }
+        return List.copyOf(points);
+    }
+
+    private void removeHeatingZone() {
+        HydronicHeating heating = selectedHydronicHeating()
+                .orElseThrow(() -> new IllegalStateException("Keine Heizung ausgewählt."));
+        int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
+        if (selectedIndex < 0 || selectedIndex >= heating.zones().size()) {
+            throw new IllegalStateException("Zuerst einen Heizbereich in der Liste auswählen.");
+        }
+        List<HeatingZone> zones = new ArrayList<>(heating.zones());
+        zones.remove(selectedIndex);
+        applyHeatingZones(heating, zones, Math.min(selectedIndex, zones.size() - 1));
+    }
+
+    private void applyHeatingZones(HydronicHeating heating, List<HeatingZone> zones, int selectedIndex) {
+        HydronicHeating updatedHeating = heating.withZones(zones);
+        Room room = selectedRoom().orElseThrow(() -> new IllegalStateException("Kein Raum ausgewählt."));
+        hydronicHeatingLayoutService.validateZones(room, updatedHeating);
+        boolean maximumExceeded = hydronicHeatingLayoutService.layout(updatedHeating).stream()
+                .anyMatch(circuit -> circuit.pipeLength().compareTo(updatedHeating.maximumPipeLength()) > 0);
+        if (maximumExceeded) {
+            throw new IllegalArgumentException("Mindestens ein bearbeiteter Heizbereich überschreitet die maximale Rohrlänge.");
+        }
+        rememberStateForUndo();
+        activeLevel.get().replaceHydronicHeating(updatedHeating);
+        refreshHeatingSection();
+        if (selectedIndex >= 0) {
+            heatingZoneList.getSelectionModel().select(selectedIndex);
+        }
+        draftLabel.setText("Heizbereiche aktualisiert.");
+        render();
+    }
+
+    private void removeHydronicHeating() {
+        HydronicHeating heating = selectedHydronicHeating()
+                .orElseThrow(() -> new IllegalStateException("Keine Heizung ausgewählt."));
+        rememberStateForUndo();
+        activeLevel.get().removeHydronicHeating(heating.id());
+        refreshHeatingSection();
+        draftLabel.setText("Heizung für " + heating.surfacePosition() + " entfernt.");
+        render();
+    }
+
+    private record HeatingZoneInput(String name, String pointsText) {
+    }
+
     private void refreshSurfaceLayerSection() {
         Optional<SurfaceSelectionContext> selectionContext = currentSurfaceSelectionContext();
         if (selectionContext.isEmpty()) {
@@ -7176,6 +7608,28 @@ public final class CadWorkbench extends BorderPane {
         return activeLevel.get().rooms().get(index);
     }
 
+    public void automationPlanHydronicHeating(String surfacePosition, String layoutPattern) {
+        heatingSurfacePositionSelector.setValue(HeatingSurfacePosition.valueOf(surfacePosition.trim().toUpperCase(Locale.ROOT)));
+        heatingLayoutPatternSelector.setValue(HeatingLayoutPattern.valueOf(layoutPattern.trim().toUpperCase(Locale.ROOT)));
+        planHydronicHeating();
+    }
+
+    public HydronicHeating automationHydronicHeating(int index) {
+        return activeLevel.get().hydronicHeatings().get(index);
+    }
+
+    public int automationHydronicHeatingCount() {
+        return activeLevel.get().hydronicHeatings().size();
+    }
+
+    public void automationReplaceHeatingZone(int heatingIndex, int zoneIndex, String name, List<PlanPoint> outline) {
+        HydronicHeating heating = activeLevel.get().hydronicHeatings().get(heatingIndex);
+        List<HeatingZone> zones = new ArrayList<>(heating.zones());
+        HeatingZone previous = zones.get(zoneIndex);
+        zones.set(zoneIndex, new HeatingZone(previous.id(), name, outline));
+        applyHeatingZones(heating, zones, zoneIndex);
+    }
+
     public void automationPrepareSelectionContextMenu(double screenX, double screenY) {
         contextMenuWorldPoint = screenToWorld(screenX, screenY);
         contextMenuSelection = selectionQueryService.findSelection(
@@ -7746,6 +8200,14 @@ public final class CadWorkbench extends BorderPane {
             case "roomObjectBaseElevation" -> roomObjectBaseElevationField;
             case "roomObjectAngle" -> roomObjectAngleField;
             case "floorExtensionThickness" -> floorExtensionThicknessField;
+            case "heatingPipeSpacing" -> heatingPipeSpacingField;
+            case "heatingPipeDiameter" -> heatingPipeDiameterField;
+            case "heatingMaximumPipeLength" -> heatingMaximumPipeLengthField;
+            case "heatingWallClearance" -> heatingWallClearanceField;
+            case "heatingSupplyX" -> heatingSupplyXField;
+            case "heatingSupplyY" -> heatingSupplyYField;
+            case "heatingReturnX" -> heatingReturnXField;
+            case "heatingReturnY" -> heatingReturnYField;
             default -> throw new IllegalArgumentException("Eingabefeld `" + fieldName + "` ist unbekannt.");
         };
     }
@@ -7767,6 +8229,14 @@ public final class CadWorkbench extends BorderPane {
             case "roomObjectHeight" -> roomObjectHeightUnit;
             case "roomObjectBaseElevation" -> roomObjectBaseElevationUnit;
             case "floorExtensionThickness" -> floorExtensionThicknessUnit;
+            case "heatingPipeSpacing" -> heatingPipeSpacingUnit;
+            case "heatingPipeDiameter" -> heatingPipeDiameterUnit;
+            case "heatingMaximumPipeLength" -> heatingMaximumPipeLengthUnit;
+            case "heatingWallClearance" -> heatingWallClearanceUnit;
+            case "heatingSupplyX" -> heatingSupplyXUnit;
+            case "heatingSupplyY" -> heatingSupplyYUnit;
+            case "heatingReturnX" -> heatingReturnXUnit;
+            case "heatingReturnY" -> heatingReturnYUnit;
             case "surfaceLayerThickness" -> surfaceLayerThicknessUnit;
             case "surfaceTileWidth" -> surfaceTileWidthUnit;
             case "surfaceTileHeight" -> surfaceTileHeightUnit;
