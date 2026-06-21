@@ -93,14 +93,14 @@ class RoomObjectPresetServiceTest {
         Files.writeString(sourceFile, simpleSolidDxf());
         RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, new DwgLibraryAnalyzer(new UnavailableConverter()));
 
-        RoomObjectPreset preset = service.importDxf3dObject(sourceFile);
+        RoomObjectPreset preset = service.importCad3dObject(sourceFile);
 
         assertEquals(RoomObjectType.DXF_3D_REFERENCE, preset.type());
         assertEquals(20.0, preset.width().toMillimeters(), 0.001);
         assertEquals(20.0, preset.depth().toMillimeters(), 0.001);
         assertEquals(20.0, preset.height().toMillimeters(), 0.001);
         assertTrue(Files.exists(objectDirectory.resolve("Wärmepumpe.dxf")));
-        assertEquals(1, service.loadDxf3dPresets().size());
+        assertEquals(1, service.loadCad3dPresets().size());
     }
 
     @Test

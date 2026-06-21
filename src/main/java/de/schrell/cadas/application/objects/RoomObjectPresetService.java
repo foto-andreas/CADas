@@ -79,10 +79,6 @@ public final class RoomObjectPresetService {
         }
     }
 
-    public List<RoomObjectPreset> loadDxf3dPresets() {
-        return loadCad3dPresets();
-    }
-
     public List<RoomObjectPreset> loadCad3dPresets() {
         if (!Files.isDirectory(objectDirectory)) {
             return List.of();
@@ -97,10 +93,6 @@ public final class RoomObjectPresetService {
         } catch (IOException exception) {
             return List.of();
         }
-    }
-
-    public RoomObjectPreset importDxf3dObject(Path sourceFile) throws IOException {
-        return importCad3dObject(sourceFile);
     }
 
     public RoomObjectPreset importCad3dObject(Path sourceFile) throws IOException {
@@ -152,10 +144,6 @@ public final class RoomObjectPresetService {
         } catch (IOException | IllegalArgumentException exception) {
             return Optional.empty();
         }
-    }
-
-    private RoomObjectPreset dxf3dPreset(Path path) throws IOException {
-        return cad3dPreset(path);
     }
 
     private RoomObjectPreset cad3dPreset(Path path) throws IOException {

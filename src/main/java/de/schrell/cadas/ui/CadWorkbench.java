@@ -1009,7 +1009,7 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Etage sichern als ...", this::saveCurrentLevelAs, null),
                 menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
-                menuItem("3D-Objekt aus DXF/IFC laden", this::importThreeDObjectFromDxf, null),
+                menuItem("3D-Objekt aus DXF/IFC laden", this::importThreeDObject, null),
                 menuItem("Beenden", this::requestApplicationExit, shortcutKey(KeyCode.Q))
         );
 
@@ -5076,7 +5076,7 @@ public final class CadWorkbench extends BorderPane {
         importLevel(file.toPath());
     }
 
-    private void importThreeDObjectFromDxf() {
+    private void importThreeDObject() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("3D-Objekt aus DXF oder IFC laden");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
@@ -5086,10 +5086,10 @@ public final class CadWorkbench extends BorderPane {
         if (file == null) {
             return;
         }
-        importThreeDObjectFromDxf(file.toPath());
+        importThreeDObject(file.toPath());
     }
 
-    private void importThreeDObjectFromDxf(Path sourceFile) {
+    private void importThreeDObject(Path sourceFile) {
         try {
             Path targetFile = roomObjectPresetService.importTarget(sourceFile);
             if (Files.exists(targetFile)
