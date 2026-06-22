@@ -1089,6 +1089,7 @@ public final class CadWorkbench extends BorderPane {
                 toolMenuItem(DrawingTool.STAIR, KeyCode.T),
                 toolMenuItem(DrawingTool.FLOOR_EXTENSION, KeyCode.G),
                 menuItem(DrawingTool.HEATING_ZONE_RECTANGLE.label(), () -> toolSelector.setValue(DrawingTool.HEATING_ZONE_RECTANGLE), null),
+                menuItem(DrawingTool.HEATING_MANIFOLD.label(), () -> toolSelector.setValue(DrawingTool.HEATING_MANIFOLD), null),
                 menuItem(DrawingTool.HEATING_EXCLUSION_RECTANGLE.label(), () -> toolSelector.setValue(DrawingTool.HEATING_EXCLUSION_RECTANGLE), null),
                 toolMenuItem(DrawingTool.DOOR, KeyCode.D),
                 toolMenuItem(DrawingTool.WINDOW, KeyCode.F),
@@ -1366,7 +1367,9 @@ public final class CadWorkbench extends BorderPane {
                 case 0, 1 -> true;
                 case 2 -> shouldShowSection(DrawingTool.WALL, RenderableKind.WALL);
                 case 3 -> shouldShowRoomSection();
-                case 4 -> selectedRoom().isPresent() || currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE;
+                case 4 -> selectedRoom().isPresent()
+                        || currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
+                        || currentTool() == DrawingTool.HEATING_MANIFOLD;
                 case 5 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
                 case 6 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW)
                         || shouldShowSection(DrawingTool.ROOF_WINDOW, RenderableKind.ROOF_WINDOW);
@@ -2064,6 +2067,10 @@ public final class CadWorkbench extends BorderPane {
             previewSegment = null;
         } else if (currentTool() == DrawingTool.OBJECT) {
             placeRoomObject(draftStart);
+            draftStart = null;
+            previewSegment = null;
+        } else if (currentTool() == DrawingTool.HEATING_MANIFOLD) {
+            placeHydronicManifold(draftStart);
             draftStart = null;
             previewSegment = null;
         }
@@ -4773,6 +4780,7 @@ public final class CadWorkbench extends BorderPane {
             case FLOOR_OPENING_RECTANGLE -> "Werkzeug: Bodenloch rechteckig | Rechteck innerhalb eines Raums aufziehen.";
             case FLOOR_OPENING_CIRCLE -> "Werkzeug: Bodenloch rund | Begrenzungsquadrat innerhalb eines Raums aufziehen.";
             case HEATING_ZONE_RECTANGLE -> "Werkzeug: Heizkreis | Rechteck innerhalb eines Raums aufziehen; Standard ist Schnecke, die Verlegung kann danach im Kontextmenü geändert werden.";
+            case HEATING_MANIFOLD -> "Werkzeug: HKV | Linksklick in einem Raum setzt den Verteiler für die gewählte Boden- oder Deckenheizung.";
             case HEATING_EXCLUSION_RECTANGLE -> "Werkzeug: FBH-Sperrfläche | Rechteck innerhalb eines Raums aufziehen; der FBH-Layouter spart diese Fläche aus.";
             case OBJECT -> "Werkzeug: Objekt | Linksklick platziert das ausgewählte Objekt-Preset innen oder außen.";
         };
@@ -5151,6 +5159,45 @@ public final class CadWorkbench extends BorderPane {
         selectSingle(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), zone.id().toString()));
         refreshHeatingSection();
         draftLabel.setText(heatingUpdateMessage(updatedHeating, "Heizkreis erzeugt."));
+    }
+
+    private void placeHydronicManifold(PlanPoint point) {
+        Room room = roomAt(point).orElse(null);
+        if (room == null) {
+            draftLabel.setText("HKV muss in einem Raum gesetzt werden.");
+            return;
+        }
+        PlanPoint returnPoint = new PlanPoint(
+                point.xMillimeters() + DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS,
+                point.yMillimeters()
+        );
+        setLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(point.xMillimeters()), LengthUnit.CENTIMETER);
+        setLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(point.yMillimeters()), LengthUnit.CENTIMETER);
+        setLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(returnPoint.xMillimeters()), LengthUnit.CENTIMETER);
+        setLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(returnPoint.yMillimeters()), LengthUnit.CENTIMETER);
+        HydronicHeating existing = activeLevel.get().findHydronicHeating(
+                room.id(),
+                Optional.ofNullable(heatingSurfacePositionSelector.getValue()).orElse(HeatingSurfacePosition.FLOOR)
+        );
+        HydronicHeating updated;
+        try {
+            updated = existing == null
+                    ? heatingFromInputs(room, UUID.randomUUID())
+                    : existing.withManifold(point, returnPoint);
+        } catch (RuntimeException exception) {
+            draftLabel.setText("HKV nicht gesetzt: " + UiErrorDialogs.userMessage(exception));
+            return;
+        }
+        rememberStateForUndo();
+        if (existing == null) {
+            activeLevel.get().addHydronicHeating(updated);
+        } else {
+            activeLevel.get().replaceHydronicHeating(updated);
+        }
+        selectSingle(new SelectionKey(RenderableKind.HEATING_MANIFOLD, activeLevel.get().name(), updated.id().toString()));
+        refreshHeatingSection();
+        draftLabel.setText("HKV gesetzt.");
+        render();
     }
 
     private Optional<Room> roomAt(PlanPoint point) {

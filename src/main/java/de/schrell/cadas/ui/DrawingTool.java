@@ -8,6 +8,7 @@ public enum DrawingTool {
     FLOOR_OPENING_RECTANGLE("Bodenloch rechteckig", false),
     FLOOR_OPENING_CIRCLE("Bodenloch rund", false),
     HEATING_ZONE_RECTANGLE("Heizkreis", false),
+    HEATING_MANIFOLD("HKV", true),
     HEATING_EXCLUSION_RECTANGLE("FBH-Sperrfläche", false),
     DOOR("Tür", true),
     WINDOW("Fenster", true),

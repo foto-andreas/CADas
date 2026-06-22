@@ -558,6 +558,34 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void setztHkvMitPunktwerkzeugImRaum() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("HEATING_MANIFOLD");
+            workbench.automationCanvasPress(50, 70, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(workbench::automationHydronicHeatingCount));
+        HydronicHeating heating = aufFxThread(() -> workbench.automationHydronicHeating(0));
+        Assertions.assertEquals(new PlanPoint(500, 700), heating.supplyPoint());
+        Assertions.assertEquals(new PlanPoint(550, 700), heating.returnPoint());
+        Assertions.assertEquals(1, aufFxThread(() -> workbench.automationSnapshot().selectionCount()));
+    }
+
+    @Test
     void undoUndWiederherstellenBehaltenZoomUndPosition() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
