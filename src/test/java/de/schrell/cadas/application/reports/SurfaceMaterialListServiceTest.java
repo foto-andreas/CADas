@@ -87,13 +87,14 @@ class SurfaceMaterialListServiceTest {
                         new PlanPoint(1_900, 100),
                         new PlanPoint(1_900, 1_400),
                         new PlanPoint(100, 1_400)
-                ))));
+                ), HeatingLayoutPattern.SPIRAL)));
         project.primaryLevel().addHydronicHeating(heating);
 
         SurfaceMaterialReport report = service.create(project);
 
         assertEquals(1, report.heatingPlans().size());
         assertEquals("FBH 1", report.heatingPlans().getFirst().zoneName());
+        assertEquals("Schnecke", report.heatingPlans().getFirst().layoutPattern());
         assertTrue(report.heatingPlans().getFirst().svg().contains("<svg"));
         assertTrue(report.heatingPlans().getFirst().svg().contains("V1"));
         assertTrue(report.toMarkdown().contains("## Flächenheizungen"));

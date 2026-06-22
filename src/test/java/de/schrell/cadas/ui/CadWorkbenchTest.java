@@ -134,18 +134,45 @@ class CadWorkbenchTest {
         Assertions.assertEquals(HeatingLayoutPattern.MEANDER, floorHeating.layoutPattern());
         Assertions.assertEquals(HeatingSurfacePosition.CEILING, ceilingHeating.surfacePosition());
         Assertions.assertEquals(HeatingLayoutPattern.SPIRAL, ceilingHeating.layoutPattern());
+        Assertions.assertTrue(floorHeating.zones().stream().allMatch(zone -> zone.layoutPattern() == HeatingLayoutPattern.MEANDER));
+        Assertions.assertTrue(ceilingHeating.zones().stream().allMatch(zone -> zone.layoutPattern() == HeatingLayoutPattern.SPIRAL));
 
         aufFxThread(() -> {
-            workbench.automationReplaceHeatingZone(0, 0, "L-Bereich", java.util.List.of(
-                    new PlanPoint(100, 100), new PlanPoint(3_900, 100), new PlanPoint(3_900, 1_500),
-                    new PlanPoint(2_000, 1_500), new PlanPoint(2_000, 2_900), new PlanPoint(100, 2_900)
-            ));
+            workbench.automationReplaceHeatingZone(
+                    0,
+                    0,
+                    "L-Bereich",
+                    java.util.List.of(
+                            new PlanPoint(100, 100), new PlanPoint(3_900, 100), new PlanPoint(3_900, 1_500),
+                            new PlanPoint(2_000, 1_500), new PlanPoint(2_000, 2_900), new PlanPoint(100, 2_900)
+                    ),
+                    "SPIRAL",
+                    true
+            );
             return null;
         });
 
         HydronicHeating editedHeating = aufFxThread(() -> workbench.automationHydronicHeating(0));
         Assertions.assertEquals("L-Bereich", editedHeating.zones().getFirst().name());
         Assertions.assertEquals(6, editedHeating.zones().getFirst().outline().size());
+        Assertions.assertEquals(HeatingLayoutPattern.SPIRAL, editedHeating.zones().getFirst().layoutPattern());
+        Assertions.assertTrue(editedHeating.zones().getFirst().flowInverted());
+
+        int zoneCount = editedHeating.zones().size();
+        aufFxThread(() -> {
+            workbench.automationRemoveHeatingZone(0, 0);
+            return null;
+        });
+        HydronicHeating afterDelete = aufFxThread(() -> workbench.automationHydronicHeating(0));
+        Assertions.assertEquals(zoneCount - 1, afterDelete.zones().size());
+
+        aufFxThread(() -> {
+            workbench.automationAddDefaultHeatingZone(0);
+            return null;
+        });
+        HydronicHeating afterAdd = aufFxThread(() -> workbench.automationHydronicHeating(0));
+        Assertions.assertEquals(zoneCount, afterAdd.zones().size());
+        Assertions.assertEquals(4, afterAdd.zones().getLast().outline().size());
     }
 
     @Test

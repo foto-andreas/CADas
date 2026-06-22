@@ -242,6 +242,6 @@ class ConstructionDrawingPdfServiceTest {
                 room.id(), surfacePosition, layoutPattern,
                 Length.ofMillimeters(200), Length.ofMillimeters(16), Length.ofMillimeters(300_000),
                 Length.ofMillimeters(150), room.outline().getFirst(), new PlanPoint(200, 0)
-        ).withZones(java.util.List.of(HeatingZone.create(zoneName, room.outline())));
+        ).withZones(java.util.List.of(HeatingZone.create(zoneName, room.outline(), layoutPattern)));
     }
 }

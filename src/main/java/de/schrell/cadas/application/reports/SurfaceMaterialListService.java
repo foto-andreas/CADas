@@ -100,7 +100,7 @@ public final class SurfaceMaterialListService {
                             level.name(),
                             room.name(),
                             heating.surfacePosition().toString(),
-                            heating.layoutPattern().toString(),
+                            zone.layoutPattern().toString(),
                             zone.name(),
                             zone.areaSquareMillimeters() / 1_000_000.0,
                             pipeLength / 1_000.0,
