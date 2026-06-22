@@ -260,19 +260,22 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         for (HydronicHeating heating : level.hydronicHeatings()) {
             appendMetadataText(dxf, context, heating.supplyPoint(), String.format(
                     Locale.US,
-                    "HEAT|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
+                    "HEAT|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
                     heating.id(), heating.roomId(), heating.surfacePosition().name(), heating.layoutPattern().name(),
                     heating.pipeSpacing().toMillimeters(), heating.pipeDiameter().toMillimeters(),
                     heating.maximumPipeLength().toMillimeters(), heating.wallClearance().toMillimeters(),
                     heating.supplyPoint().xMillimeters(), heating.supplyPoint().yMillimeters(),
-                    heating.returnPoint().xMillimeters(), heating.returnPoint().yMillimeters()
+                    heating.returnPoint().xMillimeters(), heating.returnPoint().yMillimeters(),
+                    heating.manifoldFreeAreaWidth().toMillimeters(), heating.manifoldFreeAreaDepth().toMillimeters()
             ));
             for (HeatingZone zone : heating.zones()) {
                 appendMetadataText(dxf, context, zone.outline().getFirst(), String.format(
                         Locale.US,
-                        "HZONE|%s|%s|%s|%s|%s|%s",
+                        "HZONE|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f",
                         heating.id(), zone.id(), DxfMetadataCodec.encode(zone.name()),
-                        zone.layoutPattern().name(), zone.flowInverted(), serializePoints(zone.outline())
+                        zone.layoutPattern().name(), zone.flowInverted(), serializePoints(zone.outline()),
+                        zone.supplyConnectionPoint().xMillimeters(), zone.supplyConnectionPoint().yMillimeters(),
+                        zone.returnConnectionPoint().xMillimeters(), zone.returnConnectionPoint().yMillimeters()
                 ));
             }
         }
@@ -676,11 +679,25 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                 Length.ofMillimeters(parseDouble(parts[5])), Length.ofMillimeters(parseDouble(parts[6])),
                 Length.ofMillimeters(parseDouble(parts[7])), Length.ofMillimeters(parseDouble(parts[8])),
                 new PlanPoint(parseDouble(parts[9]), parseDouble(parts[10])),
-                new PlanPoint(parseDouble(parts[11]), parseDouble(parts[12])), List.of()
+                new PlanPoint(parseDouble(parts[11]), parseDouble(parts[12])),
+                parts.length >= 15 ? Length.ofMillimeters(parseDouble(parts[13])) : HydronicHeating.DEFAULT_MANIFOLD_FREE_AREA_WIDTH,
+                parts.length >= 15 ? Length.ofMillimeters(parseDouble(parts[14])) : HydronicHeating.DEFAULT_MANIFOLD_FREE_AREA_DEPTH,
+                List.of()
         );
     }
 
     private static HeatingZone deserializeHeatingZone(String[] parts, boolean encodedFields) {
+        if (parts.length >= 11) {
+            return new HeatingZone(
+                    UUID.fromString(parts[2]),
+                    DxfMetadataCodec.decode(parts[3], encodedFields),
+                    deserializePoints(parts[6]),
+                    HeatingLayoutPattern.valueOf(parts[4]),
+                    Boolean.parseBoolean(parts[5]),
+                    new PlanPoint(parseDouble(parts[7]), parseDouble(parts[8])),
+                    new PlanPoint(parseDouble(parts[9]), parseDouble(parts[10]))
+            );
+        }
         if (parts.length >= 7) {
             return new HeatingZone(
                     UUID.fromString(parts[2]),

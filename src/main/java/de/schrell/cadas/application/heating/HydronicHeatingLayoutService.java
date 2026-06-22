@@ -34,8 +34,6 @@ public final class HydronicHeatingLayoutService {
     private static final int MAXIMUM_ZONE_COUNT = 64;
     private static final int MAXIMUM_REPAIR_ATTEMPTS = 10;
     private static final double MANIFOLD_PAIR_PITCH_MILLIMETERS = 50.0;
-    private static final double MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS = 600.0;
-    private static final double MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS = 1_000.0;
     private static final int COMPUTATION_CACHE_SIZE = 128;
 
     private final Map<HydronicHeating, LayoutComputation> computationCache = Collections.synchronizedMap(
@@ -189,7 +187,7 @@ public final class HydronicHeatingLayoutService {
         Objects.requireNonNull(heating, "heating darf nicht null sein.");
         Objects.requireNonNull(floorOpenings, "floorOpenings darf nicht null sein.");
         Objects.requireNonNull(heatingExclusionAreas, "heatingExclusionAreas darf nicht null sein.");
-        List<CircuitLayout> circuits = layout(heating);
+        List<CircuitLayout> circuits = layoutBestEffort(heating).circuits();
         List<PlanPoint> svgPoints = new ArrayList<>(room.outline());
         heating.zones().forEach(zone -> svgPoints.addAll(zone.outline()));
         circuits.forEach(circuit -> svgPoints.addAll(circuit.pipePath()));
@@ -369,7 +367,7 @@ public final class HydronicHeatingLayoutService {
         }
         boolean needsConnectorCorridor = ports.stream().anyMatch(port -> !strictlyInsideAny(polygons, port));
         if (needsConnectorCorridor) {
-            polygons.add(connectorCorridor(polygons, ports, heating.pipeSpacing().toMillimeters()));
+            polygons.add(connectorCorridor(heating, polygons, ports, heating.pipeSpacing().toMillimeters()));
         }
         return new GeometryScope(polygons);
     }
@@ -476,10 +474,10 @@ public final class HydronicHeatingLayoutService {
         if (!containsPoint(room.outline(), center)) {
             return;
         }
-        double minX = center.xMillimeters() - MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS / 2.0;
-        double minY = center.yMillimeters() - MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS / 2.0;
-        double maxX = center.xMillimeters() + MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS / 2.0;
-        double maxY = center.yMillimeters() + MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS / 2.0;
+        double minX = center.xMillimeters() - heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
+        double minY = center.yMillimeters() - heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
+        double maxX = center.xMillimeters() + heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
+        double maxY = center.yMillimeters() + heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
         if (minX < roomBounds.minX() + EPSILON
                 || maxX > roomBounds.maxX() - EPSILON
                 || minY < roomBounds.minY() + EPSILON
@@ -553,7 +551,7 @@ public final class HydronicHeatingLayoutService {
         return false;
     }
 
-    private List<PlanPoint> connectorCorridor(List<List<PlanPoint>> polygons, List<PlanPoint> ports, double pitch) {
+    private List<PlanPoint> connectorCorridor(HydronicHeating heating, List<List<PlanPoint>> polygons, List<PlanPoint> ports, double pitch) {
         List<PlanPoint> zonePoints = polygons.stream()
                 .flatMap(List::stream)
                 .toList();
@@ -561,10 +559,10 @@ public final class HydronicHeatingLayoutService {
         Bounds portBounds = bounds(ports);
         double centerX = (portBounds.minX() + portBounds.maxX()) / 2.0;
         double centerY = (portBounds.minY() + portBounds.maxY()) / 2.0;
-        double freeMinX = centerX - MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS / 2.0;
-        double freeMaxX = centerX + MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS / 2.0;
-        double freeMinY = centerY - MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS / 2.0;
-        double freeMaxY = centerY + MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS / 2.0;
+        double freeMinX = centerX - heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
+        double freeMaxX = centerX + heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
+        double freeMinY = centerY - heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
+        double freeMaxY = centerY + heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
         double padding = Math.max(pitch, MANIFOLD_PAIR_PITCH_MILLIMETERS);
         return rectangle(
                 Math.min(zoneBounds.minX(), freeMinX) - padding,
@@ -956,7 +954,30 @@ public final class HydronicHeatingLayoutService {
             PlanPoint center = centroid(zone.outline());
             return new FieldPattern(List.of(center), List.of(center), List.of(center));
         }
-        return zone.flowInverted() ? pattern.inverted() : pattern;
+        FieldPattern oriented = zone.flowInverted() ? pattern.inverted() : pattern;
+        return withZoneConnections(zone, oriented);
+    }
+
+    private FieldPattern withZoneConnections(HeatingZone zone, FieldPattern pattern) {
+        if (!zone.hasCustomConnectionPoints()) {
+            return pattern;
+        }
+        List<PlanPoint> fullPath = new ArrayList<>();
+        appendDistinct(fullPath, zone.supplyConnectionPoint());
+        for (PlanPoint point : pattern.fullPath()) {
+            appendDistinct(fullPath, point);
+        }
+        appendDistinct(fullPath, zone.returnConnectionPoint());
+
+        List<PlanPoint> supplyPath = new ArrayList<>();
+        appendDistinct(supplyPath, zone.supplyConnectionPoint());
+        for (PlanPoint point : pattern.supplyPath()) {
+            appendDistinct(supplyPath, point);
+        }
+
+        List<PlanPoint> returnPath = new ArrayList<>(pattern.returnPath());
+        appendDistinct(returnPath, zone.returnConnectionPoint());
+        return new FieldPattern(simplifyPath(fullPath), simplifyPath(supplyPath), simplifyPath(returnPath));
     }
 
     private FieldPattern meanderPattern(List<PlanPoint> polygon, double clearance, double pitch) {

@@ -103,6 +103,28 @@ class SelectionQueryServiceTest {
     }
 
     @Test
+    void findetHkvFreifläche() {
+        Level level = new Level("EG");
+        HydronicHeating heating = HydronicHeating.create(
+                java.util.UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(1_000, 1_000),
+                new PlanPoint(1_050, 1_000)
+        );
+        level.addHydronicHeating(heating);
+
+        var selection = selectionQueryService.findSelection(level, new PlanPoint(1_020, 1_100), Length.ofMillimeters(10)).orElseThrow();
+
+        assertEquals(RenderableKind.HEATING_MANIFOLD, selection.kind());
+        assertEquals(heating.id().toString(), selection.elementId());
+    }
+
+    @Test
     void priorisiertOeffnungenVorRaeumenTreppenUndWaenden() {
         Level level = new Level("Erdgeschoss");
         Wall wall = Wall.create(

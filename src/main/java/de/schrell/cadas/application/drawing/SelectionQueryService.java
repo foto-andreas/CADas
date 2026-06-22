@@ -7,6 +7,7 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Room;
@@ -34,6 +35,7 @@ public final class SelectionQueryService {
         selections.addAll(findFloorOpeningSelections(level, point));
         selections.addAll(findHeatingExclusionSelections(level, point));
         selections.addAll(findHeatingZoneSelections(level, point));
+        selections.addAll(findHeatingManifoldSelections(level, point));
         selections.addAll(findWallSelections(level, point, tolerance));
         selections.addAll(findRoomObjectSelections(level, point));
         selections.addAll(findRoomSelections(level, point));
@@ -135,6 +137,24 @@ public final class SelectionQueryService {
                 .filter(zone -> containsPoint(zone, point))
                 .map(zone -> new SelectionKey(RenderableKind.HEATING_ZONE, level.name(), zone.id().toString()))
                 .toList();
+    }
+
+    private List<SelectionKey> findHeatingManifoldSelections(Level level, PlanPoint point) {
+        return level.hydronicHeatings().stream()
+                .filter(heating -> containsManifoldArea(heating, point))
+                .map(heating -> new SelectionKey(RenderableKind.HEATING_MANIFOLD, level.name(), heating.id().toString()))
+                .toList();
+    }
+
+    private boolean containsManifoldArea(HydronicHeating heating, PlanPoint point) {
+        double centerX = (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0;
+        double centerY = (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0;
+        double halfWidth = heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
+        double halfDepth = heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
+        return point.xMillimeters() >= centerX - halfWidth
+                && point.xMillimeters() <= centerX + halfWidth
+                && point.yMillimeters() >= centerY - halfDepth
+                && point.yMillimeters() <= centerY + halfDepth;
     }
 
     private List<SelectionKey> findWallSelections(Level level, PlanPoint point, Length tolerance) {

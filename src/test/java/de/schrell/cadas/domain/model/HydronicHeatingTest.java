@@ -57,11 +57,32 @@ class HydronicHeatingTest {
     }
 
     @Test
+    void speichertAnschlussPunkteAufDemHeizkreisrand() {
+        HeatingZone zone = HeatingZone.create("Standard", List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(1_000, 0),
+                new PlanPoint(1_000, 1_000),
+                new PlanPoint(0, 1_000)
+        )).withSupplyConnectionPoint(new PlanPoint(0, 500))
+                .withReturnConnectionPoint(new PlanPoint(1_000, 500));
+
+        assertEquals(new PlanPoint(0, 500), zone.supplyConnectionPoint());
+        assertEquals(new PlanPoint(1_000, 500), zone.returnConnectionPoint());
+        assertThrows(IllegalArgumentException.class, () -> zone.withSupplyConnectionPoint(new PlanPoint(500, 500)));
+    }
+
+    @Test
     void lehntUngültigeRohrparameterAb() {
         assertThrows(IllegalArgumentException.class, () -> new HydronicHeating(
                 UUID.randomUUID(), UUID.randomUUID(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER,
                 Length.ofMillimeters(100), Length.ofMillimeters(100), Length.ofMillimeters(80_000),
                 Length.ofMillimeters(100), new PlanPoint(0, 0), new PlanPoint(100, 0), List.of()
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new HydronicHeating(
+                UUID.randomUUID(), UUID.randomUUID(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER,
+                Length.ofMillimeters(100), Length.ofMillimeters(11.6), Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100), new PlanPoint(0, 0), new PlanPoint(100, 0),
+                Length.zero(), Length.ofMillimeters(1_000), List.of()
         ));
         assertThrows(IllegalArgumentException.class, () -> HeatingZone.create("Leer", List.of(
                 new PlanPoint(0, 0), new PlanPoint(1, 0)

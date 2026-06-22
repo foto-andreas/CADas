@@ -37,6 +37,7 @@ public final class SelectionTranslationService {
         Set<String> selectedFloorOpenings = selectedIds(selections, RenderableKind.FLOOR_OPENING);
         Set<String> selectedHeatingExclusionAreas = selectedIds(selections, RenderableKind.HEATING_EXCLUSION);
         Set<String> selectedHeatingZones = selectedIds(selections, RenderableKind.HEATING_ZONE);
+        Set<String> selectedHeatingManifolds = selectedIds(selections, RenderableKind.HEATING_MANIFOLD);
         List<PlanPoint> translatedWallEndpoints = selectedWallEndpoints(level, selectedWalls);
         List<Wall> translatedWalls = level.walls().stream()
                 .map(wall -> selectedWalls.contains(wall.id().toString())
@@ -61,13 +62,17 @@ public final class SelectionTranslationService {
                 .toList();
         List<HydronicHeating> translatedHydronicHeatings = level.hydronicHeatings().stream()
                 .map(heating -> translateHeatingZones(heating, selectedHeatingZones, deltaXMillimeters, deltaYMillimeters))
+                .map(heating -> selectedHeatingManifolds.contains(heating.id().toString())
+                        ? translateHeatingManifold(heating, deltaXMillimeters, deltaYMillimeters)
+                        : heating)
                 .toList();
         boolean changed = !selectedWalls.isEmpty()
                 || !selectedStairs.isEmpty()
                 || !selectedRoomObjects.isEmpty()
                 || !selectedFloorOpenings.isEmpty()
                 || !selectedHeatingExclusionAreas.isEmpty()
-                || !selectedHeatingZones.isEmpty();
+                || !selectedHeatingZones.isEmpty()
+                || !selectedHeatingManifolds.isEmpty();
         return new TranslationResult(translatedWalls, translatedStairs, translatedRoomObjects,
                 translatedFloorOpenings, translatedHeatingExclusionAreas, translatedHydronicHeatings, changed);
     }
@@ -174,9 +179,28 @@ public final class SelectionTranslationService {
     }
 
     private HeatingZone translateHeatingZone(HeatingZone zone, double deltaXMillimeters, double deltaYMillimeters) {
-        return zone.withOutline(zone.outline().stream()
-                .map(point -> translatePoint(point, deltaXMillimeters, deltaYMillimeters))
-                .toList());
+        return new HeatingZone(
+                zone.id(),
+                zone.name(),
+                zone.outline().stream()
+                        .map(point -> translatePoint(point, deltaXMillimeters, deltaYMillimeters))
+                        .toList(),
+                zone.layoutPattern(),
+                zone.flowInverted(),
+                translatePoint(zone.supplyConnectionPoint(), deltaXMillimeters, deltaYMillimeters),
+                translatePoint(zone.returnConnectionPoint(), deltaXMillimeters, deltaYMillimeters)
+        );
+    }
+
+    private HydronicHeating translateHeatingManifold(
+            HydronicHeating heating,
+            double deltaXMillimeters,
+            double deltaYMillimeters
+    ) {
+        return heating.withManifold(
+                translatePoint(heating.supplyPoint(), deltaXMillimeters, deltaYMillimeters),
+                translatePoint(heating.returnPoint(), deltaXMillimeters, deltaYMillimeters)
+        );
     }
 
     public record TranslationResult(

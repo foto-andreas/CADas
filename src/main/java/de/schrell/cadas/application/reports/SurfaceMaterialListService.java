@@ -88,7 +88,7 @@ public final class SurfaceMaterialListService {
                 if (room == null) {
                     continue;
                 }
-                List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layout(heating);
+                List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layoutBestEffort(heating).circuits();
                 String svg = hydronicHeatingLayoutService.toSvg(
                         room, heating, level.floorOpenings(), level.heatingExclusionAreas()
                 );

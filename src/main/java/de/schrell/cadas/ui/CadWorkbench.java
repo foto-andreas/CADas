@@ -1449,6 +1449,7 @@ public final class CadWorkbench extends BorderPane {
             case FLOOR_EXTENSION -> "Balkon/Empore";
             case FLOOR_OPENING -> "Bodenöffnung";
             case HEATING_ZONE -> "Heizkreis";
+            case HEATING_MANIFOLD -> "HKV-Freifläche";
             case HEATING_EXCLUSION -> "FBH-Sperrfläche";
             default -> selection.kind().name();
         };
@@ -1460,7 +1461,8 @@ public final class CadWorkbench extends BorderPane {
         boolean hasSelection = !selectedSelections.isEmpty();
         boolean hasDeletableSelection = selectedSelections.stream().anyMatch(selection -> selection.kind() != RenderableKind.ROOM_VOLUME
                 && selection.kind() != RenderableKind.ROOM_FLOOR
-                && selection.kind() != RenderableKind.ROOM_CEILING);
+                && selection.kind() != RenderableKind.ROOM_CEILING
+                && selection.kind() != RenderableKind.HEATING_MANIFOLD);
         deleteSelectionButton.setDisable(!hasDeletableSelection);
         clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
         applySelectionPropertiesButton.setDisable(!hasSelection);
@@ -2708,6 +2710,10 @@ public final class CadWorkbench extends BorderPane {
                         .filter(zone -> zone.id().toString().equals(selection.elementId()))
                         .findFirst()
                         .ifPresent(zone -> drawSelectedHeatingZone(graphics, zone));
+                case HEATING_MANIFOLD -> activeLevel.get().hydronicHeatings().stream()
+                        .filter(heating -> heating.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(heating -> drawSelectedHeatingManifold(graphics, heating));
                 case HEATING_EXCLUSION -> activeLevel.get().heatingExclusionAreas().stream()
                         .filter(area -> area.id().toString().equals(selection.elementId()))
                         .findFirst()
@@ -2762,6 +2768,19 @@ public final class CadWorkbench extends BorderPane {
                 zone.outline().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray(),
                 zone.outline().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray(),
                 zone.outline().size()
+        );
+    }
+
+    private void drawSelectedHeatingManifold(GraphicsContext graphics, HydronicHeating heating) {
+        double centerX = (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0;
+        double centerY = (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0;
+        double minX = centerX - heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
+        double minY = centerY - heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
+        graphics.strokeRect(
+                toScreenProjectedX(new PlanPoint(minX, minY), 0.0),
+                toScreenProjectedY(new PlanPoint(minX, minY), 0.0),
+                heating.manifoldFreeAreaWidth().toMillimeters() * scale(),
+                heating.manifoldFreeAreaDepth().toMillimeters() * scale()
         );
     }
 
@@ -3295,6 +3314,7 @@ public final class CadWorkbench extends BorderPane {
             Color color = heating.surfacePosition() == HeatingSurfacePosition.FLOOR
                     ? Color.web("#c53b32")
                     : Color.web("#2878a8");
+            drawHeatingManifold(graphics, heating);
             graphics.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.55));
             graphics.setLineWidth(1.0);
             graphics.setLineDashes(5.0, 4.0);
@@ -3305,6 +3325,8 @@ public final class CadWorkbench extends BorderPane {
                 double[] xPoints = zone.outline().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray();
                 double[] yPoints = zone.outline().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray();
                 graphics.strokePolygon(xPoints, yPoints, xPoints.length);
+                drawHeatingConnectionMarker(graphics, zone.supplyConnectionPoint(), "V", Color.web("#1f62d0"));
+                drawHeatingConnectionMarker(graphics, zone.returnConnectionPoint(), "R", Color.web("#d33b32"));
             }
             graphics.setLineDashes();
             graphics.setLineWidth(clamp(heating.pipeDiameter().toMillimeters() * scale(), 1.2, 5.0));
@@ -3317,6 +3339,35 @@ public final class CadWorkbench extends BorderPane {
                 drawHeatingConnectionMarker(graphics, circuit.returnPort(), "R", Color.web("#d33b32"));
             }
         }
+    }
+
+    private void drawHeatingManifold(GraphicsContext graphics, HydronicHeating heating) {
+        double centerX = (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0;
+        double centerY = (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0;
+        double minX = centerX - heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
+        double minY = centerY - heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
+        boolean selected = selectedSelections.contains(new SelectionKey(RenderableKind.HEATING_MANIFOLD, activeLevel.get().name(), heating.id().toString()));
+        graphics.save();
+        graphics.setFill(Color.color(0.75, 0.78, 0.74, selected ? 0.22 : 0.12));
+        graphics.setStroke(selected ? Color.web("#f2a900") : Color.web("#6b746b"));
+        graphics.setLineWidth(selected ? 2.2 : 1.0);
+        graphics.setLineDashes(6.0, 4.0);
+        graphics.fillRect(
+                toScreenProjectedX(new PlanPoint(minX, minY), 0.0),
+                toScreenProjectedY(new PlanPoint(minX, minY), 0.0),
+                heating.manifoldFreeAreaWidth().toMillimeters() * scale(),
+                heating.manifoldFreeAreaDepth().toMillimeters() * scale()
+        );
+        graphics.strokeRect(
+                toScreenProjectedX(new PlanPoint(minX, minY), 0.0),
+                toScreenProjectedY(new PlanPoint(minX, minY), 0.0),
+                heating.manifoldFreeAreaWidth().toMillimeters() * scale(),
+                heating.manifoldFreeAreaDepth().toMillimeters() * scale()
+        );
+        graphics.setLineDashes();
+        drawHeatingConnectionMarker(graphics, heating.supplyPoint(), "HKV V", Color.web("#1f62d0"));
+        drawHeatingConnectionMarker(graphics, heating.returnPoint(), "HKV R", Color.web("#d33b32"));
+        graphics.restore();
     }
 
     private void drawHeatingRolePath(GraphicsContext graphics, List<PlanPoint> path, double radiusMillimeters, Color color, boolean connector) {
@@ -6046,6 +6097,10 @@ public final class CadWorkbench extends BorderPane {
         if (zoneContext.isPresent()) {
             return Optional.of(zoneContext.orElseThrow().heating());
         }
+        Optional<HeatingContext> heatingContext = selectedHeatingContext();
+        if (heatingContext.isPresent()) {
+            return Optional.of(heatingContext.orElseThrow().heating());
+        }
         Room room = selectedRoom().orElse(null);
         HeatingSurfacePosition surfacePosition = heatingSurfacePositionSelector.getValue();
         if (room == null || surfacePosition == null) {
@@ -6530,6 +6585,12 @@ public final class CadWorkbench extends BorderPane {
     ) {
     }
 
+    private record HeatingContext(
+            Room room,
+            HydronicHeating heating
+    ) {
+    }
+
     private record HeatingZoneBounds(double minX, double minY, double maxX, double maxY) {
         private double width() {
             return maxX - minX;
@@ -6893,6 +6954,10 @@ public final class CadWorkbench extends BorderPane {
         if (zoneContext.isPresent()) {
             return Optional.of(zoneContext.orElseThrow().room());
         }
+        Optional<HeatingContext> heatingContext = selectedHeatingContext();
+        if (heatingContext.isPresent()) {
+            return Optional.of(heatingContext.orElseThrow().room());
+        }
         if (selectedSelection.get().kind() != RenderableKind.ROOM_VOLUME
                 && selectedSelection.get().kind() != RenderableKind.ROOM_FLOOR
                 && selectedSelection.get().kind() != RenderableKind.ROOM_CEILING) {
@@ -6908,6 +6973,20 @@ public final class CadWorkbench extends BorderPane {
             return Optional.empty();
         }
         return heatingZoneContext(UUID.fromString(selectedSelection.get().elementId()));
+    }
+
+    private Optional<HeatingContext> selectedHeatingContext() {
+        if (selectedSelection.get() == null || selectedSelection.get().kind() != RenderableKind.HEATING_MANIFOLD) {
+            return Optional.empty();
+        }
+        UUID heatingId = UUID.fromString(selectedSelection.get().elementId());
+        return activeLevel.get().hydronicHeatings().stream()
+                .filter(heating -> heating.id().equals(heatingId))
+                .findFirst()
+                .flatMap(heating -> activeLevel.get().rooms().stream()
+                        .filter(room -> room.id().equals(heating.roomId()))
+                        .findFirst()
+                        .map(room -> new HeatingContext(room, heating)));
     }
 
     private Optional<HeatingZoneContext> contextHeatingZoneContext() {
@@ -7469,7 +7548,9 @@ public final class CadWorkbench extends BorderPane {
                     : HeatingLayoutPattern.SPIRAL;
             selectionContextMenu.getItems().addAll(
                     menuItem("Verlegung auf " + targetPattern + " umschalten", () -> setContextHeatingZonePattern(targetPattern), null),
-                    menuItem("Vorlauf/Rücklauf im Heizkreis tauschen", this::invertContextHeatingZone, null)
+                    menuItem("Vorlauf/Rücklauf im Heizkreis tauschen", this::invertContextHeatingZone, null),
+                    menuItem("Vorlauf hier am Rand setzen", this::setContextHeatingZoneSupplyConnection, null),
+                    menuItem("Rücklauf hier am Rand setzen", this::setContextHeatingZoneReturnConnection, null)
             );
             if (mergeableHeatingZone(context).isPresent()) {
                 selectionContextMenu.getItems().add(menuItem("Mit angrenzendem Heizkreis verbinden", this::mergeContextHeatingZone, null));
@@ -7477,7 +7558,8 @@ public final class CadWorkbench extends BorderPane {
         });
         if (selectedSelections.stream().anyMatch(selection -> selection.kind() != RenderableKind.ROOM_VOLUME
                 && selection.kind() != RenderableKind.ROOM_FLOOR
-                && selection.kind() != RenderableKind.ROOM_CEILING)) {
+                && selection.kind() != RenderableKind.ROOM_CEILING
+                && selection.kind() != RenderableKind.HEATING_MANIFOLD)) {
             selectionContextMenu.getItems().add(menuItem("Auswahl löschen", this::deleteSelection, null));
         }
         if (selectedSelections.stream().anyMatch(this::isRotatableSelection)) {
@@ -7520,6 +7602,63 @@ public final class CadWorkbench extends BorderPane {
         HeatingZoneContext context = contextHeatingZoneContext()
                 .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
         replaceHeatingZone(context, context.zone().withFlowInverted(!context.zone().flowInverted()), "Vorlauf und Rücklauf im Heizkreis getauscht.");
+    }
+
+    private void setContextHeatingZoneSupplyConnection() {
+        HeatingZoneContext context = contextHeatingZoneContext()
+                .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
+        replaceHeatingZone(
+                context,
+                context.zone().withSupplyConnectionPoint(nearestPointOnHeatingZoneBoundary(context.zone(), contextMenuWorldPoint)),
+                "Vorlaufanschluss am Heizkreis gesetzt."
+        );
+    }
+
+    private void setContextHeatingZoneReturnConnection() {
+        HeatingZoneContext context = contextHeatingZoneContext()
+                .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
+        replaceHeatingZone(
+                context,
+                context.zone().withReturnConnectionPoint(nearestPointOnHeatingZoneBoundary(context.zone(), contextMenuWorldPoint)),
+                "Rücklaufanschluss am Heizkreis gesetzt."
+        );
+    }
+
+    private PlanPoint nearestPointOnHeatingZoneBoundary(HeatingZone zone, PlanPoint point) {
+        if (point == null) {
+            throw new IllegalStateException("Kein Kontextpunkt vorhanden.");
+        }
+        PlanPoint nearest = zone.outline().getFirst();
+        double nearestDistance = Double.POSITIVE_INFINITY;
+        for (int index = 0; index < zone.outline().size(); index++) {
+            PlanPoint candidate = nearestPointOnSegment(
+                    point,
+                    zone.outline().get(index),
+                    zone.outline().get((index + 1) % zone.outline().size())
+            );
+            double distance = candidate.distanceTo(point).toMillimeters();
+            if (distance < nearestDistance) {
+                nearest = candidate;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
+    private PlanPoint nearestPointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end) {
+        double dx = end.xMillimeters() - start.xMillimeters();
+        double dy = end.yMillimeters() - start.yMillimeters();
+        double lengthSquared = dx * dx + dy * dy;
+        if (lengthSquared <= 0.001) {
+            return start;
+        }
+        double ratio = ((point.xMillimeters() - start.xMillimeters()) * dx
+                + (point.yMillimeters() - start.yMillimeters()) * dy) / lengthSquared;
+        double clampedRatio = Math.max(0.0, Math.min(1.0, ratio));
+        return new PlanPoint(
+                start.xMillimeters() + dx * clampedRatio,
+                start.yMillimeters() + dy * clampedRatio
+        );
     }
 
     private void replaceHeatingZone(HeatingZoneContext context, HeatingZone replacement, String successPrefix) {
@@ -7689,19 +7828,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private HydronicHeating withHydronicManifold(HydronicHeating heating, PlanPoint supplyPoint, PlanPoint returnPoint) {
-        return new HydronicHeating(
-                heating.id(),
-                heating.roomId(),
-                heating.surfacePosition(),
-                heating.layoutPattern(),
-                heating.pipeSpacing(),
-                heating.pipeDiameter(),
-                heating.maximumPipeLength(),
-                heating.wallClearance(),
-                supplyPoint,
-                returnPoint,
-                heating.zones()
-        );
+        return heating.withManifold(supplyPoint, returnPoint);
     }
 
     private void renameContextRoom() {
@@ -9028,6 +9155,7 @@ public final class CadWorkbench extends BorderPane {
                 || selectionKey.kind() == RenderableKind.ROOM_OBJECT
                 || selectionKey.kind() == RenderableKind.FLOOR_OPENING
                 || selectionKey.kind() == RenderableKind.HEATING_ZONE
+                || selectionKey.kind() == RenderableKind.HEATING_MANIFOLD
                 || selectionKey.kind() == RenderableKind.HEATING_EXCLUSION;
     }
 

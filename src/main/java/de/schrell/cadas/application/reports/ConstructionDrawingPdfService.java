@@ -170,7 +170,7 @@ public final class ConstructionDrawingPdfService {
             Color supplyColor = new Color(31, 98, 208);
             Color returnColor = new Color(211, 59, 50);
             for (HydronicHeating heating : heatings) {
-                List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layout(heating);
+                List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layoutBestEffort(heating).circuits();
                 for (HeatingZone zone : heating.zones()) {
                     drawHeatingZone(canvas, viewport, zone, circuits, zoneColor);
                 }

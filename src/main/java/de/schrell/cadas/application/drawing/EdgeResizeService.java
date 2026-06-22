@@ -79,6 +79,14 @@ import java.util.UUID;
                             addRectangleHandles(handles, RenderableKind.HEATING_ZONE, zone.id(),
                                     bounds.minX(), bounds.minY(), bounds.maxX(), bounds.maxY());
                         });
+                case HEATING_MANIFOLD -> level.hydronicHeatings().stream()
+                        .filter(heating -> heating.id().equals(id))
+                        .findFirst()
+                        .ifPresent(heating -> {
+                            RectangleBounds bounds = manifoldBounds(heating);
+                            addRectangleHandles(handles, RenderableKind.HEATING_MANIFOLD, heating.id(),
+                                    bounds.minX(), bounds.minY(), bounds.maxX(), bounds.maxY());
+                        });
                 default -> {
                 }
             }
@@ -222,6 +230,7 @@ import java.util.UUID;
             case FLOOR_OPENING -> resizeFloorOpeningRectangle(level, handle, targetPoint);
             case HEATING_EXCLUSION -> resizeHeatingExclusionRectangle(level, handle, targetPoint);
             case HEATING_ZONE -> resizeHeatingZoneRectangle(level, handle, targetPoint);
+            case HEATING_MANIFOLD -> resizeHeatingManifoldRectangle(level, handle, targetPoint);
             default -> throw new IllegalArgumentException("Bauteil kann nicht rechteckig geändert werden: " + handle.elementKind());
         };
     }
@@ -315,6 +324,35 @@ import java.util.UUID;
                         .toList());
     }
 
+    private ResizeResult resizeHeatingManifoldRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+        HydronicHeating heating = level.hydronicHeatings().stream()
+                .filter(candidate -> candidate.id().equals(handle.elementId()))
+                .findFirst()
+                .orElseThrow();
+        RectangleBounds bounds = resizeBounds(manifoldBounds(heating), handle.kind(), targetPoint);
+        double centerX = (bounds.minX() + bounds.maxX()) / 2.0;
+        double centerY = (bounds.minY() + bounds.maxY()) / 2.0;
+        double oldCenterX = (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0;
+        double oldCenterY = (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0;
+        HydronicHeating resized = heating
+                .withManifold(
+                        new PlanPoint(
+                                heating.supplyPoint().xMillimeters() + centerX - oldCenterX,
+                                heating.supplyPoint().yMillimeters() + centerY - oldCenterY
+                        ),
+                        new PlanPoint(
+                                heating.returnPoint().xMillimeters() + centerX - oldCenterX,
+                                heating.returnPoint().yMillimeters() + centerY - oldCenterY
+                        )
+                )
+                .withManifoldFreeArea(Length.ofMillimeters(bounds.width()), Length.ofMillimeters(bounds.height()));
+        return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases(),
+                level.floorOpenings(), level.heatingExclusionAreas(),
+                level.hydronicHeatings().stream()
+                        .map(candidate -> candidate.id().equals(heating.id()) ? resized : candidate)
+                        .toList());
+    }
+
     private RectangleBounds resizeBounds(RectangleBounds bounds, EdgeHandleKind handleKind, PlanPoint targetPoint) {
         double minX = bounds.minX();
         double maxX = bounds.maxX();
@@ -348,6 +386,14 @@ import java.util.UUID;
                 points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0),
                 points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0)
         );
+    }
+
+    private RectangleBounds manifoldBounds(HydronicHeating heating) {
+        double centerX = (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0;
+        double centerY = (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0;
+        double halfWidth = heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
+        double halfDepth = heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
+        return new RectangleBounds(centerX - halfWidth, centerY - halfDepth, centerX + halfWidth, centerY + halfDepth);
     }
 
     private List<PlanPoint> rectanglePoints(RectangleBounds bounds) {

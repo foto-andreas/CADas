@@ -13,6 +13,7 @@ public enum RenderableKind {
     FLOOR_EXTENSION,
     FLOOR_OPENING,
     HEATING_ZONE,
+    HEATING_MANIFOLD,
     HEATING_EXCLUSION,
     TERRAIN,
     ROOF,

@@ -111,14 +111,17 @@ class DxfLevelExchangeServiceTest {
                 new PlanPoint(800, 600),
                 new PlanPoint(1_400, 1_300)
         ));
+        HeatingZone ceilingZone = HeatingZone.create("L-Heizkreis", java.util.List.of(
+                new PlanPoint(100, 100), new PlanPoint(3_800, 100), new PlanPoint(3_800, 1_600),
+                new PlanPoint(2_000, 1_600), new PlanPoint(2_000, 3_300), new PlanPoint(100, 3_300)
+        )).withSupplyConnectionPoint(new PlanPoint(100, 1_000))
+                .withReturnConnectionPoint(new PlanPoint(3_800, 800));
         HydronicHeating ceilingHeating = HydronicHeating.create(
                 level.rooms().getFirst().id(), HeatingSurfacePosition.CEILING, HeatingLayoutPattern.MEANDER,
                 Length.ofMillimeters(200), Length.ofMillimeters(18), Length.ofMillimeters(75_000),
                 Length.ofMillimeters(100), new PlanPoint(150, 200), new PlanPoint(350, 200)
-        ).withZones(java.util.List.of(HeatingZone.create("L-Heizkreis", java.util.List.of(
-                new PlanPoint(100, 100), new PlanPoint(3_800, 100), new PlanPoint(3_800, 1_600),
-                new PlanPoint(2_000, 1_600), new PlanPoint(2_000, 3_300), new PlanPoint(100, 3_300)
-        ))));
+        ).withManifoldFreeArea(Length.ofMillimeters(700), Length.ofMillimeters(900))
+                .withZones(java.util.List.of(ceilingZone));
         level.addHydronicHeating(ceilingHeating);
 
         Path file = tempDir.resolve("grundriss.dxf");
@@ -153,8 +156,12 @@ class DxfLevelExchangeServiceTest {
         assertEquals(ceilingHeating.id(), importedHeating.id());
         assertEquals(HeatingSurfacePosition.CEILING, importedHeating.surfacePosition());
         assertEquals(18.0, importedHeating.pipeDiameter().toMillimeters(), 0.001);
+        assertEquals(700.0, importedHeating.manifoldFreeAreaWidth().toMillimeters(), 0.001);
+        assertEquals(900.0, importedHeating.manifoldFreeAreaDepth().toMillimeters(), 0.001);
         assertEquals("L-Heizkreis", importedHeating.zones().getFirst().name());
         assertEquals(6, importedHeating.zones().getFirst().outline().size());
+        assertEquals(new PlanPoint(100, 1_000), importedHeating.zones().getFirst().supplyConnectionPoint());
+        assertEquals(new PlanPoint(3_800, 800), importedHeating.zones().getFirst().returnConnectionPoint());
     }
 
     @Test
@@ -351,7 +358,7 @@ class DxfLevelExchangeServiceTest {
         String dxf = Files.readString(file);
         Level imported = exchangeService.importLevel(file, "Import");
 
-        assertTrue(dxf.contains("CADAS_DXF|4"));
+        assertTrue(dxf.contains("CADAS_DXF|5"));
         assertFalse(dxf.contains("Bad | Küche/Flur"));
         assertEquals("Bad | Küche/Flur ä\nNord", imported.rooms().getFirst().name());
         assertEquals("Raum/" + room.id() + "|Boden", imported.surfaceLayerStacks().getFirst().targetKey());

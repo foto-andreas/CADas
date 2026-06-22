@@ -238,4 +238,32 @@ class SelectionTranslationServiceTest {
         assertTrue(result.changed());
         assertEquals(new PlanPoint(620, 520), result.hydronicHeatings().getFirst().zones().getFirst().outline().getFirst());
     }
+
+    @Test
+    void verschiebtAusgewähltenHkv() {
+        Level level = new Level("Erdgeschoss");
+        HydronicHeating heating = HydronicHeating.create(
+                java.util.UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(1_000, 1_000),
+                new PlanPoint(1_050, 1_000)
+        );
+        level.addHydronicHeating(heating);
+
+        SelectionTranslationService.TranslationResult result = translationService.translate(
+                level,
+                Set.of(new SelectionKey(RenderableKind.HEATING_MANIFOLD, level.name(), heating.id().toString())),
+                120.0,
+                -80.0
+        );
+
+        assertTrue(result.changed());
+        assertEquals(new PlanPoint(1_120, 920), result.hydronicHeatings().getFirst().supplyPoint());
+        assertEquals(new PlanPoint(1_170, 920), result.hydronicHeatings().getFirst().returnPoint());
+    }
 }

@@ -256,6 +256,36 @@ class EdgeResizeServiceTest {
         assertEquals(2_400.0, resized.outline().get(1).xMillimeters(), 0.001);
     }
 
+    @Test
+    void aendertHkvFreiflächeMitSeitenHandle() {
+        Level level = new Level("Erdgeschoss");
+        HydronicHeating heating = HydronicHeating.create(
+                UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(1_000, 1_000),
+                new PlanPoint(1_050, 1_000)
+        );
+        level.addHydronicHeating(heating);
+        EdgeResizeService.EdgeHandle handle = new EdgeResizeService.EdgeHandle(
+                EdgeResizeService.EdgeHandleKind.RECTANGLE_EAST,
+                RenderableKind.HEATING_MANIFOLD,
+                heating.id(),
+                null,
+                new PlanPoint(1_325, 1_000)
+        );
+
+        EdgeResizeService.ResizeResult result = service.resize(level, handle, new PlanPoint(1_525, 1_000));
+
+        HydronicHeating resized = result.hydronicHeatings().getFirst();
+        assertEquals(800.0, resized.manifoldFreeAreaWidth().toMillimeters(), 0.001);
+        assertEquals(100.0, resized.supplyPoint().xMillimeters() - heating.supplyPoint().xMillimeters(), 0.001);
+    }
+
     private java.util.List<PlanPoint> rectangle(double minX, double minY, double maxX, double maxY) {
         return java.util.List.of(
                 new PlanPoint(minX, minY),
