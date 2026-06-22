@@ -463,7 +463,7 @@ public final class CadWorkbench extends BorderPane {
     private final Button refreshDwgLibraryButton = new Button("DWG prüfen");
     private final Button addDwgBlockAsSurfaceButton = new Button("Als Belag");
     private final Button addDwgBlockAsObjectButton = new Button("Als Objekt");
-    private final Button planHeatingButton = new Button("Heizkreise planen");
+    private final Button planHeatingButton = new Button("Raumplanung pausiert");
     private final Button addHeatingZoneButton = new Button("Rechteck hinzufügen");
     private final Button editHeatingZoneButton = new Button("Bereich bearbeiten");
     private final Button removeHeatingZoneButton = new Button("Bereich entfernen");
@@ -511,6 +511,7 @@ public final class CadWorkbench extends BorderPane {
     private List<RoomObject> selectionDragBaseRoomObjects = List.of();
     private List<FloorOpening> selectionDragBaseFloorOpenings = List.of();
     private List<HeatingExclusionArea> selectionDragBaseHeatingExclusionAreas = List.of();
+    private List<HydronicHeating> selectionDragBaseHydronicHeatings = List.of();
     private UUID openingDragId;
     private PlanSegment openingDragWallAxis;
     private double openingDragWidth;
@@ -522,6 +523,7 @@ public final class CadWorkbench extends BorderPane {
     private List<Staircase> edgeResizeBaseStaircases = List.of();
     private List<FloorOpening> edgeResizeBaseFloorOpenings = List.of();
     private List<HeatingExclusionArea> edgeResizeBaseHeatingExclusionAreas = List.of();
+    private List<HydronicHeating> edgeResizeBaseHydronicHeatings = List.of();
     private double lastMouseX;
     private double lastMouseY;
     private boolean altPressed;
@@ -1086,6 +1088,7 @@ public final class CadWorkbench extends BorderPane {
                 toolMenuItem(DrawingTool.WALL, KeyCode.W),
                 toolMenuItem(DrawingTool.STAIR, KeyCode.T),
                 toolMenuItem(DrawingTool.FLOOR_EXTENSION, KeyCode.G),
+                menuItem(DrawingTool.HEATING_ZONE_RECTANGLE.label(), () -> toolSelector.setValue(DrawingTool.HEATING_ZONE_RECTANGLE), null),
                 menuItem(DrawingTool.HEATING_EXCLUSION_RECTANGLE.label(), () -> toolSelector.setValue(DrawingTool.HEATING_EXCLUSION_RECTANGLE), null),
                 toolMenuItem(DrawingTool.DOOR, KeyCode.D),
                 toolMenuItem(DrawingTool.WINDOW, KeyCode.F),
@@ -1342,7 +1345,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(refreshDwgLibraryButton, "Analysiert die aktuell geladene DWG-Bibliothek erneut über einen externen Konverter wie `dwg2dxf` oder `dwgread`.");
         applyTooltip(addDwgBlockAsSurfaceButton, "Übernimmt den ausgewählten DWG-Block mit echten Blockmaßen als Belags-Preset.");
         applyTooltip(addDwgBlockAsObjectButton, "Übernimmt den ausgewählten DWG-Block mit echtem Footprint als Objekt-Preset.");
-        applyTooltip(planHeatingButton, "Berechnet aus Raumkontur, Verlegeart, Abständen und maximaler Rohrlänge einen Vorschlag mit einem oder mehreren getrennten Heizkreisen. Eine vorhandene automatische Aufteilung wird dabei ersetzt.");
+        applyTooltip(planHeatingButton, "Die automatische Planung ganzer Räume ist vorübergehend deaktiviert. Heizkreise werden aktuell halbautomatisch als Rechtecke mit dem Werkzeug `Heizkreis` angelegt und danach direkt in der Zeichenfläche bearbeitet.");
         applyTooltip(addHeatingZoneButton, "Ergänzt einen neuen Heizkreis als rechteckiges Startfeld in einem freien Bereich des ausgewählten Raums. Das Rechteck kann im Dialog über Eckpunkte, Verlegeart und Rollenorientierung angepasst werden.");
         applyTooltip(editHeatingZoneButton, "Bearbeitet Name, Verlegeart, Rollenorientierung und sämtliche Eckpunkte des in der Liste markierten Heizbereichs. Danach wird dessen Rohrverlauf neu berechnet.");
         applyTooltip(removeHeatingZoneButton, "Entfernt den in der Liste markierten Heizbereich einschließlich seines berechneten Rohrverlaufs.");
@@ -1363,7 +1366,7 @@ public final class CadWorkbench extends BorderPane {
                 case 0, 1 -> true;
                 case 2 -> shouldShowSection(DrawingTool.WALL, RenderableKind.WALL);
                 case 3 -> shouldShowRoomSection();
-                case 4 -> selectedRoom().isPresent();
+                case 4 -> selectedRoom().isPresent() || currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE;
                 case 5 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
                 case 6 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW)
                         || shouldShowSection(DrawingTool.ROOF_WINDOW, RenderableKind.ROOF_WINDOW);
@@ -1445,6 +1448,7 @@ public final class CadWorkbench extends BorderPane {
             case ROOM_OBJECT -> "Objekt";
             case FLOOR_EXTENSION -> "Balkon/Empore";
             case FLOOR_OPENING -> "Bodenöffnung";
+            case HEATING_ZONE -> "Heizkreis";
             case HEATING_EXCLUSION -> "FBH-Sperrfläche";
             default -> selection.kind().name();
         };
@@ -1488,7 +1492,7 @@ public final class CadWorkbench extends BorderPane {
         addDwgBlockAsObjectButton.setDisable(!hasDwgBlock);
         HydronicHeating selectedHeating = selectedHydronicHeating().orElse(null);
         int selectedZoneIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
-        planHeatingButton.setDisable(selectedRoom().isEmpty());
+        planHeatingButton.setDisable(true);
         addHeatingZoneButton.setDisable(selectedHeating == null);
         editHeatingZoneButton.setDisable(selectedHeating == null || selectedZoneIndex < 0);
         removeHeatingZoneButton.setDisable(selectedHeating == null || selectedZoneIndex < 0);
@@ -1689,7 +1693,7 @@ public final class CadWorkbench extends BorderPane {
         heatingSurfacePositionSelector.getItems().setAll(HeatingSurfacePosition.values());
         heatingSurfacePositionSelector.setValue(HeatingSurfacePosition.FLOOR);
         heatingLayoutPatternSelector.getItems().setAll(HeatingLayoutPattern.values());
-        heatingLayoutPatternSelector.setValue(HeatingLayoutPattern.MEANDER);
+        heatingLayoutPatternSelector.setValue(HeatingLayoutPattern.SPIRAL);
         heatingZoneList.setPrefHeight(110.0);
         heatingSummaryLabel.setWrapText(true);
         heatingSummaryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
@@ -1803,7 +1807,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(floorExtensionThicknessField, "Legt die Dicke der tragenden rechteckigen Fußbodenplatte des Balkons oder der Empore fest.");
         applyTooltip(floorExtensionThicknessUnit, "Bestimmt die Einheit für die Fußbodendicke des Balkons oder der Empore.");
         applyTooltip(heatingSurfacePositionSelector, "Wählt unabhängig voneinander die Fußboden- oder Deckenheizung des markierten Raums. Für beide Flächen stehen dieselben Planungs- und Bearbeitungsfunktionen bereit.");
-        applyTooltip(heatingLayoutPatternSelector, "Wählt die einheitliche Start-Verlegeart für den ausgewählten Raum. Beim nächsten Planen wird diese Vorgabe auf alle vorgeschlagenen Heizkreise angewendet; einzelne Heizkreise können danach abweichend bearbeitet werden.");
+        applyTooltip(heatingLayoutPatternSelector, "Wählt die Start-Verlegeart für neu angelegte Flächenheizungen. Einzelne Heizkreise können danach direkt über ihr Kontextmenü zwischen Schnecke und Meander umgeschaltet werden.");
         applyTooltip(heatingPipeSpacingField, "Legt den Achsabstand benachbarter Rohrläufe fest. Der Kurvenradius wird automatisch als halber Verlegeabstand angesetzt.");
         applyTooltip(heatingPipeSpacingUnit, "Bestimmt die Einheit für den Verlegeabstand der Heizungsrohre.");
         applyTooltip(heatingPipeDiameterField, "Legt den Außendurchmesser des Heizungsrohrs fest. Er muss kleiner als der Verlegeabstand sein.");
@@ -1970,6 +1974,7 @@ public final class CadWorkbench extends BorderPane {
                 edgeResizeBaseStaircases = List.copyOf(activeLevel.get().staircases());
                 edgeResizeBaseFloorOpenings = List.copyOf(activeLevel.get().floorOpenings());
                 edgeResizeBaseHeatingExclusionAreas = List.copyOf(activeLevel.get().heatingExclusionAreas());
+                edgeResizeBaseHydronicHeatings = List.copyOf(activeLevel.get().hydronicHeatings());
                 selectedEndpointGroup = null;
                 selectionDragAnchor = null;
                 openingDragId = null;
@@ -1987,6 +1992,7 @@ public final class CadWorkbench extends BorderPane {
             selectionDragBaseRoomObjects = List.of();
             selectionDragBaseFloorOpenings = List.of();
             selectionDragBaseHeatingExclusionAreas = List.of();
+            selectionDragBaseHydronicHeatings = List.of();
             historyCapturedForDrag = false;
             if (selectedEndpointGroup != null) {
                 syncEndpointHeightInputFromSelection();
@@ -2100,6 +2106,7 @@ public final class CadWorkbench extends BorderPane {
                 baseLevel.replaceStaircases(edgeResizeBaseStaircases);
                 baseLevel.replaceFloorOpenings(edgeResizeBaseFloorOpenings);
                 baseLevel.replaceHeatingExclusionAreas(edgeResizeBaseHeatingExclusionAreas);
+                baseLevel.replaceHydronicHeatings(edgeResizeBaseHydronicHeatings);
                 boolean isWallHandle = activeEdgeHandle.kind() == EdgeResizeService.EdgeHandleKind.WALL_START
                         || activeEdgeHandle.kind() == EdgeResizeService.EdgeHandleKind.WALL_END;
                 Set<UUID> excludedWallIds = isWallHandle ? Set.of(activeEdgeHandle.hostWallId()) : Set.of();
@@ -2121,6 +2128,7 @@ public final class CadWorkbench extends BorderPane {
                 activeLevel.get().replaceStaircases(result.staircases());
                 activeLevel.get().replaceFloorOpenings(result.floorOpenings());
                 activeLevel.get().replaceHeatingExclusionAreas(result.heatingExclusionAreas());
+                activeLevel.get().replaceHydronicHeatings(result.hydronicHeatings());
                 List<Staircase> resizedStaircasesWithUnderbuild = result.staircases().stream()
                         .filter(staircase -> staircase.leftUnderbuildWidth().toMillimeters() > 0.0
                                 || staircase.rightUnderbuildWidth().toMillimeters() > 0.0)
@@ -2252,6 +2260,7 @@ public final class CadWorkbench extends BorderPane {
             edgeResizeBaseStaircases = List.of();
             edgeResizeBaseFloorOpenings = List.of();
             edgeResizeBaseHeatingExclusionAreas = List.of();
+            edgeResizeBaseHydronicHeatings = List.of();
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -2286,6 +2295,7 @@ public final class CadWorkbench extends BorderPane {
             selectionDragBaseRoomObjects = List.of();
             selectionDragBaseFloorOpenings = List.of();
             selectionDragBaseHeatingExclusionAreas = List.of();
+            selectionDragBaseHydronicHeatings = List.of();
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -2345,6 +2355,10 @@ public final class CadWorkbench extends BorderPane {
                     && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
                     && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
                 createHeatingExclusionArea(previewSegment);
+            } else if (currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
+                    && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
+                    && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
+                createHeatingZone(previewSegment);
             }
             markThreeDDirty();
         }
@@ -2689,6 +2703,11 @@ public final class CadWorkbench extends BorderPane {
                         .filter(opening -> opening.id().toString().equals(selection.elementId()))
                         .findFirst()
                         .ifPresent(opening -> drawSelectedFloorOpening(graphics, opening));
+                case HEATING_ZONE -> activeLevel.get().hydronicHeatings().stream()
+                        .flatMap(heating -> heating.zones().stream())
+                        .filter(zone -> zone.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(zone -> drawSelectedHeatingZone(graphics, zone));
                 case HEATING_EXCLUSION -> activeLevel.get().heatingExclusionAreas().stream()
                         .filter(area -> area.id().toString().equals(selection.elementId()))
                         .findFirst()
@@ -2736,6 +2755,14 @@ public final class CadWorkbench extends BorderPane {
         } else {
             graphics.strokeRect(x, y, width, height);
         }
+    }
+
+    private void drawSelectedHeatingZone(GraphicsContext graphics, HeatingZone zone) {
+        graphics.strokePolygon(
+                zone.outline().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray(),
+                zone.outline().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray(),
+                zone.outline().size()
+        );
     }
 
     private void drawSelectedHeatingExclusionArea(GraphicsContext graphics, HeatingExclusionArea area) {
@@ -3272,13 +3299,16 @@ public final class CadWorkbench extends BorderPane {
             graphics.setLineWidth(1.0);
             graphics.setLineDashes(5.0, 4.0);
             for (HeatingZone zone : heating.zones()) {
+                boolean selected = selectedSelections.contains(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), zone.id().toString()));
+                graphics.setStroke(selected ? Color.web("#f2a900") : Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.55));
+                graphics.setLineWidth(selected ? 2.2 : 1.0);
                 double[] xPoints = zone.outline().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray();
                 double[] yPoints = zone.outline().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray();
                 graphics.strokePolygon(xPoints, yPoints, xPoints.length);
             }
             graphics.setLineDashes();
             graphics.setLineWidth(clamp(heating.pipeDiameter().toMillimeters() * scale(), 1.2, 5.0));
-            for (HydronicHeatingLayoutService.CircuitLayout circuit : hydronicHeatingLayoutService.layout(heating)) {
+            for (HydronicHeatingLayoutService.CircuitLayout circuit : hydronicHeatingLayoutService.layoutBestEffort(heating).circuits()) {
                 drawHeatingRolePath(graphics, circuit.supplyConnectorPath(), circuit.bendRadius().toMillimeters(), Color.web("#1f62d0"), true);
                 drawHeatingRolePath(graphics, circuit.returnConnectorPath(), circuit.bendRadius().toMillimeters(), Color.web("#d33b32"), true);
                 drawHeatingRolePath(graphics, circuit.fieldSupplyPath(), circuit.bendRadius().toMillimeters(), Color.web("#1f62d0"), false);
@@ -4294,6 +4324,7 @@ public final class CadWorkbench extends BorderPane {
                 || currentTool() == DrawingTool.FLOOR_EXTENSION
                 || currentTool() == DrawingTool.FLOOR_OPENING_RECTANGLE
                 || currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE
+                || currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
                 || currentTool() == DrawingTool.HEATING_EXCLUSION_RECTANGLE) {
             graphics.setFill(Color.color(0.45, 0.37, 0.29, 0.18));
             graphics.setStroke(Color.web("#7f6a55"));
@@ -4690,6 +4721,7 @@ public final class CadWorkbench extends BorderPane {
             case FLOOR_EXTENSION -> "Werkzeug: Balkon/Empore | Rechteck aufziehen fügt die Fußbodenplatte innen oder außen an die aktive Etage an.";
             case FLOOR_OPENING_RECTANGLE -> "Werkzeug: Bodenloch rechteckig | Rechteck innerhalb eines Raums aufziehen.";
             case FLOOR_OPENING_CIRCLE -> "Werkzeug: Bodenloch rund | Begrenzungsquadrat innerhalb eines Raums aufziehen.";
+            case HEATING_ZONE_RECTANGLE -> "Werkzeug: Heizkreis | Rechteck innerhalb eines Raums aufziehen; Standard ist Schnecke, die Verlegung kann danach im Kontextmenü geändert werden.";
             case HEATING_EXCLUSION_RECTANGLE -> "Werkzeug: FBH-Sperrfläche | Rechteck innerhalb eines Raums aufziehen; der FBH-Layouter spart diese Fläche aus.";
             case OBJECT -> "Werkzeug: Objekt | Linksklick platziert das ausgewählte Objekt-Preset innen oder außen.";
         };
@@ -4983,12 +5015,7 @@ public final class CadWorkbench extends BorderPane {
             width = diameter;
             depth = diameter;
         }
-        Optional<Room> room = selectionQueryService.findSelections(activeLevel.get(), center, SNAP_TOLERANCE).stream()
-                .filter(selection -> selection.kind() == RenderableKind.ROOM_VOLUME)
-                .findFirst()
-                .flatMap(selection -> activeLevel.get().rooms().stream()
-                        .filter(candidate -> candidate.id().toString().equals(selection.elementId()))
-                        .findFirst());
+        Optional<Room> room = roomAt(center);
         if (room.isEmpty()) {
             draftLabel.setText("Bodenöffnungen müssen mit ihrem Mittelpunkt in einem Raum liegen.");
             return;
@@ -5009,12 +5036,7 @@ public final class CadWorkbench extends BorderPane {
                 (bounds.start().xMillimeters() + bounds.end().xMillimeters()) / 2.0,
                 (bounds.start().yMillimeters() + bounds.end().yMillimeters()) / 2.0
         );
-        Optional<Room> room = selectionQueryService.findSelections(activeLevel.get(), center, SNAP_TOLERANCE).stream()
-                .filter(selection -> selection.kind() == RenderableKind.ROOM_VOLUME)
-                .findFirst()
-                .flatMap(selection -> activeLevel.get().rooms().stream()
-                        .filter(candidate -> candidate.id().toString().equals(selection.elementId()))
-                        .findFirst());
+        Optional<Room> room = roomAt(center);
         if (room.isEmpty()) {
             draftLabel.setText("FBH-Sperrflächen müssen mit ihrem Mittelpunkt in einem Raum liegen.");
             return;
@@ -5029,6 +5051,64 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().addHeatingExclusionArea(area);
         selectSingle(new SelectionKey(RenderableKind.HEATING_EXCLUSION, activeLevel.get().name(), area.id().toString()));
         draftLabel.setText("FBH-Sperrfläche erzeugt.");
+    }
+
+    private void createHeatingZone(PlanSegment bounds) {
+        PlanPoint center = new PlanPoint(
+                (bounds.start().xMillimeters() + bounds.end().xMillimeters()) / 2.0,
+                (bounds.start().yMillimeters() + bounds.end().yMillimeters()) / 2.0
+        );
+        Room room = roomAt(center).orElse(null);
+        if (room == null) {
+            draftLabel.setText("Heizkreise müssen mit ihrem Mittelpunkt in einem Raum liegen.");
+            return;
+        }
+        HeatingSurfacePosition surfacePosition = Optional.ofNullable(heatingSurfacePositionSelector.getValue())
+                .orElse(HeatingSurfacePosition.FLOOR);
+        HydronicHeating existing = activeLevel.get().findHydronicHeating(room.id(), surfacePosition);
+        HydronicHeating heating;
+        try {
+            heating = existing == null
+                    ? heatingFromInputs(room, UUID.randomUUID())
+                    : existing;
+        } catch (RuntimeException exception) {
+            draftLabel.setText("Heizkreis nicht erzeugt: " + UiErrorDialogs.userMessage(exception));
+            return;
+        }
+        List<HeatingZone> zones = new ArrayList<>(heating.zones());
+        HeatingZone zone = new HeatingZone(
+                UUID.randomUUID(),
+                "Heizkreis " + (zones.size() + 1),
+                rectanglePoints(heatingZoneBounds(bounds)),
+                HeatingLayoutPattern.SPIRAL,
+                false
+        );
+        zones.add(zone);
+        HydronicHeating updatedHeating = heating.withZones(zones);
+        try {
+            hydronicHeatingLayoutService.validateZoneGeometry(room, updatedHeating);
+        } catch (RuntimeException exception) {
+            draftLabel.setText("Heizkreis nicht erzeugt: " + UiErrorDialogs.userMessage(exception));
+            return;
+        }
+        rememberStateForUndo();
+        if (existing == null) {
+            activeLevel.get().addHydronicHeating(updatedHeating);
+        } else {
+            activeLevel.get().replaceHydronicHeating(updatedHeating);
+        }
+        selectSingle(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), zone.id().toString()));
+        refreshHeatingSection();
+        draftLabel.setText(heatingUpdateMessage(updatedHeating, "Heizkreis erzeugt."));
+    }
+
+    private Optional<Room> roomAt(PlanPoint point) {
+        return selectionQueryService.findSelections(activeLevel.get(), point, SNAP_TOLERANCE).stream()
+                .filter(selection -> selection.kind() == RenderableKind.ROOM_VOLUME)
+                .findFirst()
+                .flatMap(selection -> activeLevel.get().rooms().stream()
+                        .filter(candidate -> candidate.id().toString().equals(selection.elementId()))
+                        .findFirst());
     }
 
     private void startGuideDrag(GuideOrientation orientation, double worldMillimeters) {
@@ -5962,6 +6042,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private Optional<HydronicHeating> selectedHydronicHeating() {
+        Optional<HeatingZoneContext> zoneContext = selectedHeatingZoneContext();
+        if (zoneContext.isPresent()) {
+            return Optional.of(zoneContext.orElseThrow().heating());
+        }
         Room room = selectedRoom().orElse(null);
         HeatingSurfacePosition surfacePosition = heatingSurfacePositionSelector.getValue();
         if (room == null || surfacePosition == null) {
@@ -5985,6 +6069,9 @@ public final class CadWorkbench extends BorderPane {
             updateActionButtons();
             return;
         }
+        if (heatingSurfacePositionSelector.getValue() != heating.surfacePosition()) {
+            heatingSurfacePositionSelector.setValue(heating.surfacePosition());
+        }
         heatingLayoutPatternSelector.setValue(heating.layoutPattern());
         syncLengthInput(heatingPipeSpacingField, heatingPipeSpacingUnit, heating.pipeSpacing(), LengthUnit.CENTIMETER);
         syncLengthInput(heatingPipeDiameterField, heatingPipeDiameterUnit, heating.pipeDiameter(), LengthUnit.CENTIMETER);
@@ -5994,8 +6081,12 @@ public final class CadWorkbench extends BorderPane {
         syncLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(heating.supplyPoint().yMillimeters()), LengthUnit.CENTIMETER);
         syncLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(heating.returnPoint().xMillimeters()), LengthUnit.CENTIMETER);
         syncLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(heating.returnPoint().yMillimeters()), LengthUnit.CENTIMETER);
-        List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layout(heating);
-        int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
+        HydronicHeatingLayoutService.PlanningResult layoutResult = hydronicHeatingLayoutService.layoutBestEffort(heating);
+        List<HydronicHeatingLayoutService.CircuitLayout> circuits = layoutResult.circuits();
+        int selectedIndex = selectedHeatingZoneContext()
+                .filter(context -> context.heating().id().equals(heating.id()))
+                .map(HeatingZoneContext::zoneIndex)
+                .orElse(heatingZoneList.getSelectionModel().getSelectedIndex());
         heatingZoneList.getItems().setAll(heating.zones().stream()
                 .map(zone -> describeHeatingZone(zone, circuits))
                 .toList());
@@ -6003,10 +6094,13 @@ public final class CadWorkbench extends BorderPane {
             heatingZoneList.getSelectionModel().select(Math.max(0, Math.min(selectedIndex, heatingZoneList.getItems().size() - 1)));
         }
         double totalLength = circuits.stream().mapToDouble(circuit -> circuit.pipeLength().toMillimeters()).sum();
+        boolean maximumExceeded = circuits.stream()
+                .anyMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) > 0);
+        String warning = heatingWarning(layoutResult.validationReport(), maximumExceeded);
         heatingSummaryLabel.setText(String.format(
                 Locale.GERMAN,
-                "%s · Raumvorgabe %s · %d Heizkreis(e) · %.1f m Rohr",
-                heating.surfacePosition(), heating.layoutPattern(), circuits.size(), totalLength / 1_000.0
+                "%s · Raumvorgabe %s · %d Heizkreis(e) · %.1f m Rohr%s",
+                heating.surfacePosition(), heating.layoutPattern(), circuits.size(), totalLength / 1_000.0, warning
         ));
         updateActionButtons();
     }
@@ -6025,7 +6119,33 @@ public final class CadWorkbench extends BorderPane {
         );
     }
 
+    private String heatingUpdateMessage(HydronicHeating heating, String successPrefix) {
+        HydronicHeatingLayoutService.PlanningResult layoutResult = hydronicHeatingLayoutService.layoutBestEffort(heating);
+        boolean maximumExceeded = layoutResult.circuits().stream()
+                .anyMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) > 0);
+        String warning = heatingWarning(layoutResult.validationReport(), maximumExceeded);
+        return successPrefix + (warning.isBlank() ? "" : " " + warning.strip());
+    }
+
+    private String heatingWarning(HydronicHeatingLayoutService.ValidationReport report, boolean maximumExceeded) {
+        List<String> warnings = new ArrayList<>();
+        if (!report.valid()) {
+            warnings.add(report.summary());
+        }
+        if (maximumExceeded) {
+            warnings.add("Mindestens ein Heizkreis überschreitet die maximale Rohrlänge.");
+        }
+        if (warnings.isEmpty()) {
+            return "";
+        }
+        return " · Warnung: " + String.join(" ", warnings);
+    }
+
     private void planHydronicHeating() {
+        throw new IllegalStateException("Die automatische Planung ganzer Räume ist vorübergehend deaktiviert. Lege Heizkreise mit dem Werkzeug `Heizkreis` als Rechtecke an.");
+    }
+
+    private void planHydronicHeatingAutomatically() {
         Room room = selectedRoom().orElseThrow(() -> new IllegalStateException("Für die Heizflächenplanung muss ein Raum ausgewählt sein."));
         HydronicHeating existing = selectedHydronicHeating().orElse(null);
         HydronicHeating unplanned = heatingFromInputs(room, existing == null ? UUID.randomUUID() : existing.id());
@@ -6090,7 +6210,7 @@ public final class CadWorkbench extends BorderPane {
         HeatingSurfacePosition surfacePosition = Optional.ofNullable(heatingSurfacePositionSelector.getValue())
                 .orElse(HeatingSurfacePosition.FLOOR);
         HeatingLayoutPattern layoutPattern = Optional.ofNullable(heatingLayoutPatternSelector.getValue())
-                .orElse(HeatingLayoutPattern.MEANDER);
+                .orElse(HeatingLayoutPattern.SPIRAL);
         return new HydronicHeating(
                 heatingId, room.id(), surfacePosition, layoutPattern,
                 requiredPositiveLength(heatingPipeSpacingField, heatingPipeSpacingUnit, "Verlegeabstand"),
@@ -6209,6 +6329,15 @@ public final class CadWorkbench extends BorderPane {
                 points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0),
                 points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0),
                 points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0)
+        );
+    }
+
+    private HeatingZoneBounds heatingZoneBounds(PlanSegment segment) {
+        return new HeatingZoneBounds(
+                Math.min(segment.start().xMillimeters(), segment.end().xMillimeters()),
+                Math.min(segment.start().yMillimeters(), segment.end().yMillimeters()),
+                Math.max(segment.start().xMillimeters(), segment.end().xMillimeters()),
+                Math.max(segment.start().yMillimeters(), segment.end().yMillimeters())
         );
     }
 
@@ -6346,22 +6475,32 @@ public final class CadWorkbench extends BorderPane {
         applyHeatingZones(heating, zones, Math.min(selectedIndex, zones.size() - 1));
     }
 
+    private boolean removeHeatingZoneById(UUID zoneId) {
+        Optional<HeatingZoneContext> context = heatingZoneContext(zoneId);
+        if (context.isEmpty()) {
+            return false;
+        }
+        HeatingZoneContext heatingZoneContext = context.orElseThrow();
+        List<HeatingZone> zones = new ArrayList<>(heatingZoneContext.heating().zones());
+        zones.removeIf(zone -> zone.id().equals(zoneId));
+        activeLevel.get().replaceHydronicHeating(heatingZoneContext.heating().withZones(zones));
+        return true;
+    }
+
     private void applyHeatingZones(HydronicHeating heating, List<HeatingZone> zones, int selectedIndex) {
         HydronicHeating updatedHeating = heating.withZones(zones);
-        Room room = selectedRoom().orElseThrow(() -> new IllegalStateException("Kein Raum ausgewählt."));
-        hydronicHeatingLayoutService.validateZones(room, updatedHeating);
-        boolean maximumExceeded = hydronicHeatingLayoutService.layout(updatedHeating).stream()
-                .anyMatch(circuit -> circuit.pipeLength().compareTo(updatedHeating.maximumPipeLength()) > 0);
-        if (maximumExceeded) {
-            throw new IllegalArgumentException("Mindestens ein bearbeiteter Heizbereich überschreitet die maximale Rohrlänge.");
-        }
+        Room room = activeLevel.get().rooms().stream()
+                .filter(candidate -> candidate.id().equals(updatedHeating.roomId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Kein Raum für die Heizung gefunden."));
+        hydronicHeatingLayoutService.validateZoneGeometry(room, updatedHeating);
         rememberStateForUndo();
         activeLevel.get().replaceHydronicHeating(updatedHeating);
         refreshHeatingSection();
         if (selectedIndex >= 0) {
             heatingZoneList.getSelectionModel().select(selectedIndex);
         }
-        draftLabel.setText("Heizbereiche aktualisiert.");
+        draftLabel.setText(heatingUpdateMessage(updatedHeating, "Heizbereiche aktualisiert."));
         render();
     }
 
@@ -6380,6 +6519,14 @@ public final class CadWorkbench extends BorderPane {
             String pointsText,
             HeatingLayoutPattern layoutPattern,
             boolean flowInverted
+    ) {
+    }
+
+    private record HeatingZoneContext(
+            Room room,
+            HydronicHeating heating,
+            HeatingZone zone,
+            int zoneIndex
     ) {
     }
 
@@ -6742,6 +6889,10 @@ public final class CadWorkbench extends BorderPane {
         if (selectedSelection.get() == null) {
             return Optional.empty();
         }
+        Optional<HeatingZoneContext> zoneContext = selectedHeatingZoneContext();
+        if (zoneContext.isPresent()) {
+            return Optional.of(zoneContext.orElseThrow().room());
+        }
         if (selectedSelection.get().kind() != RenderableKind.ROOM_VOLUME
                 && selectedSelection.get().kind() != RenderableKind.ROOM_FLOOR
                 && selectedSelection.get().kind() != RenderableKind.ROOM_CEILING) {
@@ -6750,6 +6901,36 @@ public final class CadWorkbench extends BorderPane {
         return activeLevel.get().rooms().stream()
                 .filter(room -> room.id().toString().equals(selectedSelection.get().elementId()))
                 .findFirst();
+    }
+
+    private Optional<HeatingZoneContext> selectedHeatingZoneContext() {
+        if (selectedSelection.get() == null || selectedSelection.get().kind() != RenderableKind.HEATING_ZONE) {
+            return Optional.empty();
+        }
+        return heatingZoneContext(UUID.fromString(selectedSelection.get().elementId()));
+    }
+
+    private Optional<HeatingZoneContext> contextHeatingZoneContext() {
+        if (contextMenuSelection == null || contextMenuSelection.kind() != RenderableKind.HEATING_ZONE) {
+            return Optional.empty();
+        }
+        return heatingZoneContext(UUID.fromString(contextMenuSelection.elementId()));
+    }
+
+    private Optional<HeatingZoneContext> heatingZoneContext(UUID zoneId) {
+        for (HydronicHeating heating : activeLevel.get().hydronicHeatings()) {
+            for (int zoneIndex = 0; zoneIndex < heating.zones().size(); zoneIndex++) {
+                HeatingZone zone = heating.zones().get(zoneIndex);
+                if (zone.id().equals(zoneId)) {
+                    int currentZoneIndex = zoneIndex;
+                    return activeLevel.get().rooms().stream()
+                            .filter(room -> room.id().equals(heating.roomId()))
+                            .findFirst()
+                            .map(room -> new HeatingZoneContext(room, heating, zone, currentZoneIndex));
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     private List<SurfaceType> availableSurfaceTypesForSelection() {
@@ -7129,6 +7310,7 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseRoomObjects = List.of();
         selectionDragBaseFloorOpenings = List.of();
         selectionDragBaseHeatingExclusionAreas = List.of();
+        selectionDragBaseHydronicHeatings = List.of();
         openingDragId = null;
         openingDragWallAxis = null;
         openingDragWidth = 0;
@@ -7163,6 +7345,7 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseRoomObjects = List.of();
         selectionDragBaseFloorOpenings = List.of();
         selectionDragBaseHeatingExclusionAreas = List.of();
+        selectionDragBaseHydronicHeatings = List.of();
         openingDragId = null;
         openingDragWallAxis = null;
         openingDragWidth = 0;
@@ -7190,6 +7373,7 @@ public final class CadWorkbench extends BorderPane {
                 case ROOM_OBJECT -> activeLevel.get().removeRoomObject(id);
                 case FLOOR_EXTENSION -> activeLevel.get().removeFloorExtension(id);
                 case FLOOR_OPENING -> activeLevel.get().removeFloorOpening(id);
+                case HEATING_ZONE -> removeHeatingZoneById(id);
                 case HEATING_EXCLUSION -> activeLevel.get().removeHeatingExclusionArea(id);
                 default -> false;
             };
@@ -7279,6 +7463,18 @@ public final class CadWorkbench extends BorderPane {
                     )
             );
         }
+        contextHeatingZoneContext().ifPresent(context -> {
+            HeatingLayoutPattern targetPattern = context.zone().layoutPattern() == HeatingLayoutPattern.SPIRAL
+                    ? HeatingLayoutPattern.MEANDER
+                    : HeatingLayoutPattern.SPIRAL;
+            selectionContextMenu.getItems().addAll(
+                    menuItem("Verlegung auf " + targetPattern + " umschalten", () -> setContextHeatingZonePattern(targetPattern), null),
+                    menuItem("Vorlauf/Rücklauf im Heizkreis tauschen", this::invertContextHeatingZone, null)
+            );
+            if (mergeableHeatingZone(context).isPresent()) {
+                selectionContextMenu.getItems().add(menuItem("Mit angrenzendem Heizkreis verbinden", this::mergeContextHeatingZone, null));
+            }
+        });
         if (selectedSelections.stream().anyMatch(selection -> selection.kind() != RenderableKind.ROOM_VOLUME
                 && selection.kind() != RenderableKind.ROOM_FLOOR
                 && selection.kind() != RenderableKind.ROOM_CEILING)) {
@@ -7312,6 +7508,84 @@ public final class CadWorkbench extends BorderPane {
         return activeLevel.get().rooms().stream()
                 .filter(room -> room.id().toString().equals(contextMenuSelection.elementId()))
                 .findFirst();
+    }
+
+    private void setContextHeatingZonePattern(HeatingLayoutPattern pattern) {
+        HeatingZoneContext context = contextHeatingZoneContext()
+                .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
+        replaceHeatingZone(context, context.zone().withLayoutPattern(pattern), "Verlegung für Heizkreis geändert.");
+    }
+
+    private void invertContextHeatingZone() {
+        HeatingZoneContext context = contextHeatingZoneContext()
+                .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
+        replaceHeatingZone(context, context.zone().withFlowInverted(!context.zone().flowInverted()), "Vorlauf und Rücklauf im Heizkreis getauscht.");
+    }
+
+    private void replaceHeatingZone(HeatingZoneContext context, HeatingZone replacement, String successPrefix) {
+        List<HeatingZone> zones = new ArrayList<>(context.heating().zones());
+        zones.set(context.zoneIndex(), replacement);
+        HydronicHeating updatedHeating = context.heating().withZones(zones);
+        hydronicHeatingLayoutService.validateZoneGeometry(context.room(), updatedHeating);
+        rememberStateForUndo();
+        activeLevel.get().replaceHydronicHeating(updatedHeating);
+        selectSingle(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), replacement.id().toString()));
+        refreshHeatingSection();
+        draftLabel.setText(heatingUpdateMessage(updatedHeating, successPrefix));
+        render();
+    }
+
+    private Optional<HeatingZone> mergeableHeatingZone(HeatingZoneContext context) {
+        HeatingZoneBounds bounds = heatingZoneBounds(context.zone().outline());
+        return context.heating().zones().stream()
+                .filter(zone -> !zone.id().equals(context.zone().id()))
+                .filter(zone -> canMerge(bounds, heatingZoneBounds(zone.outline())))
+                .findFirst();
+    }
+
+    private void mergeContextHeatingZone() {
+        HeatingZoneContext context = contextHeatingZoneContext()
+                .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
+        HeatingZone neighbor = mergeableHeatingZone(context)
+                .orElseThrow(() -> new IllegalStateException("Kein exakt angrenzender Rechteck-Heizkreis gefunden."));
+        HeatingZoneBounds mergedBounds = union(heatingZoneBounds(context.zone().outline()), heatingZoneBounds(neighbor.outline()));
+        HeatingZone merged = context.zone().withOutline(rectanglePoints(mergedBounds))
+                .withName(context.zone().name() + "+" + neighbor.name());
+        List<HeatingZone> zones = context.heating().zones().stream()
+                .filter(zone -> !zone.id().equals(neighbor.id()))
+                .map(zone -> zone.id().equals(context.zone().id()) ? merged : zone)
+                .toList();
+        HydronicHeating updatedHeating = context.heating().withZones(zones);
+        hydronicHeatingLayoutService.validateZoneGeometry(context.room(), updatedHeating);
+        rememberStateForUndo();
+        activeLevel.get().replaceHydronicHeating(updatedHeating);
+        selectSingle(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), merged.id().toString()));
+        refreshHeatingSection();
+        draftLabel.setText(heatingUpdateMessage(updatedHeating, "Angrenzende Heizkreise verbunden."));
+        render();
+    }
+
+    private boolean canMerge(HeatingZoneBounds first, HeatingZoneBounds second) {
+        boolean sameY = sameCoordinate(first.minY(), second.minY()) && sameCoordinate(first.maxY(), second.maxY());
+        boolean sameX = sameCoordinate(first.minX(), second.minX()) && sameCoordinate(first.maxX(), second.maxX());
+        boolean verticalNeighbor = sameY
+                && (sameCoordinate(first.maxX(), second.minX()) || sameCoordinate(second.maxX(), first.minX()));
+        boolean horizontalNeighbor = sameX
+                && (sameCoordinate(first.maxY(), second.minY()) || sameCoordinate(second.maxY(), first.minY()));
+        return verticalNeighbor || horizontalNeighbor;
+    }
+
+    private boolean sameCoordinate(double first, double second) {
+        return Math.abs(first - second) <= 0.001;
+    }
+
+    private HeatingZoneBounds union(HeatingZoneBounds first, HeatingZoneBounds second) {
+        return new HeatingZoneBounds(
+                Math.min(first.minX(), second.minX()),
+                Math.min(first.minY(), second.minY()),
+                Math.max(first.maxX(), second.maxX()),
+                Math.max(first.maxY(), second.maxY())
+        );
     }
 
     private void createRoofSlopeFromSelectedWall() {
@@ -7835,6 +8109,7 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseRoomObjects = List.copyOf(activeLevel.get().roomObjects());
         selectionDragBaseFloorOpenings = List.copyOf(activeLevel.get().floorOpenings());
         selectionDragBaseHeatingExclusionAreas = List.copyOf(activeLevel.get().heatingExclusionAreas());
+        selectionDragBaseHydronicHeatings = List.copyOf(activeLevel.get().hydronicHeatings());
         draftLabel.setText("Ausgewählte Wände, Treppen, Objekte oder rechteckige Flächen können jetzt parallel verschoben werden.");
     }
 
@@ -7863,6 +8138,7 @@ public final class CadWorkbench extends BorderPane {
         dragLevel.replaceRoomObjects(selectionDragBaseRoomObjects);
         dragLevel.replaceFloorOpenings(selectionDragBaseFloorOpenings);
         dragLevel.replaceHeatingExclusionAreas(selectionDragBaseHeatingExclusionAreas);
+        dragLevel.replaceHydronicHeatings(selectionDragBaseHydronicHeatings);
         SelectionTranslationService.TranslationResult translationResult = selectionTranslationService.translate(dragLevel, Set.copyOf(selectedSelections), deltaX, deltaY);
         if (!translationResult.changed()) {
             return;
@@ -7872,6 +8148,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceRoomObjects(translationResult.roomObjects());
         activeLevel.get().replaceFloorOpenings(translationResult.floorOpenings());
         activeLevel.get().replaceHeatingExclusionAreas(translationResult.heatingExclusionAreas());
+        activeLevel.get().replaceHydronicHeatings(translationResult.hydronicHeatings());
         synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
     }
@@ -7919,6 +8196,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceRoomObjects(result.roomObjects());
         activeLevel.get().replaceFloorOpenings(result.floorOpenings());
         activeLevel.get().replaceHeatingExclusionAreas(result.heatingExclusionAreas());
+        activeLevel.get().replaceHydronicHeatings(result.hydronicHeatings());
         synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
         draftLabel.setText("Auswahl um eine Rasterweite verschoben.");
@@ -8011,7 +8289,7 @@ public final class CadWorkbench extends BorderPane {
     public void automationPlanHydronicHeating(String surfacePosition, String layoutPattern) {
         heatingSurfacePositionSelector.setValue(HeatingSurfacePosition.valueOf(surfacePosition.trim().toUpperCase(Locale.ROOT)));
         heatingLayoutPatternSelector.setValue(HeatingLayoutPattern.valueOf(layoutPattern.trim().toUpperCase(Locale.ROOT)));
-        planHydronicHeating();
+        planHydronicHeatingAutomatically();
     }
 
     public HydronicHeating automationHydronicHeating(int index) {
@@ -8749,6 +9027,7 @@ public final class CadWorkbench extends BorderPane {
                 || selectionKey.kind() == RenderableKind.STAIR
                 || selectionKey.kind() == RenderableKind.ROOM_OBJECT
                 || selectionKey.kind() == RenderableKind.FLOOR_OPENING
+                || selectionKey.kind() == RenderableKind.HEATING_ZONE
                 || selectionKey.kind() == RenderableKind.HEATING_EXCLUSION;
     }
 

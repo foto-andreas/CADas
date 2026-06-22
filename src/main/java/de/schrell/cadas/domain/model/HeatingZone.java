@@ -32,11 +32,11 @@ public record HeatingZone(
     }
 
     public HeatingZone(UUID id, String name, List<PlanPoint> outline) {
-        this(id, name, outline, HeatingLayoutPattern.MEANDER, false);
+        this(id, name, outline, HeatingLayoutPattern.SPIRAL, false);
     }
 
     public static HeatingZone create(String name, List<PlanPoint> outline) {
-        return create(name, outline, HeatingLayoutPattern.MEANDER);
+        return create(name, outline, HeatingLayoutPattern.SPIRAL);
     }
 
     public static HeatingZone create(String name, List<PlanPoint> outline, HeatingLayoutPattern layoutPattern) {

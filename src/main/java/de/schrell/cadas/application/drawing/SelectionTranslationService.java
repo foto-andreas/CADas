@@ -8,6 +8,8 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
@@ -34,6 +36,7 @@ public final class SelectionTranslationService {
         Set<String> selectedRoomObjects = selectedIds(selections, RenderableKind.ROOM_OBJECT);
         Set<String> selectedFloorOpenings = selectedIds(selections, RenderableKind.FLOOR_OPENING);
         Set<String> selectedHeatingExclusionAreas = selectedIds(selections, RenderableKind.HEATING_EXCLUSION);
+        Set<String> selectedHeatingZones = selectedIds(selections, RenderableKind.HEATING_ZONE);
         List<PlanPoint> translatedWallEndpoints = selectedWallEndpoints(level, selectedWalls);
         List<Wall> translatedWalls = level.walls().stream()
                 .map(wall -> selectedWalls.contains(wall.id().toString())
@@ -56,13 +59,17 @@ public final class SelectionTranslationService {
                         ? area.translated(deltaXMillimeters, deltaYMillimeters)
                         : area)
                 .toList();
+        List<HydronicHeating> translatedHydronicHeatings = level.hydronicHeatings().stream()
+                .map(heating -> translateHeatingZones(heating, selectedHeatingZones, deltaXMillimeters, deltaYMillimeters))
+                .toList();
         boolean changed = !selectedWalls.isEmpty()
                 || !selectedStairs.isEmpty()
                 || !selectedRoomObjects.isEmpty()
                 || !selectedFloorOpenings.isEmpty()
-                || !selectedHeatingExclusionAreas.isEmpty();
+                || !selectedHeatingExclusionAreas.isEmpty()
+                || !selectedHeatingZones.isEmpty();
         return new TranslationResult(translatedWalls, translatedStairs, translatedRoomObjects,
-                translatedFloorOpenings, translatedHeatingExclusionAreas, changed);
+                translatedFloorOpenings, translatedHeatingExclusionAreas, translatedHydronicHeatings, changed);
     }
 
     private Set<String> selectedIds(Set<SelectionKey> selections, RenderableKind kind) {
@@ -150,12 +157,35 @@ public final class SelectionTranslationService {
         return new PlanPoint(point.xMillimeters() + deltaXMillimeters, point.yMillimeters() + deltaYMillimeters);
     }
 
+    private HydronicHeating translateHeatingZones(
+            HydronicHeating heating,
+            Set<String> selectedHeatingZones,
+            double deltaXMillimeters,
+            double deltaYMillimeters
+    ) {
+        if (heating.zones().stream().noneMatch(zone -> selectedHeatingZones.contains(zone.id().toString()))) {
+            return heating;
+        }
+        return heating.withZones(heating.zones().stream()
+                .map(zone -> selectedHeatingZones.contains(zone.id().toString())
+                        ? translateHeatingZone(zone, deltaXMillimeters, deltaYMillimeters)
+                        : zone)
+                .toList());
+    }
+
+    private HeatingZone translateHeatingZone(HeatingZone zone, double deltaXMillimeters, double deltaYMillimeters) {
+        return zone.withOutline(zone.outline().stream()
+                .map(point -> translatePoint(point, deltaXMillimeters, deltaYMillimeters))
+                .toList());
+    }
+
     public record TranslationResult(
             List<Wall> walls,
             List<Staircase> staircases,
             List<RoomObject> roomObjects,
             List<FloorOpening> floorOpenings,
             List<HeatingExclusionArea> heatingExclusionAreas,
+            List<HydronicHeating> hydronicHeatings,
             boolean changed
     ) {
     }

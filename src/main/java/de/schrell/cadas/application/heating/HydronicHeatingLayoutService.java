@@ -158,6 +158,15 @@ public final class HydronicHeatingLayoutService {
         return computation.circuits();
     }
 
+    public PlanningResult layoutBestEffort(HydronicHeating heating) {
+        Objects.requireNonNull(heating, "heating darf nicht null sein.");
+        if (heating.zones().isEmpty()) {
+            return new PlanningResult(heating, List.of(), ValidationReport.ok());
+        }
+        LayoutComputation computation = cachedCompute(heating);
+        return new PlanningResult(heating, computation.circuits(), computation.report());
+    }
+
     public ValidationReport validateLayout(HydronicHeating heating) {
         Objects.requireNonNull(heating, "heating darf nicht null sein.");
         if (heating.zones().isEmpty()) {
@@ -258,6 +267,14 @@ public final class HydronicHeatingLayoutService {
     }
 
     public void validateZones(Room room, HydronicHeating heating) {
+        validateZoneGeometry(room, heating);
+        ValidationReport report = validateLayout(heating);
+        if (!report.valid()) {
+            throw new IllegalArgumentException(report.summary());
+        }
+    }
+
+    public void validateZoneGeometry(Room room, HydronicHeating heating) {
         if (!room.id().equals(heating.roomId())) {
             throw new IllegalArgumentException("Die Heizung gehört nicht zum ausgewählten Raum.");
         }
@@ -269,10 +286,6 @@ public final class HydronicHeatingLayoutService {
                     throw new IllegalArgumentException("Der Heizbereich `" + zone.name() + "` liegt nicht vollständig im Raum.");
                 }
             }
-        }
-        ValidationReport report = validateLayout(heating);
-        if (!report.valid()) {
-            throw new IllegalArgumentException(report.summary());
         }
     }
 

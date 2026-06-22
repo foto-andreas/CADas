@@ -14,6 +14,10 @@ import de.schrell.cadas.domain.model.FloorExtension;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.StairType;
@@ -59,6 +63,43 @@ class SelectionQueryServiceTest {
 
         assertEquals(RenderableKind.HEATING_EXCLUSION, selections.getFirst().kind());
         assertEquals(area.id().toString(), selections.getFirst().elementId());
+    }
+
+    @Test
+    void findetHeizkreisVorRaum() {
+        Level level = new Level("EG");
+        Room room = Room.rectangular(
+                "Bad",
+                new PlanPoint(0, 0),
+                new PlanPoint(3_000, 3_000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        HeatingZone zone = HeatingZone.create("HK 1", List.of(
+                new PlanPoint(500, 500),
+                new PlanPoint(2_000, 500),
+                new PlanPoint(2_000, 2_000),
+                new PlanPoint(500, 2_000)
+        ));
+        level.addRoom(room);
+        level.addHydronicHeating(HydronicHeating.create(
+                room.id(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        ).withZones(List.of(zone)));
+
+        var selections = selectionQueryService.findSelections(level, new PlanPoint(1_000, 1_000), Length.ofMillimeters(10));
+
+        assertEquals(RenderableKind.HEATING_ZONE, selections.getFirst().kind());
+        assertEquals(zone.id().toString(), selections.getFirst().elementId());
+        assertEquals(RenderableKind.ROOM_VOLUME, selections.get(1).kind());
     }
 
     @Test

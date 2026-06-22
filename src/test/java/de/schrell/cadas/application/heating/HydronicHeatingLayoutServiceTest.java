@@ -30,7 +30,7 @@ class HydronicHeatingLayoutServiceTest {
     void verlegtMeanderZwischenVorlaufUndRücklauf() {
         Room room = rectangularRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 80_000)
-                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline())));
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.MEANDER)));
 
         HydronicHeatingLayoutService.CircuitLayout circuit = service.layout(heating).getFirst();
 
@@ -44,7 +44,7 @@ class HydronicHeatingLayoutServiceTest {
     void erzeugtFürSchneckeAnderenRohrverlauf() {
         Room room = rectangularRoom();
         HydronicHeating meander = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 80_000)
-                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline())));
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.MEANDER)));
         HydronicHeating spiral = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 80_000)
                 .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)));
 

@@ -11,6 +11,10 @@ import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
@@ -106,12 +110,27 @@ class EdgeResizeServiceTest {
         );
         level.addFloorOpening(opening);
         level.addHeatingExclusionArea(area);
+        HeatingZone zone = HeatingZone.create("HK 1", rectangle(4_000, 500, 5_000, 1_500));
+        level.addHydronicHeating(HydronicHeating.create(
+                roomId,
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        ).withZones(java.util.List.of(zone)));
 
         assertEquals(8, service.handles(level, Set.of(new SelectionKey(
                 RenderableKind.FLOOR_OPENING, level.name(), opening.id().toString()
         ))).size());
         assertEquals(8, service.handles(level, Set.of(new SelectionKey(
                 RenderableKind.HEATING_EXCLUSION, level.name(), area.id().toString()
+        ))).size());
+        assertEquals(8, service.handles(level, Set.of(new SelectionKey(
+                RenderableKind.HEATING_ZONE, level.name(), zone.id().toString()
         ))).size());
     }
 
@@ -204,6 +223,46 @@ class EdgeResizeServiceTest {
 
         assertEquals(1_400.0, result.heatingExclusionAreas().getFirst().widthMillimeters(), 0.001);
         assertEquals(1_300.0, result.heatingExclusionAreas().getFirst().depthMillimeters(), 0.001);
+    }
+
+    @Test
+    void aendertHeizkreisMitSeitenHandle() {
+        Level level = new Level("Erdgeschoss");
+        HeatingZone zone = HeatingZone.create("HK 1", rectangle(1_000, 1_000, 2_000, 2_000));
+        HydronicHeating heating = HydronicHeating.create(
+                UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        ).withZones(java.util.List.of(zone));
+        level.addHydronicHeating(heating);
+        EdgeResizeService.EdgeHandle handle = new EdgeResizeService.EdgeHandle(
+                EdgeResizeService.EdgeHandleKind.RECTANGLE_EAST,
+                RenderableKind.HEATING_ZONE,
+                zone.id(),
+                null,
+                new PlanPoint(2_000, 1_500)
+        );
+
+        EdgeResizeService.ResizeResult result = service.resize(level, handle, new PlanPoint(2_400, 1_500));
+
+        HeatingZone resized = result.hydronicHeatings().getFirst().zones().getFirst();
+        assertEquals(1_400_000.0, resized.areaSquareMillimeters(), 0.001);
+        assertEquals(2_400.0, resized.outline().get(1).xMillimeters(), 0.001);
+    }
+
+    private java.util.List<PlanPoint> rectangle(double minX, double minY, double maxX, double maxY) {
+        return java.util.List.of(
+                new PlanPoint(minX, minY),
+                new PlanPoint(maxX, minY),
+                new PlanPoint(maxX, maxY),
+                new PlanPoint(minX, maxY)
+        );
     }
 
     private Level level() {

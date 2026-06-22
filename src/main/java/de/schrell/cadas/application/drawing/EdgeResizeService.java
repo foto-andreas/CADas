@@ -9,6 +9,8 @@ import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
@@ -68,6 +70,15 @@ import java.util.UUID;
                     addRectangleHandles(handles, RenderableKind.HEATING_EXCLUSION, area.id(),
                             area.minXMillimeters(), area.minYMillimeters(), area.maxXMillimeters(), area.maxYMillimeters());
                 });
+                case HEATING_ZONE -> level.hydronicHeatings().stream()
+                        .flatMap(heating -> heating.zones().stream())
+                        .filter(zone -> zone.id().equals(id))
+                        .findFirst()
+                        .ifPresent(zone -> {
+                            RectangleBounds bounds = bounds(zone.outline());
+                            addRectangleHandles(handles, RenderableKind.HEATING_ZONE, zone.id(),
+                                    bounds.minX(), bounds.minY(), bounds.maxX(), bounds.maxY());
+                        });
                 default -> {
                 }
             }
@@ -141,7 +152,7 @@ import java.util.UUID;
         List<WindowElement> windows = level.windows().stream()
                 .map(window -> window.wallId().equals(wall.id()) ? window.withOffset(Length.ofMillimeters(window.offsetFromStart().toMillimeters() - startShift)) : window)
                 .toList();
-        return new ResizeResult(walls, doors, windows, level.staircases(), level.floorOpenings(), level.heatingExclusionAreas());
+        return new ResizeResult(walls, doors, windows, level.staircases(), level.floorOpenings(), level.heatingExclusionAreas(), level.hydronicHeatings());
     }
 
     private ResizeResult resizeDoor(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -153,7 +164,8 @@ import java.util.UUID;
         Door resized = handle.kind() == EdgeHandleKind.DOOR_START
                 ? new Door(door.id(), door.wallId(), Length.ofMillimeters(Math.min(target, end - MINIMUM_LENGTH)), Length.ofMillimeters(end - Math.min(target, end - MINIMUM_LENGTH)), door.height(), door.thresholdHeight())
                 : new Door(door.id(), door.wallId(), door.offsetFromStart(), Length.ofMillimeters(Math.max(target, start + MINIMUM_LENGTH) - start), door.height(), door.thresholdHeight());
-        return new ResizeResult(level.walls(), level.doors().stream().map(candidate -> candidate.id().equals(door.id()) ? resized : candidate).toList(), level.windows(), level.staircases(), level.floorOpenings(), level.heatingExclusionAreas());
+        return new ResizeResult(level.walls(), level.doors().stream().map(candidate -> candidate.id().equals(door.id()) ? resized : candidate).toList(),
+                level.windows(), level.staircases(), level.floorOpenings(), level.heatingExclusionAreas(), level.hydronicHeatings());
     }
 
     private ResizeResult resizeWindow(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -165,7 +177,9 @@ import java.util.UUID;
         WindowElement resized = handle.kind() == EdgeHandleKind.WINDOW_START
                 ? new WindowElement(window.id(), window.wallId(), Length.ofMillimeters(Math.min(target, end - MINIMUM_LENGTH)), Length.ofMillimeters(end - Math.min(target, end - MINIMUM_LENGTH)), window.sillHeight(), window.windowHeight())
                 : new WindowElement(window.id(), window.wallId(), window.offsetFromStart(), Length.ofMillimeters(Math.max(target, start + MINIMUM_LENGTH) - start), window.sillHeight(), window.windowHeight());
-        return new ResizeResult(level.walls(), level.doors(), level.windows().stream().map(candidate -> candidate.id().equals(window.id()) ? resized : candidate).toList(), level.staircases(), level.floorOpenings(), level.heatingExclusionAreas());
+        return new ResizeResult(level.walls(), level.doors(),
+                level.windows().stream().map(candidate -> candidate.id().equals(window.id()) ? resized : candidate).toList(),
+                level.staircases(), level.floorOpenings(), level.heatingExclusionAreas(), level.hydronicHeatings());
     }
 
     private ResizeResult resizeStaircase(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -197,7 +211,9 @@ import java.util.UUID;
         Staircase resized = draggingFirstCorner
                 ? new Staircase(staircase.id(), staircase.stairType(), clampedTarget, staircase.oppositeCorner(), staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth(), staircase.leftUnderbuildWidth(), staircase.rightUnderbuildWidth(), staircase.undersideThickness())
                 : new Staircase(staircase.id(), staircase.stairType(), staircase.firstCorner(), clampedTarget, staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth(), staircase.leftUnderbuildWidth(), staircase.rightUnderbuildWidth(), staircase.undersideThickness());
-        return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases().stream().map(candidate -> candidate.id().equals(staircase.id()) ? resized : candidate).toList(), level.floorOpenings(), level.heatingExclusionAreas());
+        return new ResizeResult(level.walls(), level.doors(), level.windows(),
+                level.staircases().stream().map(candidate -> candidate.id().equals(staircase.id()) ? resized : candidate).toList(),
+                level.floorOpenings(), level.heatingExclusionAreas(), level.hydronicHeatings());
     }
 
     private ResizeResult resizeRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -205,6 +221,7 @@ import java.util.UUID;
             case STAIR -> resizeStaircaseRectangle(level, handle, targetPoint);
             case FLOOR_OPENING -> resizeFloorOpeningRectangle(level, handle, targetPoint);
             case HEATING_EXCLUSION -> resizeHeatingExclusionRectangle(level, handle, targetPoint);
+            case HEATING_ZONE -> resizeHeatingZoneRectangle(level, handle, targetPoint);
             default -> throw new IllegalArgumentException("Bauteil kann nicht rechteckig geändert werden: " + handle.elementKind());
         };
     }
@@ -229,7 +246,7 @@ import java.util.UUID;
         );
         return new ResizeResult(level.walls(), level.doors(), level.windows(),
                 level.staircases().stream().map(candidate -> candidate.id().equals(staircase.id()) ? resized : candidate).toList(),
-                level.floorOpenings(), level.heatingExclusionAreas());
+                level.floorOpenings(), level.heatingExclusionAreas(), level.hydronicHeatings());
     }
 
     private ResizeResult resizeFloorOpeningRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -253,7 +270,7 @@ import java.util.UUID;
         );
         return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases(),
                 level.floorOpenings().stream().map(candidate -> candidate.id().equals(opening.id()) ? resized : candidate).toList(),
-                level.heatingExclusionAreas());
+                level.heatingExclusionAreas(), level.hydronicHeatings());
     }
 
     private ResizeResult resizeHeatingExclusionRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -273,7 +290,29 @@ import java.util.UUID;
         );
         return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases(),
                 level.floorOpenings(),
-                level.heatingExclusionAreas().stream().map(candidate -> candidate.id().equals(area.id()) ? resized : candidate).toList());
+                level.heatingExclusionAreas().stream().map(candidate -> candidate.id().equals(area.id()) ? resized : candidate).toList(),
+                level.hydronicHeatings());
+    }
+
+    private ResizeResult resizeHeatingZoneRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+        HydronicHeating heating = level.hydronicHeatings().stream()
+                .filter(candidate -> candidate.zones().stream().anyMatch(zone -> zone.id().equals(handle.elementId())))
+                .findFirst()
+                .orElseThrow();
+        HeatingZone zone = heating.zones().stream()
+                .filter(candidate -> candidate.id().equals(handle.elementId()))
+                .findFirst()
+                .orElseThrow();
+        RectangleBounds bounds = resizeBounds(bounds(zone.outline()), handle.kind(), targetPoint);
+        HeatingZone resized = zone.withOutline(rectanglePoints(bounds));
+        HydronicHeating resizedHeating = heating.withZones(heating.zones().stream()
+                .map(candidate -> candidate.id().equals(zone.id()) ? resized : candidate)
+                .toList());
+        return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases(),
+                level.floorOpenings(), level.heatingExclusionAreas(),
+                level.hydronicHeatings().stream()
+                        .map(candidate -> candidate.id().equals(heating.id()) ? resizedHeating : candidate)
+                        .toList());
     }
 
     private RectangleBounds resizeBounds(RectangleBounds bounds, EdgeHandleKind handleKind, PlanPoint targetPoint) {
@@ -300,6 +339,24 @@ import java.util.UUID;
         double x = corner.xMillimeters() <= oppositeCorner.xMillimeters() ? bounds.minX() : bounds.maxX();
         double y = corner.yMillimeters() <= oppositeCorner.yMillimeters() ? bounds.minY() : bounds.maxY();
         return new PlanPoint(x, y);
+    }
+
+    private RectangleBounds bounds(List<PlanPoint> points) {
+        return new RectangleBounds(
+                points.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0),
+                points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0),
+                points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0),
+                points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0)
+        );
+    }
+
+    private List<PlanPoint> rectanglePoints(RectangleBounds bounds) {
+        return List.of(
+                new PlanPoint(bounds.minX(), bounds.minY()),
+                new PlanPoint(bounds.maxX(), bounds.minY()),
+                new PlanPoint(bounds.maxX(), bounds.maxY()),
+                new PlanPoint(bounds.minX(), bounds.maxY())
+        );
     }
 
     public static boolean isRectangleCorner(EdgeHandleKind kind) {
@@ -442,10 +499,22 @@ import java.util.UUID;
             List<WindowElement> windows,
             List<Staircase> staircases,
             List<FloorOpening> floorOpenings,
-            List<HeatingExclusionArea> heatingExclusionAreas
+            List<HeatingExclusionArea> heatingExclusionAreas,
+            List<HydronicHeating> hydronicHeatings
     ) {
         public ResizeResult(List<Wall> walls, List<Door> doors, List<WindowElement> windows, List<Staircase> staircases) {
-            this(walls, doors, windows, staircases, List.of(), List.of());
+            this(walls, doors, windows, staircases, List.of(), List.of(), List.of());
+        }
+
+        public ResizeResult(
+                List<Wall> walls,
+                List<Door> doors,
+                List<WindowElement> windows,
+                List<Staircase> staircases,
+                List<FloorOpening> floorOpenings,
+                List<HeatingExclusionArea> heatingExclusionAreas
+        ) {
+            this(walls, doors, windows, staircases, floorOpenings, heatingExclusionAreas, List.of());
         }
 
         public ResizeResult {
@@ -455,6 +524,7 @@ import java.util.UUID;
             staircases = List.copyOf(staircases);
             floorOpenings = List.copyOf(floorOpenings);
             heatingExclusionAreas = List.copyOf(heatingExclusionAreas);
+            hydronicHeatings = List.copyOf(hydronicHeatings);
         }
     }
 }

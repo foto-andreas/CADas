@@ -45,6 +45,18 @@ class HydronicHeatingTest {
     }
 
     @Test
+    void neuerHeizkreisNutztSchneckeAlsStandard() {
+        HeatingZone zone = HeatingZone.create("Standard", List.of(
+                new PlanPoint(0, 0),
+                new PlanPoint(1_000, 0),
+                new PlanPoint(1_000, 1_000),
+                new PlanPoint(0, 1_000)
+        ));
+
+        assertEquals(HeatingLayoutPattern.SPIRAL, zone.layoutPattern());
+    }
+
+    @Test
     void lehntUngültigeRohrparameterAb() {
         assertThrows(IllegalArgumentException.class, () -> new HydronicHeating(
                 UUID.randomUUID(), UUID.randomUUID(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER,

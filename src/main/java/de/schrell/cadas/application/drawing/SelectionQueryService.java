@@ -6,6 +6,7 @@ import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
+import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Room;
@@ -32,6 +33,7 @@ public final class SelectionQueryService {
         selections.addAll(findFloorExtensionSelections(level, point));
         selections.addAll(findFloorOpeningSelections(level, point));
         selections.addAll(findHeatingExclusionSelections(level, point));
+        selections.addAll(findHeatingZoneSelections(level, point));
         selections.addAll(findWallSelections(level, point, tolerance));
         selections.addAll(findRoomObjectSelections(level, point));
         selections.addAll(findRoomSelections(level, point));
@@ -127,6 +129,14 @@ public final class SelectionQueryService {
                 .toList();
     }
 
+    private List<SelectionKey> findHeatingZoneSelections(Level level, PlanPoint point) {
+        return level.hydronicHeatings().stream()
+                .flatMap(heating -> heating.zones().stream())
+                .filter(zone -> containsPoint(zone, point))
+                .map(zone -> new SelectionKey(RenderableKind.HEATING_ZONE, level.name(), zone.id().toString()))
+                .toList();
+    }
+
     private List<SelectionKey> findWallSelections(Level level, PlanPoint point, Length tolerance) {
         return level.walls().stream()
                 .filter(wall -> wall.axis().distanceTo(point).toMillimeters() <= Math.max(tolerance.toMillimeters(), wall.thickness().toMillimeters() / 2.0))
@@ -136,11 +146,19 @@ public final class SelectionQueryService {
     }
 
     private boolean containsPoint(Room room, PlanPoint point) {
+        return containsPoint(room.outline(), point);
+    }
+
+    private boolean containsPoint(HeatingZone zone, PlanPoint point) {
+        return containsPoint(zone.outline(), point);
+    }
+
+    private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
         boolean inside = false;
-        int lastIndex = room.outline().size() - 1;
-        for (int currentIndex = 0; currentIndex < room.outline().size(); currentIndex++) {
-            PlanPoint current = room.outline().get(currentIndex);
-            PlanPoint previous = room.outline().get(lastIndex);
+        int lastIndex = outline.size() - 1;
+        for (int currentIndex = 0; currentIndex < outline.size(); currentIndex++) {
+            PlanPoint current = outline.get(currentIndex);
+            PlanPoint previous = outline.get(lastIndex);
             boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
                     && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
                     * (point.yMillimeters() - current.yMillimeters())
