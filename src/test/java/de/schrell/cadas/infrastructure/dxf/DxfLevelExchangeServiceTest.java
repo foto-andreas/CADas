@@ -229,7 +229,7 @@ class DxfLevelExchangeServiceTest {
                 Length.of(2, LengthUnit.MILLIMETER),
                 SurfaceCutRestriction.OUTER_CUTS_ROTATABLE,
                 "Kacheln"
-        ));
+        ).withLayoutRotatedQuarterTurn(true));
         floorStack.addLayer(new SurfaceLayer(
                 java.util.UUID.randomUUID(),
                 "Daemmung",
@@ -289,6 +289,7 @@ class DxfLevelExchangeServiceTest {
         assertEquals(2, importedFloor.layers().size());
         assertEquals("Fliese", importedFloor.layers().getFirst().name());
         assertEquals(600.0, importedFloor.layers().getFirst().tileWidth().toMillimeters(), 0.001);
+        assertTrue(importedFloor.layers().getFirst().layoutRotatedQuarterTurn());
         assertEquals(2.0, importedFloor.layers().getFirst().jointWidth().toMillimeters(), 0.001);
         assertEquals(SurfaceCutRestriction.OUTER_CUTS_ROTATABLE, importedFloor.layers().getFirst().cutRestriction());
         assertTrue(importedFloor.layers().getFirst().visible());

@@ -19,7 +19,8 @@ public record SurfaceLayer(
         Length minimumStartEndMargin,
         Length jointWidth,
         SurfaceCutRestriction cutRestriction,
-        String coveringSource
+        String coveringSource,
+        boolean layoutRotatedQuarterTurn
 ) {
 
     public SurfaceLayer(
@@ -57,6 +58,25 @@ public record SurfaceLayer(
         this(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, SurfaceCutRestriction.fallback(), coveringSource);
     }
 
+    public SurfaceLayer(
+            UUID id,
+            String name,
+            Length thickness,
+            boolean visible,
+            Length tileWidth,
+            Length tileHeight,
+            SurfaceLayoutMode layoutMode,
+            Length layoutOffset,
+            Length minimumOffset,
+            Length minimumEdgeWidth,
+            Length minimumStartEndMargin,
+            Length jointWidth,
+            SurfaceCutRestriction cutRestriction,
+            String coveringSource
+    ) {
+        this(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, cutRestriction, coveringSource, false);
+    }
+
     public SurfaceLayer {
         Objects.requireNonNull(id, "id darf nicht null sein.");
         Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -80,7 +100,7 @@ public record SurfaceLayer(
             Length tileHeight,
             Length minimumOffset
     ) {
-        return new SurfaceLayer(UUID.randomUUID(), name, thickness, true, tileWidth, tileHeight, SurfaceLayoutMode.AUTOMATIC, Length.zero(), minimumOffset, Length.zero(), Length.zero(), Length.ofMillimeters(2), SurfaceCutRestriction.fallback(), "");
+        return new SurfaceLayer(UUID.randomUUID(), name, thickness, true, tileWidth, tileHeight, SurfaceLayoutMode.AUTOMATIC, Length.zero(), minimumOffset, Length.zero(), Length.zero(), Length.ofMillimeters(2), SurfaceCutRestriction.fallback(), "", false);
     }
 
     public static SurfaceLayer create(
@@ -113,15 +133,61 @@ public record SurfaceLayer(
             SurfaceCutRestriction cutRestriction,
             String coveringSource
     ) {
-        return new SurfaceLayer(UUID.randomUUID(), name, thickness, true, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, cutRestriction, coveringSource);
+        return new SurfaceLayer(UUID.randomUUID(), name, thickness, true, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, cutRestriction, coveringSource, false);
     }
 
     public SurfaceLayer rename(String newName) {
-        return new SurfaceLayer(id, newName, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, cutRestriction, coveringSource);
+        return new SurfaceLayer(id, newName, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn);
     }
 
     public SurfaceLayer withVisibility(boolean newVisibility) {
-        return new SurfaceLayer(id, name, thickness, newVisibility, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, cutRestriction, coveringSource);
+        return new SurfaceLayer(id, name, thickness, newVisibility, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn);
+    }
+
+    public SurfaceLayer withLayoutRotatedQuarterTurn(boolean newLayoutRotatedQuarterTurn) {
+        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, jointWidth, cutRestriction, coveringSource, newLayoutRotatedQuarterTurn);
+    }
+
+    public Length effectiveTileWidth() {
+        return layoutRotatedQuarterTurn ? tileHeight : tileWidth;
+    }
+
+    public Length effectiveTileHeight() {
+        return layoutRotatedQuarterTurn ? tileWidth : tileHeight;
+    }
+
+    public SurfaceLayer reconfigure(
+            String newName,
+            Length newThickness,
+            Length newTileWidth,
+            Length newTileHeight,
+            SurfaceLayoutMode newLayoutMode,
+            Length newLayoutOffset,
+            Length newMinimumOffset,
+            Length newMinimumEdgeWidth,
+            Length newMinimumStartEndMargin,
+            Length newJointWidth,
+            SurfaceCutRestriction newCutRestriction,
+            String newCoveringSource,
+            boolean newLayoutRotatedQuarterTurn
+    ) {
+        return new SurfaceLayer(
+                id,
+                newName,
+                newThickness,
+                visible,
+                newTileWidth,
+                newTileHeight,
+                newLayoutMode,
+                newLayoutOffset,
+                newMinimumOffset,
+                newMinimumEdgeWidth,
+                newMinimumStartEndMargin,
+                newJointWidth,
+                newCutRestriction,
+                newCoveringSource,
+                newLayoutRotatedQuarterTurn
+        );
     }
 
     public SurfaceLayer reconfigure(
@@ -138,11 +204,9 @@ public record SurfaceLayer(
             SurfaceCutRestriction newCutRestriction,
             String newCoveringSource
     ) {
-        return new SurfaceLayer(
-                id,
+        return reconfigure(
                 newName,
                 newThickness,
-                visible,
                 newTileWidth,
                 newTileHeight,
                 newLayoutMode,
@@ -152,7 +216,8 @@ public record SurfaceLayer(
                 newMinimumStartEndMargin,
                 newJointWidth,
                 newCutRestriction,
-                newCoveringSource
+                newCoveringSource,
+                layoutRotatedQuarterTurn
         );
     }
 
@@ -181,7 +246,8 @@ public record SurfaceLayer(
                 newMinimumStartEndMargin,
                 newJointWidth,
                 cutRestriction,
-                newCoveringSource
+                newCoveringSource,
+                layoutRotatedQuarterTurn
         );
     }
 }

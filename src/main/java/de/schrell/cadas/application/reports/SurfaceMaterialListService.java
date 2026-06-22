@@ -311,6 +311,7 @@ public final class SurfaceMaterialListService {
                 Double.toString(layer.minimumStartEndMargin().toMillimeters()),
                 Double.toString(layer.jointWidth().toMillimeters()),
                 layer.cutRestriction().name(),
+                Boolean.toString(layer.layoutRotatedQuarterTurn()),
                 layer.coveringSource()
         );
     }
@@ -435,16 +436,16 @@ public final class SurfaceMaterialListService {
         }
 
         private void add(SurfaceRectangle rectangle) {
-            double tileWidth = layer.tileWidth().toMillimeters();
-            double tileHeight = layer.tileHeight().toMillimeters();
+            double tileWidth = layer.effectiveTileWidth().toMillimeters();
+            double tileHeight = layer.effectiveTileHeight().toMillimeters();
             if (rectangle.widthMillimeters() <= EPSILON || rectangle.heightMillimeters() <= EPSILON || tileWidth <= EPSILON || tileHeight <= EPSILON) {
                 return;
             }
             List<TilePlacement> placements = new TileLayoutService().fillSurface(new TileLayoutRequest(
                     Length.ofMillimeters(rectangle.widthMillimeters()),
                     Length.ofMillimeters(rectangle.heightMillimeters()),
-                    layer.tileWidth(),
-                    layer.tileHeight(),
+                    layer.effectiveTileWidth(),
+                    layer.effectiveTileHeight(),
                     layer.layoutMode(),
                     layer.layoutOffset(),
                     layer.minimumOffset(),
@@ -773,8 +774,8 @@ public final class SurfaceMaterialListService {
                 }
             }
             return MaterialCuttingOptimizer.optimize(
-                    layer.tileWidth().toMillimeters(),
-                    layer.tileHeight().toMillimeters(),
+                    layer.effectiveTileWidth().toMillimeters(),
+                    layer.effectiveTileHeight().toMillimeters(),
                     cutPieces,
                     layer.cutRestriction().allowsMaterialRotation(),
                     pendingEntries.size()
@@ -786,6 +787,7 @@ public final class SurfaceMaterialListService {
                     + ", Format " + length(layer.tileWidth(), LengthUnit.CENTIMETER, 1)
                     + " x " + length(layer.tileHeight(), LengthUnit.CENTIMETER, 1)
                     + ", Verlegung " + layer.layoutMode()
+                    + (layer.layoutRotatedQuarterTurn() ? " um 90° gedreht" : "")
                     + ", Versatz " + length(layer.layoutOffset(), LengthUnit.CENTIMETER, 1)
                     + ", Mindestversatz " + length(layer.minimumOffset(), LengthUnit.CENTIMETER, 1)
                     + ", Mindestrand " + length(layer.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1)

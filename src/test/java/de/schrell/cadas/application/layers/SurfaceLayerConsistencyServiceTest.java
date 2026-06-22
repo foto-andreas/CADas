@@ -41,4 +41,15 @@ class SurfaceLayerConsistencyServiceTest {
 
         assertFalse(consistencyService.haveEqualSequence(first, second));
     }
+
+    @Test
+    void erkenntGedrehteVerlegerichtungAlsUnterschiedlicheEbenenfolge() {
+        SurfaceLayerStack first = new SurfaceLayerStack(SurfaceType.FLOOR, "raum-a");
+        first.addLayer(SurfaceLayer.create("Dielen", Length.of(2, LengthUnit.CENTIMETER), Length.of(120, LengthUnit.CENTIMETER), Length.of(20, LengthUnit.CENTIMETER), Length.zero()));
+        SurfaceLayerStack second = new SurfaceLayerStack(SurfaceType.FLOOR, "raum-b");
+        second.addLayer(SurfaceLayer.create("Dielen", Length.of(2, LengthUnit.CENTIMETER), Length.of(120, LengthUnit.CENTIMETER), Length.of(20, LengthUnit.CENTIMETER), Length.zero())
+                .withLayoutRotatedQuarterTurn(true));
+
+        assertFalse(consistencyService.haveEqualSequence(first, second));
+    }
 }

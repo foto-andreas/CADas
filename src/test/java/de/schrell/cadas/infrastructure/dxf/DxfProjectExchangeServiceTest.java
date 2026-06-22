@@ -343,7 +343,7 @@ class DxfProjectExchangeServiceTest {
                 Length.of(1, LengthUnit.MILLIMETER),
                 SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
                 "Holz"
-        ));
+        ).withLayoutRotatedQuarterTurn(true));
         project.primaryLevel().addSurfaceLayerStack(egFloor);
         project.primaryLevel().addRoomObject(RoomObject.create(
                 "dwg-spiegel",
@@ -404,6 +404,7 @@ class DxfProjectExchangeServiceTest {
         assertEquals(SurfaceType.FLOOR, importedEg.surfaceLayerStacks().getFirst().surfaceType());
         assertEquals(1, importedEg.surfaceLayerStacks().getFirst().layers().size());
         assertEquals("Parkett", importedEg.surfaceLayerStacks().getFirst().layers().getFirst().name());
+        assertTrue(importedEg.surfaceLayerStacks().getFirst().layers().getFirst().layoutRotatedQuarterTurn());
         assertEquals(1.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().jointWidth().toMillimeters(), 0.001);
         assertEquals(SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().cutRestriction());
         assertEquals(1, importedEg.roomObjects().size());
@@ -544,7 +545,7 @@ class DxfProjectExchangeServiceTest {
                 Length.of(600, LengthUnit.MILLIMETER), Length.of(120, LengthUnit.MILLIMETER),
                 SurfaceLayoutMode.AUTOMATIC, Length.of(50, LengthUnit.MILLIMETER),
                 Length.of(5, LengthUnit.MILLIMETER), Length.of(8, LengthUnit.MILLIMETER),
-                Length.of(2, LengthUnit.MILLIMETER), "Eiche"));
+                Length.of(2, LengthUnit.MILLIMETER), "Eiche").withLayoutRotatedQuarterTurn(true));
         project.primaryLevel().addSurfaceLayerStack(floorStack);
 
         Path file = tempDir.resolve("rundlauf.dxf");
@@ -558,5 +559,6 @@ class DxfProjectExchangeServiceTest {
         assertEquals(room.id().toString(), importedStack.targetKey(), "SLS-targetKey muss Raum-UUID entsprechen");
         assertFalse(importedStack.layers().isEmpty());
         assertEquals("Dielen", importedStack.layers().getFirst().name());
+        assertTrue(importedStack.layers().getFirst().layoutRotatedQuarterTurn());
     }
 }

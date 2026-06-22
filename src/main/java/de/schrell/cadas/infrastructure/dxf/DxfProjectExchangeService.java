@@ -287,7 +287,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                     Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[12]) : parseDouble(parts[11])),
                                     Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[13]) : parseDouble(parts[12])),
                                     SurfaceCutRestriction.fromStoredValue(parts.length >= 16 ? parts[15] : null),
-                                    DxfMetadataCodec.decode(parts.length >= 15 ? parts[14] : parts[13], encodedFields)
+                                    DxfMetadataCodec.decode(parts.length >= 15 ? parts[14] : parts[13], encodedFields),
+                                    parts.length >= 17 && Boolean.parseBoolean(parts[16])
                             );
                             stack.addLayer(layer);
                         }
@@ -570,7 +571,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             for (SurfaceLayer layer : sls.layers()) {
                 appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
                         Locale.US,
-                        "SLL|%s|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s",
+                        "SLL|%s|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s",
                         DxfMetadataCodec.encode(level.name()),
                         layer.id(),
                         DxfMetadataCodec.encode(layer.name()),
@@ -585,7 +586,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                         layer.minimumStartEndMargin().toMillimeters(),
                         layer.jointWidth().toMillimeters(),
                         DxfMetadataCodec.encode(layer.coveringSource()),
-                        layer.cutRestriction().name()
+                        layer.cutRestriction().name(),
+                        layer.layoutRotatedQuarterTurn()
                 ));
             }
         }

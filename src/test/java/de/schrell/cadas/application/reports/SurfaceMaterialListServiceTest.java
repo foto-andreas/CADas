@@ -278,6 +278,31 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
+    void nutztGedrehteVerlegerichtungInMaterialbedarfUndAusgabe() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Flur",
+                new PlanPoint(0, 0),
+                new PlanPoint(1000, 600),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        stack.addLayer(layer("Diele", Length.of(100, LengthUnit.CENTIMETER), Length.of(60, LengthUnit.CENTIMETER))
+                .withLayoutRotatedQuarterTurn(true));
+        project.primaryLevel().addSurfaceLayerStack(stack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        MaterialSummary material = report.materials().getFirst();
+        assertEquals(2, material.requiredPieces());
+        assertTrue(material.values().contains("Verlegung Kein Versatz um 90° gedreht"));
+        assertTrue(report.toMarkdown().contains("um 90° gedreht"));
+    }
+
+    @Test
     void spartBodenbelagUnterBodenaussparendenObjektenAus() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Room room = Room.rectangular(

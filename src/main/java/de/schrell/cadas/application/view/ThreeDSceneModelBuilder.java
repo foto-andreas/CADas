@@ -462,8 +462,8 @@ public final class ThreeDSceneModelBuilder {
         TileLayoutRequest request = new TileLayoutRequest(
                 Length.ofMillimeters(room.widthMillimeters()),
                 Length.ofMillimeters(room.depthMillimeters()),
-                layer.tileWidth(),
-                layer.tileHeight(),
+                layer.effectiveTileWidth(),
+                layer.effectiveTileHeight(),
                 layer.layoutMode(),
                 layer.layoutOffset(),
                 layer.minimumOffset(),
@@ -1075,8 +1075,8 @@ public final class ThreeDSceneModelBuilder {
         TileLayoutRequest request = new TileLayoutRequest(
                 Length.ofMillimeters(wallLength),
                 Length.ofMillimeters(wallHeight),
-                layer.tileWidth(),
-                layer.tileHeight(),
+                layer.effectiveTileWidth(),
+                layer.effectiveTileHeight(),
                 layer.layoutMode(),
                 layer.layoutOffset(),
                 layer.minimumOffset(),
