@@ -242,11 +242,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     }
                     case "HZONE" -> pendingHeatingZones
                             .computeIfAbsent(UUID.fromString(parts[2]), ignored -> new ArrayList<>())
-                            .add(new HeatingZone(
-                                    UUID.fromString(parts[3]),
-                                    DxfMetadataCodec.decode(parts[4], encodedFields),
-                                    deserializePoints(parts[5])
-                            ));
+                            .add(deserializeProjectHeatingZone(parts, encodedFields));
                     case "ROOF" -> importedRoof = new Roof(
                             RoofType.valueOf(parts[1]),
                             Angle.ofDegrees(parseDouble(parts[2])),
@@ -532,9 +528,10 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             for (HeatingZone zone : heating.zones()) {
                 appendMetadataText(dxf, context, zone.outline().getFirst(), String.format(
                         Locale.US,
-                        "HZONE|%s|%s|%s|%s|%s",
+                        "HZONE|%s|%s|%s|%s|%s|%s|%s",
                         DxfMetadataCodec.encode(level.name()), heating.id(), zone.id(),
-                        DxfMetadataCodec.encode(zone.name()), serializePoints(zone.outline())
+                        DxfMetadataCodec.encode(zone.name()), zone.layoutPattern().name(),
+                        zone.flowInverted(), serializePoints(zone.outline())
                 ));
             }
         }
@@ -740,6 +737,23 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 Length.ofMillimeters(parseDouble(parts[8])), Length.ofMillimeters(parseDouble(parts[9])),
                 new PlanPoint(parseDouble(parts[10]), parseDouble(parts[11])),
                 new PlanPoint(parseDouble(parts[12]), parseDouble(parts[13])), List.of()
+        );
+    }
+
+    private HeatingZone deserializeProjectHeatingZone(String[] parts, boolean encodedFields) {
+        if (parts.length >= 8) {
+            return new HeatingZone(
+                    UUID.fromString(parts[3]),
+                    DxfMetadataCodec.decode(parts[4], encodedFields),
+                    deserializePoints(parts[7]),
+                    HeatingLayoutPattern.valueOf(parts[5]),
+                    Boolean.parseBoolean(parts[6])
+            );
+        }
+        return new HeatingZone(
+                UUID.fromString(parts[3]),
+                DxfMetadataCodec.decode(parts[4], encodedFields),
+                deserializePoints(parts[5])
         );
     }
 

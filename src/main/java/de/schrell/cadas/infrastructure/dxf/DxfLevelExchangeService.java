@@ -259,8 +259,9 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             for (HeatingZone zone : heating.zones()) {
                 appendMetadataText(dxf, context, zone.outline().getFirst(), String.format(
                         Locale.US,
-                        "HZONE|%s|%s|%s|%s",
-                        heating.id(), zone.id(), DxfMetadataCodec.encode(zone.name()), serializePoints(zone.outline())
+                        "HZONE|%s|%s|%s|%s|%s|%s",
+                        heating.id(), zone.id(), DxfMetadataCodec.encode(zone.name()),
+                        zone.layoutPattern().name(), zone.flowInverted(), serializePoints(zone.outline())
                 ));
             }
         }
@@ -424,11 +425,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     }
                     case "HZONE" -> importedHeatingZones
                             .computeIfAbsent(UUID.fromString(parts[1]), ignored -> new ArrayList<>())
-                            .add(new HeatingZone(
-                                    UUID.fromString(parts[2]),
-                                    DxfMetadataCodec.decode(parts[3], encodedFields),
-                                    deserializePoints(parts[4])
-                            ));
+                            .add(deserializeHeatingZone(parts, encodedFields));
                     case "SLS" -> {
                         SurfaceLayerStack stack = new SurfaceLayerStack(
                                 UUID.fromString(parts[1]),
@@ -652,6 +649,23 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                 Length.ofMillimeters(parseDouble(parts[7])), Length.ofMillimeters(parseDouble(parts[8])),
                 new PlanPoint(parseDouble(parts[9]), parseDouble(parts[10])),
                 new PlanPoint(parseDouble(parts[11]), parseDouble(parts[12])), List.of()
+        );
+    }
+
+    private static HeatingZone deserializeHeatingZone(String[] parts, boolean encodedFields) {
+        if (parts.length >= 7) {
+            return new HeatingZone(
+                    UUID.fromString(parts[2]),
+                    DxfMetadataCodec.decode(parts[3], encodedFields),
+                    deserializePoints(parts[6]),
+                    HeatingLayoutPattern.valueOf(parts[4]),
+                    Boolean.parseBoolean(parts[5])
+            );
+        }
+        return new HeatingZone(
+                UUID.fromString(parts[2]),
+                DxfMetadataCodec.decode(parts[3], encodedFields),
+                deserializePoints(parts[4])
         );
     }
 
