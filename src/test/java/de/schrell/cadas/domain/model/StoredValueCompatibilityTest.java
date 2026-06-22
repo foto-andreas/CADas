@@ -43,4 +43,10 @@ class StoredValueCompatibilityTest {
         assertEquals(SurfaceCutRestriction.fallback(), SurfaceCutRestriction.fromStoredValue(""));
         assertEquals(SurfaceCutRestriction.fallback(), SurfaceCutRestriction.fromStoredValue("unbekannt"));
     }
+
+    @Test
+    void kenntVarioAlsHeizkreisvariante() {
+        assertEquals(HeatingLayoutPattern.VARIO, HeatingLayoutPattern.valueOf("VARIO"));
+        assertEquals("Vario", HeatingLayoutPattern.VARIO.toString());
+    }
 }

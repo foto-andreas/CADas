@@ -1091,6 +1091,7 @@ public final class CadWorkbench extends BorderPane {
                 menuItem(DrawingTool.HEATING_ZONE_RECTANGLE.label(), () -> toolSelector.setValue(DrawingTool.HEATING_ZONE_RECTANGLE), null),
                 menuItem(DrawingTool.HEATING_MANIFOLD.label(), () -> toolSelector.setValue(DrawingTool.HEATING_MANIFOLD), null),
                 menuItem(DrawingTool.HEATING_EXCLUSION_RECTANGLE.label(), () -> toolSelector.setValue(DrawingTool.HEATING_EXCLUSION_RECTANGLE), null),
+                menuItem("Heizkreis-Router Vario testen", this::showHeatingCircuitRoutingWindow, null),
                 toolMenuItem(DrawingTool.DOOR, KeyCode.D),
                 toolMenuItem(DrawingTool.WINDOW, KeyCode.F),
                 menuItem(DrawingTool.ROOF_WINDOW.label(), () -> toolSelector.setValue(DrawingTool.ROOF_WINDOW), null),
@@ -1563,6 +1564,10 @@ public final class CadWorkbench extends BorderPane {
         showErrorDialog(title, title, content, throwable);
     }
 
+    private void showHeatingCircuitRoutingWindow() {
+        new HeatingCircuitRoutingWindow().show(currentWindow());
+    }
+
     private void showErrorDialog(String title, String header, String content, Throwable throwable) {
         lastErrorDialog = UiErrorDialogs.fromThrowable(title, header, content, throwable);
         UiErrorDialogs.show(lastErrorDialog, currentWindow(), interactiveDialogsEnabled);
@@ -1812,7 +1817,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(floorExtensionThicknessField, "Legt die Dicke der tragenden rechteckigen Fußbodenplatte des Balkons oder der Empore fest.");
         applyTooltip(floorExtensionThicknessUnit, "Bestimmt die Einheit für die Fußbodendicke des Balkons oder der Empore.");
         applyTooltip(heatingSurfacePositionSelector, "Wählt unabhängig voneinander die Fußboden- oder Deckenheizung des markierten Raums. Für beide Flächen stehen dieselben Planungs- und Bearbeitungsfunktionen bereit.");
-        applyTooltip(heatingLayoutPatternSelector, "Wählt die Start-Verlegeart für neu angelegte Flächenheizungen. Einzelne Heizkreise können danach direkt über ihr Kontextmenü zwischen Schnecke und Meander umgeschaltet werden.");
+        applyTooltip(heatingLayoutPatternSelector, "Wählt die Start-Verlegeart für neu angelegte Flächenheizungen. Vario wird zunächst zusätzlich im separaten Testfenster geprüft.");
         applyTooltip(heatingPipeSpacingField, "Legt den Achsabstand benachbarter Rohrläufe fest. Der Kurvenradius wird automatisch als halber Verlegeabstand angesetzt.");
         applyTooltip(heatingPipeSpacingUnit, "Bestimmt die Einheit für den Verlegeabstand der Heizungsrohre.");
         applyTooltip(heatingPipeDiameterField, "Legt den Außendurchmesser des Heizungsrohrs fest. Er muss kleiner als der Verlegeabstand sein.");

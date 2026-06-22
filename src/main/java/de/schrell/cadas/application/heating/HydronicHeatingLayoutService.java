@@ -947,9 +947,10 @@ public final class HydronicHeatingLayoutService {
     private FieldPattern createPattern(HydronicHeating heating, HeatingZone zone) {
         double clearance = heating.wallClearance().toMillimeters();
         double pitch = heating.pipeSpacing().toMillimeters();
-        List<FieldPattern> candidates = zone.layoutPattern() == HeatingLayoutPattern.SPIRAL
-                ? spiralPatterns(zone.outline(), clearance, pitch)
-                : List.of(meanderPattern(zone.outline(), clearance, pitch));
+        List<FieldPattern> candidates = switch (zone.layoutPattern()) {
+            case MEANDER -> List.of(meanderPattern(zone.outline(), clearance, pitch));
+            case SPIRAL, VARIO -> spiralPatterns(zone.outline(), clearance, pitch);
+        };
         FieldPattern pattern = selectPattern(candidates, zone);
         if (pattern.fullPath().isEmpty()) {
             PlanPoint center = centroid(zone.outline());

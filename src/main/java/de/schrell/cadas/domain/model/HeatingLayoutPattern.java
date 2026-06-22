@@ -2,7 +2,8 @@ package de.schrell.cadas.domain.model;
 
 public enum HeatingLayoutPattern {
     MEANDER("Meander"),
-    SPIRAL("Schnecke");
+    SPIRAL("Schnecke"),
+    VARIO("Vario");
 
     private final String label;
 
