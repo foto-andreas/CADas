@@ -67,6 +67,26 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void liefertTeilplanungWennEinAnschlussNichtRoutbarBleibt() {
+        Room room = rectangularRoom();
+        HydronicHeating heating = HydronicHeating.create(
+                room.id(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER,
+                Length.ofMillimeters(200), Length.ofMillimeters(16), Length.ofMillimeters(25_000),
+                Length.ofMillimeters(100), new PlanPoint(100, 100), new PlanPoint(300, 100)
+        );
+
+        HydronicHeatingLayoutService.PlanningResult result = service.suggest(room, heating);
+
+        assertTrue(result.validationReport().valid());
+        assertFalse(result.validationReport().warnings().isEmpty());
+        assertTrue(result.validationReport().warnings().stream()
+                .anyMatch(warning -> warning.type() == HydronicHeatingLayoutService.ValidationErrorType.PARTIAL_LAYOUT));
+        assertEquals(result.heating().zones().size(), result.circuits().size());
+        assertTrue(result.circuits().stream()
+                .allMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) <= 0));
+    }
+
+    @Test
     void ordnetJedemHeizkreisEinEigenesHkvPaarZu() {
         Room room = rectangularRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 35_000);

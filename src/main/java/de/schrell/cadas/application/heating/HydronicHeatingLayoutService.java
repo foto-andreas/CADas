@@ -29,6 +29,7 @@ public final class HydronicHeatingLayoutService {
 
     private static final double EPSILON = 0.001;
     private static final int MAXIMUM_ZONE_COUNT = 64;
+    private static final int MAXIMUM_REPAIR_ATTEMPTS = 10;
     private static final double MANIFOLD_PAIR_PITCH_MILLIMETERS = 50.0;
     private static final double MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS = 600.0;
     private static final double MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS = 1_000.0;
@@ -45,10 +46,30 @@ public final class HydronicHeatingLayoutService {
         Objects.requireNonNull(staircases, "staircases darf nicht null sein.");
         List<HeatingZone> zones = initialZones(room, heating, staircases);
         HydronicHeating planned = heating.withZones(zones);
+        List<ValidationIssue> warnings = new ArrayList<>();
+        int repairAttempts = 0;
         while (zones.size() < MAXIMUM_ZONE_COUNT) {
             planned = optimizeFlowOrientation(planned);
             zones = new ArrayList<>(planned.zones());
-            List<CircuitLayout> layouts = layout(planned);
+            LayoutComputation computation = compute(planned);
+            if (!computation.unroutableZoneIds().isEmpty()) {
+                Optional<HydronicHeating> repaired = repairBySplittingUnroutableZone(planned, computation.unroutableZoneIds());
+                if (repaired.isPresent() && repairAttempts < MAXIMUM_REPAIR_ATTEMPTS) {
+                    planned = repaired.orElseThrow();
+                    zones = new ArrayList<>(planned.zones());
+                    repairAttempts++;
+                    continue;
+                }
+                Optional<PlanningResult> relocated = tryRelocatedManifold(room, planned, warnings);
+                if (relocated.isPresent()) {
+                    return relocated.orElseThrow();
+                }
+                return partialPlanning(planned, computation, warnings);
+            }
+            if (!computation.report().valid()) {
+                return new PlanningResult(planned, computation.circuits(), computation.report());
+            }
+            List<CircuitLayout> layouts = computation.circuits();
             HydronicHeating currentPlanned = planned;
             Optional<CircuitLayout> oversized = layouts.stream()
                     .filter(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) > 0)
@@ -59,7 +80,7 @@ public final class HydronicHeatingLayoutService {
                             .orElse(0.0)));
             if (oversized.isEmpty()) {
                 ValidationReport report = validateLayout(planned);
-                return new PlanningResult(planned, layouts, report);
+                return new PlanningResult(planned, layouts, withWarnings(report, warnings));
             }
             HeatingZone zone = planned.zones().stream()
                     .filter(candidate -> candidate.id().equals(oversized.orElseThrow().zoneId()))
@@ -68,7 +89,7 @@ public final class HydronicHeatingLayoutService {
             List<HeatingZone> split = split(zone);
             if (split.size() < 2) {
                 ValidationReport report = validateLayout(planned);
-                return new PlanningResult(planned, layouts, report);
+                return new PlanningResult(planned, layouts, withWarnings(report, warnings));
             }
             int index = zones.indexOf(zone);
             zones.remove(index);
@@ -77,8 +98,11 @@ public final class HydronicHeatingLayoutService {
             planned = heating.withZones(zones);
         }
         planned = optimizeFlowOrientation(planned);
-        List<CircuitLayout> layouts = layout(planned);
-        return new PlanningResult(planned, layouts, validateLayout(planned));
+        LayoutComputation computation = compute(planned);
+        if (!computation.unroutableZoneIds().isEmpty()) {
+            return partialPlanning(planned, computation, warnings);
+        }
+        return new PlanningResult(planned, computation.circuits(), withWarnings(computation.report(), warnings));
     }
 
     public List<CircuitLayout> layout(HydronicHeating heating) {
@@ -177,6 +201,7 @@ public final class HydronicHeatingLayoutService {
         GeometryScope scope = scopeFor(heating);
         GridGraph graph = GridGraph.create(scope, heating.pipeSpacing().toMillimeters());
         List<ValidationIssue> errors = new ArrayList<>();
+        Set<UUID> unroutableZoneIds = new LinkedHashSet<>();
         List<CircuitLayout> circuits = new ArrayList<>();
         Set<GridEdge> fieldEdges = new LinkedHashSet<>();
         List<FieldPattern> patterns = new ArrayList<>();
@@ -194,6 +219,7 @@ public final class HydronicHeatingLayoutService {
             try {
                 connectors = routeConnectors(graph, scope, pattern, pair, blocked, heating.pipeSpacing().toMillimeters());
             } catch (IllegalArgumentException exception) {
+                unroutableZoneIds.add(zone.id());
                 errors.add(new ValidationIssue(
                         ValidationErrorType.UNROUTABLE_CONNECTOR,
                         zone.name() + ": " + exception.getMessage()
@@ -221,7 +247,7 @@ public final class HydronicHeatingLayoutService {
         ValidationReport report = new ValidationReport(errors.isEmpty(), errors, List.of());
         return new LayoutComputation(circuits.stream()
                 .map(circuit -> circuit.withValidationReport(report))
-                .toList(), report);
+                .toList(), report, unroutableZoneIds);
     }
 
     private GeometryScope scopeFor(HydronicHeating heating) {
@@ -348,6 +374,159 @@ public final class HydronicHeatingLayoutService {
                 Math.max(zoneBounds.maxX(), freeMaxX) + padding,
                 Math.max(zoneBounds.maxY(), freeMaxY) + padding
         );
+    }
+
+    private Optional<HydronicHeating> repairBySplittingUnroutableZone(HydronicHeating heating, Set<UUID> unroutableZoneIds) {
+        Optional<HeatingZone> zoneToSplit = heating.zones().stream()
+                .filter(zone -> unroutableZoneIds.contains(zone.id()))
+                .max(Comparator.comparingDouble(HeatingZone::areaSquareMillimeters));
+        if (zoneToSplit.isEmpty()) {
+            return Optional.empty();
+        }
+        List<HeatingZone> split = split(zoneToSplit.orElseThrow());
+        if (split.size() < 2 || heating.zones().size() + split.size() - 1 > MAXIMUM_ZONE_COUNT) {
+            return Optional.empty();
+        }
+        List<HeatingZone> zones = new ArrayList<>(heating.zones());
+        int index = zones.indexOf(zoneToSplit.orElseThrow());
+        zones.remove(index);
+        zones.addAll(index, split);
+        return Optional.of(heating.withZones(renameZones(zones)));
+    }
+
+    private Optional<PlanningResult> tryRelocatedManifold(
+            Room room,
+            HydronicHeating heating,
+            List<ValidationIssue> existingWarnings
+    ) {
+        for (ManifoldPair candidate : manifoldCandidates(room, heating)) {
+            if (samePoint(candidate.supplyPort(), heating.supplyPoint())
+                    && samePoint(candidate.returnPort(), heating.returnPoint())) {
+                continue;
+            }
+            HydronicHeating relocated = optimizeFlowOrientation(withConnectionPoints(
+                    heating,
+                    candidate.supplyPort(),
+                    candidate.returnPort()
+            ));
+            LayoutComputation computation = compute(relocated);
+            if (computation.report().valid() && !maximumPipeLengthExceeded(relocated, computation.circuits())) {
+                List<ValidationIssue> warnings = new ArrayList<>(existingWarnings);
+                warnings.add(new ValidationIssue(
+                        ValidationErrorType.AUTOMATIC_REPAIR,
+                        "HKV wurde automatisch von "
+                                + format(heating.supplyPoint()) + " / " + format(heating.returnPoint())
+                                + " nach "
+                                + format(relocated.supplyPoint()) + " / " + format(relocated.returnPoint())
+                                + " verschoben, weil die ursprünglichen Anschlüsse nicht kreuzungsfrei erreichbar waren."
+                ));
+                return Optional.of(new PlanningResult(
+                        relocated,
+                        computation.circuits(),
+                        new ValidationReport(true, List.of(), warnings)
+                ));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private List<ManifoldPair> manifoldCandidates(Room room, HydronicHeating heating) {
+        Bounds bounds = bounds(room.outline());
+        double offset = Math.max(heating.pipeSpacing().toMillimeters(), 100.0);
+        double pairWidth = Math.max(MANIFOLD_PAIR_PITCH_MILLIMETERS, heating.pipeSpacing().toMillimeters());
+        double centerX = (bounds.minX() + bounds.maxX()) / 2.0;
+        double centerY = (bounds.minY() + bounds.maxY()) / 2.0;
+        return List.of(
+                new ManifoldPair(
+                        new PlanPoint(centerX - pairWidth / 2.0, bounds.minY() - offset),
+                        new PlanPoint(centerX + pairWidth / 2.0, bounds.minY() - offset)
+                ),
+                new ManifoldPair(
+                        new PlanPoint(centerX - pairWidth / 2.0, bounds.maxY() + offset),
+                        new PlanPoint(centerX + pairWidth / 2.0, bounds.maxY() + offset)
+                ),
+                new ManifoldPair(
+                        new PlanPoint(bounds.minX() - offset, centerY - pairWidth / 2.0),
+                        new PlanPoint(bounds.minX() - offset, centerY + pairWidth / 2.0)
+                ),
+                new ManifoldPair(
+                        new PlanPoint(bounds.maxX() + offset, centerY - pairWidth / 2.0),
+                        new PlanPoint(bounds.maxX() + offset, centerY + pairWidth / 2.0)
+                )
+        );
+    }
+
+    private HydronicHeating withConnectionPoints(HydronicHeating heating, PlanPoint supplyPoint, PlanPoint returnPoint) {
+        return new HydronicHeating(
+                heating.id(),
+                heating.roomId(),
+                heating.surfacePosition(),
+                heating.layoutPattern(),
+                heating.pipeSpacing(),
+                heating.pipeDiameter(),
+                heating.maximumPipeLength(),
+                heating.wallClearance(),
+                supplyPoint,
+                returnPoint,
+                heating.zones()
+        );
+    }
+
+    private PlanningResult partialPlanning(
+            HydronicHeating planned,
+            LayoutComputation computation,
+            List<ValidationIssue> existingWarnings
+    ) {
+        List<ValidationIssue> warnings = new ArrayList<>(existingWarnings);
+        HydronicHeating current = planned;
+        LayoutComputation currentComputation = computation;
+        while (!current.zones().isEmpty()) {
+            if (currentComputation.report().valid()) {
+                return new PlanningResult(current, currentComputation.circuits(), new ValidationReport(true, List.of(), warnings));
+            }
+            Set<UUID> failedZoneIds = new LinkedHashSet<>(currentComputation.unroutableZoneIds());
+            if (failedZoneIds.isEmpty()) {
+                failedZoneIds.add(current.zones().getLast().id());
+            }
+            Map<UUID, HeatingZone> zonesById = current.zones().stream()
+                    .collect(java.util.stream.Collectors.toMap(HeatingZone::id, zone -> zone));
+            for (UUID failedZoneId : failedZoneIds) {
+                HeatingZone failedZone = zonesById.get(failedZoneId);
+                if (failedZone == null) {
+                    continue;
+                }
+                String reason = currentComputation.unroutableZoneIds().contains(failedZoneId)
+                        ? "kein kreuzungsfreier Anschlussweg vom HKV zum Heizfeld gefunden wurde"
+                        : "die Restplanung sonst weiterhin Geometriekonflikte enthält: " + currentComputation.report().summary();
+                warnings.add(new ValidationIssue(
+                        ValidationErrorType.PARTIAL_LAYOUT,
+                        "Heizkreis `" + failedZone.name() + "` wurde ausgelassen, weil " + reason + "."
+                ));
+            }
+            Set<UUID> currentFailedZoneIds = Set.copyOf(failedZoneIds);
+            List<HeatingZone> remainingZones = current.zones().stream()
+                    .filter(zone -> !currentFailedZoneIds.contains(zone.id()))
+                    .toList();
+            current = current.withZones(remainingZones);
+            if (current.zones().isEmpty()) {
+                return new PlanningResult(current, List.of(), new ValidationReport(true, List.of(), warnings));
+            }
+            currentComputation = compute(current);
+        }
+        return new PlanningResult(current, List.of(), new ValidationReport(true, List.of(), warnings));
+    }
+
+    private boolean maximumPipeLengthExceeded(HydronicHeating heating, List<CircuitLayout> circuits) {
+        return circuits.stream().anyMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) > 0);
+    }
+
+    private ValidationReport withWarnings(ValidationReport report, List<ValidationIssue> warnings) {
+        if (warnings.isEmpty()) {
+            return report;
+        }
+        List<ValidationIssue> combinedWarnings = new ArrayList<>(report.warnings());
+        combinedWarnings.addAll(warnings);
+        return new ValidationReport(report.valid(), report.errors(), combinedWarnings);
     }
 
     public HydronicHeating optimizeFlowOrientation(HydronicHeating heating) {
@@ -1500,7 +1679,7 @@ public final class HydronicHeatingLayoutService {
         }
     }
 
-    private record LayoutComputation(List<CircuitLayout> circuits, ValidationReport report) {
+    private record LayoutComputation(List<CircuitLayout> circuits, ValidationReport report, Set<UUID> unroutableZoneIds) {
     }
 
     private record IndexedSegment(int circuitIndex, int segmentIndex, PipeSegment segment) {
@@ -1741,7 +1920,9 @@ public final class HydronicHeatingLayoutService {
         GEOMETRIC_INTERSECTION,
         CONNECTOR_NOT_CONNECTED,
         UNROUTABLE_CONNECTOR,
-        CIRCUIT_TOO_LONG
+        CIRCUIT_TOO_LONG,
+        AUTOMATIC_REPAIR,
+        PARTIAL_LAYOUT
     }
 
     public record PipeSegment(UUID zoneId, PipeRole role, PlanPoint start, PlanPoint end) {

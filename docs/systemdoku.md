@@ -205,7 +205,7 @@ Aktuell abgesichert sind unter anderem:
 * 90°-Drehung für Wände, Räume und Treppen
 * Rückgängig-/Wiederherstellen-Verhalten des generischen Verlaufs
 * Grundverhalten des Projektmodells
-* Heizkreisaufteilung, maximale Rohrlänge, L-/U-Formen, Meander, kreuzungsfreie Schnecke, Treppenaussparung, je Heizkreis gespeicherte Verlegeart, Rolleninvertierung, DXF-Roundtrip und getrennte PDF-Heizplanseiten
+* Heizkreisaufteilung, maximale Rohrlänge, L-/U-Formen, Meander, kreuzungsfreie Schnecke, Treppenaussparung, je Heizkreis gespeicherte Verlegeart, Rolleninvertierung, Teilplanung bei unroutebaren Anschlüssen, DXF-Roundtrip und getrennte PDF-Heizplanseiten
 
 Build und Tests laufen über:
 

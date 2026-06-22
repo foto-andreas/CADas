@@ -5936,6 +5936,9 @@ public final class CadWorkbench extends BorderPane {
                 unplanned,
                 activeLevel.get().staircases()
         );
+        if (!result.validationReport().valid()) {
+            throw new IllegalArgumentException(result.validationReport().summary());
+        }
         boolean maximumExceeded = result.circuits().stream()
                 .anyMatch(circuit -> circuit.pipeLength().compareTo(result.heating().maximumPipeLength()) > 0);
         if (maximumExceeded) {
@@ -5948,8 +5951,39 @@ public final class CadWorkbench extends BorderPane {
             activeLevel.get().replaceHydronicHeating(result.heating());
         }
         refreshHeatingSection();
-        draftLabel.setText(result.heating().zones().size() + " Heizkreis(e) für " + result.heating().surfacePosition() + " geplant.");
+        String warningText = formatHeatingWarnings(result.validationReport().warnings());
+        draftLabel.setText(result.heating().zones().size() + " Heizkreis(e) für " + result.heating().surfacePosition() + " geplant." + warningText);
+        showHeatingWarnings(result.validationReport().warnings());
         render();
+    }
+
+    private String formatHeatingWarnings(List<HydronicHeatingLayoutService.ValidationIssue> warnings) {
+        if (warnings.isEmpty()) {
+            return "";
+        }
+        return " Warnung: " + warnings.stream()
+                .map(HydronicHeatingLayoutService.ValidationIssue::message)
+                .collect(java.util.stream.Collectors.joining(" "));
+    }
+
+    private void showHeatingWarnings(List<HydronicHeatingLayoutService.ValidationIssue> warnings) {
+        if (warnings.isEmpty() || !interactiveDialogsEnabled) {
+            return;
+        }
+        Alert alert = new Alert(
+                Alert.AlertType.WARNING,
+                warnings.stream()
+                        .map(HydronicHeatingLayoutService.ValidationIssue::message)
+                        .collect(java.util.stream.Collectors.joining(System.lineSeparator())),
+                ButtonType.OK
+        );
+        alert.setTitle("FBH-Planung mit Warnungen");
+        alert.setHeaderText("CADas hat nur eine angepasste FBH-Planung erstellen können.");
+        Window owner = currentWindow();
+        if (owner != null) {
+            alert.initOwner(owner);
+        }
+        alert.showAndWait();
     }
 
     private HydronicHeating heatingFromInputs(Room room, UUID heatingId) {
