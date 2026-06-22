@@ -425,14 +425,14 @@ Räume werden nicht mehr mit einem eigenen Zeichenwerkzeug erstellt.
 
 Wähle im Werkzeug `Bearbeiten` genau einen Raum. Der Bereich `Flächenheizung` erscheint in der Eigenschaftenleiste und bietet für `Fußboden` und `Decke` dieselben Funktionen.
 
-1. Wähle die Fläche und als Verlegung `Meander` oder `Schnecke`.
+1. Wähle die Fläche und als Raumvorgabe für die Verlegung `Meander` oder `Schnecke`.
 2. Gib Verlegeabstand, Rohrdurchmesser, maximale Rohrlänge und Mindestabstand zur Wand ein. Die Startwerte passen zum Variotherm-Trockenbau-System mit 100 mm Verlegeabstand, 11,6 mm Rohr und 18 mm Plattenstärke.
 3. Gib die X-/Y-Koordinaten von Vorlauf und Rücklauf am Verteiler ein. Ein HKV-Anschlusspaar ist 5 cm breit.
-4. Wähle `Heizkreise planen`. CADas schlägt die nötige Aufteilung vor und trennt einen Raum so lange, bis jeder Heizkreis die maximale Rohrlänge einhält.
-5. Wähle einen Heizkreis in der Liste. Mit `Bereich bearbeiten` änderst du Name und Polygon-Eckpunkte als `X; Y` in Zentimetern. Dadurch sind auch L- und U-förmige Bereiche möglich.
-6. Ergänze oder entferne Bereiche bei Bedarf. Bereiche außerhalb des Raums und bearbeitete Kreise oberhalb der maximalen Rohrlänge werden abgelehnt.
+4. Wähle `Heizkreise planen`. CADas schlägt die nötige Aufteilung vor, übernimmt die Raumvorgabe zunächst in alle Heizkreise, spart Treppenbereiche aus und trennt einen Raum so lange, bis jeder Heizkreis die maximale Rohrlänge einhält.
+5. Wähle einen Heizkreis in der Liste. Mit `Bereich bearbeiten` änderst du Name, Verlegeart, Vorlauf-/Rücklauf-Invertierung und Polygon-Eckpunkte als `X; Y` in Zentimetern. Dadurch sind auch L- und U-förmige Bereiche möglich.
+6. Mit `Rechteck hinzufügen` ergänzt du einen neuen Heizkreis als rechteckiges Startfeld in einem freien Bereich. Mit `Bereich entfernen` löschst du den markierten Heizkreis. Bereiche außerhalb des Raums und bearbeitete Kreise oberhalb der maximalen Rohrlänge werden abgelehnt.
 
-Die 2D-Ansicht zeichnet Heizbereiche als Umriss, Vorläufe blau und Rückläufe rot. Gestrichelte Leitungen führen zum HKV, durchgezogene Leitungen liegen in der Heizfläche. `V` und `R` markieren Vorlauf und Rücklauf. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen und berechneter Rohrlänge. Die Materialliste enthält zusätzlich je Raum eine maßstäbliche SVG-Zeichnung der geplanten Flächenheizung.
+Die 2D-Ansicht zeichnet Heizbereiche als Umriss, Vorläufe blau und Rückläufe rot. Gestrichelte Leitungen führen zum HKV, durchgezogene Leitungen liegen in der Heizfläche. `V` und `R` markieren Vorlauf und Rücklauf. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen, Verlegeart und berechneter Rohrlänge. Die Materialliste enthält zusätzlich je Raum eine maßstäbliche SVG-Zeichnung der geplanten Flächenheizung. Allgemeine Hindernisse werden noch nicht automatisch ausgespart; Treppenbereiche werden beim automatischen Vorschlag berücksichtigt.
 
 ### Ebenen auf Flächen
 

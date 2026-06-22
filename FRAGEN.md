@@ -26,8 +26,8 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * Analysierte `DWG`-Blöcke können als Belag oder als Raumobjekt übernommen werden. Raumobjekte speichern zusätzlich den Montagemodus: auf Bodenbelag, Bodenbelag ausgespart oder wandmontiert.
 * Die Standard-FBH basiert auf der Variotherm-Trockenbauplatte 60 x 100 cm mit 18 mm Dicke, 100 mm Verlegeabstand und 11,6 mm Heizrohr.
 * Ein HKV-Anschlusspaar bleibt fachlich 50 mm breit. Automatisch erzeugte weitere Kreise werden bis zur eigenen HKV-Geometrieverwaltung mindestens um eine Rasterweite versetzt, damit Zuleitungen in der CAD-Darstellung unterscheidbar und prüfbar bleiben.
+* FBH-Verlegeart und Vorlauf-/Rücklauf-Rollenorientierung werden dauerhaft je Heizbereich gespeichert. Die Raumverlegung ist nur die Startvorgabe für neue automatische Vorschläge.
+* Treppenbereiche werden beim automatischen FBH-Vorschlag als rechteckige Ausschlussflächen aus der beheizbaren Raumfläche entfernt.
 
 ## Offene Folgeentscheidungen
-* Ob die Verlegeart dauerhaft pro gesamter Flächenheizung oder feiner pro Heizbereich gespeichert wird, bleibt für die nächste Persistenz-Erweiterung zu entscheiden.
-* Hindernisse, Schächte und manuell sperrbare Anschlusskorridore brauchen ein eigenes persistentes Flächenmodell, bevor der FBH-Layouter sie sauber berücksichtigen kann. Bis dahin nutzt CADas Raum-/Heizbereichspolygone und automatisch freigehaltene HKV-Korridore.
-* Die globale Invertierung benachbarter Heizkreise zur Vermeidung gleicher Rollen an gemeinsamen Grenzen wird erst ergänzt, wenn Verlegeart und Rollenorientierung pro Heizbereich gespeichert werden.
+* Hindernisse, Schächte und manuell sperrbare Anschlusskorridore brauchen ein eigenes persistentes Flächenmodell, bevor der FBH-Layouter sie sauber berücksichtigen kann. Bis dahin nutzt CADas Raum-/Heizbereichspolygone, Treppenaussparungen und automatisch freigehaltene HKV-Korridore.

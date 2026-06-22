@@ -110,7 +110,7 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 ### Domäne
 
-`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement`, `Staircase`, `RoomObject`, `Roof`, `Terrain`, `SurfaceLayerStack` und `HydronicHeating` bilden den aktuellen Grundrisskern ab. `HeatingZone` speichert frei polygonale Heizkreisbereiche; Boden und Decke unterscheiden sich nur über `HeatingSurfacePosition` und nutzen dieselben Parameter. `WallProfilePoint` erweitert lineare Wandoberkanten zu stückweise linearen Polygonprofilen; Wandbearbeitung, DXF-Persistenz sowie 3D- und Seitenableitung erhalten diese Profile. `TerrainCornerService` leitet die äußeren Gebäudeecken aus der konvexen Hülle der untersten Etage ab und erhält bereits erfasste Geländehöhen. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
+`Length` speichert Maßangaben in Millimetern auf Basis von `BigDecimal`, um Einheiten konsistent zu halten. `ProjectModel`, `Level`, `Wall`, `Room`, `Door`, `WindowElement`, `Staircase`, `RoomObject`, `Roof`, `Terrain`, `SurfaceLayerStack` und `HydronicHeating` bilden den aktuellen Grundrisskern ab. `HeatingZone` speichert frei polygonale Heizkreisbereiche einschließlich eigener Verlegeart und Vorlauf-/Rücklauf-Rollenorientierung; Boden und Decke unterscheiden sich nur über `HeatingSurfacePosition` und nutzen dieselben Parameter. `WallProfilePoint` erweitert lineare Wandoberkanten zu stückweise linearen Polygonprofilen; Wandbearbeitung, DXF-Persistenz sowie 3D- und Seitenableitung erhalten diese Profile. `TerrainCornerService` leitet die äußeren Gebäudeecken aus der konvexen Hülle der untersten Etage ab und erhält bereits erfasste Geländehöhen. Etagen lassen sich bereits dynamisch anlegen und getrennt voneinander bearbeiten.
 
 `StairUnderbuildService` leitet aus einer Treppe deterministische linke und rechte Unterbauwand-IDs ab. Die erzeugten Wände folgen der Treppensteigung als Polygonprofil und bleiben dadurch normale Hosts für Türen und Fenster. Beim Deaktivieren einer Seite werden nur deren Wand und gebundene Öffnungen entfernt. Die planare Untersicht wird im `ThreeDSceneModelBuilder` als eigener schräger Volumenkörper aus ihrer konfigurierten Dicke abgeleitet.
 
@@ -205,7 +205,7 @@ Aktuell abgesichert sind unter anderem:
 * 90°-Drehung für Wände, Räume und Treppen
 * Rückgängig-/Wiederherstellen-Verhalten des generischen Verlaufs
 * Grundverhalten des Projektmodells
-* Heizkreisaufteilung, maximale Rohrlänge, L-/U-Formen, Meander, kreuzungsfreie Schnecke, DXF-Roundtrip und getrennte PDF-Heizplanseiten
+* Heizkreisaufteilung, maximale Rohrlänge, L-/U-Formen, Meander, kreuzungsfreie Schnecke, Treppenaussparung, je Heizkreis gespeicherte Verlegeart, Rolleninvertierung, DXF-Roundtrip und getrennte PDF-Heizplanseiten
 
 Build und Tests laufen über:
 
