@@ -28,6 +28,8 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * Ein HKV-Anschlusspaar bleibt fachlich 50 mm breit. Automatisch erzeugte weitere Kreise werden bis zur eigenen HKV-Geometrieverwaltung mindestens um eine Rasterweite versetzt, damit Zuleitungen in der CAD-Darstellung unterscheidbar und prüfbar bleiben.
 * FBH-Verlegeart und Vorlauf-/Rücklauf-Rollenorientierung werden dauerhaft je Heizbereich gespeichert. Die Raumverlegung ist nur die Startvorgabe für neue automatische Vorschläge.
 * Treppenbereiche werden beim automatischen FBH-Vorschlag als rechteckige Ausschlussflächen aus der beheizbaren Raumfläche entfernt.
+* Schachtartige Boden-/Deckenöffnungen werden über `FloorOpening` modelliert und beim automatischen FBH-Vorschlag als Sperrflächen ausgewertet.
+* Manuelle rechteckige FBH-Sperrflächen besitzen ein eigenes persistentes Flächenmodell, sind in der Workbench editierbar und werden in DXF, Bauzeichnung und Heizplan-SVGs ausgegeben.
 
 ## Offene Folgeentscheidungen
-* Allgemeine Hindernisse und manuell sperrbare Anschlusskorridore brauchen ein eigenes persistentes Flächenmodell, bevor der FBH-Layouter sie sauber berücksichtigen kann. Schachtartige Boden-/Deckenöffnungen existieren bereits als `FloorOpening`, müssen aber noch als FBH-Sperrflächen ausgewertet werden. Bis dahin nutzt CADas Raum-/Heizbereichspolygone, Treppenaussparungen und automatisch freigehaltene HKV-Korridore.
+* Für nicht rechteckige allgemeine Hindernisse ist später zu entscheiden, ob sie als freie Polygone oder als Bauteilklassen mit eigener Fachlogik modelliert werden.
