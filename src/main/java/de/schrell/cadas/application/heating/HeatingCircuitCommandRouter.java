@@ -59,6 +59,88 @@ public final class HeatingCircuitCommandRouter {
         return Character.isWhitespace(character);
     }
 
+    public String squareVarioCommands(double sideMillimeters, double spacingMillimeters) {
+        if (sideMillimeters <= 0.0) {
+            throw new IllegalArgumentException("Die Quadratseite muss größer als null sein.");
+        }
+        if (spacingMillimeters <= 0.0) {
+            throw new IllegalArgumentException("Der Verlegeabstand muss größer als null sein.");
+        }
+        int sideSteps = (int) Math.floor(sideMillimeters / spacingMillimeters);
+        if (sideSteps < 3) {
+            throw new IllegalArgumentException("Ein Quadrat-Vario-Heizkreis benötigt mindestens drei Verlegeabstände Seitenlänge.");
+        }
+        int supplyMaximum = sideSteps - 2;
+        int returnMaximum = sideSteps - 1;
+        StringBuilder commands = new StringBuilder("rrRR");
+        int maximum = Math.max(supplyMaximum, returnMaximum);
+        for (int length = 1; length <= maximum; length++) {
+            if (length <= supplyMaximum) {
+                appendRepeated(commands, 'I', length);
+            }
+            if (length <= returnMaximum) {
+                appendRepeated(commands, 'i', length);
+            }
+            if (length < supplyMaximum) {
+                commands.append('R');
+            }
+            if (length <= returnMaximum) {
+                commands.append('r');
+            }
+        }
+        appendRepeated(commands, 'i', returnMaximum);
+        return commands.toString();
+    }
+
+    public String rectangularVarioCommands(double widthMillimeters, double heightMillimeters, double spacingMillimeters) {
+        if (widthMillimeters <= 0.0 || heightMillimeters <= 0.0) {
+            throw new IllegalArgumentException("Die Heizbereichsmaße müssen größer als null sein.");
+        }
+        if (spacingMillimeters <= 0.0) {
+            throw new IllegalArgumentException("Der Verlegeabstand muss größer als null sein.");
+        }
+        double shortSideMillimeters = Math.min(widthMillimeters, heightMillimeters);
+        double longSideMillimeters = Math.max(widthMillimeters, heightMillimeters);
+        int extension = (int) Math.floor((longSideMillimeters - shortSideMillimeters) / spacingMillimeters);
+        if (extension <= 0) {
+            return squareVarioCommands(shortSideMillimeters, spacingMillimeters);
+        }
+        int shortSideSteps = (int) Math.floor(shortSideMillimeters / spacingMillimeters);
+        if (shortSideSteps < 3) {
+            throw new IllegalArgumentException("Ein Rechteck-Vario-Heizkreis benötigt mindestens drei Verlegeabstände auf der kurzen Seite.");
+        }
+        int supplyBaseMaximum = shortSideSteps - 1;
+        if (supplyBaseMaximum % 2 != 0) {
+            supplyBaseMaximum--;
+        }
+        int returnBaseMaximum = supplyBaseMaximum - 1;
+        int returnInitialLength = extension / 2;
+        int supplyInitialLength = extension - returnInitialLength;
+        StringBuilder commands = new StringBuilder();
+        appendRepeated(commands, 'i', returnInitialLength);
+        appendRepeated(commands, 'I', supplyInitialLength);
+        commands.append("RRrr");
+        for (int baseLength = 1; baseLength <= supplyBaseMaximum; baseLength++) {
+            if (baseLength < returnBaseMaximum) {
+                appendRepeated(commands, 'i', rectangularVarioLength(baseLength, extension));
+                commands.append('r');
+            }
+            appendRepeated(commands, 'I', rectangularVarioLength(baseLength, extension));
+            commands.append('R');
+        }
+        return commands.toString();
+    }
+
+    private int rectangularVarioLength(int baseLength, int extension) {
+        return baseLength % 2 == 1 ? baseLength + extension : baseLength;
+    }
+
+    private void appendRepeated(StringBuilder target, char character, int repetitions) {
+        for (int index = 0; index < repetitions; index++) {
+            target.append(character);
+        }
+    }
+
     private PipeCursor appendLine(List<PipePrimitive> primitives, PipeCursor cursor, double spacingMillimeters) {
         RoutingPoint endPoint = cursor.position().translate(cursor.direction(), spacingMillimeters);
         primitives.add(new LineSegment(cursor.position(), endPoint));
@@ -74,7 +156,9 @@ public final class HeatingCircuitCommandRouter {
         double radiusMillimeters = spacingMillimeters / 2.0;
         CardinalDirection endDirection = cursor.direction().turn(turn);
         RoutingPoint centerPoint = cursor.position().translate(cursor.direction().sideDirection(turn), radiusMillimeters);
-        RoutingPoint endPoint = centerPoint.translate(endDirection, radiusMillimeters);
+        RoutingPoint endPoint = cursor.position()
+                .translate(cursor.direction(), radiusMillimeters)
+                .translate(endDirection, radiusMillimeters);
         primitives.add(new QuarterArc(
                 cursor.position(),
                 endPoint,
@@ -109,6 +193,26 @@ public final class HeatingCircuitCommandRouter {
             }
             return new RoutingResult(widthMillimeters, heightMillimeters, spacingMillimeters, returnPath, supplyPath);
         }
+
+        public RoutingResult translatedBy(double xMillimeters, double yMillimeters) {
+            return new RoutingResult(
+                    widthMillimeters,
+                    heightMillimeters,
+                    spacingMillimeters,
+                    supplyPath.translatedBy(xMillimeters, yMillimeters),
+                    returnPath.translatedBy(xMillimeters, yMillimeters)
+            );
+        }
+
+        public RoutingResult rotatedClockwise() {
+            return new RoutingResult(
+                    heightMillimeters,
+                    widthMillimeters,
+                    spacingMillimeters,
+                    supplyPath.rotatedClockwise(),
+                    returnPath.rotatedClockwise()
+            );
+        }
     }
 
     public record PipePath(
@@ -125,6 +229,30 @@ public final class HeatingCircuitCommandRouter {
             Objects.requireNonNull(primitives, "primitives darf nicht null sein.");
             primitives = List.copyOf(primitives);
         }
+
+        PipePath translatedBy(double xMillimeters, double yMillimeters) {
+            List<PipePrimitive> translatedPrimitives = primitives.stream()
+                    .map(primitive -> primitive.translatedBy(xMillimeters, yMillimeters))
+                    .toList();
+            return new PipePath(
+                    startPoint.translatedBy(xMillimeters, yMillimeters),
+                    endPoint.translatedBy(xMillimeters, yMillimeters),
+                    endDirection,
+                    translatedPrimitives
+            );
+        }
+
+        PipePath rotatedClockwise() {
+            List<PipePrimitive> rotatedPrimitives = primitives.stream()
+                    .map(PipePrimitive::rotatedClockwise)
+                    .toList();
+            return new PipePath(
+                    startPoint.rotatedClockwise(),
+                    endPoint.rotatedClockwise(),
+                    endDirection.rotatedClockwise(),
+                    rotatedPrimitives
+            );
+        }
     }
 
     public sealed interface PipePrimitive permits LineSegment, QuarterArc {
@@ -132,6 +260,10 @@ public final class HeatingCircuitCommandRouter {
         RoutingPoint startPoint();
 
         RoutingPoint endPoint();
+
+        PipePrimitive translatedBy(double xMillimeters, double yMillimeters);
+
+        PipePrimitive rotatedClockwise();
     }
 
     public record LineSegment(RoutingPoint startPoint, RoutingPoint endPoint) implements PipePrimitive {
@@ -139,6 +271,19 @@ public final class HeatingCircuitCommandRouter {
         public LineSegment {
             Objects.requireNonNull(startPoint, "startPoint darf nicht null sein.");
             Objects.requireNonNull(endPoint, "endPoint darf nicht null sein.");
+        }
+
+        @Override
+        public LineSegment translatedBy(double xMillimeters, double yMillimeters) {
+            return new LineSegment(
+                    startPoint.translatedBy(xMillimeters, yMillimeters),
+                    endPoint.translatedBy(xMillimeters, yMillimeters)
+            );
+        }
+
+        @Override
+        public LineSegment rotatedClockwise() {
+            return new LineSegment(startPoint.rotatedClockwise(), endPoint.rotatedClockwise());
         }
     }
 
@@ -163,6 +308,32 @@ public final class HeatingCircuitCommandRouter {
                 throw new IllegalArgumentException("Der Bogenradius muss größer als null sein.");
             }
         }
+
+        @Override
+        public QuarterArc translatedBy(double xMillimeters, double yMillimeters) {
+            return new QuarterArc(
+                    startPoint.translatedBy(xMillimeters, yMillimeters),
+                    endPoint.translatedBy(xMillimeters, yMillimeters),
+                    centerPoint.translatedBy(xMillimeters, yMillimeters),
+                    radiusMillimeters,
+                    turn,
+                    startDirection,
+                    endDirection
+            );
+        }
+
+        @Override
+        public QuarterArc rotatedClockwise() {
+            return new QuarterArc(
+                    startPoint.rotatedClockwise(),
+                    endPoint.rotatedClockwise(),
+                    centerPoint.rotatedClockwise(),
+                    radiusMillimeters,
+                    turn,
+                    startDirection.rotatedClockwise(),
+                    endDirection.rotatedClockwise()
+            );
+        }
     }
 
     public record RoutingPoint(double xMillimeters, double yMillimeters) {
@@ -172,6 +343,14 @@ public final class HeatingCircuitCommandRouter {
                     xMillimeters + direction.xFactor() * distanceMillimeters,
                     yMillimeters + direction.yFactor() * distanceMillimeters
             );
+        }
+
+        public RoutingPoint translatedBy(double xOffsetMillimeters, double yOffsetMillimeters) {
+            return new RoutingPoint(xMillimeters + xOffsetMillimeters, yMillimeters + yOffsetMillimeters);
+        }
+
+        public RoutingPoint rotatedClockwise() {
+            return new RoutingPoint(yMillimeters, -xMillimeters);
         }
     }
 
@@ -210,6 +389,10 @@ public final class HeatingCircuitCommandRouter {
 
         CardinalDirection sideDirection(Turn turn) {
             return turn == Turn.RIGHT ? turn(Turn.RIGHT) : turn(Turn.LEFT);
+        }
+
+        CardinalDirection rotatedClockwise() {
+            return turn(Turn.RIGHT);
         }
     }
 }

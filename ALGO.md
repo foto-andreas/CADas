@@ -58,3 +58,27 @@ Der erste Schritt ist ein separates Testfenster in der Anwendung:
 * Protokollfeld unter dem Canvas, das Eingaben buchstabenweise annimmt.
 * 90°-Drehung durch Vertauschen von Länge und Breite.
 * V/R-Tausch als reine Darstellung, ohne HKV-Verbindung.
+* Ein Button erzeugt eine Vario-Doppelspirale aus dem aktuellen Heizbereich. Rechtecke werden auf `schmale Seite x lange Seite` normalisiert, weil die lange Richtung aktuell der Startausrichtung entspricht.
+
+## Quadratischer Vario-Generator
+
+Für ein Quadrat mit Seitenlänge `s` und Verlegeabstand `v` wird `n = floor(s / v)` verwendet. Der Generator erzeugt zwei unabhängige, ineinander verschachtelte Spiralsequenzen:
+
+```text
+Vorlauf:  RR I R II R III R ... I^(n-2)
+Rücklauf: rr i r ii r iii r ... i^(n-1) r i^(n-1)
+```
+
+Die Kommandos werden für die Eingabe im Testfenster ineinander verschachtelt, bleiben aber je Rohr in dieser Reihenfolge. Dadurch wächst das Muster programmatisch nach außen und bleibt in einem Quadrat mit Seitenlänge höchstens `n * v`.
+
+Für ein Rechteck mit kurzer Seite `b`, langer Seite `l` und `k = floor((l - b) / v)` werden die zur langen Seite parallelen Geraden um `k` Rastersegmente verlängert. Direkt am Anfang wird `k` außerdem auf Vorlauf und Rücklauf verteilt:
+
+```text
+Start: floor(k / 2) * i, ceil(k / 2) * I
+Lange Geraden: Basislänge + k
+Kurze Geraden: Basislänge
+```
+
+Damit entsteht aus der quadratischen Doppelspirale ein längliches Vario-Muster, ohne eckige Richtungswechsel einzuführen.
+
+Die abschließenden Vorlauf- und Rücklaufgeraden werden gekürzt, sobald der erste Austritt aus der Belegefläche erreicht ist. Die Anschlusslage entsteht dadurch aus dem Routing selbst; es gibt keine freie Translation an eine Ecke. Die vorhandene halbe Rasterverschiebung bleibt ausschließlich zur Rinnenausrichtung erhalten.

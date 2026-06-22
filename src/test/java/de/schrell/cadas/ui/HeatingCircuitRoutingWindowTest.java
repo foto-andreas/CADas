@@ -1,5 +1,6 @@
 package de.schrell.cadas.ui;
 
+import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingPoint;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -16,7 +17,7 @@ class HeatingCircuitRoutingWindowTest {
     }
 
     @Test
-    void machtProtokolleingabenRueckgaengigUndWiederher() throws Exception {
+    void machtProtokolleingabenRückgängigUndWiederher() throws Exception {
         HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
 
         aufFxThread(() -> {
@@ -49,6 +50,50 @@ class HeatingCircuitRoutingWindowTest {
 
             Assertions.assertEquals("Ii", window.automationProtocol());
             Assertions.assertEquals("Ii", window.automationCommands());
+            return null;
+        });
+    }
+
+    @Test
+    void zoomtImTestfensterEinUndAus() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            double startZoom = window.automationZoomFactor();
+            window.automationZoomIn();
+            Assertions.assertTrue(window.automationZoomFactor() > startZoom);
+            window.automationZoomOut();
+            Assertions.assertEquals(startZoom, window.automationZoomFactor(), 0.001);
+            return null;
+        });
+    }
+
+    @Test
+    void erzeugtVarioAusAktuellenMaßen() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationGenerateVario();
+
+            Assertions.assertEquals("200x300", window.automationAreaSizeText());
+            Assertions.assertFalse(window.automationCommands().isBlank());
+            Assertions.assertEquals(window.automationCommands(), window.automationProtocol());
+            return null;
+        });
+    }
+
+    @Test
+    void drehtHeizkreisGemeinsamMitHintergrund() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationInput("I");
+            RoutingPoint before = window.automationSupplyEndPoint();
+            window.automationRotateArea();
+            RoutingPoint after = window.automationSupplyEndPoint();
+
+            Assertions.assertEquals(0.0, before.xMillimeters(), 0.001);
+            Assertions.assertTrue(Math.abs(after.xMillimeters()) > 0.001);
             return null;
         });
     }

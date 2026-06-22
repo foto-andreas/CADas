@@ -44,11 +44,14 @@ final class HeatingCircuitRoutingWindow {
     private static final double CANVAS_WIDTH = 980.0;
     private static final double CANVAS_HEIGHT = 620.0;
     private static final double VIEW_PADDING = 46.0;
-    private static final Color SUPPLY_COLOR = Color.web("#1f62d0");
-    private static final Color RETURN_COLOR = Color.web("#d33b32");
+    private static final Color SUPPLY_COLOR = Color.web("#d33b32");
+    private static final Color RETURN_COLOR = Color.web("#1f62d0");
     private static final Color GROOVE_COLOR = Color.web("#d8dee3");
     private static final Color FIELD_COLOR = Color.web("#f7f3eb");
     private static final Color FIELD_BORDER_COLOR = Color.web("#6f7f8a");
+    private static final double MINIMUM_ZOOM = 0.25;
+    private static final double MAXIMUM_ZOOM = 6.0;
+    private static final double ZOOM_STEP = 1.2;
 
     private final HeatingCircuitCommandRouter router = new HeatingCircuitCommandRouter();
     private final Canvas canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -58,11 +61,14 @@ final class HeatingCircuitRoutingWindow {
     private final CheckBox flowInvertedCheckBox = new CheckBox("V/R tauschen");
     private final Button undoButton = new Button("Rückgängig");
     private final Button redoButton = new Button("Wiederherstellen");
+    private final Button generateVarioButton = new Button("Vario erzeugen");
     private final Label statusLabel = new Label();
     private final Deque<RoutingState> undoStack = new ArrayDeque<>();
     private final Deque<RoutingState> redoStack = new ArrayDeque<>();
     private final StringBuilder protocol = new StringBuilder();
     private final StringBuilder commands = new StringBuilder();
+    private double zoomFactor = 1.0;
+    private int rotationQuarterTurns;
 
     void show(Window owner) {
         Stage stage = new Stage();
@@ -84,6 +90,7 @@ final class HeatingCircuitRoutingWindow {
         root.setTop(buildInputRow());
         root.setCenter(new StackPane(canvas));
         root.setBottom(buildProtocolArea());
+        root.addEventFilter(KeyEvent.KEY_PRESSED, this::handleWindowShortcut);
         redraw();
         return root;
     }
@@ -99,6 +106,9 @@ final class HeatingCircuitRoutingWindow {
         rotateButton.setOnAction(event -> rotateArea());
         applyTooltip(rotateButton, "Vertauscht Länge und Breite des Test-Heizbereichs, um eine 90°-Drehung der Vario-Geometrie zu prüfen.");
 
+        generateVarioButton.setOnAction(event -> generateVario());
+        applyTooltip(generateVarioButton, "Erzeugt aus dem aktuellen Heizbereich eine Vario-Doppelspirale. Rechtecke werden auf schmale Seite mal lange Seite normalisiert.");
+
         Button clearButton = new Button("Kommandos löschen");
         clearButton.setOnAction(event -> clearCommands());
         applyTooltip(clearButton, "Löscht das Protokoll und startet die Routingeingabe wieder im Mittelpunkt des Heizbereichs.");
@@ -112,6 +122,7 @@ final class HeatingCircuitRoutingWindow {
                 undoButton,
                 redoButton,
                 rotateButton,
+                generateVarioButton,
                 flowInvertedCheckBox,
                 clearButton,
                 statusLabel
@@ -170,12 +181,42 @@ final class HeatingCircuitRoutingWindow {
         redo();
     }
 
+    void automationZoomIn() {
+        zoomIn();
+    }
+
+    void automationZoomOut() {
+        zoomOut();
+    }
+
+    double automationZoomFactor() {
+        return zoomFactor;
+    }
+
+    void automationRotateArea() {
+        rotateArea();
+    }
+
+    RoutingPoint automationSupplyEndPoint() {
+        AreaSize size = parseAreaSize();
+        double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
+        return currentRoutingResult(size, spacingMillimeters).supplyPath().endPoint();
+    }
+
+    void automationGenerateVario() {
+        generateVario();
+    }
+
     String automationProtocol() {
         return protocol.toString();
     }
 
     String automationCommands() {
         return commands.toString();
+    }
+
+    String automationAreaSizeText() {
+        return areaSizeField.getText();
     }
 
     private void applyInput(String text) {
@@ -220,6 +261,74 @@ final class HeatingCircuitRoutingWindow {
         }
         if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) {
             event.consume();
+        }
+    }
+
+    private void handleWindowShortcut(KeyEvent event) {
+        if (!event.isShortcutDown() && !event.isControlDown()) {
+            return;
+        }
+        if (isZoomInKey(event)) {
+            zoomIn();
+            event.consume();
+            return;
+        }
+        if (isZoomOutKey(event)) {
+            zoomOut();
+            event.consume();
+        }
+    }
+
+    private boolean isZoomInKey(KeyEvent event) {
+        return event.getCode() == KeyCode.PLUS
+                || event.getCode() == KeyCode.ADD
+                || event.getCode() == KeyCode.EQUALS;
+    }
+
+    private boolean isZoomOutKey(KeyEvent event) {
+        return event.getCode() == KeyCode.MINUS
+                || event.getCode() == KeyCode.SUBTRACT;
+    }
+
+    private void zoomIn() {
+        setZoom(zoomFactor * ZOOM_STEP);
+    }
+
+    private void zoomOut() {
+        setZoom(zoomFactor / ZOOM_STEP);
+    }
+
+    private void setZoom(double newZoomFactor) {
+        zoomFactor = Math.max(MINIMUM_ZOOM, Math.min(MAXIMUM_ZOOM, newZoomFactor));
+        redraw();
+    }
+
+    private void generateVario() {
+        try {
+            AreaSize size = parseAreaSize();
+            double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
+            double sideMillimeters = Math.min(size.widthMillimeters(), size.heightMillimeters());
+            double longSideMillimeters = Math.max(size.widthMillimeters(), size.heightMillimeters());
+            String generatedCommands = router.rectangularVarioCommands(
+                    size.widthMillimeters(),
+                    size.heightMillimeters(),
+                    spacingMillimeters
+            );
+            rememberUndoState();
+            redoStack.clear();
+            commands.setLength(0);
+            commands.append(generatedCommands);
+            protocol.setLength(0);
+            protocol.append(generatedCommands);
+            rotationQuarterTurns = 0;
+            areaSizeField.setText(formatCentimeters(sideMillimeters) + "x" + formatCentimeters(longSideMillimeters));
+            updateProtocolArea();
+            redraw();
+            statusLabel.setText("Vario für " + formatCentimeters(sideMillimeters) + "x"
+                    + formatCentimeters(longSideMillimeters) + " cm erzeugt.");
+            Platform.runLater(protocolArea::requestFocus);
+        } catch (IllegalArgumentException exception) {
+            statusLabel.setText(exception.getMessage());
         }
     }
 
@@ -287,7 +396,9 @@ final class HeatingCircuitRoutingWindow {
     private void rotateArea() {
         try {
             AreaSize size = parseAreaSize();
+            rotationQuarterTurns = (rotationQuarterTurns + 1) % 4;
             areaSizeField.setText(formatCentimeters(size.heightMillimeters()) + "x" + formatCentimeters(size.widthMillimeters()));
+            redraw();
         } catch (IllegalArgumentException exception) {
             statusLabel.setText(exception.getMessage());
         }
@@ -301,23 +412,35 @@ final class HeatingCircuitRoutingWindow {
         try {
             AreaSize size = parseAreaSize();
             double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
-            RoutingResult result = router.route(
-                    size.widthMillimeters(),
-                    size.heightMillimeters(),
-                    spacingMillimeters,
-                    commands.toString()
-            ).withFlowInverted(flowInvertedCheckBox.isSelected());
+            RoutingResult result = currentRoutingResult(size, spacingMillimeters);
             ViewTransform transform = transformFor(size, result);
             drawField(gc, size, spacingMillimeters, transform);
             drawPath(gc, result.supplyPath(), SUPPLY_COLOR, transform);
             drawPath(gc, result.returnPath(), RETURN_COLOR, transform);
             drawEndpoint(gc, result.supplyPath().endPoint(), "VL", SUPPLY_COLOR, transform);
             drawEndpoint(gc, result.returnPath().endPoint(), "RL", RETURN_COLOR, transform);
-            drawStartPoint(gc, transform);
-            statusLabel.setText("Bereit. Gültige Befehle: I/R/L und i/r/l.");
+            drawStartPoint(gc, result.supplyPath().startPoint(), transform);
+            statusLabel.setText(String.format(
+                    Locale.GERMANY,
+                    "Bereit. Gültige Befehle: I/R/L und i/r/l. Zoom %.0f %%.",
+                    zoomFactor * 100.0
+            ));
         } catch (IllegalArgumentException exception) {
             statusLabel.setText(exception.getMessage());
         }
+    }
+
+    private RoutingResult currentRoutingResult(AreaSize size, double spacingMillimeters) {
+        RoutingResult result = router.route(
+                size.widthMillimeters(),
+                size.heightMillimeters(),
+                spacingMillimeters,
+                commands.toString()
+        ).withFlowInverted(flowInvertedCheckBox.isSelected());
+        for (int index = 0; index < rotationQuarterTurns; index++) {
+            result = result.rotatedClockwise();
+        }
+        return alignVerticallyToGrid(result, size, spacingMillimeters);
     }
 
     private void drawField(GraphicsContext gc, AreaSize size, double spacingMillimeters, ViewTransform transform) {
@@ -395,8 +518,39 @@ final class HeatingCircuitRoutingWindow {
         return points;
     }
 
-    private void drawStartPoint(GraphicsContext gc, ViewTransform transform) {
-        Point2D point = transform.screen(new RoutingPoint(0.0, 0.0));
+    private RoutingResult alignVerticallyToGrid(RoutingResult result, AreaSize size, double spacingMillimeters) {
+        if (result.supplyPath().primitives().isEmpty() && result.returnPath().primitives().isEmpty()) {
+            return result;
+        }
+        Bounds bounds = routeBounds(result);
+        double halfSpacing = spacingMillimeters / 2.0;
+        double upOffset = halfSpacing;
+        double downOffset = -halfSpacing;
+        double offset = verticalAlignmentScore(bounds, size.heightMillimeters(), downOffset)
+                <= verticalAlignmentScore(bounds, size.heightMillimeters(), upOffset)
+                ? downOffset
+                : upOffset;
+        return result.translatedBy(0.0, offset);
+    }
+
+    private double verticalAlignmentScore(Bounds bounds, double heightMillimeters, double offsetMillimeters) {
+        double bottom = -heightMillimeters / 2.0;
+        double top = heightMillimeters / 2.0;
+        double shiftedMinY = bounds.minY() + offsetMillimeters;
+        double shiftedMaxY = bounds.maxY() + offsetMillimeters;
+        double overflow = Math.max(0.0, bottom - shiftedMinY) + Math.max(0.0, shiftedMaxY - top);
+        double edgeDistance = Math.min(Math.abs(shiftedMinY - bottom), Math.abs(top - shiftedMaxY));
+        return overflow * 1_000.0 + edgeDistance;
+    }
+
+    private Bounds routeBounds(RoutingResult result) {
+        return new Bounds(0.0, 0.0, 0.0, 0.0)
+                .include(result.supplyPath())
+                .include(result.returnPath());
+    }
+
+    private void drawStartPoint(GraphicsContext gc, RoutingPoint startPoint, ViewTransform transform) {
+        Point2D point = transform.screen(startPoint);
         gc.setFill(Color.web("#222222"));
         gc.fillOval(point.getX() - 4.0, point.getY() - 4.0, 8.0, 8.0);
     }
@@ -423,8 +577,14 @@ final class HeatingCircuitRoutingWindow {
         double scale = Math.min(
                 (canvas.getWidth() - VIEW_PADDING * 2.0) / width,
                 (canvas.getHeight() - VIEW_PADDING * 2.0) / height
+        ) * zoomFactor;
+        return new ViewTransform(
+                (bounds.minX() + bounds.maxX()) / 2.0,
+                (bounds.minY() + bounds.maxY()) / 2.0,
+                scale,
+                canvas.getWidth(),
+                canvas.getHeight()
         );
-        return new ViewTransform(bounds.minX(), bounds.minY(), bounds.maxY(), scale);
     }
 
     private AreaSize parseAreaSize() {
@@ -471,7 +631,13 @@ final class HeatingCircuitRoutingWindow {
     private record RoutingState(String protocol, String commands) {
     }
 
-    private record ViewTransform(double minX, double minY, double maxY, double scale) {
+    private record ViewTransform(
+            double centerX,
+            double centerY,
+            double scale,
+            double viewportWidth,
+            double viewportHeight
+    ) {
 
         Point2D screen(RoutingPoint point) {
             return screen(point.xMillimeters(), point.yMillimeters());
@@ -479,8 +645,8 @@ final class HeatingCircuitRoutingWindow {
 
         Point2D screen(double xMillimeters, double yMillimeters) {
             return new Point2D(
-                    VIEW_PADDING + (xMillimeters - minX) * scale,
-                    VIEW_PADDING + (maxY - yMillimeters) * scale
+                    viewportWidth / 2.0 + (xMillimeters - centerX) * scale,
+                    viewportHeight / 2.0 - (yMillimeters - centerY) * scale
             );
         }
     }
