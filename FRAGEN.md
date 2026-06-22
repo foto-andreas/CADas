@@ -30,4 +30,4 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * Treppenbereiche werden beim automatischen FBH-Vorschlag als rechteckige Ausschlussflächen aus der beheizbaren Raumfläche entfernt.
 
 ## Offene Folgeentscheidungen
-* Hindernisse, Schächte und manuell sperrbare Anschlusskorridore brauchen ein eigenes persistentes Flächenmodell, bevor der FBH-Layouter sie sauber berücksichtigen kann. Bis dahin nutzt CADas Raum-/Heizbereichspolygone, Treppenaussparungen und automatisch freigehaltene HKV-Korridore.
+* Allgemeine Hindernisse und manuell sperrbare Anschlusskorridore brauchen ein eigenes persistentes Flächenmodell, bevor der FBH-Layouter sie sauber berücksichtigen kann. Schachtartige Boden-/Deckenöffnungen existieren bereits als `FloorOpening`, müssen aber noch als FBH-Sperrflächen ausgewertet werden. Bis dahin nutzt CADas Raum-/Heizbereichspolygone, Treppenaussparungen und automatisch freigehaltene HKV-Korridore.
