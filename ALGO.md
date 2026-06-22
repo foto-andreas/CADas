@@ -82,3 +82,35 @@ Kurze Geraden: Basislänge
 Damit entsteht aus der quadratischen Doppelspirale ein längliches Vario-Muster, ohne eckige Richtungswechsel einzuführen.
 
 Die abschließenden Vorlauf- und Rücklaufgeraden werden gekürzt, sobald der erste Austritt aus der Belegefläche erreicht ist. Die Anschlusslage entsteht dadurch aus dem Routing selbst; es gibt keine freie Translation an eine Ecke. Die vorhandene halbe Rasterverschiebung bleibt ausschließlich zur Rinnenausrichtung erhalten.
+
+Optional kann der Generator mit schlangenförmiger Mittellinie starten, wenn die Breite sonst um ein Raster nicht sauber aufgeht. Die Schlange belegt maximal zwei Reihen. Ihre Länge wird aus `k = floor((l - b) / v)` berechnet und damit sowohl an das Raster als auch an das Schlangenmuster gebunden. Das Testfenster bietet dafür den Schalter `Mittellinie schlängeln`. Für `b = 7v`, `l = 16v` und `k = 9` ist die Referenz:
+
+```text
+rrRRLllLrrRRllLLrrRiRIrRiiiiiiiiiiriiiIIIIIIIIIIRIIIRIIIIIIIIIIIIrRIIIIIiiiiiiiiiiiiriiiiiriiiiiiiiiiiiiiriiiiii
+```
+
+Die Regel dahinter:
+
+```text
+Mitte: rrRRLllLrrRRllLLrrRiRIrR
+erste Runde: i^(1+k) r i^3 I^(1+k) R I^3 R
+zweite Reihe: I^(3+k) r R I^5 i^(3+k) r i^5 r
+Abschluss: i^(5+k) r i^6
+```
+
+## Meander-Generator
+
+Der Meander ist eine zweite Testfenster-Variante. Für `b = 20v`, `l = 30v` ist die Referenz:
+
+```text
+iiiiiiiiiiiilliiiiiiiiiiiiiiiiiiiiiiiiiiirriiiiiiiiiiiiiiiiiiiiiiiiiiilliiiiiiiiiiiiiiiiiiiiiiiiiiirriiiiiiiiiiiiiiiiiiiiiiiiiiilliiiiiiiiiiiiiiiiiiiiiiiiiiirriiiiiiiiiiiiiiiiiiiiiiiiiiilliiiiiiiiiiiiiiiiiiiiiiiiiiirriiiiiiiiiiiiiiiiiiiiiiiiiiilliiiiiiiiiiiiiiiiiiiiiiiiiiirriiiiiiiiiiiiiiiiiiiiiiiiiiiiriiiiiiiiiiiiiiiiiiiIIIIIIIIIIIIIILLIIIIIIIIIIIIIIIIIIIIIIIIIIIRRIIIIIIIIIIIIIIIIIIIIIIIIIIILLIIIIIIIIIIIIIIIIIIIIIIIIIIIRRIIIIIIIIIIIIIIIIIIIIIIIIIIILLIIIIIIIIIIIIIIIIIIIIIIIIIIIRRIIIIIIIIIIIIIIIIIIIIIIIIIIILLIIIIIIIIIIIIIIIIIIIIIIIIIIIRRIIIIIIIIIIIIIIIIIIIIIIIIIIILLIIIIIIIIIIIIIIIIIIIIIIIIIIIR
+```
+
+Die daraus abgeleitete Regel nutzt `n = floor(b / v)`, `m = floor(l / v)`, `k = m - n`, `p = floor(n / 4)`, `z_r = m - 3` und `z_v = z_r - max(0, k - (2p - 1))`. Der Rücklauf wächst mit der Länge. Der Vorlauf wird ab der passenden Referenzdifferenz gekürzt, damit er nicht zeilenweise in den Rücklauf hineinwandert:
+
+```text
+Rücklauf: i^(n/2+2), dann p mal ll i^z_r rr i^z_r, letzte zweite Gerade als i^(z_r+1) r i^(n-1)
+Vorlauf:  I^(n/2+4), dann p mal LL I^z_v RR I^z_v, letzte Runde endet mit LL I^z_v R
+```
+
+Der bestehende Schalter `Mittellinie schlängeln` fügt beim Meander optional eine kurze zweireihige Schlangenlinie in der Mitte ein. Ihre geraden Schlangenstücke nutzen ebenfalls `k = floor((l - b) / v)`.

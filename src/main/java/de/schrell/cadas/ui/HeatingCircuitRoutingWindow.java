@@ -59,9 +59,11 @@ final class HeatingCircuitRoutingWindow {
     private final TextField spacingField = new TextField("10");
     private final TextArea protocolArea = new TextArea();
     private final CheckBox flowInvertedCheckBox = new CheckBox("V/R tauschen");
+    private final CheckBox serpentineMiddleLineCheckBox = new CheckBox("Mittellinie schlängeln");
     private final Button undoButton = new Button("Rückgängig");
     private final Button redoButton = new Button("Wiederherstellen");
     private final Button generateVarioButton = new Button("Vario erzeugen");
+    private final Button generateMeanderButton = new Button("Meander erzeugen");
     private final Label statusLabel = new Label();
     private final Deque<RoutingState> undoStack = new ArrayDeque<>();
     private final Deque<RoutingState> redoStack = new ArrayDeque<>();
@@ -109,6 +111,9 @@ final class HeatingCircuitRoutingWindow {
         generateVarioButton.setOnAction(event -> generateVario());
         applyTooltip(generateVarioButton, "Erzeugt aus dem aktuellen Heizbereich eine Vario-Doppelspirale. Rechtecke werden auf schmale Seite mal lange Seite normalisiert.");
 
+        generateMeanderButton.setOnAction(event -> generateMeander());
+        applyTooltip(generateMeanderButton, "Erzeugt aus dem aktuellen Heizbereich einen Meander-Verlauf. Der Schalter `Mittellinie schlängeln` ergänzt optional eine zweireihige Schlangenlinie in der Mitte.");
+
         Button clearButton = new Button("Kommandos löschen");
         clearButton.setOnAction(event -> clearCommands());
         applyTooltip(clearButton, "Löscht das Protokoll und startet die Routingeingabe wieder im Mittelpunkt des Heizbereichs.");
@@ -123,6 +128,8 @@ final class HeatingCircuitRoutingWindow {
                 redoButton,
                 rotateButton,
                 generateVarioButton,
+                generateMeanderButton,
+                serpentineMiddleLineCheckBox,
                 flowInvertedCheckBox,
                 clearButton,
                 statusLabel
@@ -160,6 +167,7 @@ final class HeatingCircuitRoutingWindow {
         applyTooltip(areaSizeField, "Erfasst Breite und Länge des rechteckigen Heizbereichs in Zentimetern, zum Beispiel `200x300`.");
         applyTooltip(spacingField, "Legt den Verlegeabstand `v` in Zentimetern fest. Geraden sind `v` lang, Bögen besitzen den Durchmesser `v`.");
         applyTooltip(protocolArea, "Nimmt Routingkommandos buchstabenweise an: `I/R/L` für Vorlauf und `i/r/l` für Rücklauf. Leerzeichen und Enter werden ignoriert, ungültige Zeichen erscheinen als `x`.");
+        applyTooltip(serpentineMiddleLineCheckBox, "Erzeugt die Mitte beim nächsten Klick auf `Vario erzeugen` oder `Meander erzeugen` schlangenförmig. Die Schlangenlänge wird aus der Rasterdifferenz zwischen langer und kurzer Seite berechnet.");
         applyTooltip(flowInvertedCheckBox, "Tauscht die Darstellung von Vorlauf und Rücklauf, ohne eine HKV-Verbindung zu erzeugen.");
         updateUndoRedoButtons();
     }
@@ -205,6 +213,18 @@ final class HeatingCircuitRoutingWindow {
 
     void automationGenerateVario() {
         generateVario();
+    }
+
+    void automationGenerateMeander() {
+        generateMeander();
+    }
+
+    void automationSetAreaSize(String areaSizeText) {
+        areaSizeField.setText(areaSizeText);
+    }
+
+    void automationSetSerpentineMiddleLine(boolean selected) {
+        serpentineMiddleLineCheckBox.setSelected(selected);
     }
 
     String automationProtocol() {
@@ -312,7 +332,8 @@ final class HeatingCircuitRoutingWindow {
             String generatedCommands = router.rectangularVarioCommands(
                     size.widthMillimeters(),
                     size.heightMillimeters(),
-                    spacingMillimeters
+                    spacingMillimeters,
+                    serpentineMiddleLineCheckBox.isSelected()
             );
             rememberUndoState();
             redoStack.clear();
@@ -324,7 +345,43 @@ final class HeatingCircuitRoutingWindow {
             areaSizeField.setText(formatCentimeters(sideMillimeters) + "x" + formatCentimeters(longSideMillimeters));
             updateProtocolArea();
             redraw();
-            statusLabel.setText("Vario für " + formatCentimeters(sideMillimeters) + "x"
+            String serpentineText = serpentineMiddleLineCheckBox.isSelected()
+                    ? " mit schlangenförmiger Mittellinie"
+                    : "";
+            statusLabel.setText("Vario" + serpentineText + " für " + formatCentimeters(sideMillimeters) + "x"
+                    + formatCentimeters(longSideMillimeters) + " cm erzeugt.");
+            Platform.runLater(protocolArea::requestFocus);
+        } catch (IllegalArgumentException exception) {
+            statusLabel.setText(exception.getMessage());
+        }
+    }
+
+    private void generateMeander() {
+        try {
+            AreaSize size = parseAreaSize();
+            double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
+            double sideMillimeters = Math.min(size.widthMillimeters(), size.heightMillimeters());
+            double longSideMillimeters = Math.max(size.widthMillimeters(), size.heightMillimeters());
+            String generatedCommands = router.meanderCommands(
+                    size.widthMillimeters(),
+                    size.heightMillimeters(),
+                    spacingMillimeters,
+                    serpentineMiddleLineCheckBox.isSelected()
+            );
+            rememberUndoState();
+            redoStack.clear();
+            commands.setLength(0);
+            commands.append(generatedCommands);
+            protocol.setLength(0);
+            protocol.append(generatedCommands);
+            rotationQuarterTurns = 0;
+            areaSizeField.setText(formatCentimeters(sideMillimeters) + "x" + formatCentimeters(longSideMillimeters));
+            updateProtocolArea();
+            redraw();
+            String serpentineText = serpentineMiddleLineCheckBox.isSelected()
+                    ? " mit schlangenförmiger Mittellinie"
+                    : "";
+            statusLabel.setText("Meander" + serpentineText + " für " + formatCentimeters(sideMillimeters) + "x"
                     + formatCentimeters(longSideMillimeters) + " cm erzeugt.");
             Platform.runLater(protocolArea::requestFocus);
         } catch (IllegalArgumentException exception) {

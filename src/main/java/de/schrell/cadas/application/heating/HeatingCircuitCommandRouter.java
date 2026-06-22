@@ -6,6 +6,8 @@ import java.util.Objects;
 
 public final class HeatingCircuitCommandRouter {
 
+    private static final String SERPENTINE_MIDDLE_LINE = "rrRRLllLrrRRllLLrrRiRIrR";
+
     public RoutingResult route(double widthMillimeters, double heightMillimeters, double spacingMillimeters, String commands) {
         if (widthMillimeters <= 0.0) {
             throw new IllegalArgumentException("Die Heizbereichsbreite muss größer als null sein.");
@@ -93,6 +95,47 @@ public final class HeatingCircuitCommandRouter {
     }
 
     public String rectangularVarioCommands(double widthMillimeters, double heightMillimeters, double spacingMillimeters) {
+        return rectangularVarioCommands(widthMillimeters, heightMillimeters, spacingMillimeters, false);
+    }
+
+    public String meanderCommands(double widthMillimeters, double heightMillimeters, double spacingMillimeters) {
+        return meanderCommands(widthMillimeters, heightMillimeters, spacingMillimeters, false);
+    }
+
+    public String meanderCommands(
+            double widthMillimeters,
+            double heightMillimeters,
+            double spacingMillimeters,
+            boolean serpentineMiddleLine
+    ) {
+        if (widthMillimeters <= 0.0 || heightMillimeters <= 0.0) {
+            throw new IllegalArgumentException("Die Heizbereichsmaße müssen größer als null sein.");
+        }
+        if (spacingMillimeters <= 0.0) {
+            throw new IllegalArgumentException("Der Verlegeabstand muss größer als null sein.");
+        }
+        int shortSideSteps = (int) Math.floor(Math.min(widthMillimeters, heightMillimeters) / spacingMillimeters);
+        int longSideSteps = (int) Math.floor(Math.max(widthMillimeters, heightMillimeters) / spacingMillimeters);
+        int extension = longSideSteps - shortSideSteps;
+        int turnPairs = shortSideSteps / 4;
+        int lineSteps = longSideSteps - 3;
+        int supplyLineSteps = meanderSupplyLineSteps(shortSideSteps, lineSteps, turnPairs, extension);
+        if (turnPairs < 1 || lineSteps < 1) {
+            throw new IllegalArgumentException("Ein Meander-Heizkreis benötigt mindestens vier Verlegeabstände Breite und vier Verlegeabstände Länge.");
+        }
+
+        StringBuilder commands = new StringBuilder();
+        appendMeanderReturn(commands, shortSideSteps, lineSteps, turnPairs, extension, serpentineMiddleLine);
+        appendMeanderSupply(commands, shortSideSteps, supplyLineSteps, turnPairs, extension, serpentineMiddleLine);
+        return commands.toString();
+    }
+
+    public String rectangularVarioCommands(
+            double widthMillimeters,
+            double heightMillimeters,
+            double spacingMillimeters,
+            boolean serpentineMiddleLine
+    ) {
         if (widthMillimeters <= 0.0 || heightMillimeters <= 0.0) {
             throw new IllegalArgumentException("Die Heizbereichsmaße müssen größer als null sein.");
         }
@@ -102,10 +145,13 @@ public final class HeatingCircuitCommandRouter {
         double shortSideMillimeters = Math.min(widthMillimeters, heightMillimeters);
         double longSideMillimeters = Math.max(widthMillimeters, heightMillimeters);
         int extension = (int) Math.floor((longSideMillimeters - shortSideMillimeters) / spacingMillimeters);
+        int shortSideSteps = (int) Math.floor(shortSideMillimeters / spacingMillimeters);
+        if (serpentineMiddleLine && extension > 0) {
+            return serpentineMiddleLineVarioCommands(shortSideSteps, extension);
+        }
         if (extension <= 0) {
             return squareVarioCommands(shortSideMillimeters, spacingMillimeters);
         }
-        int shortSideSteps = (int) Math.floor(shortSideMillimeters / spacingMillimeters);
         if (shortSideSteps < 3) {
             throw new IllegalArgumentException("Ein Rechteck-Vario-Heizkreis benötigt mindestens drei Verlegeabstände auf der kurzen Seite.");
         }
@@ -129,6 +175,107 @@ public final class HeatingCircuitCommandRouter {
             commands.append('R');
         }
         return commands.toString();
+    }
+
+    private String serpentineMiddleLineVarioCommands(int shortSideSteps, int extension) {
+        if (shortSideSteps < 7) {
+            throw new IllegalArgumentException("Eine schlangenförmige Vario-Mittellinie benötigt mindestens sieben Verlegeabstände auf der kurzen Seite.");
+        }
+        int snakeLength = serpentineSnakeLength(extension);
+        int supplyMaximum = 5;
+        StringBuilder commands = new StringBuilder(SERPENTINE_MIDDLE_LINE);
+        appendRepeated(commands, 'i', 1 + snakeLength);
+        commands.append('r');
+        appendRepeated(commands, 'i', 3);
+        appendRepeated(commands, 'I', 1 + snakeLength);
+        commands.append('R');
+        appendRepeated(commands, 'I', 3);
+        commands.append('R');
+        appendRepeated(commands, 'I', 3 + snakeLength);
+        commands.append("rR");
+        appendRepeated(commands, 'I', supplyMaximum);
+        appendRepeated(commands, 'i', 3 + snakeLength);
+        commands.append('r');
+        appendRepeated(commands, 'i', supplyMaximum);
+        commands.append('r');
+        appendRepeated(commands, 'i', supplyMaximum + snakeLength);
+        commands.append('r');
+        appendRepeated(commands, 'i', supplyMaximum + 1);
+        return commands.toString();
+    }
+
+    private void appendMeanderReturn(
+            StringBuilder commands,
+            int shortSideSteps,
+            int lineSteps,
+            int turnPairs,
+            int extension,
+            boolean serpentineMiddleLine
+    ) {
+        appendRepeated(commands, 'i', shortSideSteps / 2 + 2);
+        for (int turnPair = 0; turnPair < turnPairs; turnPair++) {
+            commands.append("ll");
+            appendRepeated(commands, 'i', lineSteps);
+            commands.append("rr");
+            if (turnPair < turnPairs - 1) {
+                appendRepeated(commands, 'i', lineSteps);
+            } else {
+                appendRepeated(commands, 'i', lineSteps + 1);
+                if (serpentineMiddleLine) {
+                    appendMeanderMiddleSnake(commands, 'i', 'r', 'l', serpentineSnakeLength(extension));
+                }
+                commands.append('r');
+                appendRepeated(commands, 'i', shortSideSteps - 1);
+            }
+        }
+    }
+
+    private void appendMeanderSupply(
+            StringBuilder commands,
+            int shortSideSteps,
+            int supplyLineSteps,
+            int turnPairs,
+            int extension,
+            boolean serpentineMiddleLine
+    ) {
+        appendRepeated(commands, 'I', shortSideSteps / 2 + 4);
+        for (int turnPair = 0; turnPair < turnPairs; turnPair++) {
+            commands.append("LL");
+            appendRepeated(commands, 'I', supplyLineSteps);
+            if (turnPair < turnPairs - 1) {
+                commands.append("RR");
+                appendRepeated(commands, 'I', supplyLineSteps);
+            } else {
+                if (serpentineMiddleLine) {
+                    appendMeanderMiddleSnake(commands, 'I', 'L', 'R', serpentineSnakeLength(extension));
+                }
+                commands.append('R');
+            }
+        }
+    }
+
+    private void appendMeanderMiddleSnake(
+            StringBuilder commands,
+            char lineCommand,
+            char firstTurnCommand,
+            char secondTurnCommand,
+            int snakeLength
+    ) {
+        commands.append(firstTurnCommand);
+        commands.append(firstTurnCommand);
+        appendRepeated(commands, lineCommand, snakeLength);
+        commands.append(secondTurnCommand);
+        commands.append(secondTurnCommand);
+        appendRepeated(commands, lineCommand, snakeLength);
+    }
+
+    private int meanderSupplyLineSteps(int shortSideSteps, int lineSteps, int turnPairs, int extension) {
+        int referenceExtension = turnPairs * 2 - 1;
+        return lineSteps - Math.max(0, extension - referenceExtension);
+    }
+
+    private int serpentineSnakeLength(int extension) {
+        return Math.max(1, extension);
     }
 
     private int rectangularVarioLength(int baseLength, int extension) {

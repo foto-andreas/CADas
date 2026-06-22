@@ -83,6 +83,55 @@ class HeatingCircuitRoutingWindowTest {
     }
 
     @Test
+    void erzeugtVarioMitSchlangenförmigerMittellinie() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationSetAreaSize("70x160");
+            window.automationGenerateVario();
+            String standardCommands = window.automationCommands();
+
+            window.automationSetSerpentineMiddleLine(true);
+            window.automationGenerateVario();
+
+            Assertions.assertNotEquals(standardCommands, window.automationCommands());
+            Assertions.assertTrue(window.automationCommands().startsWith("rrRRLllLrrRRllLLrrRiRIrR"));
+            return null;
+        });
+    }
+
+    @Test
+    void erzeugtMeanderAusAktuellenMaßen() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationGenerateMeander();
+
+            Assertions.assertEquals("200x300", window.automationAreaSizeText());
+            Assertions.assertFalse(window.automationCommands().isBlank());
+            Assertions.assertEquals(window.automationCommands(), window.automationProtocol());
+            Assertions.assertTrue(window.automationCommands().startsWith("iiiiiiiiiiiill"));
+            return null;
+        });
+    }
+
+    @Test
+    void erzeugtMeanderMitSchlangenförmigerMittellinie() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationGenerateMeander();
+            String standardCommands = window.automationCommands();
+
+            window.automationSetSerpentineMiddleLine(true);
+            window.automationGenerateMeander();
+
+            Assertions.assertTrue(window.automationCommands().length() > standardCommands.length());
+            return null;
+        });
+    }
+
+    @Test
     void drehtHeizkreisGemeinsamMitHintergrund() throws Exception {
         HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
 
