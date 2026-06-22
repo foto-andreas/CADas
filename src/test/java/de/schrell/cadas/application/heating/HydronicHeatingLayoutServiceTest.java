@@ -57,6 +57,18 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void zeichnetSchneckenMitteAlsSichtbareVorlaufRuecklaufBruecke() {
+        Room room = rectangularRoom();
+        HydronicHeating spiral = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000)
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)));
+
+        HydronicHeatingLayoutService.CircuitLayout circuit = service.layout(spiral).getFirst();
+
+        assertEquals(circuit.fieldSupplyPath().getLast(), circuit.fieldReturnPath().getFirst());
+        assertTrue(circuit.fieldSupplyPath().size() > circuit.fieldReturnPath().size() / 2);
+    }
+
+    @Test
     void teiltRaumBisZurMaximalenRohrlängeInHeizkreise() {
         Room room = rectangularRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 35_000);
@@ -258,6 +270,31 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void zerlegtSchlafzimmerNichtInWinzigeHeizkreise() {
+        Room room = bedroomFromRegressionFile();
+        HydronicHeating heating = HydronicHeating.create(
+                room.id(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(2_334.619, -6_977.869),
+                new PlanPoint(2_434.619, -6_977.869)
+        );
+
+        HydronicHeatingLayoutService.PlanningResult result = service.suggest(room, heating);
+
+        assertTrue(result.validationReport().valid(), result.validationReport().summary());
+        assertTrue(result.heating().zones().size() <= 6, "Zu viele automatisch erzeugte Heizkreise: " + result.heating().zones().size());
+        assertTrue(result.heating().zones().stream()
+                .allMatch(zone -> zone.areaSquareMillimeters() >= 2_000_000.0));
+        assertTrue(result.circuits().stream()
+                .allMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) <= 0));
+    }
+
+    @Test
     void lehntManuellÜberRaumgrenzeGezogenenHeizbereichAb() {
         Room room = rectangularRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 300_000)
@@ -319,7 +356,8 @@ class HydronicHeatingLayoutServiceTest {
                                     && point.xMillimeters() < maxX - 0.001
                                     && point.yMillimeters() > minY + 0.001
                                     && point.yMillimeters() < maxY - 0.001,
-                            () -> "Rohr in Sperrfläche bei " + point
+                            () -> "Rohr in Sperrfläche bei " + point + " über "
+                                    + segment.role() + " " + segment.start() + " -> " + segment.end()
                     );
                 }
             }
@@ -383,6 +421,27 @@ class HydronicHeatingLayoutServiceTest {
                 new PlanPoint(0, 0), new PlanPoint(6_000, 0), new PlanPoint(6_000, 2_000),
                 new PlanPoint(3_000, 2_000), new PlanPoint(3_000, 5_000), new PlanPoint(0, 5_000)
         ), Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200), null);
+    }
+
+    private Room bedroomFromRegressionFile() {
+        return new Room(
+                java.util.UUID.randomUUID(),
+                "Schlafzimmer",
+                List.of(
+                        new PlanPoint(149.238, -3_620.000),
+                        new PlanPoint(1_540.000, -3_620.000),
+                        new PlanPoint(1_540.000, -3_880.000),
+                        new PlanPoint(1_534.908, -3_880.000),
+                        new PlanPoint(1_534.908, -6_877.869),
+                        new PlanPoint(4_620.000, -6_877.869),
+                        new PlanPoint(4_620.000, -260.000),
+                        new PlanPoint(149.238, -260.000)
+                ),
+                Length.ofMillimeters(2_550),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(1),
+                null
+        );
     }
 
     private List<PlanPoint> reversed(List<PlanPoint> points) {

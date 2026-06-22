@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +36,16 @@ public final class HydronicHeatingLayoutService {
     private static final double MANIFOLD_PAIR_PITCH_MILLIMETERS = 50.0;
     private static final double MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS = 600.0;
     private static final double MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS = 1_000.0;
+    private static final int COMPUTATION_CACHE_SIZE = 128;
+
+    private final Map<HydronicHeating, LayoutComputation> computationCache = Collections.synchronizedMap(
+            new LinkedHashMap<>(COMPUTATION_CACHE_SIZE, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<HydronicHeating, LayoutComputation> eldest) {
+                    return size() > COMPUTATION_CACHE_SIZE;
+                }
+            }
+    );
 
     public PlanningResult suggest(Room room, HydronicHeating heating) {
         Objects.requireNonNull(room, "room darf nicht null sein.");
@@ -62,11 +73,19 @@ public final class HydronicHeatingLayoutService {
         HydronicHeating planned = heating.withZones(zones);
         List<ValidationIssue> warnings = new ArrayList<>();
         int repairAttempts = 0;
+        boolean earlyRelocationAttempted = false;
         while (zones.size() < MAXIMUM_ZONE_COUNT) {
             planned = optimizeFlowOrientation(planned);
             zones = new ArrayList<>(planned.zones());
             LayoutComputation computation = compute(planned);
             if (!computation.unroutableZoneIds().isEmpty()) {
+                if (!earlyRelocationAttempted && shouldTryEarlyRelocation(planned)) {
+                    earlyRelocationAttempted = true;
+                    Optional<PlanningResult> relocated = tryRelocatedManifold(room, planned, warnings);
+                    if (relocated.isPresent()) {
+                        return relocated.orElseThrow();
+                    }
+                }
                 Optional<HydronicHeating> repaired = repairBySplittingUnroutableZone(planned, computation.unroutableZoneIds());
                 if (repaired.isPresent() && repairAttempts < MAXIMUM_REPAIR_ATTEMPTS) {
                     planned = repaired.orElseThrow();
@@ -93,7 +112,7 @@ public final class HydronicHeatingLayoutService {
                             .map(HeatingZone::areaSquareMillimeters)
                             .orElse(0.0)));
             if (oversized.isEmpty()) {
-                ValidationReport report = validateLayout(planned);
+                ValidationReport report = computation.report();
                 return new PlanningResult(planned, layouts, withWarnings(report, warnings));
             }
             HeatingZone zone = planned.zones().stream()
@@ -102,7 +121,7 @@ public final class HydronicHeatingLayoutService {
                     .orElseThrow();
             List<HeatingZone> split = split(zone);
             if (split.size() < 2) {
-                ValidationReport report = validateLayout(planned);
+                ValidationReport report = computation.report();
                 return new PlanningResult(planned, layouts, withWarnings(report, warnings));
             }
             int index = zones.indexOf(zone);
@@ -119,12 +138,17 @@ public final class HydronicHeatingLayoutService {
         return new PlanningResult(planned, computation.circuits(), withWarnings(computation.report(), warnings));
     }
 
+    private boolean shouldTryEarlyRelocation(HydronicHeating heating) {
+        GeometryScope fieldScope = fieldScopeFor(heating);
+        return !fieldScope.contains(heating.supplyPoint()) || !fieldScope.contains(heating.returnPoint());
+    }
+
     public List<CircuitLayout> layout(HydronicHeating heating) {
         Objects.requireNonNull(heating, "heating darf nicht null sein.");
         if (heating.zones().isEmpty()) {
             return List.of();
         }
-        LayoutComputation computation = compute(heating);
+        LayoutComputation computation = cachedCompute(heating);
         if (!computation.report().valid()) {
             throw new IllegalArgumentException(computation.report().summary());
         }
@@ -136,7 +160,7 @@ public final class HydronicHeatingLayoutService {
         if (heating.zones().isEmpty()) {
             return ValidationReport.ok();
         }
-        return compute(heating).report();
+        return cachedCompute(heating).report();
     }
 
     public String toSvg(Room room, HydronicHeating heating) {
@@ -250,6 +274,7 @@ public final class HydronicHeatingLayoutService {
     }
 
     private LayoutComputation compute(HydronicHeating heating) {
+        GeometryScope fieldScope = fieldScopeFor(heating);
         GeometryScope scope = scopeFor(heating);
         GridGraph graph = GridGraph.create(scope, heating.pipeSpacing().toMillimeters());
         List<ValidationIssue> errors = new ArrayList<>();
@@ -269,7 +294,7 @@ public final class HydronicHeatingLayoutService {
             ManifoldPair pair = manifoldPair(heating, index);
             ConnectorPlan connectors;
             try {
-                connectors = routeConnectors(graph, scope, pattern, pair, blocked, heating.pipeSpacing().toMillimeters());
+                connectors = routeConnectors(graph, scope, fieldScope, pattern, pair, blocked, heating.pipeSpacing().toMillimeters());
             } catch (IllegalArgumentException exception) {
                 unroutableZoneIds.add(zone.id());
                 errors.add(new ValidationIssue(
@@ -302,6 +327,20 @@ public final class HydronicHeatingLayoutService {
                 .toList(), report, unroutableZoneIds);
     }
 
+    private LayoutComputation cachedCompute(HydronicHeating heating) {
+        synchronized (computationCache) {
+            LayoutComputation cached = computationCache.get(heating);
+            if (cached != null) {
+                return cached;
+            }
+        }
+        LayoutComputation computed = compute(heating);
+        synchronized (computationCache) {
+            computationCache.put(heating, computed);
+        }
+        return computed;
+    }
+
     private GeometryScope scopeFor(HydronicHeating heating) {
         List<List<PlanPoint>> polygons = new ArrayList<>(heating.zones().stream()
                 .map(HeatingZone::outline)
@@ -317,6 +356,12 @@ public final class HydronicHeatingLayoutService {
             polygons.add(connectorCorridor(polygons, ports, heating.pipeSpacing().toMillimeters()));
         }
         return new GeometryScope(polygons);
+    }
+
+    private GeometryScope fieldScopeFor(HydronicHeating heating) {
+        return new GeometryScope(heating.zones().stream()
+                .map(HeatingZone::outline)
+                .toList());
     }
 
     private List<HeatingZone> initialZones(
@@ -899,15 +944,16 @@ public final class HydronicHeatingLayoutService {
         if (supply.size() < 2 || ret.size() < 2) {
             return meanderPattern(polygon, clearance, pitch);
         }
-        List<PlanPoint> full = new ArrayList<>(supply);
-        appendConnected(full, ret.getLast(), polygon, pitch);
+        List<PlanPoint> visibleSupply = new ArrayList<>(supply);
+        appendConnected(visibleSupply, ret.getLast(), polygon, pitch);
+        List<PlanPoint> full = new ArrayList<>(visibleSupply);
         for (PlanPoint point : ret.reversed()) {
             appendDistinct(full, point);
         }
         if (full.stream().anyMatch(point -> !containsPoint(polygon, point))) {
             return meanderPattern(polygon, clearance, pitch);
         }
-        return new FieldPattern(simplifyPath(full), simplifyPath(supply), simplifyPath(ret.reversed()));
+        return new FieldPattern(simplifyPath(full), simplifyPath(visibleSupply), simplifyPath(ret.reversed()));
     }
 
     private List<PlanPoint> rectangularSpiral(double left, double right, double top, double bottom, double step) {
@@ -940,6 +986,7 @@ public final class HydronicHeatingLayoutService {
     private ConnectorPlan routeConnectors(
             GridGraph graph,
             GeometryScope scope,
+            GeometryScope fieldScope,
             FieldPattern pattern,
             ManifoldPair pair,
             Set<GridEdge> blocked,
@@ -947,16 +994,17 @@ public final class HydronicHeatingLayoutService {
     ) {
         PlanPoint start = pattern.fullPath().getFirst();
         PlanPoint end = pattern.fullPath().getLast();
-        List<PlanPoint> supply = routePath(graph, scope, pair.supplyPort(), start, blocked, pitch, false, pair.supplyPort());
+        List<PlanPoint> supply = routePath(graph, scope, fieldScope, pair.supplyPort(), start, blocked, pitch, false, pair.supplyPort());
         Set<GridEdge> returnBlocked = new LinkedHashSet<>(blocked);
         returnBlocked.addAll(edgesOf(supply, pitch));
-        List<PlanPoint> ret = routePath(graph, scope, end, pair.returnPort(), returnBlocked, pitch, false, pair.returnPort());
+        List<PlanPoint> ret = routePath(graph, scope, fieldScope, end, pair.returnPort(), returnBlocked, pitch, false, pair.returnPort());
         return new ConnectorPlan(pair, supply, ret);
     }
 
     private List<PlanPoint> routePath(
             GridGraph graph,
             GeometryScope scope,
+            GeometryScope fieldScope,
             PlanPoint start,
             PlanPoint goal,
             Set<GridEdge> blocked,
@@ -968,13 +1016,13 @@ public final class HydronicHeatingLayoutService {
             return List.of(start);
         }
         if (!allowDirect && !blocked.isEmpty()) {
-            List<PlanPoint> perimeter = perimeterConnector(start, goal, scope, blocked, pitch, perimeterReference);
+            List<PlanPoint> perimeter = perimeterConnector(start, goal, scope, fieldScope, blocked, pitch, perimeterReference);
             if (!perimeter.isEmpty()) {
                 return perimeter;
             }
         }
         List<PlanPoint> direct = allowDirect ? directConnector(start, goal, scope) : List.of();
-        if (!direct.isEmpty() && pathAvoidsBlocked(direct, blocked, pitch)) {
+        if (!direct.isEmpty() && pathAvoidsBlocked(direct, blocked, pitch) && pathAvoidsInternalVoids(direct, fieldScope)) {
             return direct;
         }
         Set<GridPoint> forbiddenNodes = graph.blockedNodes(blocked, null, null);
@@ -987,7 +1035,7 @@ public final class HydronicHeatingLayoutService {
         }
         List<GridPoint> gridPath = graph.shortestPath(startGrid.orElseThrow(), goalGrid.orElseThrow(), blocked, true);
         if (gridPath.isEmpty()) {
-            List<PlanPoint> perimeter = perimeterConnector(start, goal, scope, blocked, pitch, perimeterReference);
+            List<PlanPoint> perimeter = perimeterConnector(start, goal, scope, fieldScope, blocked, pitch, perimeterReference);
             if (!perimeter.isEmpty()) {
                 return perimeter;
             }
@@ -1003,7 +1051,7 @@ public final class HydronicHeatingLayoutService {
         }
         appendDistinct(path, goal);
         List<PlanPoint> result = simplifyPath(path);
-        if (!pathAvoidsBlocked(result, blocked, pitch)) {
+        if (!pathAvoidsBlocked(result, blocked, pitch) || !pathAvoidsInternalVoids(result, fieldScope)) {
             throw new IllegalArgumentException("kein kreuzungsfreier Anschlussweg gefunden");
         }
         return result;
@@ -1013,6 +1061,7 @@ public final class HydronicHeatingLayoutService {
             PlanPoint start,
             PlanPoint goal,
             GeometryScope scope,
+            GeometryScope fieldScope,
             Set<GridEdge> blocked,
             double pitch,
             PlanPoint reference
@@ -1039,6 +1088,7 @@ public final class HydronicHeatingLayoutService {
                 .sorted(Comparator.comparingDouble(Candidate::sideDistance))
                 .map(candidate -> simplifyPath(candidate.path()))
                 .filter(candidate -> connectorInside(candidate, scope))
+                .filter(candidate -> pathAvoidsInternalVoids(candidate, fieldScope))
                 .filter(candidate -> pathAvoidsBlocked(candidate, blocked, pitch))
                 .findFirst()
                 .orElse(List.of());
@@ -1096,6 +1146,32 @@ public final class HydronicHeatingLayoutService {
             }
         }
         return true;
+    }
+
+    private boolean pathAvoidsInternalVoids(List<PlanPoint> path, GeometryScope fieldScope) {
+        Bounds bounds = fieldScope.bounds();
+        for (int index = 1; index < path.size(); index++) {
+            PlanPoint start = path.get(index - 1);
+            PlanPoint end = path.get(index);
+            for (int step = 0; step <= 32; step++) {
+                double ratio = step / 32.0;
+                PlanPoint point = new PlanPoint(
+                        start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
+                        start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
+                );
+                if (insideBounds(bounds, point) && !fieldScope.contains(point)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean insideBounds(Bounds bounds, PlanPoint point) {
+        return point.xMillimeters() > bounds.minX() + EPSILON
+                && point.xMillimeters() < bounds.maxX() - EPSILON
+                && point.yMillimeters() > bounds.minY() + EPSILON
+                && point.yMillimeters() < bounds.maxY() - EPSILON;
     }
 
     private ManifoldPair manifoldPair(HydronicHeating heating, int index) {
@@ -1371,7 +1447,7 @@ public final class HydronicHeatingLayoutService {
         }
         GeometryScope scope = new GeometryScope(List.of(polygon));
         GridGraph graph = GridGraph.create(scope, pitch);
-        List<PlanPoint> connector = routePath(graph, scope, previous, target, edgesOf(path, pitch), pitch, false, null);
+        List<PlanPoint> connector = routePath(graph, scope, scope, previous, target, edgesOf(path, pitch), pitch, false, null);
         connector.stream().skip(1).forEach(point -> appendDistinct(path, point));
     }
 
