@@ -89,7 +89,9 @@ public final class SurfaceMaterialListService {
                     continue;
                 }
                 List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layout(heating);
-                String svg = hydronicHeatingLayoutService.toSvg(room, heating);
+                String svg = hydronicHeatingLayoutService.toSvg(
+                        room, heating, level.floorOpenings(), level.heatingExclusionAreas()
+                );
                 for (HeatingZone zone : heating.zones()) {
                     double pipeLength = circuits.stream()
                             .filter(circuit -> circuit.zoneId().equals(zone.id()))

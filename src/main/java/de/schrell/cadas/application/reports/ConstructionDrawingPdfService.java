@@ -14,6 +14,7 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
@@ -101,6 +102,9 @@ public final class ConstructionDrawingPdfService {
             for (FloorOpening opening : level.floorOpenings()) {
                 drawFloorOpening(canvas, viewport, opening);
             }
+            for (HeatingExclusionArea area : level.heatingExclusionAreas()) {
+                drawHeatingExclusionArea(canvas, viewport, area);
+            }
             for (var extension : level.floorExtensions()) {
                 drawPolygon(canvas, viewport, extension.outline(), new Color(222, 210, 190), 0.7f);
                 canvas.text(viewport.x(extension.minX()) + 5, viewport.y(extension.minY()) - 12, 7.5f, extension.type().toString());
@@ -149,6 +153,9 @@ public final class ConstructionDrawingPdfService {
             }
             for (FloorOpening opening : level.floorOpenings()) {
                 drawFloorOpening(canvas, viewport, opening);
+            }
+            for (HeatingExclusionArea area : level.heatingExclusionAreas()) {
+                drawHeatingExclusionArea(canvas, viewport, area);
             }
             for (Wall wall : level.walls()) {
                 canvas.line(
@@ -484,6 +491,24 @@ public final class ConstructionDrawingPdfService {
             outline.add(new PlanPoint(opening.minXMillimeters(), opening.maxYMillimeters()));
         }
         drawPolygon(canvas, viewport, outline, Color.WHITE, 0.9f);
+    }
+
+    private void drawHeatingExclusionArea(PageCanvas canvas, Viewport viewport, HeatingExclusionArea area) throws IOException {
+        canvas.rectangle(
+                viewport.x(area.minXMillimeters()),
+                viewport.y(area.maxYMillimeters()),
+                area.widthMillimeters() * viewport.factor(),
+                area.depthMillimeters() * viewport.factor(),
+                0.9f,
+                new Color(170, 45, 35),
+                new Color(248, 220, 216)
+        );
+        canvas.text(
+                viewport.x(area.minXMillimeters()) + 4,
+                viewport.y(area.minYMillimeters()) + 10,
+                6.0f,
+                area.name()
+        );
     }
 
     private void drawWallDimensions(PageCanvas canvas, Viewport viewport, Level level, ConstructionDrawingOptions options, List<TextBlockingBox> seedBlockers) throws IOException {

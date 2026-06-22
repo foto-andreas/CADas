@@ -15,6 +15,7 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -106,6 +107,12 @@ class DxfProjectExchangeServiceTest {
                 project.primaryLevel().rooms().getFirst().id(), FloorOpeningShape.CIRCLE,
                 new PlanPoint(2_000, 2_000), Length.ofMillimeters(1_000), Length.ofMillimeters(1_000)
         ));
+        project.primaryLevel().addHeatingExclusionArea(HeatingExclusionArea.create(
+                project.primaryLevel().rooms().getFirst().id(),
+                "FBH-Schacht",
+                new PlanPoint(800, 800),
+                new PlanPoint(1_500, 1_700)
+        ));
         project.primaryLevel().addStaircase(new Staircase(
                 java.util.UUID.randomUUID(),
                 StairType.HALF_TURN,
@@ -137,6 +144,7 @@ class DxfProjectExchangeServiceTest {
         exchangeService.exportProject(project, file);
         String exportedDxf = Files.readString(file);
         assertTrue(exportedDxf.contains("FOPEN"));
+        assertTrue(exportedDxf.contains("HEXCL"));
         ProjectModel imported = exchangeService.importProject(file, "Import");
 
         assertEquals(2, imported.levels().size());
@@ -145,7 +153,10 @@ class DxfProjectExchangeServiceTest {
         assertEquals(1, imported.primaryLevel().staircases().size());
         assertEquals(1, imported.primaryLevel().floorExtensions().size());
         assertEquals(1, imported.primaryLevel().floorOpenings().size());
+        assertEquals(1, imported.primaryLevel().heatingExclusionAreas().size());
         assertEquals(FloorOpeningShape.CIRCLE, imported.primaryLevel().floorOpenings().getFirst().shape());
+        assertEquals("FBH-Schacht", imported.primaryLevel().heatingExclusionAreas().getFirst().name());
+        assertEquals(900, imported.primaryLevel().heatingExclusionAreas().getFirst().depthMillimeters(), 0.001);
         assertEquals(FloorExtensionType.GALLERY, imported.primaryLevel().floorExtensions().getFirst().type());
         assertEquals(750, imported.primaryLevel().staircases().getFirst().startLandingWidth().toMillimeters(), 0.001);
         assertEquals(500, imported.primaryLevel().staircases().getFirst().endLandingWidth().toMillimeters(), 0.001);

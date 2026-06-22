@@ -14,6 +14,7 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -104,6 +105,12 @@ class DxfLevelExchangeServiceTest {
                 level.rooms().getFirst().id(), FloorOpeningShape.RECTANGLE,
                 new PlanPoint(2_000, 1_500), Length.ofMillimeters(1_000), Length.ofMillimeters(800)
         ));
+        level.addHeatingExclusionArea(HeatingExclusionArea.create(
+                level.rooms().getFirst().id(),
+                "FBH-Verteiler frei",
+                new PlanPoint(800, 600),
+                new PlanPoint(1_400, 1_300)
+        ));
         HydronicHeating ceilingHeating = HydronicHeating.create(
                 level.rooms().getFirst().id(), HeatingSurfacePosition.CEILING, HeatingLayoutPattern.MEANDER,
                 Length.ofMillimeters(200), Length.ofMillimeters(18), Length.ofMillimeters(75_000),
@@ -125,7 +132,10 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1, imported.staircases().size());
         assertEquals(1, imported.floorExtensions().size());
         assertEquals(1, imported.floorOpenings().size());
+        assertEquals(1, imported.heatingExclusionAreas().size());
         assertEquals(800.0, imported.floorOpenings().getFirst().depth().toMillimeters(), 0.001);
+        assertEquals("FBH-Verteiler frei", imported.heatingExclusionAreas().getFirst().name());
+        assertEquals(600.0, imported.heatingExclusionAreas().getFirst().widthMillimeters(), 0.001);
         assertEquals(FloorExtensionType.BALCONY, imported.floorExtensions().getFirst().type());
         assertEquals(180, imported.floorExtensions().getFirst().slabThickness().toMillimeters(), 0.001);
         assertEquals(door.id(), imported.doors().getFirst().id());

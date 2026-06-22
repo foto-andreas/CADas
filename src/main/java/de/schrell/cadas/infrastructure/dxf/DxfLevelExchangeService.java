@@ -10,6 +10,7 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -237,6 +238,16 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     opening.width().toMillimeters(), opening.depth().toMillimeters()
             ));
         }
+        for (HeatingExclusionArea area : level.heatingExclusionAreas()) {
+            appendClosedPolyline(dxf, context, DxfLayer.ROOMS, rectangle(area));
+            appendMetadataText(dxf, context, area.center(), String.format(
+                    Locale.US,
+                    "HEXCL|%s|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                    area.id(), area.roomId(), DxfMetadataCodec.encode(area.name()),
+                    area.firstCorner().xMillimeters(), area.firstCorner().yMillimeters(),
+                    area.oppositeCorner().xMillimeters(), area.oppositeCorner().yMillimeters()
+            ));
+        }
         for (RoofWindow roofWindow : level.roofWindows()) {
             appendMetadataText(dxf, context, roofWindow.center(), String.format(
                     Locale.US,
@@ -412,6 +423,12 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             UUID.fromString(parts[1]), UUID.fromString(parts[2]), FloorOpeningShape.valueOf(parts[3]),
                             new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
                             Length.ofMillimeters(parseDouble(parts[6])), Length.ofMillimeters(parseDouble(parts[7]))
+                    ));
+                    case "HEXCL" -> level.addHeatingExclusionArea(new HeatingExclusionArea(
+                            UUID.fromString(parts[1]), UUID.fromString(parts[2]),
+                            DxfMetadataCodec.decode(parts[3], encodedFields),
+                            new PlanPoint(parseDouble(parts[4]), parseDouble(parts[5])),
+                            new PlanPoint(parseDouble(parts[6]), parseDouble(parts[7]))
                     ));
                     case "ROOF_WINDOW" -> level.addRoofWindow(new RoofWindow(
                             UUID.fromString(parts[1]), UUID.fromString(parts[2]),
@@ -597,6 +614,15 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             appendPair(dxf, 10, point.xMillimeters());
             appendPair(dxf, 20, point.yMillimeters());
         }
+    }
+
+    private List<PlanPoint> rectangle(HeatingExclusionArea area) {
+        return List.of(
+                new PlanPoint(area.minXMillimeters(), area.minYMillimeters()),
+                new PlanPoint(area.maxXMillimeters(), area.minYMillimeters()),
+                new PlanPoint(area.maxXMillimeters(), area.maxYMillimeters()),
+                new PlanPoint(area.minXMillimeters(), area.maxYMillimeters())
+        );
     }
 
     private void appendMetadataText(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, PlanPoint anchor, String value) {

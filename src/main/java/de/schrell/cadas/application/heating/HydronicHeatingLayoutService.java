@@ -140,8 +140,19 @@ public final class HydronicHeatingLayoutService {
     }
 
     public String toSvg(Room room, HydronicHeating heating) {
+        return toSvg(room, heating, List.of(), List.of());
+    }
+
+    public String toSvg(
+            Room room,
+            HydronicHeating heating,
+            List<FloorOpening> floorOpenings,
+            List<HeatingExclusionArea> heatingExclusionAreas
+    ) {
         Objects.requireNonNull(room, "room darf nicht null sein.");
         Objects.requireNonNull(heating, "heating darf nicht null sein.");
+        Objects.requireNonNull(floorOpenings, "floorOpenings darf nicht null sein.");
+        Objects.requireNonNull(heatingExclusionAreas, "heatingExclusionAreas darf nicht null sein.");
         List<CircuitLayout> circuits = layout(heating);
         List<PlanPoint> svgPoints = new ArrayList<>(room.outline());
         heating.zones().forEach(zone -> svgPoints.addAll(zone.outline()));
@@ -158,6 +169,33 @@ public final class HydronicHeatingLayoutService {
                 minX, minY, width, height));
         svg.append("<g id=\"raum\" fill=\"none\" stroke=\"#202020\" stroke-width=\"10\">\n");
         svg.append("<polygon points=\"").append(pointsAttribute(room.outline())).append("\"/>\n</g>\n");
+        svg.append("<g id=\"sperrflaechen\" fill=\"#f8dcd8\" stroke=\"#aa2d23\" stroke-width=\"5\">\n");
+        for (FloorOpening opening : floorOpenings) {
+            if (!opening.roomId().equals(room.id())) {
+                continue;
+            }
+            if (opening.shape() == de.schrell.cadas.domain.model.FloorOpeningShape.CIRCLE) {
+                svg.append(String.format(Locale.US,
+                        "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"%.3f\"/>\n",
+                        opening.center().xMillimeters(), opening.center().yMillimeters(),
+                        opening.width().toMillimeters() / 2.0));
+            } else {
+                svg.append("<polygon points=\"").append(pointsAttribute(rectangle(
+                        opening.minXMillimeters(), opening.minYMillimeters(),
+                        opening.maxXMillimeters(), opening.maxYMillimeters()
+                ))).append("\"/>\n");
+            }
+        }
+        for (HeatingExclusionArea area : heatingExclusionAreas) {
+            if (!area.roomId().equals(room.id())) {
+                continue;
+            }
+            svg.append("<polygon points=\"").append(pointsAttribute(rectangle(
+                    area.minXMillimeters(), area.minYMillimeters(),
+                    area.maxXMillimeters(), area.maxYMillimeters()
+            ))).append("\"/>\n");
+        }
+        svg.append("</g>\n");
         svg.append("<g id=\"variotherm-rinnen\" fill=\"none\" stroke=\"#9aa6ad\" stroke-width=\"2\">\n");
         appendVariothermGrooves(svg, room);
         svg.append("</g>\n");

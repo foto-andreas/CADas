@@ -13,6 +13,7 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -89,6 +90,12 @@ class SurfaceMaterialListServiceTest {
                         new PlanPoint(100, 1_400)
                 ), HeatingLayoutPattern.SPIRAL)));
         project.primaryLevel().addHydronicHeating(heating);
+        project.primaryLevel().addHeatingExclusionArea(HeatingExclusionArea.create(
+                room.id(),
+                "Wanne",
+                new PlanPoint(800, 500),
+                new PlanPoint(1_200, 900)
+        ));
 
         SurfaceMaterialReport report = service.create(project);
 
@@ -96,6 +103,8 @@ class SurfaceMaterialListServiceTest {
         assertEquals("FBH 1", report.heatingPlans().getFirst().zoneName());
         assertEquals("Schnecke", report.heatingPlans().getFirst().layoutPattern());
         assertTrue(report.heatingPlans().getFirst().svg().contains("<svg"));
+        assertTrue(report.heatingPlans().getFirst().svg().contains("id=\"sperrflaechen\""));
+        assertTrue(report.heatingPlans().getFirst().svg().contains("800.000,500.000 1200.000,500.000"));
         assertTrue(report.heatingPlans().getFirst().svg().contains("V1"));
         assertTrue(report.toMarkdown().contains("## Flächenheizungen"));
         assertTrue(report.toMarkdown().contains("### Heizplan Erdgeschoss / Bad / Fußboden"));

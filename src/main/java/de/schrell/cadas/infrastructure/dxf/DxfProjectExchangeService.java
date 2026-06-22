@@ -11,6 +11,7 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -224,6 +225,15 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 Length.ofMillimeters(parseDouble(parts[7])), Length.ofMillimeters(parseDouble(parts[8]))
                         ));
                     }
+                    case "HEXCL" -> {
+                        Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                        level.addHeatingExclusionArea(new HeatingExclusionArea(
+                                UUID.fromString(parts[2]), UUID.fromString(parts[3]),
+                                DxfMetadataCodec.decode(parts[4], encodedFields),
+                                new PlanPoint(parseDouble(parts[5]), parseDouble(parts[6])),
+                                new PlanPoint(parseDouble(parts[7]), parseDouble(parts[8]))
+                        ));
+                    }
                     case "ROOF_WINDOW" -> {
                         Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
                         level.addRoofWindow(new RoofWindow(
@@ -404,6 +414,9 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (FloorExtension extension : level.floorExtensions()) {
             appendClosedPolyline(dxf, context, layerPrefix + "_ROOMS", extension.outline());
         }
+        for (HeatingExclusionArea area : level.heatingExclusionAreas()) {
+            appendClosedPolyline(dxf, context, layerPrefix + "_ROOMS", rectangle(area));
+        }
     }
 
     private void exportLevelMetadata(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, Level level) {
@@ -503,6 +516,16 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     DxfMetadataCodec.encode(level.name()), opening.id(), opening.roomId(), opening.shape().name(),
                     opening.center().xMillimeters(), opening.center().yMillimeters(),
                     opening.width().toMillimeters(), opening.depth().toMillimeters()
+            ));
+        }
+        for (HeatingExclusionArea area : level.heatingExclusionAreas()) {
+            appendMetadataText(dxf, context, area.center(), String.format(
+                    Locale.US,
+                    "HEXCL|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                    DxfMetadataCodec.encode(level.name()), area.id(), area.roomId(),
+                    DxfMetadataCodec.encode(area.name()),
+                    area.firstCorner().xMillimeters(), area.firstCorner().yMillimeters(),
+                    area.oppositeCorner().xMillimeters(), area.oppositeCorner().yMillimeters()
             ));
         }
         for (RoofWindow roofWindow : level.roofWindows()) {
@@ -635,6 +658,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         target.replaceRoomObjects(source.roomObjects());
         target.replaceFloorExtensions(source.floorExtensions());
         target.replaceFloorOpenings(source.floorOpenings());
+        target.replaceHeatingExclusionAreas(source.heatingExclusionAreas());
         target.replaceSurfaceLayerStacks(source.surfaceLayerStacks().stream()
                 .map(SurfaceLayerStack::copy)
                 .toList());
@@ -696,6 +720,15 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             appendPair(dxf, 10, point.xMillimeters());
             appendPair(dxf, 20, point.yMillimeters());
         }
+    }
+
+    private List<PlanPoint> rectangle(HeatingExclusionArea area) {
+        return List.of(
+                new PlanPoint(area.minXMillimeters(), area.minYMillimeters()),
+                new PlanPoint(area.maxXMillimeters(), area.minYMillimeters()),
+                new PlanPoint(area.maxXMillimeters(), area.maxYMillimeters()),
+                new PlanPoint(area.minXMillimeters(), area.maxYMillimeters())
+        );
     }
 
     private void appendMetadataText(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, PlanPoint anchor, String text) {
