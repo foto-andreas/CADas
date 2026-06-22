@@ -26,6 +26,7 @@ Die zuvor offenen Punkte sind entschieden und gelten bis auf Weiteres als verbin
 * Analysierte `DWG`-Blöcke können als Belag oder als Raumobjekt übernommen werden. Raumobjekte speichern zusätzlich den Montagemodus: auf Bodenbelag, Bodenbelag ausgespart oder wandmontiert.
 * Die Standard-FBH basiert auf der Variotherm-Trockenbauplatte 60 x 100 cm mit 18 mm Dicke, 100 mm Verlegeabstand und 11,6 mm Heizrohr.
 * Ein HKV-Anschlusspaar bleibt fachlich 50 mm breit. Automatisch erzeugte weitere Kreise werden bis zur eigenen HKV-Geometrieverwaltung mindestens um eine Rasterweite versetzt, damit Zuleitungen in der CAD-Darstellung unterscheidbar und prüfbar bleiben.
+* Ein HKV kann über das Raum-Kontextmenü am angeklickten Standort gesetzt werden. Liegt er ausreichend frei im Raum, reserviert die automatische FBH-Planung dort eine 60 x 100 cm große Verteiler-Freifläche ohne Heizrohre; an Randpositionen bleibt die Fläche unverändert.
 * FBH-Verlegeart und Vorlauf-/Rücklauf-Rollenorientierung werden dauerhaft je Heizbereich gespeichert. Die Raumverlegung ist nur die Startvorgabe für neue automatische Vorschläge.
 * Treppenbereiche werden beim automatischen FBH-Vorschlag als rechteckige Ausschlussflächen aus der beheizbaren Raumfläche entfernt.
 * Schachtartige Boden-/Deckenöffnungen werden über `FloorOpening` modelliert und beim automatischen FBH-Vorschlag als Sperrflächen ausgewertet.

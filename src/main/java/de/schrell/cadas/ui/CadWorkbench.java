@@ -228,6 +228,7 @@ public final class CadWorkbench extends BorderPane {
     private static final Length DEFAULT_WINDOW_SILL = Length.of(90, LengthUnit.CENTIMETER);
     private static final Length DEFAULT_STAIR_HEIGHT = Length.of(2.80, LengthUnit.METER);
     private static final Length SNAP_TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
+    private static final double DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS = 50.0;
     private static final int LENGTH_INPUT_DECIMALS = 3;
     private static final Font DIMENSION_LABEL_FONT = Font.font("Menlo", 12);
     private static final double DIMENSION_TEXT_AWAY_DISTANCE = 8.0;
@@ -7270,6 +7271,7 @@ public final class CadWorkbench extends BorderPane {
                 && contextMenuWorldPoint != null) {
             selectionContextMenu.getItems().addAll(
                     menuItem("Raum umbenennen …", this::renameContextRoom, null),
+                    menuItem("HKV hier setzen", this::setHydronicManifoldFromContextLocation, null),
                     menuItem(
                             "Innenansicht ab diesem Standort öffnen",
                             this::openInteriorViewFromContextLocation,
@@ -7372,6 +7374,60 @@ public final class CadWorkbench extends BorderPane {
         threeDViewport.activateInteriorView(project, activeLevel.get(), room.orElseThrow(), contextMenuWorldPoint);
         activeWorkspaceMode.set(WorkspaceMode.INTERIOR);
         draftLabel.setText("Innenansicht am gewählten Raumstandort geöffnet.");
+    }
+
+    private void setHydronicManifoldFromContextLocation() {
+        Room room = contextMenuRoom().orElseThrow(() -> new IllegalStateException("Kein Raum im Kontextmenü ausgewählt."));
+        if (contextMenuWorldPoint == null) {
+            throw new IllegalStateException("Kein Standort im Kontextmenü vorhanden.");
+        }
+        PlanPoint supplyPoint = contextMenuWorldPoint;
+        PlanPoint returnPoint = new PlanPoint(
+                contextMenuWorldPoint.xMillimeters() + DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS,
+                contextMenuWorldPoint.yMillimeters()
+        );
+        setLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(supplyPoint.xMillimeters()), LengthUnit.CENTIMETER);
+        setLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(supplyPoint.yMillimeters()), LengthUnit.CENTIMETER);
+        setLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(returnPoint.xMillimeters()), LengthUnit.CENTIMETER);
+        setLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(returnPoint.yMillimeters()), LengthUnit.CENTIMETER);
+
+        HydronicHeating existing = activeLevel.get().findHydronicHeating(
+                room.id(),
+                Optional.ofNullable(heatingSurfacePositionSelector.getValue()).orElse(HeatingSurfacePosition.FLOOR)
+        );
+        if (existing == null) {
+            draftLabel.setText("HKV-Position gesetzt. Heizkreise können jetzt mit diesem Vor- und Rücklauf geplant werden.");
+            return;
+        }
+        HydronicHeating updated = withHydronicManifold(existing, supplyPoint, returnPoint);
+        HydronicHeatingLayoutService.ValidationReport report = hydronicHeatingLayoutService.validateLayout(updated);
+        boolean maximumExceeded = report.valid() && hydronicHeatingLayoutService.layout(updated).stream()
+                .anyMatch(circuit -> circuit.pipeLength().compareTo(updated.maximumPipeLength()) > 0);
+        if (!report.valid() || maximumExceeded) {
+            draftLabel.setText("HKV-Felder gesetzt. Die vorhandene Planung bleibt unverändert; bitte Heizkreise neu planen.");
+            return;
+        }
+        rememberStateForUndo();
+        activeLevel.get().replaceHydronicHeating(updated);
+        refreshHeatingSection();
+        draftLabel.setText("HKV-Position gesetzt und vorhandene Heizkreise neu angebunden.");
+        render();
+    }
+
+    private HydronicHeating withHydronicManifold(HydronicHeating heating, PlanPoint supplyPoint, PlanPoint returnPoint) {
+        return new HydronicHeating(
+                heating.id(),
+                heating.roomId(),
+                heating.surfacePosition(),
+                heating.layoutPattern(),
+                heating.pipeSpacing(),
+                heating.pipeDiameter(),
+                heating.maximumPipeLength(),
+                heating.wallClearance(),
+                supplyPoint,
+                returnPoint,
+                heating.zones()
+        );
     }
 
     private void renameContextRoom() {

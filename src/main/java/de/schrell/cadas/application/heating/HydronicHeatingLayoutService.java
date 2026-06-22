@@ -79,7 +79,8 @@ public final class HydronicHeatingLayoutService {
             zones = new ArrayList<>(planned.zones());
             LayoutComputation computation = compute(planned);
             if (!computation.unroutableZoneIds().isEmpty()) {
-                if (!earlyRelocationAttempted && shouldTryEarlyRelocation(planned)) {
+                boolean relocationAllowed = shouldTryRelocation(room, planned);
+                if (!earlyRelocationAttempted && relocationAllowed) {
                     earlyRelocationAttempted = true;
                     Optional<PlanningResult> relocated = tryRelocatedManifold(room, planned, warnings);
                     if (relocated.isPresent()) {
@@ -93,9 +94,11 @@ public final class HydronicHeatingLayoutService {
                     repairAttempts++;
                     continue;
                 }
-                Optional<PlanningResult> relocated = tryRelocatedManifold(room, planned, warnings);
-                if (relocated.isPresent()) {
-                    return relocated.orElseThrow();
+                if (relocationAllowed) {
+                    Optional<PlanningResult> relocated = tryRelocatedManifold(room, planned, warnings);
+                    if (relocated.isPresent()) {
+                        return relocated.orElseThrow();
+                    }
                 }
                 return partialPlanning(planned, computation, warnings);
             }
@@ -138,9 +141,9 @@ public final class HydronicHeatingLayoutService {
         return new PlanningResult(planned, computation.circuits(), withWarnings(computation.report(), warnings));
     }
 
-    private boolean shouldTryEarlyRelocation(HydronicHeating heating) {
-        GeometryScope fieldScope = fieldScopeFor(heating);
-        return !fieldScope.contains(heating.supplyPoint()) || !fieldScope.contains(heating.returnPoint());
+    private boolean shouldTryRelocation(Room room, HydronicHeating heating) {
+        return !containsPoint(room.outline(), heating.supplyPoint())
+                || !containsPoint(room.outline(), heating.returnPoint());
     }
 
     public List<CircuitLayout> layout(HydronicHeating heating) {
@@ -371,7 +374,7 @@ public final class HydronicHeatingLayoutService {
             List<FloorOpening> floorOpenings,
             List<HeatingExclusionArea> heatingExclusionAreas
     ) {
-        List<ExclusionRect> exclusions = exclusions(room, staircases, floorOpenings, heatingExclusionAreas);
+        List<ExclusionRect> exclusions = exclusions(room, heating, staircases, floorOpenings, heatingExclusionAreas);
         if (exclusions.isEmpty()) {
             return List.of(HeatingZone.create("Heizkreis 1", room.outline(), heating.layoutPattern()));
         }
@@ -408,12 +411,14 @@ public final class HydronicHeatingLayoutService {
 
     private List<ExclusionRect> exclusions(
             Room room,
+            HydronicHeating heating,
             List<Staircase> staircases,
             List<FloorOpening> floorOpenings,
             List<HeatingExclusionArea> heatingExclusionAreas
     ) {
         Bounds roomBounds = bounds(room.outline());
         List<ExclusionRect> exclusions = new ArrayList<>();
+        appendManifoldFreeArea(room, heating, roomBounds, exclusions);
         for (Staircase staircase : staircases) {
             ExclusionRect rectangle = new ExclusionRect(
                     Math.max(roomBounds.minX(), staircase.minX()),
@@ -443,6 +448,41 @@ public final class HydronicHeatingLayoutService {
                     area.maxXMillimeters(), area.maxYMillimeters());
         }
         return List.copyOf(exclusions);
+    }
+
+    private void appendManifoldFreeArea(
+            Room room,
+            HydronicHeating heating,
+            Bounds roomBounds,
+            List<ExclusionRect> exclusions
+    ) {
+        PlanPoint center = new PlanPoint(
+                (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0,
+                (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0
+        );
+        if (!containsPoint(room.outline(), center)) {
+            return;
+        }
+        double minX = center.xMillimeters() - MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS / 2.0;
+        double minY = center.yMillimeters() - MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS / 2.0;
+        double maxX = center.xMillimeters() + MANIFOLD_FREE_AREA_WIDTH_MILLIMETERS / 2.0;
+        double maxY = center.yMillimeters() + MANIFOLD_FREE_AREA_HEIGHT_MILLIMETERS / 2.0;
+        if (minX < roomBounds.minX() + EPSILON
+                || maxX > roomBounds.maxX() - EPSILON
+                || minY < roomBounds.minY() + EPSILON
+                || maxY > roomBounds.maxY() - EPSILON
+                || rectangle(minX, minY, maxX, maxY).stream().anyMatch(point -> !containsPoint(room.outline(), point))) {
+            return;
+        }
+        appendExclusion(
+                room,
+                roomBounds,
+                exclusions,
+                minX,
+                minY,
+                maxX,
+                maxY
+        );
     }
 
     private void appendExclusion(
@@ -581,7 +621,11 @@ public final class HydronicHeatingLayoutService {
         double pairWidth = Math.max(MANIFOLD_PAIR_PITCH_MILLIMETERS, heating.pipeSpacing().toMillimeters());
         double centerX = (bounds.minX() + bounds.maxX()) / 2.0;
         double centerY = (bounds.minY() + bounds.maxY()) / 2.0;
-        return List.of(
+        PlanPoint currentCenter = new PlanPoint(
+                (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0,
+                (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0
+        );
+        List<ManifoldPair> candidates = new ArrayList<>(List.of(
                 new ManifoldPair(
                         new PlanPoint(centerX - pairWidth / 2.0, bounds.minY() - offset),
                         new PlanPoint(centerX + pairWidth / 2.0, bounds.minY() - offset)
@@ -598,6 +642,15 @@ public final class HydronicHeatingLayoutService {
                         new PlanPoint(bounds.maxX() + offset, centerY - pairWidth / 2.0),
                         new PlanPoint(bounds.maxX() + offset, centerY + pairWidth / 2.0)
                 )
+        ));
+        candidates.sort(Comparator.comparingDouble(candidate -> manifoldCenter(candidate).distanceTo(currentCenter).toMillimeters()));
+        return List.copyOf(candidates);
+    }
+
+    private PlanPoint manifoldCenter(ManifoldPair pair) {
+        return new PlanPoint(
+                (pair.supplyPort().xMillimeters() + pair.returnPort().xMillimeters()) / 2.0,
+                (pair.supplyPort().yMillimeters() + pair.returnPort().yMillimeters()) / 2.0
         );
     }
 
@@ -1067,23 +1120,27 @@ public final class HydronicHeatingLayoutService {
             PlanPoint reference
     ) {
         Bounds bounds = scope.bounds();
-        double minX = bounds.minX() + pitch / 2.0;
-        double maxX = bounds.maxX() - pitch / 2.0;
-        double minY = bounds.minY() + pitch / 2.0;
-        double maxY = bounds.maxY() - pitch / 2.0;
         PlanPoint sideReference = reference == null ? centroid(List.of(start, goal, new PlanPoint(start.xMillimeters(), goal.yMillimeters()))) : reference;
         record Candidate(List<PlanPoint> path, double sideDistance) {
         }
-        List<Candidate> candidates = List.of(
-                new Candidate(List.of(start, new PlanPoint(start.xMillimeters(), minY), new PlanPoint(goal.xMillimeters(), minY), goal),
-                        Math.abs(sideReference.yMillimeters() - minY)),
-                new Candidate(List.of(start, new PlanPoint(start.xMillimeters(), maxY), new PlanPoint(goal.xMillimeters(), maxY), goal),
-                        Math.abs(sideReference.yMillimeters() - maxY)),
-                new Candidate(List.of(start, new PlanPoint(minX, start.yMillimeters()), new PlanPoint(minX, goal.yMillimeters()), goal),
-                        Math.abs(sideReference.xMillimeters() - minX)),
-                new Candidate(List.of(start, new PlanPoint(maxX, start.yMillimeters()), new PlanPoint(maxX, goal.yMillimeters()), goal),
-                        Math.abs(sideReference.xMillimeters() - maxX))
-        );
+        List<Candidate> candidates = new ArrayList<>();
+        for (double inset : List.of(pitch / 2.0, pitch * 1.5, pitch * 2.5)) {
+            double minX = bounds.minX() + inset;
+            double maxX = bounds.maxX() - inset;
+            double minY = bounds.minY() + inset;
+            double maxY = bounds.maxY() - inset;
+            if (minX >= maxX - EPSILON || minY >= maxY - EPSILON) {
+                continue;
+            }
+            candidates.add(new Candidate(List.of(start, new PlanPoint(start.xMillimeters(), minY), new PlanPoint(goal.xMillimeters(), minY), goal),
+                    Math.abs(sideReference.yMillimeters() - minY)));
+            candidates.add(new Candidate(List.of(start, new PlanPoint(start.xMillimeters(), maxY), new PlanPoint(goal.xMillimeters(), maxY), goal),
+                    Math.abs(sideReference.yMillimeters() - maxY)));
+            candidates.add(new Candidate(List.of(start, new PlanPoint(minX, start.yMillimeters()), new PlanPoint(minX, goal.yMillimeters()), goal),
+                    Math.abs(sideReference.xMillimeters() - minX)));
+            candidates.add(new Candidate(List.of(start, new PlanPoint(maxX, start.yMillimeters()), new PlanPoint(maxX, goal.yMillimeters()), goal),
+                    Math.abs(sideReference.xMillimeters() - maxX)));
+        }
         return candidates.stream()
                 .sorted(Comparator.comparingDouble(Candidate::sideDistance))
                 .map(candidate -> simplifyPath(candidate.path()))

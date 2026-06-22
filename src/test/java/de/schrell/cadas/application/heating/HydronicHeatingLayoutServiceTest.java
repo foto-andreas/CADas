@@ -82,7 +82,7 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
-    void liefertTeilplanungWennEinAnschlussNichtRoutbarBleibt() {
+    void nutztWeitereRandspurenBevorEineTeilplanungNoetigWird() {
         Room room = rectangularRoom();
         HydronicHeating heating = HydronicHeating.create(
                 room.id(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER,
@@ -93,9 +93,6 @@ class HydronicHeatingLayoutServiceTest {
         HydronicHeatingLayoutService.PlanningResult result = service.suggest(room, heating);
 
         assertTrue(result.validationReport().valid());
-        assertFalse(result.validationReport().warnings().isEmpty());
-        assertTrue(result.validationReport().warnings().stream()
-                .anyMatch(warning -> warning.type() == HydronicHeatingLayoutService.ValidationErrorType.PARTIAL_LAYOUT));
         assertEquals(result.heating().zones().size(), result.circuits().size());
         assertTrue(result.circuits().stream()
                 .allMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) <= 0));
@@ -290,6 +287,29 @@ class HydronicHeatingLayoutServiceTest {
         assertTrue(result.heating().zones().size() <= 6, "Zu viele automatisch erzeugte Heizkreise: " + result.heating().zones().size());
         assertTrue(result.heating().zones().stream()
                 .allMatch(zone -> zone.areaSquareMillimeters() >= 2_000_000.0));
+        assertTrue(result.circuits().stream()
+                .allMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) <= 0));
+    }
+
+    @Test
+    void plantSchlafzimmerAuchMitStandardHkvAmRand() {
+        Room room = bedroomFromRegressionFile();
+        HydronicHeating heating = HydronicHeating.create(
+                room.id(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        );
+
+        HydronicHeatingLayoutService.PlanningResult result = service.suggest(room, heating);
+
+        assertTrue(result.validationReport().valid(), result.validationReport().summary());
+        assertFalse(result.circuits().isEmpty());
         assertTrue(result.circuits().stream()
                 .allMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) <= 0));
     }

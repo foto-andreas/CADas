@@ -177,6 +177,43 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void setztHkvPerRaumKontextmenueFuerNaechsteHeizungsplanung() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instance = new CadWorkbench();
+            new Scene(instance, 1200, 800);
+            instance.applyCss();
+            instance.layout();
+            Room room = Room.rectangular(
+                    "Schlafen", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            );
+            instance.automationAddRoom(room);
+            instance.automationSetTool("EDIT");
+            instance.automationSetViewport(1.0, 0.0, 0.0);
+            instance.automationPrepareSelectionContextMenu(100.0, 80.0);
+            return instance;
+        });
+
+        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems).contains("HKV hier setzen"));
+        aufFxThread(() -> {
+            workbench.automationInvokeSelectionContextMenuItem("HKV hier setzen");
+            workbench.automationSetField("heatingMaximumPipeLength", "30000");
+            workbench.automationPlanHydronicHeating("FLOOR", "MEANDER");
+            return null;
+        });
+
+        Assertions.assertEquals("100", aufFxThread(() -> workbench.automationFieldValue("heatingSupplyX")));
+        Assertions.assertEquals("80", aufFxThread(() -> workbench.automationFieldValue("heatingSupplyY")));
+        Assertions.assertEquals("105", aufFxThread(() -> workbench.automationFieldValue("heatingReturnX")));
+        Assertions.assertEquals("80", aufFxThread(() -> workbench.automationFieldValue("heatingReturnY")));
+        HydronicHeating heating = aufFxThread(() -> workbench.automationHydronicHeating(0));
+        Assertions.assertEquals(1_000.0, heating.supplyPoint().xMillimeters(), 0.001);
+        Assertions.assertEquals(800.0, heating.supplyPoint().yMillimeters(), 0.001);
+        Assertions.assertEquals(1_050.0, heating.returnPoint().xMillimeters(), 0.001);
+        Assertions.assertEquals(800.0, heating.returnPoint().yMillimeters(), 0.001);
+    }
+
+    @Test
     void kontextmenüBietetNeunzigGradKorrekturFürAuswahlen() throws Exception {
         CadWorkbench workbench = aufFxThread(CadWorkbench::new);
 
