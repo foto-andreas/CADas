@@ -947,37 +947,54 @@ public final class HydronicHeatingLayoutService {
     private FieldPattern createPattern(HydronicHeating heating, HeatingZone zone) {
         double clearance = heating.wallClearance().toMillimeters();
         double pitch = heating.pipeSpacing().toMillimeters();
-        FieldPattern pattern = zone.layoutPattern() == HeatingLayoutPattern.SPIRAL
-                ? spiralPattern(zone.outline(), clearance, pitch)
-                : meanderPattern(zone.outline(), clearance, pitch);
+        List<FieldPattern> candidates = zone.layoutPattern() == HeatingLayoutPattern.SPIRAL
+                ? spiralPatterns(zone.outline(), clearance, pitch)
+                : List.of(meanderPattern(zone.outline(), clearance, pitch));
+        FieldPattern pattern = selectPattern(candidates, zone);
         if (pattern.fullPath().isEmpty()) {
             PlanPoint center = centroid(zone.outline());
             return new FieldPattern(List.of(center), List.of(center), List.of(center));
         }
-        FieldPattern oriented = zone.flowInverted() ? pattern.inverted() : pattern;
-        return withZoneConnections(zone, oriented);
+        return withZoneConnections(zone, pattern, pitch);
     }
 
-    private FieldPattern withZoneConnections(HeatingZone zone, FieldPattern pattern) {
+    private FieldPattern selectPattern(List<FieldPattern> candidates, HeatingZone zone) {
+        return candidates.stream()
+                .map(candidate -> zone.flowInverted() ? candidate.inverted() : candidate)
+                .min(Comparator.comparingDouble(candidate -> connectionScore(zone, candidate)))
+                .orElseGet(() -> new FieldPattern(List.of(), List.of(), List.of()));
+    }
+
+    private double connectionScore(HeatingZone zone, FieldPattern pattern) {
+        if (!zone.hasCustomConnectionPoints() || pattern.fullPath().isEmpty()) {
+            return 0.0;
+        }
+        return zone.supplyConnectionPoint().distanceTo(pattern.fullPath().getFirst()).toMillimeters()
+                + zone.returnConnectionPoint().distanceTo(pattern.fullPath().getLast()).toMillimeters();
+    }
+
+    private FieldPattern withZoneConnections(HeatingZone zone, FieldPattern pattern, double pitch) {
         if (!zone.hasCustomConnectionPoints()) {
             return pattern;
         }
         List<PlanPoint> fullPath = new ArrayList<>();
         appendDistinct(fullPath, zone.supplyConnectionPoint());
-        for (PlanPoint point : pattern.fullPath()) {
+        appendConnected(fullPath, pattern.fullPath().getFirst(), zone.outline(), pitch);
+        for (PlanPoint point : pattern.fullPath().stream().skip(1).toList()) {
             appendDistinct(fullPath, point);
         }
-        appendDistinct(fullPath, zone.returnConnectionPoint());
+        appendConnected(fullPath, zone.returnConnectionPoint(), zone.outline(), pitch);
 
         List<PlanPoint> supplyPath = new ArrayList<>();
         appendDistinct(supplyPath, zone.supplyConnectionPoint());
-        for (PlanPoint point : pattern.supplyPath()) {
+        appendConnected(supplyPath, pattern.supplyPath().getFirst(), zone.outline(), pitch);
+        for (PlanPoint point : pattern.supplyPath().stream().skip(1).toList()) {
             appendDistinct(supplyPath, point);
         }
 
         List<PlanPoint> returnPath = new ArrayList<>(pattern.returnPath());
-        appendDistinct(returnPath, zone.returnConnectionPoint());
-        return new FieldPattern(simplifyPath(fullPath), simplifyPath(supplyPath), simplifyPath(returnPath));
+        appendConnected(returnPath, zone.returnConnectionPoint(), zone.outline(), pitch);
+        return new FieldPattern(fullPath, supplyPath, returnPath);
     }
 
     private FieldPattern meanderPattern(List<PlanPoint> polygon, double clearance, double pitch) {
@@ -1014,9 +1031,9 @@ public final class HydronicHeatingLayoutService {
         return new FieldPattern(simplified, split.first(), split.second());
     }
 
-    private FieldPattern spiralPattern(List<PlanPoint> polygon, double clearance, double pitch) {
+    private List<FieldPattern> spiralPatterns(List<PlanPoint> polygon, double clearance, double pitch) {
         if (!isAxisAlignedRectangle(polygon)) {
-            return meanderPattern(polygon, clearance, pitch);
+            return List.of(meanderPattern(polygon, clearance, pitch));
         }
         Bounds bounds = bounds(polygon);
         double left = snapUp(bounds.minX() + clearance, pitch);
@@ -1024,23 +1041,56 @@ public final class HydronicHeatingLayoutService {
         double top = snapUp(bounds.minY() + clearance, pitch);
         double bottom = snapDown(bounds.maxY() - clearance, pitch);
         if (right - left < pitch * 3.0 || bottom - top < pitch * 3.0) {
-            return meanderPattern(polygon, clearance, pitch);
+            return List.of(meanderPattern(polygon, clearance, pitch));
         }
         List<PlanPoint> supply = rectangularSpiral(left, right, top, bottom, pitch * 2.0);
         List<PlanPoint> ret = rectangularSpiral(left + pitch, right - pitch, top + pitch, bottom - pitch, pitch * 2.0);
         if (supply.size() < 2 || ret.size() < 2) {
-            return meanderPattern(polygon, clearance, pitch);
+            return List.of(meanderPattern(polygon, clearance, pitch));
         }
         List<PlanPoint> visibleSupply = new ArrayList<>(supply);
-        appendConnected(visibleSupply, ret.getLast(), polygon, pitch);
+        List<PlanPoint> reversedReturn = List.copyOf(ret.reversed());
+        appendSpiralBridge(visibleSupply, reversedReturn, polygon, pitch);
         List<PlanPoint> full = new ArrayList<>(visibleSupply);
-        for (PlanPoint point : ret.reversed()) {
+        for (PlanPoint point : reversedReturn) {
             appendDistinct(full, point);
         }
         if (full.stream().anyMatch(point -> !containsPoint(polygon, point))) {
-            return meanderPattern(polygon, clearance, pitch);
+            return List.of(meanderPattern(polygon, clearance, pitch));
         }
-        return new FieldPattern(simplifyPath(full), simplifyPath(visibleSupply), simplifyPath(ret.reversed()));
+        FieldPattern base = new FieldPattern(simplifyPath(full), simplifyPath(visibleSupply), simplifyPath(reversedReturn));
+        List<FieldPattern> candidates = new ArrayList<>();
+        for (boolean mirrorX : List.of(false, true)) {
+            for (boolean mirrorY : List.of(false, true)) {
+                addDistinctPattern(candidates, mirrorPattern(base, bounds, mirrorX, mirrorY));
+            }
+        }
+        return List.copyOf(candidates);
+    }
+
+    private void addDistinctPattern(List<FieldPattern> patterns, FieldPattern candidate) {
+        if (patterns.stream().noneMatch(pattern -> pattern.fullPath().equals(candidate.fullPath()))) {
+            patterns.add(candidate);
+        }
+    }
+
+    private FieldPattern mirrorPattern(FieldPattern pattern, Bounds bounds, boolean mirrorX, boolean mirrorY) {
+        return new FieldPattern(
+                mirrorPath(pattern.fullPath(), bounds, mirrorX, mirrorY),
+                mirrorPath(pattern.supplyPath(), bounds, mirrorX, mirrorY),
+                mirrorPath(pattern.returnPath(), bounds, mirrorX, mirrorY)
+        );
+    }
+
+    private List<PlanPoint> mirrorPath(List<PlanPoint> path, Bounds bounds, boolean mirrorX, boolean mirrorY) {
+        List<PlanPoint> mirrored = new ArrayList<>();
+        for (PlanPoint point : path) {
+            mirrored.add(new PlanPoint(
+                    mirrorX ? bounds.minX() + bounds.maxX() - point.xMillimeters() : point.xMillimeters(),
+                    mirrorY ? bounds.minY() + bounds.maxY() - point.yMillimeters() : point.yMillimeters()
+            ));
+        }
+        return List.copyOf(mirrored);
     }
 
     private List<PlanPoint> rectangularSpiral(double left, double right, double top, double bottom, double step) {
@@ -1520,26 +1570,170 @@ public final class HydronicHeatingLayoutService {
             return;
         }
         PlanPoint previous = path.getLast();
-        if (segmentInside(previous, target, polygon)) {
+        if (axisAligned(previous, target) && segmentInside(previous, target, polygon)) {
             appendDistinct(path, target);
             return;
         }
+        List<List<PlanPoint>> candidates = new ArrayList<>();
         PlanPoint firstCorner = new PlanPoint(previous.xMillimeters(), target.yMillimeters());
         if (segmentInside(previous, firstCorner, polygon) && segmentInside(firstCorner, target, polygon)) {
-            appendDistinct(path, firstCorner);
-            appendDistinct(path, target);
-            return;
+            candidates.add(List.of(firstCorner, target));
         }
         PlanPoint secondCorner = new PlanPoint(target.xMillimeters(), previous.yMillimeters());
         if (segmentInside(previous, secondCorner, polygon) && segmentInside(secondCorner, target, polygon)) {
-            appendDistinct(path, secondCorner);
-            appendDistinct(path, target);
+            candidates.add(List.of(secondCorner, target));
+        }
+        if (!candidates.isEmpty()) {
+            List<PlanPoint> selected = candidates.stream()
+                    .min(Comparator.comparingDouble(candidate -> connectionPenalty(path, candidate, pitch)))
+                    .orElseThrow();
+            selected.forEach(point -> appendDistinct(path, point));
             return;
         }
         GeometryScope scope = new GeometryScope(List.of(polygon));
         GridGraph graph = GridGraph.create(scope, pitch);
         List<PlanPoint> connector = routePath(graph, scope, scope, previous, target, edgesOf(path, pitch), pitch, false, null);
         connector.stream().skip(1).forEach(point -> appendDistinct(path, point));
+    }
+
+    private void appendSpiralBridge(
+            List<PlanPoint> supplyPath,
+            List<PlanPoint> returnPath,
+            List<PlanPoint> polygon,
+            double pitch
+    ) {
+        if (returnPath.isEmpty()) {
+            return;
+        }
+        if (supplyPath.isEmpty()) {
+            appendDistinct(supplyPath, returnPath.getFirst());
+            return;
+        }
+        PlanPoint previous = supplyPath.getLast();
+        PlanPoint target = returnPath.getFirst();
+        List<List<PlanPoint>> candidates = connectionCandidates(previous, target, polygon, pitch, true);
+        if (candidates.isEmpty()) {
+            appendConnected(supplyPath, target, polygon, pitch);
+            return;
+        }
+        Set<GridEdge> returnEdges = edgesOf(returnPath, pitch);
+        List<PlanPoint> selected = candidates.stream()
+                .min(Comparator.comparingDouble(candidate -> connectionPenalty(supplyPath, candidate, pitch, returnEdges)))
+                .orElseThrow();
+        selected.forEach(point -> appendDistinct(supplyPath, point));
+    }
+
+    private double connectionPenalty(List<PlanPoint> path, List<PlanPoint> candidate, double pitch) {
+        return connectionPenalty(path, candidate, pitch, Set.of());
+    }
+
+    private double connectionPenalty(List<PlanPoint> path, List<PlanPoint> candidate, double pitch, Set<GridEdge> reservedEdges) {
+        List<PlanPoint> connection = new ArrayList<>();
+        appendDistinct(connection, path.getLast());
+        candidate.forEach(point -> appendDistinct(connection, point));
+        double penalty = rawLength(connection);
+        Set<GridEdge> existingEdges = edgesOf(path, pitch);
+        for (GridEdge edge : edgesOf(connection, pitch)) {
+            if (existingEdges.contains(edge)) {
+                penalty += 1_000_000.0;
+            }
+            if (reservedEdges.contains(edge)) {
+                penalty += 1_000_000.0;
+            }
+        }
+        if (backsUp(path, candidate.getFirst())) {
+            penalty += 1_000_000.0;
+        }
+        return penalty;
+    }
+
+    private boolean backsUp(List<PlanPoint> path, PlanPoint next) {
+        if (path.size() < 2 || samePoint(path.getLast(), next)) {
+            return false;
+        }
+        PlanPoint previous = path.get(path.size() - 2);
+        PlanPoint current = path.getLast();
+        if (Math.abs(orientation(previous, current, next)) > EPSILON) {
+            return false;
+        }
+        double firstX = current.xMillimeters() - previous.xMillimeters();
+        double firstY = current.yMillimeters() - previous.yMillimeters();
+        double secondX = next.xMillimeters() - current.xMillimeters();
+        double secondY = next.yMillimeters() - current.yMillimeters();
+        return firstX * secondX + firstY * secondY < -EPSILON;
+    }
+
+    private List<List<PlanPoint>> connectionCandidates(
+            PlanPoint previous,
+            PlanPoint target,
+            List<PlanPoint> polygon,
+            double pitch,
+            boolean includeDetours
+    ) {
+        List<List<PlanPoint>> candidates = new ArrayList<>();
+        if (axisAligned(previous, target) && segmentInside(previous, target, polygon)) {
+            candidates.add(List.of(target));
+        }
+        PlanPoint firstCorner = new PlanPoint(previous.xMillimeters(), target.yMillimeters());
+        addConnectionCandidate(candidates, previous, firstCorner, target, polygon);
+        PlanPoint secondCorner = new PlanPoint(target.xMillimeters(), previous.yMillimeters());
+        addConnectionCandidate(candidates, previous, secondCorner, target, polygon);
+        if (includeDetours && axisAligned(previous, target)) {
+            addDetourCandidates(candidates, previous, target, polygon, pitch);
+        }
+        return List.copyOf(candidates);
+    }
+
+    private void addConnectionCandidate(
+            List<List<PlanPoint>> candidates,
+            PlanPoint previous,
+            PlanPoint corner,
+            PlanPoint target,
+            List<PlanPoint> polygon
+    ) {
+        if (samePoint(previous, corner) || samePoint(corner, target)) {
+            return;
+        }
+        if (segmentInside(previous, corner, polygon) && segmentInside(corner, target, polygon)) {
+            candidates.add(List.of(corner, target));
+        }
+    }
+
+    private void addDetourCandidates(
+            List<List<PlanPoint>> candidates,
+            PlanPoint previous,
+            PlanPoint target,
+            List<PlanPoint> polygon,
+            double pitch
+    ) {
+        if (Math.abs(previous.xMillimeters() - target.xMillimeters()) < EPSILON) {
+            for (double direction : List.of(-1.0, 1.0)) {
+                double x = previous.xMillimeters() + direction * pitch;
+                addThreePointCandidate(candidates, previous, new PlanPoint(x, previous.yMillimeters()),
+                        new PlanPoint(x, target.yMillimeters()), target, polygon);
+            }
+        } else if (Math.abs(previous.yMillimeters() - target.yMillimeters()) < EPSILON) {
+            for (double direction : List.of(-1.0, 1.0)) {
+                double y = previous.yMillimeters() + direction * pitch;
+                addThreePointCandidate(candidates, previous, new PlanPoint(previous.xMillimeters(), y),
+                        new PlanPoint(target.xMillimeters(), y), target, polygon);
+            }
+        }
+    }
+
+    private void addThreePointCandidate(
+            List<List<PlanPoint>> candidates,
+            PlanPoint previous,
+            PlanPoint first,
+            PlanPoint second,
+            PlanPoint target,
+            List<PlanPoint> polygon
+    ) {
+        if (segmentInside(previous, first, polygon)
+                && segmentInside(first, second, polygon)
+                && segmentInside(second, target, polygon)) {
+            candidates.add(List.of(first, second, target));
+        }
     }
 
     private List<PlanPoint> simplifyPolygon(List<PlanPoint> points) {
@@ -1647,10 +1841,21 @@ public final class HydronicHeatingLayoutService {
     private List<PipeSegment> segments(UUID zoneId, ConnectorPlan connectors, FieldPattern pattern) {
         List<PipeSegment> segments = new ArrayList<>();
         addSegments(segments, zoneId, connectors.supplyPath(), PipeRole.SUPPLY_CONNECTOR);
-        addSegments(segments, zoneId, pattern.supplyPath(), PipeRole.SUPPLY);
+        addSupplyAndBridgeSegments(segments, zoneId, pattern);
         addSegments(segments, zoneId, pattern.returnPath(), PipeRole.RETURN);
         addSegments(segments, zoneId, connectors.returnPath(), PipeRole.RETURN_CONNECTOR);
         return List.copyOf(segments);
+    }
+
+    private void addSupplyAndBridgeSegments(List<PipeSegment> segments, UUID zoneId, FieldPattern pattern) {
+        for (int index = 1; index < pattern.supplyPath().size(); index++) {
+            PipeRole role = index == pattern.supplyPath().size() - 1
+                    && !pattern.returnPath().isEmpty()
+                    && samePoint(pattern.supplyPath().get(index), pattern.returnPath().getFirst())
+                    ? PipeRole.BRIDGE
+                    : PipeRole.SUPPLY;
+            segments.add(new PipeSegment(zoneId, role, pattern.supplyPath().get(index - 1), pattern.supplyPath().get(index)));
+        }
     }
 
     private void addSegments(List<PipeSegment> segments, UUID zoneId, List<PlanPoint> path, PipeRole role) {
@@ -2176,6 +2381,7 @@ public final class HydronicHeatingLayoutService {
 
     public enum PipeRole {
         SUPPLY,
+        BRIDGE,
         RETURN,
         SUPPLY_CONNECTOR,
         RETURN_CONNECTOR

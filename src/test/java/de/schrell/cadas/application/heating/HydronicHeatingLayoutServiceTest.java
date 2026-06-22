@@ -69,6 +69,79 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void zeichnetSchneckenMitteOhneDiagonale() {
+        Room room = rectangularRoom();
+        HydronicHeating spiral = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000)
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)));
+
+        HydronicHeatingLayoutService.CircuitLayout circuit = service.layout(spiral).getFirst();
+
+        assertAxisAligned(circuit.fieldSupplyPath());
+        assertAxisAligned(circuit.fieldReturnPath());
+        assertEquals(circuit.fieldSupplyPath().getLast(), circuit.fieldReturnPath().getFirst());
+        assertTrue(circuit.segments().stream()
+                .anyMatch(segment -> segment.role() == HydronicHeatingLayoutService.PipeRole.BRIDGE));
+    }
+
+    @Test
+    void verbindetGesetzteRandanschlüsseRastergebunden() {
+        Room room = rectangularRoom();
+        HeatingZone zone = HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)
+                .withSupplyConnectionPoint(new PlanPoint(6_000, 1_000))
+                .withReturnConnectionPoint(new PlanPoint(6_000, 1_200));
+        HydronicHeating spiral = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000)
+                .withZones(List.of(zone));
+
+        HydronicHeatingLayoutService.CircuitLayout circuit = service.layoutBestEffort(spiral).circuits().getFirst();
+
+        assertEquals(zone.supplyConnectionPoint(), circuit.fieldSupplyPath().getFirst());
+        assertEquals(zone.returnConnectionPoint(), circuit.fieldReturnPath().getLast());
+        assertAxisAligned(circuit.fieldSupplyPath());
+        assertAxisAligned(circuit.fieldReturnPath());
+    }
+
+    @Test
+    void orientiertSchneckeNachGesetztenRandanschlüssenNeu() {
+        Room room = rectangularRoom();
+        HeatingZone leftZone = HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)
+                .withSupplyConnectionPoint(new PlanPoint(0, 1_000))
+                .withReturnConnectionPoint(new PlanPoint(0, 1_200));
+        HeatingZone rightZone = leftZone
+                .withSupplyConnectionPoint(new PlanPoint(6_000, 1_000))
+                .withReturnConnectionPoint(new PlanPoint(6_000, 1_200));
+        HydronicHeating base = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000);
+
+        HydronicHeatingLayoutService.CircuitLayout leftCircuit = service.layoutBestEffort(base.withZones(List.of(leftZone))).circuits().getFirst();
+        HydronicHeatingLayoutService.CircuitLayout rightCircuit = service.layoutBestEffort(base.withZones(List.of(rightZone))).circuits().getFirst();
+
+        assertTrue(firstInteriorPoint(leftCircuit.fieldSupplyPath(), room).xMillimeters() < 1_000.0);
+        assertTrue(firstInteriorPoint(rightCircuit.fieldSupplyPath(), room).xMillimeters() > 5_000.0);
+        assertNotEquals(leftCircuit.fieldSupplyPath(), rightCircuit.fieldSupplyPath());
+    }
+
+    @Test
+    void berechnetSchneckeNachRechteckänderungNeu() {
+        Room room = rectangularRoom();
+        HeatingZone zone = HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL);
+        HydronicHeating base = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000)
+                .withZones(List.of(zone));
+        HeatingZone resized = zone.withOutline(List.of(
+                new PlanPoint(0, 0), new PlanPoint(4_800, 0),
+                new PlanPoint(4_800, 4_000), new PlanPoint(0, 4_000)
+        ));
+        HydronicHeating changed = base.withZones(List.of(resized));
+
+        HydronicHeatingLayoutService.CircuitLayout originalCircuit = service.layoutBestEffort(base).circuits().getFirst();
+        HydronicHeatingLayoutService.CircuitLayout changedCircuit = service.layoutBestEffort(changed).circuits().getFirst();
+
+        assertNotEquals(originalCircuit.fieldSupplyPath(), changedCircuit.fieldSupplyPath());
+        assertTrue(changedCircuit.fieldSupplyPath().stream()
+                .allMatch(point -> point.xMillimeters() <= 4_800.0 + 0.001));
+        assertTrue(changedCircuit.fieldReturnPath().stream()
+                .allMatch(point -> point.xMillimeters() <= 4_800.0 + 0.001));
+    }
+
+    @Test
     void teiltRaumBisZurMaximalenRohrlängeInHeizkreise() {
         Room room = rectangularRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 35_000);
@@ -390,6 +463,9 @@ class HydronicHeatingLayoutServiceTest {
         for (int index = 0; index < polygon.size(); index++) {
             PlanPoint current = polygon.get(index);
             PlanPoint previous = polygon.get(previousIndex);
+            if (pointOnSegment(point, previous, current)) {
+                return true;
+            }
             boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
                     && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
                     * (point.yMillimeters() - current.yMillimeters())
@@ -400,6 +476,42 @@ class HydronicHeatingLayoutServiceTest {
             previousIndex = index;
         }
         return inside || polygon.stream().anyMatch(vertex -> vertex.distanceTo(point).toMillimeters() < 0.001);
+    }
+
+    private boolean pointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end) {
+        if (Math.abs(orientation(start, end, point)) > 0.001) {
+            return false;
+        }
+        return point.xMillimeters() >= Math.min(start.xMillimeters(), end.xMillimeters()) - 0.001
+                && point.xMillimeters() <= Math.max(start.xMillimeters(), end.xMillimeters()) + 0.001
+                && point.yMillimeters() >= Math.min(start.yMillimeters(), end.yMillimeters()) - 0.001
+                && point.yMillimeters() <= Math.max(start.yMillimeters(), end.yMillimeters()) + 0.001;
+    }
+
+    private PlanPoint firstInteriorPoint(List<PlanPoint> path, Room room) {
+        double minX = room.outline().stream().mapToDouble(PlanPoint::xMillimeters).min().orElseThrow();
+        double maxX = room.outline().stream().mapToDouble(PlanPoint::xMillimeters).max().orElseThrow();
+        double minY = room.outline().stream().mapToDouble(PlanPoint::yMillimeters).min().orElseThrow();
+        double maxY = room.outline().stream().mapToDouble(PlanPoint::yMillimeters).max().orElseThrow();
+        return path.stream()
+                .filter(point -> point.xMillimeters() > minX + 0.001)
+                .filter(point -> point.xMillimeters() < maxX - 0.001)
+                .filter(point -> point.yMillimeters() > minY + 0.001)
+                .filter(point -> point.yMillimeters() < maxY - 0.001)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Kein Innenpunkt im Pfad für " + room.name() + " gefunden."));
+    }
+
+    private void assertAxisAligned(List<PlanPoint> path) {
+        for (int index = 1; index < path.size(); index++) {
+            PlanPoint start = path.get(index - 1);
+            PlanPoint end = path.get(index);
+            assertTrue(
+                    Math.abs(start.xMillimeters() - end.xMillimeters()) < 0.001
+                            || Math.abs(start.yMillimeters() - end.yMillimeters()) < 0.001,
+                    () -> "Diagonalstück im Heizkreis: " + start + " -> " + end
+            );
+        }
     }
 
     private void assertNoSelfIntersections(List<PlanPoint> path) {
