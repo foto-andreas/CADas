@@ -13,6 +13,7 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -177,5 +178,27 @@ class SelectionTranslationServiceTest {
         );
 
         assertEquals(new PlanPoint(1_200, 900), result.floorOpenings().getFirst().center());
+    }
+
+    @Test
+    void verschiebtAusgewählteFbhSperrfläche() {
+        Level level = new Level("Erdgeschoss");
+        HeatingExclusionArea area = HeatingExclusionArea.create(
+                java.util.UUID.randomUUID(),
+                "Sperre",
+                new PlanPoint(500, 600),
+                new PlanPoint(1_500, 1_600)
+        );
+        level.addHeatingExclusionArea(area);
+
+        SelectionTranslationService.TranslationResult result = translationService.translate(
+                level,
+                Set.of(new SelectionKey(RenderableKind.HEATING_EXCLUSION, level.name(), area.id().toString())),
+                120.0,
+                -80.0
+        );
+
+        assertEquals(new PlanPoint(620, 520), result.heatingExclusionAreas().getFirst().firstCorner());
+        assertEquals(new PlanPoint(1_620, 1_520), result.heatingExclusionAreas().getFirst().oppositeCorner());
     }
 }

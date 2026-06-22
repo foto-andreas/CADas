@@ -8,6 +8,9 @@ import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
@@ -15,6 +18,7 @@ import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 
 import java.util.Set;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -80,7 +84,35 @@ class EdgeResizeServiceTest {
 
         var handles = service.handles(level, Set.of(new SelectionKey(RenderableKind.STAIR, level.name(), staircase.id().toString())));
 
-        assertEquals(2, handles.size());
+        assertEquals(8, handles.size());
+    }
+
+    @Test
+    void liefertAchtHandlesFuerRechteckartigeFlaechen() {
+        Level level = new Level("Obergeschoss");
+        UUID roomId = UUID.randomUUID();
+        FloorOpening opening = FloorOpening.create(
+                roomId,
+                FloorOpeningShape.RECTANGLE,
+                new PlanPoint(1_000, 1_000),
+                Length.ofMillimeters(800),
+                Length.ofMillimeters(600)
+        );
+        HeatingExclusionArea area = HeatingExclusionArea.create(
+                roomId,
+                "Sperre",
+                new PlanPoint(2_000, 500),
+                new PlanPoint(3_000, 1_500)
+        );
+        level.addFloorOpening(opening);
+        level.addHeatingExclusionArea(area);
+
+        assertEquals(8, service.handles(level, Set.of(new SelectionKey(
+                RenderableKind.FLOOR_OPENING, level.name(), opening.id().toString()
+        ))).size());
+        assertEquals(8, service.handles(level, Set.of(new SelectionKey(
+                RenderableKind.HEATING_EXCLUSION, level.name(), area.id().toString()
+        ))).size());
     }
 
     @Test
@@ -121,6 +153,57 @@ class EdgeResizeServiceTest {
         assertEquals(staircase.firstCorner().yMillimeters(), resized.firstCorner().yMillimeters(), 0.001);
         assertEquals(2_800.0, resized.oppositeCorner().xMillimeters(), 0.001);
         assertEquals(1_700.0, resized.oppositeCorner().yMillimeters(), 0.001);
+    }
+
+    @Test
+    void aendertRechteckigeBodenoeffnungMitSeitenHandle() {
+        Level level = new Level("Obergeschoss");
+        UUID roomId = UUID.randomUUID();
+        FloorOpening opening = FloorOpening.create(
+                roomId,
+                FloorOpeningShape.RECTANGLE,
+                new PlanPoint(1_000, 1_000),
+                Length.ofMillimeters(800),
+                Length.ofMillimeters(600)
+        );
+        level.addFloorOpening(opening);
+        EdgeResizeService.EdgeHandle handle = new EdgeResizeService.EdgeHandle(
+                EdgeResizeService.EdgeHandleKind.RECTANGLE_EAST,
+                RenderableKind.FLOOR_OPENING,
+                opening.id(),
+                null,
+                new PlanPoint(opening.maxXMillimeters(), opening.center().yMillimeters())
+        );
+
+        EdgeResizeService.ResizeResult result = service.resize(level, handle, new PlanPoint(1_700, 1_000));
+
+        assertEquals(1_150.0, result.floorOpenings().getFirst().center().xMillimeters(), 0.001);
+        assertEquals(1_100.0, result.floorOpenings().getFirst().width().toMillimeters(), 0.001);
+        assertEquals(600.0, result.floorOpenings().getFirst().depth().toMillimeters(), 0.001);
+    }
+
+    @Test
+    void aendertFbhSperrflaecheMitEckHandle() {
+        Level level = new Level("Erdgeschoss");
+        HeatingExclusionArea area = HeatingExclusionArea.create(
+                UUID.randomUUID(),
+                "Sperre",
+                new PlanPoint(1_000, 1_000),
+                new PlanPoint(2_000, 2_000)
+        );
+        level.addHeatingExclusionArea(area);
+        EdgeResizeService.EdgeHandle handle = new EdgeResizeService.EdgeHandle(
+                EdgeResizeService.EdgeHandleKind.RECTANGLE_SOUTH_EAST,
+                RenderableKind.HEATING_EXCLUSION,
+                area.id(),
+                null,
+                area.oppositeCorner()
+        );
+
+        EdgeResizeService.ResizeResult result = service.resize(level, handle, new PlanPoint(2_400, 2_300));
+
+        assertEquals(1_400.0, result.heatingExclusionAreas().getFirst().widthMillimeters(), 0.001);
+        assertEquals(1_300.0, result.heatingExclusionAreas().getFirst().depthMillimeters(), 0.001);
     }
 
     private Level level() {

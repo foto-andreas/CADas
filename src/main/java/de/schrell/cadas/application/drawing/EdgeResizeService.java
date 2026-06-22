@@ -1,10 +1,14 @@
 package de.schrell.cadas.application.drawing;
 
 import de.schrell.cadas.application.view.SelectionKey;
+import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
@@ -17,9 +21,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-public final class EdgeResizeService {
+    public final class EdgeResizeService {
 
     private static final double MINIMUM_LENGTH = 1.0;
+    private static final double MINIMUM_RECTANGLE_SIZE = 100.0;
 
     public Optional<EdgeHandle> findHandle(Level level, Set<SelectionKey> selections, PlanPoint point, Length tolerance) {
         return handles(level, selections).stream()
@@ -50,14 +55,45 @@ public final class EdgeResizeService {
                     handles.add(new EdgeHandle(EdgeHandleKind.WINDOW_END, window.id(), wall.id(), wall.axis().pointAt(window.offsetFromStart().add(window.width()))));
                 });
                 case STAIR -> level.staircases().stream().filter(staircase -> staircase.id().equals(id)).findFirst().ifPresent(staircase -> {
-                    handles.add(new EdgeHandle(EdgeHandleKind.STAIR_FIRST_CORNER, staircase.id(), staircase.id(), staircase.firstCorner()));
-                    handles.add(new EdgeHandle(EdgeHandleKind.STAIR_OPPOSITE_CORNER, staircase.id(), staircase.id(), staircase.oppositeCorner()));
+                    addRectangleHandles(handles, RenderableKind.STAIR, staircase.id(), staircase.minX(), staircase.minY(), staircase.maxX(), staircase.maxY());
+                });
+                case FLOOR_OPENING -> level.floorOpenings().stream()
+                        .filter(opening -> opening.id().equals(id))
+                        .filter(opening -> opening.shape() == FloorOpeningShape.RECTANGLE)
+                        .findFirst()
+                        .ifPresent(opening -> addRectangleHandles(handles, RenderableKind.FLOOR_OPENING, opening.id(),
+                                opening.minXMillimeters(), opening.minYMillimeters(),
+                                opening.maxXMillimeters(), opening.maxYMillimeters()));
+                case HEATING_EXCLUSION -> level.heatingExclusionAreas().stream().filter(area -> area.id().equals(id)).findFirst().ifPresent(area -> {
+                    addRectangleHandles(handles, RenderableKind.HEATING_EXCLUSION, area.id(),
+                            area.minXMillimeters(), area.minYMillimeters(), area.maxXMillimeters(), area.maxYMillimeters());
                 });
                 default -> {
                 }
             }
         }
         return List.copyOf(handles);
+    }
+
+    private void addRectangleHandles(
+            List<EdgeHandle> handles,
+            RenderableKind elementKind,
+            UUID elementId,
+            double minX,
+            double minY,
+            double maxX,
+            double maxY
+    ) {
+        double centerX = (minX + maxX) / 2.0;
+        double centerY = (minY + maxY) / 2.0;
+        handles.add(new EdgeHandle(EdgeHandleKind.RECTANGLE_NORTH_WEST, elementKind, elementId, null, new PlanPoint(minX, minY)));
+        handles.add(new EdgeHandle(EdgeHandleKind.RECTANGLE_NORTH, elementKind, elementId, null, new PlanPoint(centerX, minY)));
+        handles.add(new EdgeHandle(EdgeHandleKind.RECTANGLE_NORTH_EAST, elementKind, elementId, null, new PlanPoint(maxX, minY)));
+        handles.add(new EdgeHandle(EdgeHandleKind.RECTANGLE_EAST, elementKind, elementId, null, new PlanPoint(maxX, centerY)));
+        handles.add(new EdgeHandle(EdgeHandleKind.RECTANGLE_SOUTH_EAST, elementKind, elementId, null, new PlanPoint(maxX, maxY)));
+        handles.add(new EdgeHandle(EdgeHandleKind.RECTANGLE_SOUTH, elementKind, elementId, null, new PlanPoint(centerX, maxY)));
+        handles.add(new EdgeHandle(EdgeHandleKind.RECTANGLE_SOUTH_WEST, elementKind, elementId, null, new PlanPoint(minX, maxY)));
+        handles.add(new EdgeHandle(EdgeHandleKind.RECTANGLE_WEST, elementKind, elementId, null, new PlanPoint(minX, centerY)));
     }
 
     private static UUID parseUuidOrNull(String value) {
@@ -74,6 +110,9 @@ public final class EdgeResizeService {
             case DOOR_START, DOOR_END -> resizeDoor(level, handle, targetPoint);
             case WINDOW_START, WINDOW_END -> resizeWindow(level, handle, targetPoint);
             case STAIR_FIRST_CORNER, STAIR_OPPOSITE_CORNER -> resizeStaircase(level, handle, targetPoint);
+            case RECTANGLE_NORTH_WEST, RECTANGLE_NORTH, RECTANGLE_NORTH_EAST, RECTANGLE_EAST,
+                 RECTANGLE_SOUTH_EAST, RECTANGLE_SOUTH, RECTANGLE_SOUTH_WEST, RECTANGLE_WEST ->
+                    resizeRectangle(level, handle, targetPoint);
         };
     }
 
@@ -102,7 +141,7 @@ public final class EdgeResizeService {
         List<WindowElement> windows = level.windows().stream()
                 .map(window -> window.wallId().equals(wall.id()) ? window.withOffset(Length.ofMillimeters(window.offsetFromStart().toMillimeters() - startShift)) : window)
                 .toList();
-        return new ResizeResult(walls, doors, windows, level.staircases());
+        return new ResizeResult(walls, doors, windows, level.staircases(), level.floorOpenings(), level.heatingExclusionAreas());
     }
 
     private ResizeResult resizeDoor(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -114,7 +153,7 @@ public final class EdgeResizeService {
         Door resized = handle.kind() == EdgeHandleKind.DOOR_START
                 ? new Door(door.id(), door.wallId(), Length.ofMillimeters(Math.min(target, end - MINIMUM_LENGTH)), Length.ofMillimeters(end - Math.min(target, end - MINIMUM_LENGTH)), door.height(), door.thresholdHeight())
                 : new Door(door.id(), door.wallId(), door.offsetFromStart(), Length.ofMillimeters(Math.max(target, start + MINIMUM_LENGTH) - start), door.height(), door.thresholdHeight());
-        return new ResizeResult(level.walls(), level.doors().stream().map(candidate -> candidate.id().equals(door.id()) ? resized : candidate).toList(), level.windows(), level.staircases());
+        return new ResizeResult(level.walls(), level.doors().stream().map(candidate -> candidate.id().equals(door.id()) ? resized : candidate).toList(), level.windows(), level.staircases(), level.floorOpenings(), level.heatingExclusionAreas());
     }
 
     private ResizeResult resizeWindow(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -126,7 +165,7 @@ public final class EdgeResizeService {
         WindowElement resized = handle.kind() == EdgeHandleKind.WINDOW_START
                 ? new WindowElement(window.id(), window.wallId(), Length.ofMillimeters(Math.min(target, end - MINIMUM_LENGTH)), Length.ofMillimeters(end - Math.min(target, end - MINIMUM_LENGTH)), window.sillHeight(), window.windowHeight())
                 : new WindowElement(window.id(), window.wallId(), window.offsetFromStart(), Length.ofMillimeters(Math.max(target, start + MINIMUM_LENGTH) - start), window.sillHeight(), window.windowHeight());
-        return new ResizeResult(level.walls(), level.doors(), level.windows().stream().map(candidate -> candidate.id().equals(window.id()) ? resized : candidate).toList(), level.staircases());
+        return new ResizeResult(level.walls(), level.doors(), level.windows().stream().map(candidate -> candidate.id().equals(window.id()) ? resized : candidate).toList(), level.staircases(), level.floorOpenings(), level.heatingExclusionAreas());
     }
 
     private ResizeResult resizeStaircase(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -158,7 +197,150 @@ public final class EdgeResizeService {
         Staircase resized = draggingFirstCorner
                 ? new Staircase(staircase.id(), staircase.stairType(), clampedTarget, staircase.oppositeCorner(), staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth(), staircase.leftUnderbuildWidth(), staircase.rightUnderbuildWidth(), staircase.undersideThickness())
                 : new Staircase(staircase.id(), staircase.stairType(), staircase.firstCorner(), clampedTarget, staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(), staircase.startLandingWidth(), staircase.endLandingWidth(), staircase.leftUnderbuildWidth(), staircase.rightUnderbuildWidth(), staircase.undersideThickness());
-        return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases().stream().map(candidate -> candidate.id().equals(staircase.id()) ? resized : candidate).toList());
+        return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases().stream().map(candidate -> candidate.id().equals(staircase.id()) ? resized : candidate).toList(), level.floorOpenings(), level.heatingExclusionAreas());
+    }
+
+    private ResizeResult resizeRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+        return switch (handle.elementKind()) {
+            case STAIR -> resizeStaircaseRectangle(level, handle, targetPoint);
+            case FLOOR_OPENING -> resizeFloorOpeningRectangle(level, handle, targetPoint);
+            case HEATING_EXCLUSION -> resizeHeatingExclusionRectangle(level, handle, targetPoint);
+            default -> throw new IllegalArgumentException("Bauteil kann nicht rechteckig geändert werden: " + handle.elementKind());
+        };
+    }
+
+    private ResizeResult resizeStaircaseRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+        Staircase staircase = level.staircases().stream()
+                .filter(candidate -> candidate.id().equals(handle.elementId()))
+                .findFirst()
+                .orElseThrow();
+        RectangleBounds bounds = resizeBounds(
+                new RectangleBounds(staircase.minX(), staircase.minY(), staircase.maxX(), staircase.maxY()),
+                handle.kind(),
+                targetPoint
+        );
+        PlanPoint firstCorner = preserveCornerOrientation(staircase.firstCorner(), staircase.oppositeCorner(), bounds);
+        PlanPoint oppositeCorner = preserveCornerOrientation(staircase.oppositeCorner(), staircase.firstCorner(), bounds);
+        Staircase resized = new Staircase(
+                staircase.id(), staircase.stairType(), firstCorner, oppositeCorner,
+                staircase.totalHeight(), staircase.stepCount(), staircase.rotationQuarterTurns(),
+                staircase.startLandingWidth(), staircase.endLandingWidth(),
+                staircase.leftUnderbuildWidth(), staircase.rightUnderbuildWidth(), staircase.undersideThickness()
+        );
+        return new ResizeResult(level.walls(), level.doors(), level.windows(),
+                level.staircases().stream().map(candidate -> candidate.id().equals(staircase.id()) ? resized : candidate).toList(),
+                level.floorOpenings(), level.heatingExclusionAreas());
+    }
+
+    private ResizeResult resizeFloorOpeningRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+        FloorOpening opening = level.floorOpenings().stream()
+                .filter(candidate -> candidate.id().equals(handle.elementId()))
+                .findFirst()
+                .orElseThrow();
+        RectangleBounds bounds = resizeBounds(
+                new RectangleBounds(opening.minXMillimeters(), opening.minYMillimeters(),
+                        opening.maxXMillimeters(), opening.maxYMillimeters()),
+                handle.kind(),
+                targetPoint
+        );
+        FloorOpening resized = new FloorOpening(
+                opening.id(),
+                opening.roomId(),
+                opening.shape(),
+                bounds.center(),
+                Length.ofMillimeters(bounds.width()),
+                Length.ofMillimeters(bounds.height())
+        );
+        return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases(),
+                level.floorOpenings().stream().map(candidate -> candidate.id().equals(opening.id()) ? resized : candidate).toList(),
+                level.heatingExclusionAreas());
+    }
+
+    private ResizeResult resizeHeatingExclusionRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+        HeatingExclusionArea area = level.heatingExclusionAreas().stream()
+                .filter(candidate -> candidate.id().equals(handle.elementId()))
+                .findFirst()
+                .orElseThrow();
+        RectangleBounds bounds = resizeBounds(
+                new RectangleBounds(area.minXMillimeters(), area.minYMillimeters(),
+                        area.maxXMillimeters(), area.maxYMillimeters()),
+                handle.kind(),
+                targetPoint
+        );
+        HeatingExclusionArea resized = area.withCorners(
+                preserveCornerOrientation(area.firstCorner(), area.oppositeCorner(), bounds),
+                preserveCornerOrientation(area.oppositeCorner(), area.firstCorner(), bounds)
+        );
+        return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases(),
+                level.floorOpenings(),
+                level.heatingExclusionAreas().stream().map(candidate -> candidate.id().equals(area.id()) ? resized : candidate).toList());
+    }
+
+    private RectangleBounds resizeBounds(RectangleBounds bounds, EdgeHandleKind handleKind, PlanPoint targetPoint) {
+        double minX = bounds.minX();
+        double maxX = bounds.maxX();
+        double minY = bounds.minY();
+        double maxY = bounds.maxY();
+        if (movesWest(handleKind)) {
+            minX = Math.min(targetPoint.xMillimeters(), maxX - MINIMUM_RECTANGLE_SIZE);
+        }
+        if (movesEast(handleKind)) {
+            maxX = Math.max(targetPoint.xMillimeters(), minX + MINIMUM_RECTANGLE_SIZE);
+        }
+        if (movesNorth(handleKind)) {
+            minY = Math.min(targetPoint.yMillimeters(), maxY - MINIMUM_RECTANGLE_SIZE);
+        }
+        if (movesSouth(handleKind)) {
+            maxY = Math.max(targetPoint.yMillimeters(), minY + MINIMUM_RECTANGLE_SIZE);
+        }
+        return new RectangleBounds(minX, minY, maxX, maxY);
+    }
+
+    private PlanPoint preserveCornerOrientation(PlanPoint corner, PlanPoint oppositeCorner, RectangleBounds bounds) {
+        double x = corner.xMillimeters() <= oppositeCorner.xMillimeters() ? bounds.minX() : bounds.maxX();
+        double y = corner.yMillimeters() <= oppositeCorner.yMillimeters() ? bounds.minY() : bounds.maxY();
+        return new PlanPoint(x, y);
+    }
+
+    public static boolean isRectangleCorner(EdgeHandleKind kind) {
+        return kind == EdgeHandleKind.RECTANGLE_NORTH_WEST
+                || kind == EdgeHandleKind.RECTANGLE_NORTH_EAST
+                || kind == EdgeHandleKind.RECTANGLE_SOUTH_EAST
+                || kind == EdgeHandleKind.RECTANGLE_SOUTH_WEST
+                || kind == EdgeHandleKind.STAIR_FIRST_CORNER
+                || kind == EdgeHandleKind.STAIR_OPPOSITE_CORNER;
+    }
+
+    public static boolean isRectangleHorizontalResize(EdgeHandleKind kind) {
+        return kind == EdgeHandleKind.RECTANGLE_EAST || kind == EdgeHandleKind.RECTANGLE_WEST;
+    }
+
+    public static boolean isRectangleVerticalResize(EdgeHandleKind kind) {
+        return kind == EdgeHandleKind.RECTANGLE_NORTH || kind == EdgeHandleKind.RECTANGLE_SOUTH;
+    }
+
+    private boolean movesWest(EdgeHandleKind kind) {
+        return kind == EdgeHandleKind.RECTANGLE_NORTH_WEST
+                || kind == EdgeHandleKind.RECTANGLE_WEST
+                || kind == EdgeHandleKind.RECTANGLE_SOUTH_WEST;
+    }
+
+    private boolean movesEast(EdgeHandleKind kind) {
+        return kind == EdgeHandleKind.RECTANGLE_NORTH_EAST
+                || kind == EdgeHandleKind.RECTANGLE_EAST
+                || kind == EdgeHandleKind.RECTANGLE_SOUTH_EAST;
+    }
+
+    private boolean movesNorth(EdgeHandleKind kind) {
+        return kind == EdgeHandleKind.RECTANGLE_NORTH_WEST
+                || kind == EdgeHandleKind.RECTANGLE_NORTH
+                || kind == EdgeHandleKind.RECTANGLE_NORTH_EAST;
+    }
+
+    private boolean movesSouth(EdgeHandleKind kind) {
+        return kind == EdgeHandleKind.RECTANGLE_SOUTH_WEST
+                || kind == EdgeHandleKind.RECTANGLE_SOUTH
+                || kind == EdgeHandleKind.RECTANGLE_SOUTH_EAST;
     }
 
     private Optional<Double> minimumOpeningOffset(Level level, Wall wall) {
@@ -213,18 +395,66 @@ public final class EdgeResizeService {
         WINDOW_START,
         WINDOW_END,
         STAIR_FIRST_CORNER,
-        STAIR_OPPOSITE_CORNER
+        STAIR_OPPOSITE_CORNER,
+        RECTANGLE_NORTH_WEST,
+        RECTANGLE_NORTH,
+        RECTANGLE_NORTH_EAST,
+        RECTANGLE_EAST,
+        RECTANGLE_SOUTH_EAST,
+        RECTANGLE_SOUTH,
+        RECTANGLE_SOUTH_WEST,
+        RECTANGLE_WEST
     }
 
-    public record EdgeHandle(EdgeHandleKind kind, UUID elementId, UUID hostWallId, PlanPoint position) {
+    private record RectangleBounds(double minX, double minY, double maxX, double maxY) {
+        private double width() {
+            return maxX - minX;
+        }
+
+        private double height() {
+            return maxY - minY;
+        }
+
+        private PlanPoint center() {
+            return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+        }
     }
 
-    public record ResizeResult(List<Wall> walls, List<Door> doors, List<WindowElement> windows, List<Staircase> staircases) {
+    public record EdgeHandle(EdgeHandleKind kind, RenderableKind elementKind, UUID elementId, UUID hostWallId, PlanPoint position) {
+        public EdgeHandle(EdgeHandleKind kind, UUID elementId, UUID hostWallId, PlanPoint position) {
+            this(kind, elementKindFor(kind), elementId, hostWallId, position);
+        }
+
+        private static RenderableKind elementKindFor(EdgeHandleKind kind) {
+            return switch (kind) {
+                case WALL_START, WALL_END -> RenderableKind.WALL;
+                case DOOR_START, DOOR_END -> RenderableKind.DOOR;
+                case WINDOW_START, WINDOW_END -> RenderableKind.WINDOW;
+                case STAIR_FIRST_CORNER, STAIR_OPPOSITE_CORNER -> RenderableKind.STAIR;
+                default -> throw new IllegalArgumentException("Rechteck-Handles brauchen eine explizite Bauteilart.");
+            };
+        }
+    }
+
+    public record ResizeResult(
+            List<Wall> walls,
+            List<Door> doors,
+            List<WindowElement> windows,
+            List<Staircase> staircases,
+            List<FloorOpening> floorOpenings,
+            List<HeatingExclusionArea> heatingExclusionAreas
+    ) {
+        public ResizeResult(List<Wall> walls, List<Door> doors, List<WindowElement> windows, List<Staircase> staircases) {
+            this(walls, doors, windows, staircases, List.of(), List.of());
+        }
+
         public ResizeResult {
             walls = List.copyOf(walls);
             doors = List.copyOf(doors);
             windows = List.copyOf(windows);
             staircases = List.copyOf(staircases);
+            floorOpenings = List.copyOf(floorOpenings);
+            heatingExclusionAreas = List.copyOf(heatingExclusionAreas);
         }
     }
 }

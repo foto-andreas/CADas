@@ -23,6 +23,7 @@ import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -475,6 +476,48 @@ class CadWorkbenchTest {
         Assertions.assertEquals(1_000.0, aufFxThread(() -> workbench.automationFloorOpening(0).width().toMillimeters()), 0.001);
         Assertions.assertEquals(1_000.0, aufFxThread(() -> workbench.automationFloorOpening(1).width().toMillimeters()), 0.001);
         Assertions.assertEquals(1_000.0, aufFxThread(() -> workbench.automationFloorOpening(1).depth().toMillimeters()), 0.001);
+    }
+
+    @Test
+    void ziehtFbhSperrflächeAufUndÄndertSieMitRechteckHandle() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("HEATING_EXCLUSION_RECTANGLE");
+            workbench.automationCanvasPress(100, 100, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(200, 250, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(200, 250, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationSetTool("EDIT");
+            return null;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(workbench::automationHeatingExclusionAreaCount));
+        double vorherigeBreite = aufFxThread(() -> workbench.automationHeatingExclusionArea(0).widthMillimeters());
+        List<PlanPoint> handles = aufFxThread(workbench::automationEdgeHandleScreenPoints);
+        Assertions.assertEquals(8, handles.size());
+        PlanPoint eastHandle = handles.get(3);
+
+        aufFxThread(() -> {
+            Assertions.assertEquals("RECTANGLE_EAST", workbench.automationEdgeHandleAtScreen(eastHandle.xMillimeters(), eastHandle.yMillimeters()));
+            workbench.automationCanvasPress(eastHandle.xMillimeters(), eastHandle.yMillimeters(), javafx.scene.input.MouseButton.PRIMARY);
+            Assertions.assertEquals("RECTANGLE_EAST", workbench.automationActiveEdgeHandle());
+            workbench.automationCanvasDragTo(eastHandle.xMillimeters() + 1_000.0, eastHandle.yMillimeters(), javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(eastHandle.xMillimeters() + 1_000.0, eastHandle.yMillimeters(), javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        Assertions.assertTrue(aufFxThread(() -> workbench.automationHeatingExclusionArea(0).widthMillimeters()) > vorherigeBreite);
     }
 
     @Test

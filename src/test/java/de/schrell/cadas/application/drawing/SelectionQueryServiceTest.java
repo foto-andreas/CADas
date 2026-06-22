@@ -13,6 +13,7 @@ import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorExtension;
 import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.StairType;
@@ -41,6 +42,23 @@ class SelectionQueryServiceTest {
 
         assertEquals(RenderableKind.FLOOR_EXTENSION, selections.getFirst().kind());
         assertEquals(balcony.id().toString(), selections.getFirst().elementId());
+    }
+
+    @Test
+    void findetFbhSperrflächeAlsEigenständigesElement() {
+        Level level = new Level("EG");
+        HeatingExclusionArea area = HeatingExclusionArea.create(
+                java.util.UUID.randomUUID(),
+                "Sperre",
+                new PlanPoint(500, 500),
+                new PlanPoint(1_500, 1_200)
+        );
+        level.addHeatingExclusionArea(area);
+
+        var selections = selectionQueryService.findSelections(level, new PlanPoint(800, 900), Length.ofMillimeters(10));
+
+        assertEquals(RenderableKind.HEATING_EXCLUSION, selections.getFirst().kind());
+        assertEquals(area.id().toString(), selections.getFirst().elementId());
     }
 
     @Test

@@ -7,6 +7,7 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
@@ -32,6 +33,7 @@ public final class SelectionTranslationService {
         }
         Set<String> selectedRoomObjects = selectedIds(selections, RenderableKind.ROOM_OBJECT);
         Set<String> selectedFloorOpenings = selectedIds(selections, RenderableKind.FLOOR_OPENING);
+        Set<String> selectedHeatingExclusionAreas = selectedIds(selections, RenderableKind.HEATING_EXCLUSION);
         List<PlanPoint> translatedWallEndpoints = selectedWallEndpoints(level, selectedWalls);
         List<Wall> translatedWalls = level.walls().stream()
                 .map(wall -> selectedWalls.contains(wall.id().toString())
@@ -49,8 +51,18 @@ public final class SelectionTranslationService {
                         ? opening.withCenter(translatePoint(opening.center(), deltaXMillimeters, deltaYMillimeters))
                         : opening)
                 .toList();
-        boolean changed = !selectedWalls.isEmpty() || !selectedStairs.isEmpty() || !selectedRoomObjects.isEmpty() || !selectedFloorOpenings.isEmpty();
-        return new TranslationResult(translatedWalls, translatedStairs, translatedRoomObjects, translatedFloorOpenings, changed);
+        List<HeatingExclusionArea> translatedHeatingExclusionAreas = level.heatingExclusionAreas().stream()
+                .map(area -> selectedHeatingExclusionAreas.contains(area.id().toString())
+                        ? area.translated(deltaXMillimeters, deltaYMillimeters)
+                        : area)
+                .toList();
+        boolean changed = !selectedWalls.isEmpty()
+                || !selectedStairs.isEmpty()
+                || !selectedRoomObjects.isEmpty()
+                || !selectedFloorOpenings.isEmpty()
+                || !selectedHeatingExclusionAreas.isEmpty();
+        return new TranslationResult(translatedWalls, translatedStairs, translatedRoomObjects,
+                translatedFloorOpenings, translatedHeatingExclusionAreas, changed);
     }
 
     private Set<String> selectedIds(Set<SelectionKey> selections, RenderableKind kind) {
@@ -143,6 +155,7 @@ public final class SelectionTranslationService {
             List<Staircase> staircases,
             List<RoomObject> roomObjects,
             List<FloorOpening> floorOpenings,
+            List<HeatingExclusionArea> heatingExclusionAreas,
             boolean changed
     ) {
     }

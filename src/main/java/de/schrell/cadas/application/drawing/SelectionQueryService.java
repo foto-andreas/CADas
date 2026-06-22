@@ -31,6 +31,7 @@ public final class SelectionQueryService {
         selections.addAll(findStairSelections(level, point));
         selections.addAll(findFloorExtensionSelections(level, point));
         selections.addAll(findFloorOpeningSelections(level, point));
+        selections.addAll(findHeatingExclusionSelections(level, point));
         selections.addAll(findWallSelections(level, point, tolerance));
         selections.addAll(findRoomObjectSelections(level, point));
         selections.addAll(findRoomSelections(level, point));
@@ -116,6 +117,13 @@ public final class SelectionQueryService {
         return level.floorOpenings().stream()
                 .filter(opening -> opening.contains(point))
                 .map(opening -> new SelectionKey(RenderableKind.FLOOR_OPENING, level.name(), opening.id().toString()))
+                .toList();
+    }
+
+    private List<SelectionKey> findHeatingExclusionSelections(Level level, PlanPoint point) {
+        return level.heatingExclusionAreas().stream()
+                .filter(area -> area.contains(point))
+                .map(area -> new SelectionKey(RenderableKind.HEATING_EXCLUSION, level.name(), area.id().toString()))
                 .toList();
     }
 

@@ -12,6 +12,7 @@ public enum RenderableKind {
     ROOM_OBJECT,
     FLOOR_EXTENSION,
     FLOOR_OPENING,
+    HEATING_EXCLUSION,
     TERRAIN,
     ROOF,
     SURFACE_LAYER

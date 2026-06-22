@@ -83,6 +83,7 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -507,6 +508,7 @@ public final class CadWorkbench extends BorderPane {
     private List<Staircase> selectionDragBaseStaircases = List.of();
     private List<RoomObject> selectionDragBaseRoomObjects = List.of();
     private List<FloorOpening> selectionDragBaseFloorOpenings = List.of();
+    private List<HeatingExclusionArea> selectionDragBaseHeatingExclusionAreas = List.of();
     private UUID openingDragId;
     private PlanSegment openingDragWallAxis;
     private double openingDragWidth;
@@ -516,6 +518,8 @@ public final class CadWorkbench extends BorderPane {
     private List<Door> edgeResizeBaseDoors = List.of();
     private List<WindowElement> edgeResizeBaseWindows = List.of();
     private List<Staircase> edgeResizeBaseStaircases = List.of();
+    private List<FloorOpening> edgeResizeBaseFloorOpenings = List.of();
+    private List<HeatingExclusionArea> edgeResizeBaseHeatingExclusionAreas = List.of();
     private double lastMouseX;
     private double lastMouseY;
     private boolean altPressed;
@@ -1080,6 +1084,7 @@ public final class CadWorkbench extends BorderPane {
                 toolMenuItem(DrawingTool.WALL, KeyCode.W),
                 toolMenuItem(DrawingTool.STAIR, KeyCode.T),
                 toolMenuItem(DrawingTool.FLOOR_EXTENSION, KeyCode.G),
+                menuItem(DrawingTool.HEATING_EXCLUSION_RECTANGLE.label(), () -> toolSelector.setValue(DrawingTool.HEATING_EXCLUSION_RECTANGLE), null),
                 toolMenuItem(DrawingTool.DOOR, KeyCode.D),
                 toolMenuItem(DrawingTool.WINDOW, KeyCode.F),
                 menuItem(DrawingTool.ROOF_WINDOW.label(), () -> toolSelector.setValue(DrawingTool.ROOF_WINDOW), null),
@@ -1437,6 +1442,7 @@ public final class CadWorkbench extends BorderPane {
             case ROOM_OBJECT -> "Objekt";
             case FLOOR_EXTENSION -> "Balkon/Empore";
             case FLOOR_OPENING -> "Bodenöffnung";
+            case HEATING_EXCLUSION -> "FBH-Sperrfläche";
             default -> selection.kind().name();
         };
     }
@@ -1958,6 +1964,8 @@ public final class CadWorkbench extends BorderPane {
                 edgeResizeBaseDoors = List.copyOf(activeLevel.get().doors());
                 edgeResizeBaseWindows = List.copyOf(activeLevel.get().windows());
                 edgeResizeBaseStaircases = List.copyOf(activeLevel.get().staircases());
+                edgeResizeBaseFloorOpenings = List.copyOf(activeLevel.get().floorOpenings());
+                edgeResizeBaseHeatingExclusionAreas = List.copyOf(activeLevel.get().heatingExclusionAreas());
                 selectedEndpointGroup = null;
                 selectionDragAnchor = null;
                 openingDragId = null;
@@ -1974,6 +1982,7 @@ public final class CadWorkbench extends BorderPane {
             selectionDragBaseStaircases = List.of();
             selectionDragBaseRoomObjects = List.of();
             selectionDragBaseFloorOpenings = List.of();
+            selectionDragBaseHeatingExclusionAreas = List.of();
             historyCapturedForDrag = false;
             if (selectedEndpointGroup != null) {
                 syncEndpointHeightInputFromSelection();
@@ -2085,6 +2094,8 @@ public final class CadWorkbench extends BorderPane {
                 baseLevel.replaceDoors(edgeResizeBaseDoors);
                 baseLevel.replaceWindows(edgeResizeBaseWindows);
                 baseLevel.replaceStaircases(edgeResizeBaseStaircases);
+                baseLevel.replaceFloorOpenings(edgeResizeBaseFloorOpenings);
+                baseLevel.replaceHeatingExclusionAreas(edgeResizeBaseHeatingExclusionAreas);
                 boolean isWallHandle = activeEdgeHandle.kind() == EdgeResizeService.EdgeHandleKind.WALL_START
                         || activeEdgeHandle.kind() == EdgeResizeService.EdgeHandleKind.WALL_END;
                 Set<UUID> excludedWallIds = isWallHandle ? Set.of(activeEdgeHandle.hostWallId()) : Set.of();
@@ -2104,11 +2115,16 @@ public final class CadWorkbench extends BorderPane {
                 activeLevel.get().replaceDoors(result.doors());
                 activeLevel.get().replaceWindows(result.windows());
                 activeLevel.get().replaceStaircases(result.staircases());
-                result.staircases().stream()
+                activeLevel.get().replaceFloorOpenings(result.floorOpenings());
+                activeLevel.get().replaceHeatingExclusionAreas(result.heatingExclusionAreas());
+                List<Staircase> resizedStaircasesWithUnderbuild = result.staircases().stream()
                         .filter(staircase -> staircase.leftUnderbuildWidth().toMillimeters() > 0.0
                                 || staircase.rightUnderbuildWidth().toMillimeters() > 0.0)
-                        .forEach(this::synchronizeStairUnderbuild);
-                synchronizeRoomsFromWalls(activeLevel.get());
+                        .toList();
+                resizedStaircasesWithUnderbuild.forEach(this::synchronizeStairUnderbuild);
+                if (isWallHandle || !resizedStaircasesWithUnderbuild.isEmpty()) {
+                    synchronizeRoomsFromWalls(activeLevel.get());
+                }
                 markThreeDDirty();
                 render();
                 return;
@@ -2230,6 +2246,8 @@ public final class CadWorkbench extends BorderPane {
             edgeResizeBaseDoors = List.of();
             edgeResizeBaseWindows = List.of();
             edgeResizeBaseStaircases = List.of();
+            edgeResizeBaseFloorOpenings = List.of();
+            edgeResizeBaseHeatingExclusionAreas = List.of();
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -2263,6 +2281,7 @@ public final class CadWorkbench extends BorderPane {
             selectionDragBaseStaircases = List.of();
             selectionDragBaseRoomObjects = List.of();
             selectionDragBaseFloorOpenings = List.of();
+            selectionDragBaseHeatingExclusionAreas = List.of();
             historyCapturedForDrag = false;
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -2318,6 +2337,10 @@ public final class CadWorkbench extends BorderPane {
                 createFloorOpening(previewSegment, currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE
                         ? FloorOpeningShape.CIRCLE
                         : FloorOpeningShape.RECTANGLE);
+            } else if (currentTool() == DrawingTool.HEATING_EXCLUSION_RECTANGLE
+                    && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
+                    && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
+                createHeatingExclusionArea(previewSegment);
             }
             markThreeDDirty();
         }
@@ -2456,9 +2479,14 @@ public final class CadWorkbench extends BorderPane {
         );
         if (handle.isPresent()) {
             EdgeResizeService.EdgeHandle edgeHandle = handle.orElseThrow();
-            if (edgeHandle.kind() == EdgeResizeService.EdgeHandleKind.STAIR_FIRST_CORNER
-                    || edgeHandle.kind() == EdgeResizeService.EdgeHandleKind.STAIR_OPPOSITE_CORNER) {
+            if (EdgeResizeService.isRectangleCorner(edgeHandle.kind())) {
                 return PointerCursorService.PointerTarget.RESIZE_CORNER;
+            }
+            if (EdgeResizeService.isRectangleHorizontalResize(edgeHandle.kind())) {
+                return PointerCursorService.PointerTarget.HORIZONTAL_EDGE;
+            }
+            if (EdgeResizeService.isRectangleVerticalResize(edgeHandle.kind())) {
+                return PointerCursorService.PointerTarget.VERTICAL_EDGE;
             }
             Wall wall = activeLevel.get().findWall(edgeHandle.hostWallId());
             double deltaX = Math.abs(wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters());
@@ -2657,6 +2685,10 @@ public final class CadWorkbench extends BorderPane {
                         .filter(opening -> opening.id().toString().equals(selection.elementId()))
                         .findFirst()
                         .ifPresent(opening -> drawSelectedFloorOpening(graphics, opening));
+                case HEATING_EXCLUSION -> activeLevel.get().heatingExclusionAreas().stream()
+                        .filter(area -> area.id().toString().equals(selection.elementId()))
+                        .findFirst()
+                        .ifPresent(area -> drawSelectedHeatingExclusionArea(graphics, area));
                 default -> {
                 }
             }
@@ -2700,6 +2732,15 @@ public final class CadWorkbench extends BorderPane {
         } else {
             graphics.strokeRect(x, y, width, height);
         }
+    }
+
+    private void drawSelectedHeatingExclusionArea(GraphicsContext graphics, HeatingExclusionArea area) {
+        graphics.strokeRect(
+                toScreenProjectedX(new PlanPoint(area.minXMillimeters(), area.minYMillimeters()), 0.0),
+                toScreenProjectedY(new PlanPoint(area.minXMillimeters(), area.minYMillimeters()), 0.0),
+                area.widthMillimeters() * scale(),
+                area.depthMillimeters() * scale()
+        );
     }
 
     private void drawLowerLevel(GraphicsContext graphics) {
@@ -3211,6 +3252,7 @@ public final class CadWorkbench extends BorderPane {
             drawRoomSlopeMarker(graphics, room);
             drawRoomTileGrid(graphics, room);
             drawFloorOpenings(graphics, room);
+            drawHeatingExclusionAreas(graphics, room);
         }
     }
 
@@ -3318,6 +3360,28 @@ public final class CadWorkbench extends BorderPane {
                 graphics.fillRect(x, y, width, height);
                 graphics.strokeRect(x, y, width, height);
             }
+        }
+    }
+
+    private void drawHeatingExclusionAreas(GraphicsContext graphics, Room room) {
+        for (HeatingExclusionArea area : activeLevel.get().heatingExclusionAreas()) {
+            if (!area.roomId().equals(room.id())) {
+                continue;
+            }
+            boolean selected = isSelected(RenderableKind.HEATING_EXCLUSION, area.id().toString());
+            double x = toScreenProjectedX(new PlanPoint(area.minXMillimeters(), area.minYMillimeters()), 0.0);
+            double y = toScreenProjectedY(new PlanPoint(area.minXMillimeters(), area.minYMillimeters()), 0.0);
+            double width = area.widthMillimeters() * scale();
+            double height = area.depthMillimeters() * scale();
+            graphics.save();
+            graphics.setFill(Color.color(0.82, 0.18, 0.12, selected ? 0.28 : 0.16));
+            graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#9f3028"));
+            graphics.setLineWidth(selected ? 2.6 : 1.6);
+            graphics.setLineDashes(8.0, 5.0);
+            graphics.fillRect(x, y, width, height);
+            graphics.strokeRect(x, y, width, height);
+            graphics.setLineDashes();
+            graphics.restore();
         }
     }
 
@@ -4225,7 +4289,8 @@ public final class CadWorkbench extends BorderPane {
         if (currentTool() == DrawingTool.STAIR
                 || currentTool() == DrawingTool.FLOOR_EXTENSION
                 || currentTool() == DrawingTool.FLOOR_OPENING_RECTANGLE
-                || currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE) {
+                || currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE
+                || currentTool() == DrawingTool.HEATING_EXCLUSION_RECTANGLE) {
             graphics.setFill(Color.color(0.45, 0.37, 0.29, 0.18));
             graphics.setStroke(Color.web("#7f6a55"));
             graphics.setLineWidth(2.0);
@@ -4621,6 +4686,7 @@ public final class CadWorkbench extends BorderPane {
             case FLOOR_EXTENSION -> "Werkzeug: Balkon/Empore | Rechteck aufziehen fügt die Fußbodenplatte innen oder außen an die aktive Etage an.";
             case FLOOR_OPENING_RECTANGLE -> "Werkzeug: Bodenloch rechteckig | Rechteck innerhalb eines Raums aufziehen.";
             case FLOOR_OPENING_CIRCLE -> "Werkzeug: Bodenloch rund | Begrenzungsquadrat innerhalb eines Raums aufziehen.";
+            case HEATING_EXCLUSION_RECTANGLE -> "Werkzeug: FBH-Sperrfläche | Rechteck innerhalb eines Raums aufziehen; der FBH-Layouter spart diese Fläche aus.";
             case OBJECT -> "Werkzeug: Objekt | Linksklick platziert das ausgewählte Objekt-Preset innen oder außen.";
         };
     }
@@ -4932,6 +4998,33 @@ public final class CadWorkbench extends BorderPane {
         selectSingle(new SelectionKey(RenderableKind.FLOOR_OPENING, activeLevel.get().name(), opening.id().toString()));
         markThreeDDirty();
         draftLabel.setText("Bodenöffnung erzeugt.");
+    }
+
+    private void createHeatingExclusionArea(PlanSegment bounds) {
+        PlanPoint center = new PlanPoint(
+                (bounds.start().xMillimeters() + bounds.end().xMillimeters()) / 2.0,
+                (bounds.start().yMillimeters() + bounds.end().yMillimeters()) / 2.0
+        );
+        Optional<Room> room = selectionQueryService.findSelections(activeLevel.get(), center, SNAP_TOLERANCE).stream()
+                .filter(selection -> selection.kind() == RenderableKind.ROOM_VOLUME)
+                .findFirst()
+                .flatMap(selection -> activeLevel.get().rooms().stream()
+                        .filter(candidate -> candidate.id().toString().equals(selection.elementId()))
+                        .findFirst());
+        if (room.isEmpty()) {
+            draftLabel.setText("FBH-Sperrflächen müssen mit ihrem Mittelpunkt in einem Raum liegen.");
+            return;
+        }
+        rememberStateForUndo();
+        HeatingExclusionArea area = HeatingExclusionArea.create(
+                room.orElseThrow().id(),
+                "FBH-Sperrfläche " + (activeLevel.get().heatingExclusionAreas().size() + 1),
+                bounds.start(),
+                bounds.end()
+        );
+        activeLevel.get().addHeatingExclusionArea(area);
+        selectSingle(new SelectionKey(RenderableKind.HEATING_EXCLUSION, activeLevel.get().name(), area.id().toString()));
+        draftLabel.setText("FBH-Sperrfläche erzeugt.");
     }
 
     private void startGuideDrag(GuideOrientation orientation, double worldMillimeters) {
@@ -5934,7 +6027,9 @@ public final class CadWorkbench extends BorderPane {
         HydronicHeatingLayoutService.PlanningResult result = hydronicHeatingLayoutService.suggest(
                 room,
                 unplanned,
-                activeLevel.get().staircases()
+                activeLevel.get().staircases(),
+                activeLevel.get().floorOpenings(),
+                activeLevel.get().heatingExclusionAreas()
         );
         if (!result.validationReport().valid()) {
             throw new IllegalArgumentException(result.validationReport().summary());
@@ -6479,7 +6574,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void afterSurfaceLayerMutation(String message) {
-        synchronizeRoomsFromWalls(activeLevel.get());
+        if (selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.WALL
+                || selection.kind() == RenderableKind.STAIR)) {
+            synchronizeRoomsFromWalls(activeLevel.get());
+        }
         markThreeDDirty();
         refreshSurfaceLayerSection();
         draftLabel.setText(message);
@@ -7018,6 +7116,7 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseStaircases = List.of();
         selectionDragBaseRoomObjects = List.of();
         selectionDragBaseFloorOpenings = List.of();
+        selectionDragBaseHeatingExclusionAreas = List.of();
         openingDragId = null;
         openingDragWallAxis = null;
         openingDragWidth = 0;
@@ -7051,6 +7150,7 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseStaircases = List.of();
         selectionDragBaseRoomObjects = List.of();
         selectionDragBaseFloorOpenings = List.of();
+        selectionDragBaseHeatingExclusionAreas = List.of();
         openingDragId = null;
         openingDragWallAxis = null;
         openingDragWidth = 0;
@@ -7078,6 +7178,7 @@ public final class CadWorkbench extends BorderPane {
                 case ROOM_OBJECT -> activeLevel.get().removeRoomObject(id);
                 case FLOOR_EXTENSION -> activeLevel.get().removeFloorExtension(id);
                 case FLOOR_OPENING -> activeLevel.get().removeFloorOpening(id);
+                case HEATING_EXCLUSION -> activeLevel.get().removeHeatingExclusionArea(id);
                 default -> false;
             };
         }
@@ -7501,7 +7602,10 @@ public final class CadWorkbench extends BorderPane {
             default -> {
             }
         }
-        synchronizeRoomsFromWalls(activeLevel.get());
+        if (selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.WALL
+                || selection.kind() == RenderableKind.STAIR)) {
+            synchronizeRoomsFromWalls(activeLevel.get());
+        }
         markThreeDDirty();
         draftLabel.setText("Eigenschaften auf Auswahl angewendet.");
         render();
@@ -7663,7 +7767,8 @@ public final class CadWorkbench extends BorderPane {
         selectionDragBaseStaircases = List.copyOf(activeLevel.get().staircases());
         selectionDragBaseRoomObjects = List.copyOf(activeLevel.get().roomObjects());
         selectionDragBaseFloorOpenings = List.copyOf(activeLevel.get().floorOpenings());
-        draftLabel.setText("Ausgewählte Wände, Treppen oder Objekte können jetzt parallel verschoben werden.");
+        selectionDragBaseHeatingExclusionAreas = List.copyOf(activeLevel.get().heatingExclusionAreas());
+        draftLabel.setText("Ausgewählte Wände, Treppen, Objekte oder rechteckige Flächen können jetzt parallel verschoben werden.");
     }
 
     private void translateSelectedComponents(PlanPoint snappedPoint) {
@@ -7690,6 +7795,7 @@ public final class CadWorkbench extends BorderPane {
         dragLevel.replaceStaircases(selectionDragBaseStaircases);
         dragLevel.replaceRoomObjects(selectionDragBaseRoomObjects);
         dragLevel.replaceFloorOpenings(selectionDragBaseFloorOpenings);
+        dragLevel.replaceHeatingExclusionAreas(selectionDragBaseHeatingExclusionAreas);
         SelectionTranslationService.TranslationResult translationResult = selectionTranslationService.translate(dragLevel, Set.copyOf(selectedSelections), deltaX, deltaY);
         if (!translationResult.changed()) {
             return;
@@ -7698,6 +7804,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceStaircases(translationResult.staircases());
         activeLevel.get().replaceRoomObjects(translationResult.roomObjects());
         activeLevel.get().replaceFloorOpenings(translationResult.floorOpenings());
+        activeLevel.get().replaceHeatingExclusionAreas(translationResult.heatingExclusionAreas());
         synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
     }
@@ -7744,6 +7851,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceStaircases(result.staircases());
         activeLevel.get().replaceRoomObjects(result.roomObjects());
         activeLevel.get().replaceFloorOpenings(result.floorOpenings());
+        activeLevel.get().replaceHeatingExclusionAreas(result.heatingExclusionAreas());
         synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
         draftLabel.setText("Auswahl um eine Rasterweite verschoben.");
@@ -7988,6 +8096,10 @@ public final class CadWorkbench extends BorderPane {
         return activeLevel.get().floorOpenings().size();
     }
 
+    public int automationHeatingExclusionAreaCount() {
+        return activeLevel.get().heatingExclusionAreas().size();
+    }
+
     public int automationRoofWindowCount() {
         return activeLevel.get().roofWindows().size();
     }
@@ -7999,6 +8111,10 @@ public final class CadWorkbench extends BorderPane {
 
     public FloorOpening automationFloorOpening(int index) {
         return activeLevel.get().floorOpenings().get(index);
+    }
+
+    public HeatingExclusionArea automationHeatingExclusionArea(int index) {
+        return activeLevel.get().heatingExclusionAreas().get(index);
     }
 
     public int automationRoomObjectCount() {
@@ -8086,6 +8202,11 @@ public final class CadWorkbench extends BorderPane {
                     .findFirst()
                     .map(opening -> new SelectionKey(RenderableKind.FLOOR_OPENING, activeLevel.get().name(), opening.id().toString()))
                     .orElseThrow(() -> new IllegalArgumentException("Bodenöffnungsindex `" + index + "` ist ungültig."));
+            case "HEATING_EXCLUSION", "HEATING_EXCLUSION_AREA" -> activeLevel.get().heatingExclusionAreas().stream()
+                    .skip(index)
+                    .findFirst()
+                    .map(area -> new SelectionKey(RenderableKind.HEATING_EXCLUSION, activeLevel.get().name(), area.id().toString()))
+                    .orElseThrow(() -> new IllegalArgumentException("FBH-Sperrflächenindex `" + index + "` ist ungültig."));
             default -> throw new IllegalArgumentException("Bauteilart `" + kindName + "` wird von der Automatisierung nicht unterstützt.");
         };
         updateSelection(selectionKey, toggle);
@@ -8559,7 +8680,9 @@ public final class CadWorkbench extends BorderPane {
     private boolean isTranslatableSelection(SelectionKey selectionKey) {
         return selectionKey.kind() == RenderableKind.WALL
                 || selectionKey.kind() == RenderableKind.STAIR
-                || selectionKey.kind() == RenderableKind.ROOM_OBJECT;
+                || selectionKey.kind() == RenderableKind.ROOM_OBJECT
+                || selectionKey.kind() == RenderableKind.FLOOR_OPENING
+                || selectionKey.kind() == RenderableKind.HEATING_EXCLUSION;
     }
 
     private record PendingWallDimensionLabel(
