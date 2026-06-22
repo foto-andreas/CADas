@@ -7,6 +7,8 @@ import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.StairType;
+import de.schrell.cadas.domain.model.Staircase;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -41,7 +43,7 @@ class HydronicHeatingLayoutServiceTest {
         HydronicHeating meander = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 80_000)
                 .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline())));
         HydronicHeating spiral = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 80_000)
-                .withZones(meander.zones());
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)));
 
         List<PlanPoint> meanderPath = service.layout(meander).getFirst().pipePath();
         List<PlanPoint> spiralPath = service.layout(spiral).getFirst().pipePath();
@@ -88,10 +90,25 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void invertiertHeizkreisrollenImLayout() {
+        Room room = rectangularRoom();
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 300_000)
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline())));
+        HydronicHeating inverted = heating.withZones(List.of(heating.zones().getFirst().withFlowInverted(true)));
+
+        HydronicHeatingLayoutService.CircuitLayout normalCircuit = service.layout(heating).getFirst();
+        HydronicHeatingLayoutService.CircuitLayout invertedCircuit = service.layout(inverted).getFirst();
+
+        assertEquals(reversed(normalCircuit.fieldReturnPath()), invertedCircuit.fieldSupplyPath());
+        assertEquals(reversed(normalCircuit.fieldSupplyPath()), invertedCircuit.fieldReturnPath());
+        assertNotEquals(normalCircuit.pipePath(), invertedCircuit.pipePath());
+    }
+
+    @Test
     void erzeugtMaßstabsgerechtesSvgMitRinnenUndRollenfarben() {
         Room room = rectangularRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000)
-                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline())));
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)));
 
         String svg = service.toSvg(room, heating);
 
@@ -154,6 +171,29 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void spartTreppenbereicheBeimVorschlagenAus() {
+        Room room = rectangularRoom();
+        Staircase staircase = Staircase.create(
+                StairType.STRAIGHT,
+                new PlanPoint(2_400, 1_000),
+                new PlanPoint(3_500, 2_700),
+                Length.ofMillimeters(2_800),
+                15
+        );
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 300_000);
+
+        HydronicHeatingLayoutService.PlanningResult result = service.suggest(room, heating, List.of(staircase));
+
+        assertTrue(result.validationReport().valid());
+        assertTrue(result.heating().zones().size() > 1);
+        for (HydronicHeatingLayoutService.CircuitLayout circuit : result.circuits()) {
+            for (HydronicHeatingLayoutService.PipeSegment segment : circuit.segments()) {
+                assertSegmentOutsideStaircase(staircase, segment.start(), segment.end());
+            }
+        }
+    }
+
+    @Test
     void lehntManuellÜberRaumgrenzeGezogenenHeizbereichAb() {
         Room room = rectangularRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 300_000)
@@ -173,6 +213,23 @@ class HydronicHeatingLayoutServiceTest {
                     start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
             );
             assertTrue(contains(outline, point), () -> "Rohr außerhalb bei " + point);
+        }
+    }
+
+    private void assertSegmentOutsideStaircase(Staircase staircase, PlanPoint start, PlanPoint end) {
+        for (int step = 0; step <= 20; step++) {
+            double ratio = step / 20.0;
+            PlanPoint point = new PlanPoint(
+                    start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
+                    start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
+            );
+            assertFalse(
+                    point.xMillimeters() > staircase.minX() + 0.001
+                            && point.xMillimeters() < staircase.maxX() - 0.001
+                            && point.yMillimeters() > staircase.minY() + 0.001
+                            && point.yMillimeters() < staircase.maxY() - 0.001,
+                    () -> "Rohr im Treppenbereich bei " + point
+            );
         }
     }
 
@@ -233,6 +290,10 @@ class HydronicHeatingLayoutServiceTest {
                 new PlanPoint(0, 0), new PlanPoint(6_000, 0), new PlanPoint(6_000, 2_000),
                 new PlanPoint(3_000, 2_000), new PlanPoint(3_000, 5_000), new PlanPoint(0, 5_000)
         ), Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200), null);
+    }
+
+    private List<PlanPoint> reversed(List<PlanPoint> points) {
+        return points.reversed();
     }
 
     private HydronicHeating heating(

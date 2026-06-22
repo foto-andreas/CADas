@@ -7,9 +7,11 @@ import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.Staircase;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,10 +36,18 @@ public final class HydronicHeatingLayoutService {
     public PlanningResult suggest(Room room, HydronicHeating heating) {
         Objects.requireNonNull(room, "room darf nicht null sein.");
         Objects.requireNonNull(heating, "heating darf nicht null sein.");
-        List<HeatingZone> zones = new ArrayList<>();
-        zones.add(HeatingZone.create("Heizkreis 1", room.outline()));
+        return suggest(room, heating, List.of());
+    }
+
+    public PlanningResult suggest(Room room, HydronicHeating heating, List<Staircase> staircases) {
+        Objects.requireNonNull(room, "room darf nicht null sein.");
+        Objects.requireNonNull(heating, "heating darf nicht null sein.");
+        Objects.requireNonNull(staircases, "staircases darf nicht null sein.");
+        List<HeatingZone> zones = initialZones(room, heating, staircases);
         HydronicHeating planned = heating.withZones(zones);
         while (zones.size() < MAXIMUM_ZONE_COUNT) {
+            planned = optimizeFlowOrientation(planned);
+            zones = new ArrayList<>(planned.zones());
             List<CircuitLayout> layouts = layout(planned);
             HydronicHeating currentPlanned = planned;
             Optional<CircuitLayout> oversized = layouts.stream()
@@ -66,6 +76,7 @@ public final class HydronicHeatingLayoutService {
             zones = renameZones(zones);
             planned = heating.withZones(zones);
         }
+        planned = optimizeFlowOrientation(planned);
         List<CircuitLayout> layouts = layout(planned);
         return new PlanningResult(planned, layouts, validateLayout(planned));
     }
@@ -223,12 +234,86 @@ public final class HydronicHeatingLayoutService {
             ports.add(pair.supplyPort());
             ports.add(pair.returnPort());
         }
-        boolean needsConnectorCorridor = heating.zones().size() > 1
-                || ports.stream().anyMatch(port -> !strictlyInsideAny(polygons, port));
+        boolean needsConnectorCorridor = ports.stream().anyMatch(port -> !strictlyInsideAny(polygons, port));
         if (needsConnectorCorridor) {
             polygons.add(connectorCorridor(polygons, ports, heating.pipeSpacing().toMillimeters()));
         }
         return new GeometryScope(polygons);
+    }
+
+    private List<HeatingZone> initialZones(Room room, HydronicHeating heating, List<Staircase> staircases) {
+        List<ExclusionRect> exclusions = staircaseExclusions(room, staircases);
+        if (exclusions.isEmpty()) {
+            return List.of(HeatingZone.create("Heizkreis 1", room.outline(), heating.layoutPattern()));
+        }
+        List<Double> xCoordinates = splitCoordinates(room.outline(), exclusions, true);
+        List<Double> yCoordinates = splitCoordinates(room.outline(), exclusions, false);
+        List<HeatingZone> zones = new ArrayList<>();
+        for (int xIndex = 0; xIndex + 1 < xCoordinates.size(); xIndex++) {
+            for (int yIndex = 0; yIndex + 1 < yCoordinates.size(); yIndex++) {
+                double minX = xCoordinates.get(xIndex);
+                double maxX = xCoordinates.get(xIndex + 1);
+                double minY = yCoordinates.get(yIndex);
+                double maxY = yCoordinates.get(yIndex + 1);
+                if (maxX - minX <= EPSILON || maxY - minY <= EPSILON) {
+                    continue;
+                }
+                PlanPoint center = new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+                if (!containsPoint(room.outline(), center) || exclusions.stream().anyMatch(rect -> rect.contains(center))) {
+                    continue;
+                }
+                zones.add(new HeatingZone(
+                        UUID.randomUUID(),
+                        "Heizkreis " + (zones.size() + 1),
+                        rectangle(minX, minY, maxX, maxY),
+                        heating.layoutPattern(),
+                        false
+                ));
+            }
+        }
+        if (zones.isEmpty()) {
+            return List.of(HeatingZone.create("Heizkreis 1", room.outline(), heating.layoutPattern()));
+        }
+        return renameZones(zones);
+    }
+
+    private List<ExclusionRect> staircaseExclusions(Room room, List<Staircase> staircases) {
+        Bounds roomBounds = bounds(room.outline());
+        List<ExclusionRect> exclusions = new ArrayList<>();
+        for (Staircase staircase : staircases) {
+            ExclusionRect rectangle = new ExclusionRect(
+                    Math.max(roomBounds.minX(), staircase.minX()),
+                    Math.max(roomBounds.minY(), staircase.minY()),
+                    Math.min(roomBounds.maxX(), staircase.maxX()),
+                    Math.min(roomBounds.maxY(), staircase.maxY())
+            );
+            if (rectangle.width() <= EPSILON || rectangle.height() <= EPSILON) {
+                continue;
+            }
+            if (containsPoint(room.outline(), rectangle.center())) {
+                exclusions.add(rectangle);
+            }
+        }
+        return List.copyOf(exclusions);
+    }
+
+    private List<Double> splitCoordinates(List<PlanPoint> outline, List<ExclusionRect> exclusions, boolean xAxis) {
+        List<Double> coordinates = new ArrayList<>();
+        outline.stream()
+                .mapToDouble(point -> xAxis ? point.xMillimeters() : point.yMillimeters())
+                .forEach(coordinates::add);
+        for (ExclusionRect exclusion : exclusions) {
+            coordinates.add(xAxis ? exclusion.minX() : exclusion.minY());
+            coordinates.add(xAxis ? exclusion.maxX() : exclusion.maxY());
+        }
+        coordinates.sort(Double::compareTo);
+        List<Double> distinct = new ArrayList<>();
+        for (double coordinate : coordinates) {
+            if (distinct.isEmpty() || Math.abs(distinct.getLast() - coordinate) > EPSILON) {
+                distinct.add(coordinate);
+            }
+        }
+        return List.copyOf(distinct);
     }
 
     private boolean strictlyInsideAny(List<List<PlanPoint>> polygons, PlanPoint point) {
@@ -265,17 +350,223 @@ public final class HydronicHeatingLayoutService {
         );
     }
 
+    public HydronicHeating optimizeFlowOrientation(HydronicHeating heating) {
+        Objects.requireNonNull(heating, "heating darf nicht null sein.");
+        if (heating.zones().size() < 2) {
+            return heating;
+        }
+        List<SharedBoundary> boundaries = sharedBoundaries(heating.zones());
+        if (boundaries.isEmpty()) {
+            return heating;
+        }
+        int zoneCount = heating.zones().size();
+        boolean[] inverted = zoneCount <= 12
+                ? bruteForceFlowOrientation(heating, boundaries)
+                : greedyFlowOrientation(heating, boundaries);
+        List<HeatingZone> zones = new ArrayList<>();
+        for (int index = 0; index < zoneCount; index++) {
+            zones.add(heating.zones().get(index).withFlowInverted(inverted[index]));
+        }
+        return heating.withZones(zones);
+    }
+
+    private boolean[] bruteForceFlowOrientation(HydronicHeating heating, List<SharedBoundary> boundaries) {
+        int zoneCount = heating.zones().size();
+        int maximumMask = 1 << zoneCount;
+        double bestScore = Double.POSITIVE_INFINITY;
+        int bestMask = currentFlowMask(heating.zones());
+        for (int mask = 0; mask < maximumMask; mask++) {
+            double score = orientationScore(heating, boundaries, mask);
+            if (score < bestScore) {
+                bestScore = score;
+                bestMask = mask;
+            }
+        }
+        return maskToInversions(zoneCount, bestMask);
+    }
+
+    private boolean[] greedyFlowOrientation(HydronicHeating heating, List<SharedBoundary> boundaries) {
+        boolean[] inverted = new boolean[heating.zones().size()];
+        for (int index = 0; index < heating.zones().size(); index++) {
+            inverted[index] = heating.zones().get(index).flowInverted();
+        }
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            double current = orientationScore(heating, boundaries, inverted);
+            for (int index = 0; index < inverted.length; index++) {
+                inverted[index] = !inverted[index];
+                double candidate = orientationScore(heating, boundaries, inverted);
+                if (candidate + EPSILON < current) {
+                    current = candidate;
+                    changed = true;
+                } else {
+                    inverted[index] = !inverted[index];
+                }
+            }
+        }
+        return inverted;
+    }
+
+    private int currentFlowMask(List<HeatingZone> zones) {
+        int mask = 0;
+        for (int index = 0; index < zones.size(); index++) {
+            if (zones.get(index).flowInverted()) {
+                mask |= 1 << index;
+            }
+        }
+        return mask;
+    }
+
+    private boolean[] maskToInversions(int zoneCount, int mask) {
+        boolean[] inverted = new boolean[zoneCount];
+        for (int index = 0; index < zoneCount; index++) {
+            inverted[index] = (mask & (1 << index)) != 0;
+        }
+        return inverted;
+    }
+
+    private double orientationScore(HydronicHeating heating, List<SharedBoundary> boundaries, int mask) {
+        return orientationScore(heating, boundaries, maskToInversions(heating.zones().size(), mask));
+    }
+
+    private double orientationScore(HydronicHeating heating, List<SharedBoundary> boundaries, boolean[] inverted) {
+        List<FieldPattern> patterns = new ArrayList<>();
+        for (int index = 0; index < heating.zones().size(); index++) {
+            patterns.add(createPattern(heating, heating.zones().get(index).withFlowInverted(inverted[index])));
+        }
+        double score = 0.0;
+        for (SharedBoundary boundary : boundaries) {
+            PipeRole firstRole = roleNearBoundary(patterns.get(boundary.firstIndex()), boundary, heating.pipeSpacing().toMillimeters());
+            PipeRole secondRole = roleNearBoundary(patterns.get(boundary.secondIndex()), boundary, heating.pipeSpacing().toMillimeters());
+            if (firstRole != null && firstRole == secondRole) {
+                score += 1_000.0;
+            }
+        }
+        for (int index = 0; index < heating.zones().size(); index++) {
+            if (inverted[index] != heating.zones().get(index).flowInverted()) {
+                score += 1.0;
+            }
+        }
+        return score;
+    }
+
+    private PipeRole roleNearBoundary(FieldPattern pattern, SharedBoundary boundary, double pitch) {
+        double supplyScore = roleScore(pattern.supplyPath(), boundary, pitch);
+        double returnScore = roleScore(pattern.returnPath(), boundary, pitch);
+        if (supplyScore <= EPSILON && returnScore <= EPSILON) {
+            return null;
+        }
+        return supplyScore >= returnScore ? PipeRole.SUPPLY : PipeRole.RETURN;
+    }
+
+    private double roleScore(List<PlanPoint> path, SharedBoundary boundary, double pitch) {
+        double score = 0.0;
+        for (int index = 1; index < path.size(); index++) {
+            score += segmentBoundaryScore(path.get(index - 1), path.get(index), boundary, pitch);
+        }
+        return score;
+    }
+
+    private double segmentBoundaryScore(PlanPoint start, PlanPoint end, SharedBoundary boundary, double pitch) {
+        if (boundary.vertical()) {
+            if (Math.abs(start.xMillimeters() - end.xMillimeters()) > EPSILON) {
+                return 0.0;
+            }
+            double distance = Math.abs(start.xMillimeters() - boundary.coordinate());
+            if (distance - pitch > EPSILON) {
+                return 0.0;
+            }
+            double overlap = overlapLength(start.yMillimeters(), end.yMillimeters(), boundary.start(), boundary.end());
+            return overlap / (1.0 + distance);
+        }
+        if (Math.abs(start.yMillimeters() - end.yMillimeters()) > EPSILON) {
+            return 0.0;
+        }
+        double distance = Math.abs(start.yMillimeters() - boundary.coordinate());
+        if (distance - pitch > EPSILON) {
+            return 0.0;
+        }
+        double overlap = overlapLength(start.xMillimeters(), end.xMillimeters(), boundary.start(), boundary.end());
+        return overlap / (1.0 + distance);
+    }
+
+    private List<SharedBoundary> sharedBoundaries(List<HeatingZone> zones) {
+        List<SharedBoundary> boundaries = new ArrayList<>();
+        for (int firstIndex = 0; firstIndex < zones.size(); firstIndex++) {
+            for (int secondIndex = firstIndex + 1; secondIndex < zones.size(); secondIndex++) {
+                boundaries.addAll(sharedBoundaries(firstIndex, zones.get(firstIndex), secondIndex, zones.get(secondIndex)));
+            }
+        }
+        return boundaries;
+    }
+
+    private List<SharedBoundary> sharedBoundaries(
+            int firstIndex,
+            HeatingZone first,
+            int secondIndex,
+            HeatingZone second
+    ) {
+        List<SharedBoundary> boundaries = new ArrayList<>();
+        for (int firstEdge = 0; firstEdge < first.outline().size(); firstEdge++) {
+            PlanPoint firstStart = first.outline().get(firstEdge);
+            PlanPoint firstEnd = first.outline().get((firstEdge + 1) % first.outline().size());
+            for (int secondEdge = 0; secondEdge < second.outline().size(); secondEdge++) {
+                PlanPoint secondStart = second.outline().get(secondEdge);
+                PlanPoint secondEnd = second.outline().get((secondEdge + 1) % second.outline().size());
+                sharedBoundary(firstIndex, firstStart, firstEnd, secondIndex, secondStart, secondEnd)
+                        .ifPresent(boundaries::add);
+            }
+        }
+        return boundaries;
+    }
+
+    private Optional<SharedBoundary> sharedBoundary(
+            int firstIndex,
+            PlanPoint firstStart,
+            PlanPoint firstEnd,
+            int secondIndex,
+            PlanPoint secondStart,
+            PlanPoint secondEnd
+    ) {
+        if (Math.abs(firstStart.xMillimeters() - firstEnd.xMillimeters()) < EPSILON
+                && Math.abs(secondStart.xMillimeters() - secondEnd.xMillimeters()) < EPSILON
+                && Math.abs(firstStart.xMillimeters() - secondStart.xMillimeters()) < EPSILON) {
+            double start = Math.max(Math.min(firstStart.yMillimeters(), firstEnd.yMillimeters()), Math.min(secondStart.yMillimeters(), secondEnd.yMillimeters()));
+            double end = Math.min(Math.max(firstStart.yMillimeters(), firstEnd.yMillimeters()), Math.max(secondStart.yMillimeters(), secondEnd.yMillimeters()));
+            if (end - start > EPSILON) {
+                return Optional.of(new SharedBoundary(firstIndex, secondIndex, true, firstStart.xMillimeters(), start, end));
+            }
+        }
+        if (Math.abs(firstStart.yMillimeters() - firstEnd.yMillimeters()) < EPSILON
+                && Math.abs(secondStart.yMillimeters() - secondEnd.yMillimeters()) < EPSILON
+                && Math.abs(firstStart.yMillimeters() - secondStart.yMillimeters()) < EPSILON) {
+            double start = Math.max(Math.min(firstStart.xMillimeters(), firstEnd.xMillimeters()), Math.min(secondStart.xMillimeters(), secondEnd.xMillimeters()));
+            double end = Math.min(Math.max(firstStart.xMillimeters(), firstEnd.xMillimeters()), Math.max(secondStart.xMillimeters(), secondEnd.xMillimeters()));
+            if (end - start > EPSILON) {
+                return Optional.of(new SharedBoundary(firstIndex, secondIndex, false, firstStart.yMillimeters(), start, end));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private double overlapLength(double firstStart, double firstEnd, double secondStart, double secondEnd) {
+        double start = Math.max(Math.min(firstStart, firstEnd), Math.min(secondStart, secondEnd));
+        double end = Math.min(Math.max(firstStart, firstEnd), Math.max(secondStart, secondEnd));
+        return Math.max(0.0, end - start);
+    }
+
     private FieldPattern createPattern(HydronicHeating heating, HeatingZone zone) {
         double clearance = heating.wallClearance().toMillimeters();
         double pitch = heating.pipeSpacing().toMillimeters();
-        FieldPattern pattern = heating.layoutPattern() == HeatingLayoutPattern.SPIRAL
+        FieldPattern pattern = zone.layoutPattern() == HeatingLayoutPattern.SPIRAL
                 ? spiralPattern(zone.outline(), clearance, pitch)
                 : meanderPattern(zone.outline(), clearance, pitch);
         if (pattern.fullPath().isEmpty()) {
             PlanPoint center = centroid(zone.outline());
             return new FieldPattern(List.of(center), List.of(center), List.of(center));
         }
-        return pattern;
+        return zone.flowInverted() ? pattern.inverted() : pattern;
     }
 
     private FieldPattern meanderPattern(List<PlanPoint> polygon, double clearance, double pitch) {
@@ -693,7 +984,7 @@ public final class HydronicHeatingLayoutService {
     private List<HeatingZone> renameZones(List<HeatingZone> zones) {
         List<HeatingZone> namedZones = new ArrayList<>();
         for (int index = 0; index < zones.size(); index++) {
-            namedZones.add(new HeatingZone(zones.get(index).id(), "Heizkreis " + (index + 1), zones.get(index).outline()));
+            namedZones.add(zones.get(index).withName("Heizkreis " + (index + 1)));
         }
         return namedZones;
     }
@@ -710,8 +1001,8 @@ public final class HydronicHeatingLayoutService {
             return List.of(zone);
         }
         return List.of(
-                HeatingZone.create(zone.name(), first),
-                HeatingZone.create(zone.name(), second)
+                new HeatingZone(UUID.randomUUID(), zone.name(), first, zone.layoutPattern(), zone.flowInverted()),
+                new HeatingZone(UUID.randomUUID(), zone.name(), second, zone.layoutPattern(), zone.flowInverted())
         );
     }
 
@@ -848,6 +1139,12 @@ public final class HydronicHeatingLayoutService {
             }
         }
         return List.copyOf(distinct);
+    }
+
+    private static List<PlanPoint> reversed(List<PlanPoint> points) {
+        List<PlanPoint> result = new ArrayList<>(points);
+        Collections.reverse(result);
+        return List.copyOf(result);
     }
 
     private SplitPath splitByLength(List<PlanPoint> path) {
@@ -1151,6 +1448,27 @@ public final class HydronicHeatingLayoutService {
         }
     }
 
+    private record ExclusionRect(double minX, double minY, double maxX, double maxY) {
+        private double width() {
+            return maxX - minX;
+        }
+
+        private double height() {
+            return maxY - minY;
+        }
+
+        private PlanPoint center() {
+            return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+        }
+
+        private boolean contains(PlanPoint point) {
+            return point.xMillimeters() > minX + EPSILON
+                    && point.xMillimeters() < maxX - EPSILON
+                    && point.yMillimeters() > minY + EPSILON
+                    && point.yMillimeters() < maxY - EPSILON;
+        }
+    }
+
     private record Interval(double start, double end) {
     }
 
@@ -1162,6 +1480,10 @@ public final class HydronicHeatingLayoutService {
             fullPath = List.copyOf(fullPath);
             supplyPath = List.copyOf(supplyPath);
             returnPath = List.copyOf(returnPath);
+        }
+
+        private FieldPattern inverted() {
+            return new FieldPattern(reversed(fullPath), reversed(returnPath), reversed(supplyPath));
         }
     }
 
@@ -1182,6 +1504,16 @@ public final class HydronicHeatingLayoutService {
     }
 
     private record IndexedSegment(int circuitIndex, int segmentIndex, PipeSegment segment) {
+    }
+
+    private record SharedBoundary(
+            int firstIndex,
+            int secondIndex,
+            boolean vertical,
+            double coordinate,
+            double start,
+            double end
+    ) {
     }
 
     private record GridPoint(int ix, int iy) {
