@@ -3,7 +3,9 @@ package de.schrell.cadas.application.heating;
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
+import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
@@ -41,10 +43,22 @@ public final class HydronicHeatingLayoutService {
     }
 
     public PlanningResult suggest(Room room, HydronicHeating heating, List<Staircase> staircases) {
+        return suggest(room, heating, staircases, List.of(), List.of());
+    }
+
+    public PlanningResult suggest(
+            Room room,
+            HydronicHeating heating,
+            List<Staircase> staircases,
+            List<FloorOpening> floorOpenings,
+            List<HeatingExclusionArea> heatingExclusionAreas
+    ) {
         Objects.requireNonNull(room, "room darf nicht null sein.");
         Objects.requireNonNull(heating, "heating darf nicht null sein.");
         Objects.requireNonNull(staircases, "staircases darf nicht null sein.");
-        List<HeatingZone> zones = initialZones(room, heating, staircases);
+        Objects.requireNonNull(floorOpenings, "floorOpenings darf nicht null sein.");
+        Objects.requireNonNull(heatingExclusionAreas, "heatingExclusionAreas darf nicht null sein.");
+        List<HeatingZone> zones = initialZones(room, heating, staircases, floorOpenings, heatingExclusionAreas);
         HydronicHeating planned = heating.withZones(zones);
         List<ValidationIssue> warnings = new ArrayList<>();
         int repairAttempts = 0;
@@ -267,8 +281,14 @@ public final class HydronicHeatingLayoutService {
         return new GeometryScope(polygons);
     }
 
-    private List<HeatingZone> initialZones(Room room, HydronicHeating heating, List<Staircase> staircases) {
-        List<ExclusionRect> exclusions = staircaseExclusions(room, staircases);
+    private List<HeatingZone> initialZones(
+            Room room,
+            HydronicHeating heating,
+            List<Staircase> staircases,
+            List<FloorOpening> floorOpenings,
+            List<HeatingExclusionArea> heatingExclusionAreas
+    ) {
+        List<ExclusionRect> exclusions = exclusions(room, staircases, floorOpenings, heatingExclusionAreas);
         if (exclusions.isEmpty()) {
             return List.of(HeatingZone.create("Heizkreis 1", room.outline(), heating.layoutPattern()));
         }
@@ -303,7 +323,12 @@ public final class HydronicHeatingLayoutService {
         return renameZones(zones);
     }
 
-    private List<ExclusionRect> staircaseExclusions(Room room, List<Staircase> staircases) {
+    private List<ExclusionRect> exclusions(
+            Room room,
+            List<Staircase> staircases,
+            List<FloorOpening> floorOpenings,
+            List<HeatingExclusionArea> heatingExclusionAreas
+    ) {
         Bounds roomBounds = bounds(room.outline());
         List<ExclusionRect> exclusions = new ArrayList<>();
         for (Staircase staircase : staircases) {
@@ -320,7 +345,44 @@ public final class HydronicHeatingLayoutService {
                 exclusions.add(rectangle);
             }
         }
+        for (FloorOpening opening : floorOpenings) {
+            if (!opening.roomId().equals(room.id())) {
+                continue;
+            }
+            appendExclusion(room, roomBounds, exclusions, opening.minXMillimeters(), opening.minYMillimeters(),
+                    opening.maxXMillimeters(), opening.maxYMillimeters());
+        }
+        for (HeatingExclusionArea area : heatingExclusionAreas) {
+            if (!area.roomId().equals(room.id())) {
+                continue;
+            }
+            appendExclusion(room, roomBounds, exclusions, area.minXMillimeters(), area.minYMillimeters(),
+                    area.maxXMillimeters(), area.maxYMillimeters());
+        }
         return List.copyOf(exclusions);
+    }
+
+    private void appendExclusion(
+            Room room,
+            Bounds roomBounds,
+            List<ExclusionRect> exclusions,
+            double minX,
+            double minY,
+            double maxX,
+            double maxY
+    ) {
+        ExclusionRect rectangle = new ExclusionRect(
+                Math.max(roomBounds.minX(), minX),
+                Math.max(roomBounds.minY(), minY),
+                Math.min(roomBounds.maxX(), maxX),
+                Math.min(roomBounds.maxY(), maxY)
+        );
+        if (rectangle.width() <= EPSILON || rectangle.height() <= EPSILON) {
+            return;
+        }
+        if (containsPoint(room.outline(), rectangle.center())) {
+            exclusions.add(rectangle);
+        }
     }
 
     private List<Double> splitCoordinates(List<PlanPoint> outline, List<ExclusionRect> exclusions, boolean xAxis) {

@@ -2,6 +2,9 @@ package de.schrell.cadas.application.heating;
 
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -214,6 +217,47 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void nutztBodenöffnungenAutomatischAlsFbhSperrfläche() {
+        Room room = rectangularRoom();
+        FloorOpening opening = FloorOpening.create(
+                room.id(),
+                FloorOpeningShape.RECTANGLE,
+                new PlanPoint(3_000, 2_000),
+                Length.ofMillimeters(1_200),
+                Length.ofMillimeters(1_000)
+        );
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 300_000);
+
+        HydronicHeatingLayoutService.PlanningResult result = service.suggest(
+                room, heating, List.of(), List.of(opening), List.of()
+        );
+
+        assertTrue(result.validationReport().valid());
+        assertTrue(result.heating().zones().size() > 1);
+        assertNoSegmentInsideRectangle(result.circuits(), 2_400, 1_500, 3_600, 2_500);
+    }
+
+    @Test
+    void nutztManuelleFbhSperrflächenBeimVorschlagen() {
+        Room room = rectangularRoom();
+        HeatingExclusionArea exclusionArea = HeatingExclusionArea.create(
+                room.id(),
+                "Schrank",
+                new PlanPoint(2_000, 1_000),
+                new PlanPoint(3_000, 2_000)
+        );
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000);
+
+        HydronicHeatingLayoutService.PlanningResult result = service.suggest(
+                room, heating, List.of(), List.of(), List.of(exclusionArea)
+        );
+
+        assertTrue(result.validationReport().valid());
+        assertTrue(result.heating().zones().size() > 1);
+        assertNoSegmentInsideRectangle(result.circuits(), 2_000, 1_000, 3_000, 2_000);
+    }
+
+    @Test
     void lehntManuellÜberRaumgrenzeGezogenenHeizbereichAb() {
         Room room = rectangularRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 300_000)
@@ -250,6 +294,35 @@ class HydronicHeatingLayoutServiceTest {
                             && point.yMillimeters() < staircase.maxY() - 0.001,
                     () -> "Rohr im Treppenbereich bei " + point
             );
+        }
+    }
+
+    private void assertNoSegmentInsideRectangle(
+            List<HydronicHeatingLayoutService.CircuitLayout> circuits,
+            double minX,
+            double minY,
+            double maxX,
+            double maxY
+    ) {
+        for (HydronicHeatingLayoutService.CircuitLayout circuit : circuits) {
+            for (HydronicHeatingLayoutService.PipeSegment segment : circuit.segments()) {
+                for (int step = 0; step <= 20; step++) {
+                    double ratio = step / 20.0;
+                    PlanPoint point = new PlanPoint(
+                            segment.start().xMillimeters()
+                                    + (segment.end().xMillimeters() - segment.start().xMillimeters()) * ratio,
+                            segment.start().yMillimeters()
+                                    + (segment.end().yMillimeters() - segment.start().yMillimeters()) * ratio
+                    );
+                    assertFalse(
+                            point.xMillimeters() > minX + 0.001
+                                    && point.xMillimeters() < maxX - 0.001
+                                    && point.yMillimeters() > minY + 0.001
+                                    && point.yMillimeters() < maxY - 0.001,
+                            () -> "Rohr in Sperrfläche bei " + point
+                    );
+                }
+            }
         }
     }
 

@@ -17,6 +17,7 @@ public final class Level {
     private final List<RoomObject> roomObjects = new ArrayList<>();
     private final List<FloorExtension> floorExtensions = new ArrayList<>();
     private final List<FloorOpening> floorOpenings = new ArrayList<>();
+    private final List<HeatingExclusionArea> heatingExclusionAreas = new ArrayList<>();
     private final List<SurfaceLayerStack> surfaceLayerStacks = new ArrayList<>();
     private final List<HydronicHeating> hydronicHeatings = new ArrayList<>();
 
@@ -81,6 +82,7 @@ public final class Level {
     public void replaceRooms(List<Room> updatedRooms) {
         rooms.clear();
         rooms.addAll(Objects.requireNonNull(updatedRooms, "updatedRooms darf nicht null sein."));
+        heatingExclusionAreas.removeIf(area -> rooms.stream().noneMatch(room -> room.id().equals(area.roomId())));
         hydronicHeatings.removeIf(heating -> rooms.stream().noneMatch(room -> room.id().equals(heating.roomId())));
     }
 
@@ -215,6 +217,24 @@ public final class Level {
         floorOpenings.addAll(Objects.requireNonNull(updatedFloorOpenings, "updatedFloorOpenings darf nicht null sein."));
     }
 
+    public List<HeatingExclusionArea> heatingExclusionAreas() {
+        return List.copyOf(heatingExclusionAreas);
+    }
+
+    public void addHeatingExclusionArea(HeatingExclusionArea area) {
+        heatingExclusionAreas.add(Objects.requireNonNull(area, "area darf nicht null sein."));
+    }
+
+    public boolean removeHeatingExclusionArea(UUID areaId) {
+        Objects.requireNonNull(areaId, "areaId darf nicht null sein.");
+        return heatingExclusionAreas.removeIf(area -> area.id().equals(areaId));
+    }
+
+    public void replaceHeatingExclusionAreas(List<HeatingExclusionArea> updatedAreas) {
+        heatingExclusionAreas.clear();
+        heatingExclusionAreas.addAll(Objects.requireNonNull(updatedAreas, "updatedAreas darf nicht null sein."));
+    }
+
     public List<SurfaceLayerStack> surfaceLayerStacks() {
         return List.copyOf(surfaceLayerStacks);
     }
@@ -313,6 +333,7 @@ public final class Level {
         copy.roomObjects.addAll(roomObjects);
         copy.floorExtensions.addAll(floorExtensions);
         copy.floorOpenings.addAll(floorOpenings);
+        copy.heatingExclusionAreas.addAll(heatingExclusionAreas);
         surfaceLayerStacks.stream()
                 .map(SurfaceLayerStack::copy)
                 .forEach(copy.surfaceLayerStacks::add);
