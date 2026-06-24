@@ -1,6 +1,9 @@
 package de.schrell.cadas.ui;
 
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingPoint;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -55,6 +58,22 @@ class HeatingCircuitRoutingWindowTest {
     }
 
     @Test
+    void rendertEditiertenKommandotext() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            Assertions.assertTrue(window.automationProtocolEditable());
+
+            window.automationSetProtocolText("I R\nzi");
+            window.automationRenderProtocolText();
+
+            Assertions.assertEquals("IRxi", window.automationProtocol());
+            Assertions.assertEquals("IRi", window.automationCommands());
+            return null;
+        });
+    }
+
+    @Test
     void zoomtImTestfensterEinUndAus() throws Exception {
         HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
 
@@ -95,7 +114,11 @@ class HeatingCircuitRoutingWindowTest {
             window.automationGenerateVario();
 
             Assertions.assertNotEquals(standardCommands, window.automationCommands());
-            Assertions.assertTrue(window.automationCommands().startsWith("rrRRLllLrrRRllLLrrRiRIrR"));
+            Assertions.assertTrue(window.automationCommands().startsWith(
+                    "rLRRllrrLLRRllrrLLRRllrriIRr"
+                            + "iiiiiiiiiiiirIIIIIIIIIIIIR"
+                            + "iiirIIIR"
+            ));
             return null;
         });
     }
@@ -110,13 +133,13 @@ class HeatingCircuitRoutingWindowTest {
             Assertions.assertEquals("200x300", window.automationAreaSizeText());
             Assertions.assertFalse(window.automationCommands().isBlank());
             Assertions.assertEquals(window.automationCommands(), window.automationProtocol());
-            Assertions.assertTrue(window.automationCommands().startsWith("iiiiiiiiiiiill"));
+            Assertions.assertTrue(window.automationCommands().startsWith("i".repeat(14) + "ll"));
             return null;
         });
     }
 
     @Test
-    void erzeugtMeanderMitSchlangenförmigerMittellinie() throws Exception {
+    void meanderSchlangenSchalterErsetztMittlereGerade() throws Exception {
         HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
 
         aufFxThread(() -> {
@@ -126,7 +149,91 @@ class HeatingCircuitRoutingWindowTest {
             window.automationSetSerpentineMiddleLine(true);
             window.automationGenerateMeander();
 
-            Assertions.assertTrue(window.automationCommands().length() > standardCommands.length());
+            Assertions.assertNotEquals(standardCommands, window.automationCommands());
+            return null;
+        });
+    }
+
+    @Test
+    void sichertAktuellesRoutingAlsHeizkreisTestdatei() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationGenerateVario();
+            Path testFile = window.automationSaveRoutingTestFile();
+            Assertions.assertNotNull(testFile);
+            try {
+                String content = Files.readString(testFile, StandardCharsets.UTF_8);
+                Assertions.assertTrue(content.contains("format=cadas-fbh-routing-v1"));
+                Assertions.assertTrue(content.contains("breiteCm=200"));
+                Assertions.assertTrue(content.contains("höheCm=300"));
+                Assertions.assertTrue(content.contains("verlegeabstandCm=10"));
+                Assertions.assertTrue(content.contains("variante=Vario"));
+                Assertions.assertTrue(content.contains("kanonischeKommandos="));
+                Assertions.assertTrue(content.contains("kommandos=" + window.automationCommands()));
+            } finally {
+                Files.deleteIfExists(testFile);
+            }
+            return null;
+        });
+    }
+
+    @Test
+    void verlängertUndKürztZuleitungsendenSegmentweise() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationInput("Ii");
+
+            window.automationExtendSupply();
+            Assertions.assertEquals("IiI", window.automationCommands());
+            Assertions.assertEquals(window.automationCommands(), window.automationProtocol());
+
+            window.automationShortenSupply();
+            Assertions.assertEquals("Ii", window.automationCommands());
+
+            window.automationExtendReturn();
+            Assertions.assertEquals("Iii", window.automationCommands());
+
+            window.automationShortenReturn();
+            Assertions.assertEquals("Ii", window.automationCommands());
+            return null;
+        });
+    }
+
+    @Test
+    void maltVarioKantenMitPlusUndMinus() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationInput("+");
+            String firstEdge = window.automationCommands();
+            Assertions.assertFalse(firstEdge.isBlank());
+            Assertions.assertEquals(firstEdge, window.automationProtocol());
+
+            window.automationInput("+");
+            Assertions.assertTrue(window.automationCommands().length() > firstEdge.length());
+
+            window.automationInput("-");
+            Assertions.assertEquals(firstEdge, window.automationCommands());
+            Assertions.assertEquals(firstEdge, window.automationProtocol());
+            return null;
+        });
+    }
+
+    @Test
+    void ergänztNachVollemVarioRechteckGemeinsameVorlaufUndRücklaufSeite() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationGenerateVario();
+            String fullRectangle = window.automationCommands();
+
+            window.automationInput("+");
+            Assertions.assertEquals(fullRectangle + "Ii", window.automationCommands());
+
+            window.automationInput("-");
+            Assertions.assertEquals(fullRectangle, window.automationCommands());
             return null;
         });
     }

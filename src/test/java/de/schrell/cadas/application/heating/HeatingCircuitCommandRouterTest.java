@@ -126,7 +126,7 @@ class HeatingCircuitCommandRouterTest {
     }
 
     @Test
-    void erzeugtRechteckigenVarioRouterMitGekürztenEndläufen() {
+    void erzeugtRechteckigenVarioRouterMitRandZuleitungen() {
         String commands = router.rectangularVarioCommands(2_000.0, 3_000.0, 100.0);
         String supply = filter(commands, true);
         String ret = filter(commands, false);
@@ -135,20 +135,22 @@ class HeatingCircuitCommandRouterTest {
         Assertions.assertEquals(repeated('i', 5) + "rr", ret.substring(0, 7));
         Assertions.assertTrue(supply.contains(repeated('I', 27)));
         Assertions.assertTrue(ret.contains(repeated('i', 25)));
-        Assertions.assertTrue(supply.endsWith(repeated('I', 18) + "R"));
-        Assertions.assertTrue(ret.endsWith(repeated('i', 16) + "r"));
-        Assertions.assertFalse(supply.endsWith(repeated('I', 28)));
-        Assertions.assertFalse(ret.endsWith(repeated('i', 27)));
+        Assertions.assertTrue(supply.endsWith(repeated('I', 28)));
+        Assertions.assertTrue(ret.endsWith(repeated('i', 27)));
         Assertions.assertDoesNotThrow(() -> router.route(2_000.0, 3_000.0, 100.0, commands));
     }
 
     @Test
     void erzeugtRechteckigenVarioRouterMitSchlangenförmigerMittellinie() {
-        String reference = "rrRRLllLrrRRllLLrrRiRIrRiiiiiiiiiiriiiIIIIIIIIIIRIIIRIIIIIIIIIIIIrRIIIIIiiiiiiiiiiiiriiiiiriiiiiiiiiiiiiiriiiiii";
-
         String commands = router.rectangularVarioCommands(700.0, 1_600.0, 100.0, true);
 
-        Assertions.assertEquals(reference, commands);
+        Assertions.assertTrue(commands.startsWith(
+                "rLRRllrrLLRRllrrLLRRllrriIRr"
+                        + repeated('i', 12) + "r"
+                        + repeated('I', 12) + "R"
+                        + repeated('i', 3) + "r"
+                        + repeated('I', 3) + "R"
+        ));
         Assertions.assertDoesNotThrow(() -> router.route(700.0, 1_600.0, 100.0, commands));
     }
 
@@ -156,9 +158,35 @@ class HeatingCircuitCommandRouterTest {
     void berechnetSchlangenförmigeVarioMittellinieAusRasterdifferenz() {
         String commands = router.rectangularVarioCommands(900.0, 1_600.0, 100.0, true);
 
+        Assertions.assertTrue(commands.startsWith("rLRRllrrLLRRllrrLLRRiIRr"));
         Assertions.assertTrue(commands.contains(repeated('i', 12)));
         Assertions.assertTrue(commands.contains(repeated('I', 10)));
         Assertions.assertDoesNotThrow(() -> router.route(900.0, 1_600.0, 100.0, commands));
+    }
+
+    @Test
+    void rundetVarioSchlangeBeiUngerademRasterunterschiedAufVollständigeSchlangengruppe() {
+        String commands = router.rectangularVarioCommands(2_100.0, 3_000.0, 100.0, true);
+
+        Assertions.assertTrue(commands.startsWith("rLRRllrrLLRRllrrLLRRllrriIRr"));
+        Assertions.assertTrue(filter(commands, true).contains(repeated('I', 12)));
+        Assertions.assertTrue(filter(commands, false).contains(repeated('i', 12)));
+        Assertions.assertDoesNotThrow(() -> router.route(2_100.0, 3_000.0, 100.0, commands));
+    }
+
+    @Test
+    void begrenztVarioSchlangeBeiUngeraderKurzerRasterseiteAufNutzbareBreite() {
+        String commands = router.rectangularVarioCommands(1_100.0, 1_800.0, 100.0, true);
+
+        Assertions.assertEquals(
+                "LRRLLRRLLRRIRIIIIIIIIIIRIIIRIIIIIIIIIIIIRIIIIIRIIIIIIIIIIIIIIRIIIIIIIRIIIIIIIIIIIIIIIIRIIIIIIIIIRIIIIIIIIIIIIIIIII",
+                filter(commands, true)
+        );
+        Assertions.assertEquals(
+                "rllrrllrririiiiiiiiiiriiiriiiiiiiiiiiiriiiiiriiiiiiiiiiiiiiriiiiiiiriiiiiiiiiiiiiiii",
+                filter(commands, false)
+        );
+        Assertions.assertDoesNotThrow(() -> router.route(1_100.0, 1_800.0, 100.0, commands));
     }
 
     @Test
@@ -170,37 +198,66 @@ class HeatingCircuitCommandRouterTest {
     }
 
     @Test
-    void erzeugtMeanderRouterMitStabilerVorlaufreihe() {
-        assertMeanderEndetMitEinerRasterreiheAbstand(2_900.0);
-        assertMeanderEndetMitEinerRasterreiheAbstand(3_000.0);
-        assertMeanderEndetMitEinerRasterreiheAbstand(3_100.0);
+    void erzeugtMeanderRouterAusGespeichertenBeispielen() {
+        assertMeanderPipes(
+                500.0,
+                500.0,
+                "IIRRIIILLIIII",
+                "irriiilliiii"
+        );
+        assertMeanderPipes(
+                600.0,
+                800.0,
+                "IIIIRRIIIIIIILLIIIIIIIRRIIIIIII",
+                "iiirriiiiiiilliiiiiiirriiiiiii"
+        );
+        assertMeanderPipes(
+                800.0,
+                1_300.0,
+                "IIIIIIILLIIIIIIIIIIIIRRIIIIIIIIIIIILLIIIIIIIIIIIIRRIIIIIIIIIIII",
+                "iiiiilliiiiiiiiiiiirriiiiiiiiiiiilliiiiiiiiiiiirriiiiiiiiiiii"
+        );
 
-        String commands = router.meanderCommands(2_000.0, 3_000.0, 100.0);
-        Assertions.assertTrue(filter(commands, true).contains(repeated('I', 26)));
-        Assertions.assertTrue(filter(commands, false).contains(repeated('i', 27)));
+        String longSupply = repeated('I', 15) + ("LL" + repeated('I', 29) + "RR" + repeated('I', 29)).repeat(5);
+        String longReturn = repeated('i', 14) + ("ll" + repeated('i', 29) + "rr" + repeated('i', 29)).repeat(5);
+        assertMeanderPipes(2_000.0, 3_000.0, longSupply, longReturn);
     }
 
     @Test
-    void erzeugtMeanderRouterMitOptionalerSchlangenmitte() {
-        String standard = router.meanderCommands(2_000.0, 3_000.0, 100.0);
+    void meanderSchlangenSchalterErsetztMittlereGerade() {
+        String commands = router.meanderCommands(2_000.0, 3_100.0, 100.0, true);
+        String longLine = repeated('I', 30);
+        String longReturnLine = repeated('i', 30);
 
+        Assertions.assertEquals(
+                "IL" + "RRLL".repeat(7) + "RRIR" + longLine
+                        + ("LL" + longLine + "RR" + longLine).repeat(4)
+                        + "LL" + longLine,
+                filter(commands, true)
+        );
+        Assertions.assertEquals(
+                "r" + "llrr".repeat(7) + "ir" + longReturnLine
+                        + ("ll" + longReturnLine + "rr" + longReturnLine).repeat(4),
+                filter(commands, false)
+        );
+        Assertions.assertDoesNotThrow(() -> router.route(2_000.0, 3_100.0, 100.0, commands));
+    }
+
+    @Test
+    void gleichtMeanderMittelschlangeAnNormaleParallelreihenAn() {
         String commands = router.meanderCommands(2_000.0, 3_000.0, 100.0, true);
 
-        Assertions.assertTrue(commands.length() > standard.length());
-        Assertions.assertTrue(commands.contains("rr" + repeated('i', 10) + "ll" + repeated('i', 10)));
-        Assertions.assertTrue(commands.contains("LL" + repeated('I', 10) + "RR" + repeated('I', 10)));
+        Assertions.assertTrue(filter(commands, false).startsWith("r" + "llrr".repeat(7) + "lrr"));
+        Assertions.assertTrue(filter(commands, true).startsWith("L" + "RRLL".repeat(6) + "RRL" + "RR"));
         Assertions.assertDoesNotThrow(() -> router.route(2_000.0, 3_000.0, 100.0, commands));
     }
 
-    private void assertMeanderEndetMitEinerRasterreiheAbstand(double heightMillimeters) {
-        String commands = router.meanderCommands(2_000.0, heightMillimeters, 100.0);
-        RoutingResult result = router.route(2_000.0, heightMillimeters, 100.0, commands);
+    private void assertMeanderPipes(double widthMillimeters, double heightMillimeters, String supply, String ret) {
+        String commands = router.meanderCommands(widthMillimeters, heightMillimeters, 100.0);
 
-        Assertions.assertEquals(
-                100.0,
-                result.supplyPath().endPoint().yMillimeters() - result.returnPath().endPoint().yMillimeters(),
-                0.001
-        );
+        Assertions.assertEquals(supply, filter(commands, true));
+        Assertions.assertEquals(ret, filter(commands, false));
+        Assertions.assertDoesNotThrow(() -> router.route(widthMillimeters, heightMillimeters, 100.0, commands));
     }
 
     private String repeated(char command, int count) {

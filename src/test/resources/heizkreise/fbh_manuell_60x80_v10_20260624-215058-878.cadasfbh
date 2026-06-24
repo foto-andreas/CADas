@@ -1,0 +1,12 @@
+# CADas FBH-Routing-Testdatei
+format=cadas-fbh-routing-v1
+breiteCm=60
+höheCm=80
+verlegeabstandCm=10
+variante=Manuell
+schlangenMittellinie=false
+vorlaufRücklaufGetauscht=false
+rotationViertel=0
+generatorVergleich=false
+kanonischeKommandos=IIIIRRIIIIIIILLIIIIIIIRRIIIIIII|iiirriiiiiiilliiiiiiirriiiiiii
+kommandos=iiirriiiiiiilliiiiiiirriiiiiiiIIIIRRIIIIIIILLIIIIIIIRRIIIIIII

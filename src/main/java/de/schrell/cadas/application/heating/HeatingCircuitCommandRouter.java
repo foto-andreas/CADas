@@ -6,8 +6,6 @@ import java.util.Objects;
 
 public final class HeatingCircuitCommandRouter {
 
-    private static final String SERPENTINE_MIDDLE_LINE = "rrRRLllLrrRRllLLrrRiRIrR";
-
     public RoutingResult route(double widthMillimeters, double heightMillimeters, double spacingMillimeters, String commands) {
         if (widthMillimeters <= 0.0) {
             throw new IllegalArgumentException("Die Heizbereichsbreite muss größer als null sein.");
@@ -117,16 +115,65 @@ public final class HeatingCircuitCommandRouter {
         int shortSideSteps = (int) Math.floor(Math.min(widthMillimeters, heightMillimeters) / spacingMillimeters);
         int longSideSteps = (int) Math.floor(Math.max(widthMillimeters, heightMillimeters) / spacingMillimeters);
         int extension = longSideSteps - shortSideSteps;
-        int turnPairs = shortSideSteps / 4;
-        int lineSteps = longSideSteps - 3;
-        int supplyLineSteps = meanderSupplyLineSteps(shortSideSteps, lineSteps, turnPairs, extension);
-        if (turnPairs < 1 || lineSteps < 1) {
+        int turnCount = shortSideSteps / 2;
+        int lineSteps = longSideSteps - 1;
+        int firstLineSteps = extension > 0 ? lineSteps : longSideSteps % 2 == 1 ? longSideSteps - 2 : lineSteps;
+        int supplyInitialSteps = extension > 0 && longSideSteps % 2 == 1 ? longSideSteps / 2 + 1 : longSideSteps / 2;
+        int returnInitialSteps = Math.max(1, longSideSteps / 2 - 1);
+        if (turnCount < 1 || firstLineSteps < 1) {
             throw new IllegalArgumentException("Ein Meander-Heizkreis benötigt mindestens vier Verlegeabstände Breite und vier Verlegeabstände Länge.");
         }
 
         StringBuilder commands = new StringBuilder();
-        appendMeanderReturn(commands, shortSideSteps, lineSteps, turnPairs, extension, serpentineMiddleLine);
-        appendMeanderSupply(commands, shortSideSteps, supplyLineSteps, turnPairs, extension, serpentineMiddleLine);
+        boolean startWithLeftTurns = shortSideSteps % 4 == 0;
+        if (serpentineMiddleLine && extension > 0) {
+            boolean oddLongSide = longSideSteps % 2 == 1;
+            appendMeanderReturnSnake(commands, extension, lineSteps, oddLongSide);
+            appendMeanderRows(
+                    commands,
+                    'i',
+                    startWithLeftTurns ? 'r' : 'l',
+                    startWithLeftTurns ? 'l' : 'r',
+                    turnCount - 1,
+                    lineSteps,
+                    lineSteps,
+                    lineSteps,
+                    oddLongSide ? 1 : 2
+            );
+            appendMeanderSupplySnake(commands, lineSteps, oddLongSide);
+            appendMeanderRows(
+                    commands,
+                    'I',
+                    startWithLeftTurns ? 'R' : 'L',
+                    startWithLeftTurns ? 'L' : 'R',
+                    turnCount,
+                    lineSteps,
+                    lineSteps,
+                    lineSteps,
+                    oddLongSide ? 1 : 2
+            );
+            return commands.toString();
+        }
+        appendMeanderPipe(
+                commands,
+                'i',
+                startWithLeftTurns ? 'l' : 'r',
+                startWithLeftTurns ? 'r' : 'l',
+                returnInitialSteps,
+                firstLineSteps,
+                lineSteps,
+                turnCount
+        );
+        appendMeanderPipe(
+                commands,
+                'I',
+                startWithLeftTurns ? 'L' : 'R',
+                startWithLeftTurns ? 'R' : 'L',
+                supplyInitialSteps,
+                firstLineSteps,
+                lineSteps,
+                turnCount
+        );
         return commands.toString();
     }
 
@@ -174,6 +221,8 @@ public final class HeatingCircuitCommandRouter {
             appendRepeated(commands, 'I', rectangularVarioLength(baseLength, extension));
             commands.append('R');
         }
+        appendRepeated(commands, 'I', supplyBaseMaximum + extension);
+        appendRepeated(commands, 'i', returnBaseMaximum + extension);
         return commands.toString();
     }
 
@@ -181,101 +230,119 @@ public final class HeatingCircuitCommandRouter {
         if (shortSideSteps < 7) {
             throw new IllegalArgumentException("Eine schlangenförmige Vario-Mittellinie benötigt mindestens sieben Verlegeabstände auf der kurzen Seite.");
         }
-        int snakeLength = serpentineSnakeLength(extension);
-        int supplyMaximum = 5;
-        StringBuilder commands = new StringBuilder(SERPENTINE_MIDDLE_LINE);
-        appendRepeated(commands, 'i', 1 + snakeLength);
-        commands.append('r');
-        appendRepeated(commands, 'i', 3);
-        appendRepeated(commands, 'I', 1 + snakeLength);
-        commands.append('R');
-        appendRepeated(commands, 'I', 3);
-        commands.append('R');
-        appendRepeated(commands, 'I', 3 + snakeLength);
-        commands.append("rR");
-        appendRepeated(commands, 'I', supplyMaximum);
-        appendRepeated(commands, 'i', 3 + snakeLength);
-        commands.append('r');
-        appendRepeated(commands, 'i', supplyMaximum);
-        commands.append('r');
-        appendRepeated(commands, 'i', supplyMaximum + snakeLength);
-        commands.append('r');
-        appendRepeated(commands, 'i', supplyMaximum + 1);
+        int snakeLength = serpentineVarioSnakeLength(extension);
+        StringBuilder commands = new StringBuilder("rLRR");
+        boolean lowerSnakeGroup = true;
+        for (int length = 2; length < snakeLength; length += 2) {
+            commands.append(lowerSnakeGroup ? "llrr" : "LLRR");
+            lowerSnakeGroup = !lowerSnakeGroup;
+        }
+        commands.append("iIRr");
+        int supplyBaseMaximum = largestEvenGridSteps(shortSideSteps) - 2;
+        int returnBaseMaximum = supplyBaseMaximum - 1;
+        for (int baseLength = 1; baseLength <= supplyBaseMaximum; baseLength++) {
+            int lineLength = serpentineVarioLength(baseLength, extension);
+            if (baseLength == 1) {
+                lineLength = Math.max(lineLength, snakeLength);
+            }
+            if (baseLength < returnBaseMaximum) {
+                appendRepeated(commands, 'i', lineLength);
+                commands.append('r');
+            }
+            appendRepeated(commands, 'I', lineLength);
+            commands.append('R');
+        }
+        appendRepeated(commands, 'I', serpentineVarioFinalLength(supplyBaseMaximum, extension));
+        appendRepeated(commands, 'i', serpentineVarioFinalLength(returnBaseMaximum, extension));
         return commands.toString();
     }
 
-    private void appendMeanderReturn(
-            StringBuilder commands,
-            int shortSideSteps,
-            int lineSteps,
-            int turnPairs,
-            int extension,
-            boolean serpentineMiddleLine
-    ) {
-        appendRepeated(commands, 'i', shortSideSteps / 2 + 2);
-        for (int turnPair = 0; turnPair < turnPairs; turnPair++) {
-            commands.append("ll");
-            appendRepeated(commands, 'i', lineSteps);
-            commands.append("rr");
-            if (turnPair < turnPairs - 1) {
-                appendRepeated(commands, 'i', lineSteps);
-            } else {
-                appendRepeated(commands, 'i', lineSteps + 1);
-                if (serpentineMiddleLine) {
-                    appendMeanderMiddleSnake(commands, 'i', 'r', 'l', serpentineSnakeLength(extension));
-                }
-                commands.append('r');
-                appendRepeated(commands, 'i', shortSideSteps - 1);
-            }
-        }
-    }
-
-    private void appendMeanderSupply(
-            StringBuilder commands,
-            int shortSideSteps,
-            int supplyLineSteps,
-            int turnPairs,
-            int extension,
-            boolean serpentineMiddleLine
-    ) {
-        appendRepeated(commands, 'I', shortSideSteps / 2 + 4);
-        for (int turnPair = 0; turnPair < turnPairs; turnPair++) {
-            commands.append("LL");
-            appendRepeated(commands, 'I', supplyLineSteps);
-            if (turnPair < turnPairs - 1) {
-                commands.append("RR");
-                appendRepeated(commands, 'I', supplyLineSteps);
-            } else {
-                if (serpentineMiddleLine) {
-                    appendMeanderMiddleSnake(commands, 'I', 'L', 'R', serpentineSnakeLength(extension));
-                }
-                commands.append('R');
-            }
-        }
-    }
-
-    private void appendMeanderMiddleSnake(
+    private void appendMeanderPipe(
             StringBuilder commands,
             char lineCommand,
             char firstTurnCommand,
             char secondTurnCommand,
-            int snakeLength
+            int initialSteps,
+            int firstLineSteps,
+            int lineSteps,
+            int turnCount
     ) {
-        commands.append(firstTurnCommand);
-        commands.append(firstTurnCommand);
-        appendRepeated(commands, lineCommand, snakeLength);
-        commands.append(secondTurnCommand);
-        commands.append(secondTurnCommand);
-        appendRepeated(commands, lineCommand, snakeLength);
+        appendRepeated(commands, lineCommand, initialSteps);
+        appendMeanderRows(commands, lineCommand, firstTurnCommand, secondTurnCommand, turnCount, firstLineSteps, lineSteps, lineSteps, 2);
     }
 
-    private int meanderSupplyLineSteps(int shortSideSteps, int lineSteps, int turnPairs, int extension) {
-        int referenceExtension = turnPairs * 2 - 1;
-        return lineSteps - Math.max(0, extension - referenceExtension);
+    private void appendMeanderRows(
+            StringBuilder commands,
+            char lineCommand,
+            char firstTurnCommand,
+            char secondTurnCommand,
+            int turnCount,
+            int firstLineSteps,
+            int lineSteps,
+            int lastLineSteps,
+            int firstTurnRepetitions
+    ) {
+        char turnCommand = firstTurnCommand;
+        for (int turn = 0; turn < turnCount; turn++) {
+            appendRepeated(commands, turnCommand, turn == 0 ? firstTurnRepetitions : 2);
+            int currentLineSteps = turn == 0 ? firstLineSteps : turn == turnCount - 1 ? lastLineSteps : lineSteps;
+            appendRepeated(commands, lineCommand, currentLineSteps);
+            turnCommand = turnCommand == firstTurnCommand ? secondTurnCommand : firstTurnCommand;
+        }
     }
 
-    private int serpentineSnakeLength(int extension) {
-        return Math.max(1, extension);
+    private void appendMeanderReturnSnake(StringBuilder commands, int extension, int lineSteps, boolean oddLongSide) {
+        int groupCount = meanderSnakeGroupCount(lineSteps, 5);
+        commands.append('r');
+        appendRepeated(commands, "llrr", groupCount);
+        if (oddLongSide) {
+            commands.append('i');
+            return;
+        }
+        commands.append('l');
+        if (groupCount == extension / 2) {
+            commands.append('i');
+        }
+    }
+
+    private void appendMeanderSupplySnake(StringBuilder commands, int lineSteps, boolean oddLongSide) {
+        int groupCount = meanderSnakeGroupCount(lineSteps, 6);
+        if (oddLongSide) {
+            commands.append('I');
+        }
+        commands.append('L');
+        appendRepeated(commands, "RRLL", groupCount);
+        commands.append(oddLongSide ? "RRI" : "RRL");
+    }
+
+    private int meanderSnakeGroupCount(int lineSteps, int fixedSnakeCommandsIncludingClosingArcs) {
+        int targetCommandsIncludingClosingArcs = lineSteps + 2;
+        return Math.max(0, Math.round((targetCommandsIncludingClosingArcs - fixedSnakeCommandsIncludingClosingArcs) / 4.0f));
+    }
+
+    private int serpentineVarioSnakeLength(int extension) {
+        int minimumLength = Math.max(2, extension + 2);
+        return minimumLength % 2 == 0 ? minimumLength : minimumLength + 1;
+    }
+
+    private int serpentineVarioLength(int baseLength, int extension) {
+        return rectangularVarioLength(baseLength, extension) + 1 + oddLongSideCorrection(baseLength, extension);
+    }
+
+    private int serpentineVarioFinalLength(int baseLength, int extension) {
+        return baseLength + extension + 1 + oddExtensionCorrection(extension);
+    }
+
+    private int oddLongSideCorrection(int baseLength, int extension) {
+        return baseLength % 2 == 1 ? oddExtensionCorrection(extension) : 0;
+    }
+
+    private int oddExtensionCorrection(int extension) {
+        return extension % 2 == 1 ? 1 : 0;
+    }
+
+    private int largestEvenGridSteps(int steps) {
+        return steps % 2 == 0 ? steps : steps - 1;
     }
 
     private int rectangularVarioLength(int baseLength, int extension) {
@@ -285,6 +352,12 @@ public final class HeatingCircuitCommandRouter {
     private void appendRepeated(StringBuilder target, char character, int repetitions) {
         for (int index = 0; index < repetitions; index++) {
             target.append(character);
+        }
+    }
+
+    private void appendRepeated(StringBuilder target, String text, int repetitions) {
+        for (int index = 0; index < repetitions; index++) {
+            target.append(text);
         }
     }
 

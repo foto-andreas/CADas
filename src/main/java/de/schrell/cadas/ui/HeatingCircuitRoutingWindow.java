@@ -9,6 +9,12 @@ import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingP
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingResult;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.Turn;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -52,6 +58,8 @@ final class HeatingCircuitRoutingWindow {
     private static final double MINIMUM_ZOOM = 0.25;
     private static final double MAXIMUM_ZOOM = 6.0;
     private static final double ZOOM_STEP = 1.2;
+    private static final Path ROUTING_TEST_DIRECTORY = Path.of("src/test/resources/heizkreise");
+    private static final DateTimeFormatter TEST_FILE_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
 
     private final HeatingCircuitCommandRouter router = new HeatingCircuitCommandRouter();
     private final Canvas canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -64,11 +72,18 @@ final class HeatingCircuitRoutingWindow {
     private final Button redoButton = new Button("Wiederherstellen");
     private final Button generateVarioButton = new Button("Vario erzeugen");
     private final Button generateMeanderButton = new Button("Meander erzeugen");
+    private final Button renderButton = new Button("Rendern");
+    private final Button extendSupplyButton = new Button("VL +");
+    private final Button shortenSupplyButton = new Button("VL -");
+    private final Button extendReturnButton = new Button("RL +");
+    private final Button shortenReturnButton = new Button("RL -");
+    private final Button saveTestFileButton = new Button("Sichern");
     private final Label statusLabel = new Label();
     private final Deque<RoutingState> undoStack = new ArrayDeque<>();
     private final Deque<RoutingState> redoStack = new ArrayDeque<>();
     private final StringBuilder protocol = new StringBuilder();
     private final StringBuilder commands = new StringBuilder();
+    private RoutingVariant routingVariant = RoutingVariant.MANUELL;
     private double zoomFactor = 1.0;
     private int rotationQuarterTurns;
 
@@ -81,6 +96,7 @@ final class HeatingCircuitRoutingWindow {
         stage.setScene(new Scene(buildContent(), 1100, 820));
         stage.setMinWidth(900);
         stage.setMinHeight(700);
+        stage.setMaximized(true);
         stage.show();
         Platform.runLater(protocolArea::requestFocus);
     }
@@ -90,7 +106,12 @@ final class HeatingCircuitRoutingWindow {
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(12));
         root.setTop(buildInputRow());
-        root.setCenter(new StackPane(canvas));
+        StackPane canvasPane = new StackPane(canvas);
+        canvas.widthProperty().bind(canvasPane.widthProperty());
+        canvas.heightProperty().bind(canvasPane.heightProperty());
+        canvas.widthProperty().addListener((ignored, oldValue, newValue) -> redraw());
+        canvas.heightProperty().addListener((ignored, oldValue, newValue) -> redraw());
+        root.setCenter(canvasPane);
         root.setBottom(buildProtocolArea());
         root.addEventFilter(KeyEvent.KEY_PRESSED, this::handleWindowShortcut);
         redraw();
@@ -114,6 +135,21 @@ final class HeatingCircuitRoutingWindow {
         generateMeanderButton.setOnAction(event -> generateMeander());
         applyTooltip(generateMeanderButton, "Erzeugt aus dem aktuellen Heizbereich einen Meander-Verlauf. Der Schalter `Mittellinie schlängeln` ergänzt optional eine zweireihige Schlangenlinie in der Mitte.");
 
+        extendSupplyButton.setOnAction(event -> extendPipeEnd('I', "Vorlauf"));
+        applyTooltip(extendSupplyButton, "Verlängert das Vorlauf-Ende um ein gerades Rastersegment, indem ein `I` an die Routingsprache angehängt wird.");
+
+        shortenSupplyButton.setOnAction(event -> shortenPipeEnd('I', "Vorlauf"));
+        applyTooltip(shortenSupplyButton, "Kürzt das Vorlauf-Ende um ein gerades Rastersegment, wenn das letzte Vorlauf-Kommando ein `I` ist.");
+
+        extendReturnButton.setOnAction(event -> extendPipeEnd('i', "Rücklauf"));
+        applyTooltip(extendReturnButton, "Verlängert das Rücklauf-Ende um ein gerades Rastersegment, indem ein `i` an die Routingsprache angehängt wird.");
+
+        shortenReturnButton.setOnAction(event -> shortenPipeEnd('i', "Rücklauf"));
+        applyTooltip(shortenReturnButton, "Kürzt das Rücklauf-Ende um ein gerades Rastersegment, wenn das letzte Rücklauf-Kommando ein `i` ist.");
+
+        saveTestFileButton.setOnAction(event -> saveRoutingTestFile());
+        applyTooltip(saveTestFileButton, "Sichert den aktuellen Heizkreis als `.cadasfbh`-Testdatei unter `src/test/resources/heizkreise`, inklusive Maße, FBH-Parametern und Routing-Kommandos.");
+
         Button clearButton = new Button("Kommandos löschen");
         clearButton.setOnAction(event -> clearCommands());
         applyTooltip(clearButton, "Löscht das Protokoll und startet die Routingeingabe wieder im Mittelpunkt des Heizbereichs.");
@@ -129,6 +165,11 @@ final class HeatingCircuitRoutingWindow {
                 rotateButton,
                 generateVarioButton,
                 generateMeanderButton,
+                extendSupplyButton,
+                shortenSupplyButton,
+                extendReturnButton,
+                shortenReturnButton,
+                saveTestFileButton,
                 serpentineMiddleLineCheckBox,
                 flowInvertedCheckBox,
                 clearButton,
@@ -142,7 +183,12 @@ final class HeatingCircuitRoutingWindow {
 
     private VBox buildProtocolArea() {
         Label label = new Label("Kommandoprotokoll");
-        VBox box = new VBox(5.0, label, protocolArea);
+        renderButton.setOnAction(event -> renderProtocolText());
+        applyTooltip(renderButton, "Übernimmt den editierbaren Text aus dem Kommandoprotokoll, filtert gültige Routingbefehle und zeichnet den Heizkreis neu.");
+        HBox protocolRow = new HBox(8.0, protocolArea, renderButton);
+        HBox.setHgrow(protocolArea, Priority.ALWAYS);
+        protocolRow.setAlignment(Pos.CENTER_LEFT);
+        VBox box = new VBox(5.0, label, protocolRow);
         box.setPadding(new Insets(10, 0, 0, 0));
         return box;
     }
@@ -152,7 +198,7 @@ final class HeatingCircuitRoutingWindow {
         spacingField.setPrefColumnCount(5);
         protocolArea.setPrefRowCount(3);
         protocolArea.setWrapText(true);
-        protocolArea.setEditable(false);
+        protocolArea.setEditable(true);
         protocolArea.setFocusTraversable(true);
         statusLabel.setMaxWidth(Double.MAX_VALUE);
         statusLabel.setStyle("-fx-text-fill: #5c5146;");
@@ -160,21 +206,14 @@ final class HeatingCircuitRoutingWindow {
         areaSizeField.textProperty().addListener((ignored, oldValue, newValue) -> redraw());
         spacingField.textProperty().addListener((ignored, oldValue, newValue) -> redraw());
         flowInvertedCheckBox.selectedProperty().addListener((ignored, oldValue, newValue) -> redraw());
-        protocolArea.addEventFilter(KeyEvent.KEY_TYPED, this::handleCommandInput);
-        protocolArea.addEventFilter(KeyEvent.KEY_PRESSED, this::handleControlKey);
         canvas.setOnMouseClicked(event -> protocolArea.requestFocus());
 
         applyTooltip(areaSizeField, "Erfasst Breite und Länge des rechteckigen Heizbereichs in Zentimetern, zum Beispiel `200x300`.");
         applyTooltip(spacingField, "Legt den Verlegeabstand `v` in Zentimetern fest. Geraden sind `v` lang, Bögen besitzen den Durchmesser `v`.");
-        applyTooltip(protocolArea, "Nimmt Routingkommandos buchstabenweise an: `I/R/L` für Vorlauf und `i/r/l` für Rücklauf. Leerzeichen und Enter werden ignoriert, ungültige Zeichen erscheinen als `x`.");
+        applyTooltip(protocolArea, "Editierbarer Text der Routingkommandos: `I/R/L` für Vorlauf und `i/r/l` für Rücklauf. Ausschneiden, Kopieren und Einfügen funktionieren über die normalen Tastenkürzel; `Rendern` übernimmt den Text in die Zeichnung.");
         applyTooltip(serpentineMiddleLineCheckBox, "Erzeugt die Mitte beim nächsten Klick auf `Vario erzeugen` oder `Meander erzeugen` schlangenförmig. Die Schlangenlänge wird aus der Rasterdifferenz zwischen langer und kurzer Seite berechnet.");
         applyTooltip(flowInvertedCheckBox, "Tauscht die Darstellung von Vorlauf und Rücklauf, ohne eine HKV-Verbindung zu erzeugen.");
         updateUndoRedoButtons();
-    }
-
-    private void handleCommandInput(KeyEvent event) {
-        applyInput(event.getCharacter());
-        event.consume();
     }
 
     void automationInput(String text) {
@@ -211,6 +250,12 @@ final class HeatingCircuitRoutingWindow {
         return currentRoutingResult(size, spacingMillimeters).supplyPath().endPoint();
     }
 
+    RoutingPoint automationReturnEndPoint() {
+        AreaSize size = parseAreaSize();
+        double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
+        return currentRoutingResult(size, spacingMillimeters).returnPath().endPoint();
+    }
+
     void automationGenerateVario() {
         generateVario();
     }
@@ -219,12 +264,44 @@ final class HeatingCircuitRoutingWindow {
         generateMeander();
     }
 
+    void automationExtendSupply() {
+        extendPipeEnd('I', "Vorlauf");
+    }
+
+    void automationShortenSupply() {
+        shortenPipeEnd('I', "Vorlauf");
+    }
+
+    void automationExtendReturn() {
+        extendPipeEnd('i', "Rücklauf");
+    }
+
+    void automationShortenReturn() {
+        shortenPipeEnd('i', "Rücklauf");
+    }
+
+    Path automationSaveRoutingTestFile() {
+        return saveRoutingTestFile();
+    }
+
     void automationSetAreaSize(String areaSizeText) {
         areaSizeField.setText(areaSizeText);
     }
 
     void automationSetSerpentineMiddleLine(boolean selected) {
         serpentineMiddleLineCheckBox.setSelected(selected);
+    }
+
+    void automationSetProtocolText(String text) {
+        protocolArea.setText(text);
+    }
+
+    void automationRenderProtocolText() {
+        renderProtocolText();
+    }
+
+    boolean automationProtocolEditable() {
+        return protocolArea.isEditable();
     }
 
     String automationProtocol() {
@@ -246,6 +323,14 @@ final class HeatingCircuitRoutingWindow {
             if (router.isIgnoredCharacter(character)) {
                 continue;
             }
+            if (character == '+') {
+                paintNextVarioEdge();
+                continue;
+            }
+            if (character == '-') {
+                removeLastVarioEdge();
+                continue;
+            }
             if (!changed) {
                 rememberUndoState();
                 redoStack.clear();
@@ -264,24 +349,37 @@ final class HeatingCircuitRoutingWindow {
         }
     }
 
-    private void handleControlKey(KeyEvent event) {
-        if (event.isShortcutDown() && event.getCode() == KeyCode.Z) {
-            if (event.isShiftDown()) {
-                redo();
-            } else {
-                undo();
+    private void renderProtocolText() {
+        String editedText = protocolArea.getText();
+        StringBuilder renderedProtocol = new StringBuilder();
+        StringBuilder renderedCommands = new StringBuilder();
+        for (int index = 0; index < editedText.length(); index++) {
+            char character = editedText.charAt(index);
+            if (router.isIgnoredCharacter(character)) {
+                continue;
             }
-            event.consume();
+            if (router.isCommandCharacter(character)) {
+                renderedProtocol.append(character);
+                renderedCommands.append(character);
+            } else {
+                renderedProtocol.append('x');
+            }
+        }
+        if (renderedProtocol.toString().contentEquals(protocol) && renderedCommands.toString().contentEquals(commands)) {
+            redraw();
             return;
         }
-        if (event.isShortcutDown() && event.getCode() == KeyCode.Y) {
-            redo();
-            event.consume();
-            return;
-        }
-        if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) {
-            event.consume();
-        }
+        rememberUndoState();
+        redoStack.clear();
+        protocol.setLength(0);
+        protocol.append(renderedProtocol);
+        commands.setLength(0);
+        commands.append(renderedCommands);
+        routingVariant = RoutingVariant.MANUELL;
+        updateProtocolArea();
+        redraw();
+        statusLabel.setText("Kommandotext gerendert.");
+        Platform.runLater(protocolArea::requestFocus);
     }
 
     private void handleWindowShortcut(KeyEvent event) {
@@ -341,6 +439,7 @@ final class HeatingCircuitRoutingWindow {
             commands.append(generatedCommands);
             protocol.setLength(0);
             protocol.append(generatedCommands);
+            routingVariant = RoutingVariant.VARIO;
             rotationQuarterTurns = 0;
             areaSizeField.setText(formatCentimeters(sideMillimeters) + "x" + formatCentimeters(longSideMillimeters));
             updateProtocolArea();
@@ -374,6 +473,7 @@ final class HeatingCircuitRoutingWindow {
             commands.append(generatedCommands);
             protocol.setLength(0);
             protocol.append(generatedCommands);
+            routingVariant = RoutingVariant.MEANDER;
             rotationQuarterTurns = 0;
             areaSizeField.setText(formatCentimeters(sideMillimeters) + "x" + formatCentimeters(longSideMillimeters));
             updateProtocolArea();
@@ -389,6 +489,232 @@ final class HeatingCircuitRoutingWindow {
         }
     }
 
+    private void paintNextVarioEdge() {
+        try {
+            VarioPaintState paintState = currentVarioPaintState();
+            rememberUndoState();
+            redoStack.clear();
+            String step = paintState.nextStep();
+            commands.append(step);
+            protocol.append(step);
+            routingVariant = RoutingVariant.VARIO;
+            rotationQuarterTurns = 0;
+            updateProtocolArea();
+            redraw();
+            statusLabel.setText("Vario-Seite gemalt.");
+            Platform.runLater(protocolArea::requestFocus);
+        } catch (IllegalArgumentException exception) {
+            statusLabel.setText(exception.getMessage());
+        }
+    }
+
+    private void removeLastVarioEdge() {
+        try {
+            VarioPaintState paintState = currentVarioPaintState();
+            String step = paintState.lastStep();
+            if (step.isEmpty()) {
+                statusLabel.setText("Keine gemalte Vario-Seite zum Entfernen vorhanden.");
+                Platform.runLater(protocolArea::requestFocus);
+                return;
+            }
+            rememberUndoState();
+            redoStack.clear();
+            commands.delete(commands.length() - step.length(), commands.length());
+            if (protocol.toString().endsWith(step)) {
+                protocol.delete(protocol.length() - step.length(), protocol.length());
+            } else {
+                protocol.setLength(0);
+                protocol.append(commands);
+            }
+            updateProtocolArea();
+            redraw();
+            statusLabel.setText("Vario-Seite entfernt.");
+            Platform.runLater(protocolArea::requestFocus);
+        } catch (IllegalArgumentException exception) {
+            statusLabel.setText(exception.getMessage());
+        }
+    }
+
+    private VarioPaintState currentVarioPaintState() {
+        AreaSize size = parseAreaSize();
+        double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
+        String generatedCommands = router.rectangularVarioCommands(
+                size.widthMillimeters(),
+                size.heightMillimeters(),
+                spacingMillimeters,
+                serpentineMiddleLineCheckBox.isSelected()
+        );
+        return VarioPaintState.of(splitVarioSteps(generatedCommands), commands.toString());
+    }
+
+    private List<String> splitVarioSteps(String generatedCommands) {
+        List<String> edges = new ArrayList<>();
+        int index = 0;
+        while (index < generatedCommands.length()) {
+            int startIndex = index;
+            char command = generatedCommands.charAt(index);
+            if (command == 'I' || command == 'i') {
+                char lineCommand = command;
+                while (index < generatedCommands.length() && generatedCommands.charAt(index) == lineCommand) {
+                    index++;
+                }
+                if (index < generatedCommands.length() && samePipe(lineCommand, generatedCommands.charAt(index))) {
+                    index++;
+                }
+            } else {
+                while (index < generatedCommands.length()
+                        && samePipe(command, generatedCommands.charAt(index))
+                        && generatedCommands.charAt(index) != 'I'
+                        && generatedCommands.charAt(index) != 'i') {
+                    index++;
+                }
+            }
+            edges.add(generatedCommands.substring(startIndex, index));
+        }
+        return groupVarioEdges(edges);
+    }
+
+    private List<String> groupVarioEdges(List<String> edges) {
+        List<String> steps = new ArrayList<>();
+        StringBuilder step = new StringBuilder();
+        boolean hasSupply = false;
+        boolean hasReturn = false;
+        for (String edge : edges) {
+            step.append(edge);
+            if (edge.chars().anyMatch(Character::isUpperCase)) {
+                hasSupply = true;
+            } else {
+                hasReturn = true;
+            }
+            if (hasSupply && hasReturn) {
+                steps.add(step.toString());
+                step.setLength(0);
+                hasSupply = false;
+                hasReturn = false;
+            }
+        }
+        if (!step.isEmpty()) {
+            if (steps.isEmpty()) {
+                steps.add(step.toString());
+            } else {
+                int lastIndex = steps.size() - 1;
+                steps.set(lastIndex, steps.get(lastIndex) + step);
+            }
+        }
+        return steps;
+    }
+
+    private boolean samePipe(char leftCommand, char rightCommand) {
+        return Character.isUpperCase(leftCommand) == Character.isUpperCase(rightCommand);
+    }
+
+    private record VarioPaintState(List<String> generatedSteps, int generatedStepCount, int additionalStepCount) {
+
+        private static final String ADDITIONAL_STEP = "Ii";
+
+        static VarioPaintState of(List<String> generatedSteps, String currentCommands) {
+            StringBuilder prefix = new StringBuilder();
+            int generatedStepCount = 0;
+            for (String step : generatedSteps) {
+                if (currentCommands.contentEquals(prefix)) {
+                    break;
+                }
+                prefix.append(step);
+                if (!currentCommands.startsWith(prefix.toString())) {
+                    throw new IllegalArgumentException("Die aktuelle Eingabe ist kein Prefix des berechneten Vario-Routers.");
+                }
+                generatedStepCount++;
+            }
+            if (currentCommands.contentEquals(prefix)) {
+                return new VarioPaintState(generatedSteps, generatedStepCount, 0);
+            }
+            if (generatedStepCount != generatedSteps.size()) {
+                throw new IllegalArgumentException("Die aktuelle Eingabe ist kein Prefix des berechneten Vario-Routers.");
+            }
+            String extraCommands = currentCommands.substring(prefix.length());
+            if (extraCommands.length() % ADDITIONAL_STEP.length() != 0) {
+                throw new IllegalArgumentException("Die zusätzlichen Vario-Seiten sind nicht vollständig.");
+            }
+            for (int index = 0; index < extraCommands.length(); index += ADDITIONAL_STEP.length()) {
+                if (!extraCommands.startsWith(ADDITIONAL_STEP, index)) {
+                    throw new IllegalArgumentException("Die zusätzlichen Vario-Seiten passen nicht zum gemeinsamen VL/RL-Schritt.");
+                }
+            }
+            return new VarioPaintState(
+                    generatedSteps,
+                    generatedStepCount,
+                    extraCommands.length() / ADDITIONAL_STEP.length()
+            );
+        }
+
+        String nextStep() {
+            if (generatedStepCount < generatedSteps.size()) {
+                return generatedSteps.get(generatedStepCount);
+            }
+            return ADDITIONAL_STEP;
+        }
+
+        String lastStep() {
+            if (additionalStepCount > 0) {
+                return ADDITIONAL_STEP;
+            }
+            if (generatedStepCount <= 0) {
+                return "";
+            }
+            return generatedSteps.get(generatedStepCount - 1);
+        }
+    }
+
+    private void extendPipeEnd(char command, String pipeName) {
+        rememberUndoState();
+        redoStack.clear();
+        commands.append(command);
+        protocol.append(command);
+        updateProtocolArea();
+        redraw();
+        statusLabel.setText(pipeName + " um ein gerades Rastersegment verlängert.");
+        Platform.runLater(protocolArea::requestFocus);
+    }
+
+    private void shortenPipeEnd(char command, String pipeName) {
+        int commandIndex = lastPipeCommandIndex(command);
+        if (commandIndex < 0 || commands.charAt(commandIndex) != command) {
+            statusLabel.setText(pipeName + " kann nicht gekürzt werden, weil sein letztes Kommando kein gerades Segment ist.");
+            Platform.runLater(protocolArea::requestFocus);
+            return;
+        }
+        rememberUndoState();
+        redoStack.clear();
+        commands.deleteCharAt(commandIndex);
+        int protocolIndex = lastIndexOf(protocol, command);
+        if (protocolIndex >= 0) {
+            protocol.deleteCharAt(protocolIndex);
+        }
+        updateProtocolArea();
+        redraw();
+        statusLabel.setText(pipeName + " um ein gerades Rastersegment gekürzt.");
+        Platform.runLater(protocolArea::requestFocus);
+    }
+
+    private int lastPipeCommandIndex(char lineCommand) {
+        boolean supply = Character.isUpperCase(lineCommand);
+        for (int index = commands.length() - 1; index >= 0; index--) {
+            if (Character.isUpperCase(commands.charAt(index)) == supply) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private int lastIndexOf(StringBuilder text, char character) {
+        for (int index = text.length() - 1; index >= 0; index--) {
+            if (text.charAt(index) == character) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
     private void clearCommands() {
         if (protocol.isEmpty() && commands.isEmpty()) {
             Platform.runLater(protocolArea::requestFocus);
@@ -398,9 +724,82 @@ final class HeatingCircuitRoutingWindow {
         redoStack.clear();
         commands.setLength(0);
         protocol.setLength(0);
+        routingVariant = RoutingVariant.MANUELL;
         updateProtocolArea();
         redraw();
         Platform.runLater(protocolArea::requestFocus);
+    }
+
+    private Path saveRoutingTestFile() {
+        try {
+            if (commands.isEmpty()) {
+                throw new IllegalArgumentException("Es gibt keine Routing-Kommandos zum Sichern.");
+            }
+            AreaSize size = parseAreaSize();
+            double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
+            router.route(size.widthMillimeters(), size.heightMillimeters(), spacingMillimeters, commands.toString());
+            Files.createDirectories(ROUTING_TEST_DIRECTORY);
+            Path target = nextRoutingTestFile(size, spacingMillimeters);
+            Files.writeString(target, routingTestFileContent(size, spacingMillimeters), StandardCharsets.UTF_8);
+            statusLabel.setText("Heizkreis-Testdatei gesichert: " + target);
+            Platform.runLater(protocolArea::requestFocus);
+            return target;
+        } catch (IOException exception) {
+            statusLabel.setText("Heizkreis-Testdatei konnte nicht gesichert werden: " + exception.getMessage());
+            Platform.runLater(protocolArea::requestFocus);
+            return null;
+        } catch (IllegalArgumentException exception) {
+            statusLabel.setText(exception.getMessage());
+            Platform.runLater(protocolArea::requestFocus);
+            return null;
+        }
+    }
+
+    private Path nextRoutingTestFile(AreaSize size, double spacingMillimeters) throws IOException {
+        String sizePart = formatFileCentimeters(size.widthMillimeters())
+                + "x" + formatFileCentimeters(size.heightMillimeters())
+                + "_v" + formatFileCentimeters(spacingMillimeters);
+        String baseName = "fbh_" + routingVariant.fileNamePart() + "_" + sizePart + "_"
+                + LocalDateTime.now().format(TEST_FILE_TIMESTAMP_FORMAT);
+        Path target = ROUTING_TEST_DIRECTORY.resolve(baseName + ".cadasfbh");
+        int suffix = 2;
+        while (Files.exists(target)) {
+            target = ROUTING_TEST_DIRECTORY.resolve(baseName + "-" + suffix + ".cadasfbh");
+            suffix++;
+        }
+        return target;
+    }
+
+    private String routingTestFileContent(AreaSize size, double spacingMillimeters) {
+        return String.join(System.lineSeparator(),
+                "# CADas FBH-Routing-Testdatei",
+                "format=cadas-fbh-routing-v1",
+                "breiteCm=" + formatFileCentimeters(size.widthMillimeters()),
+                "höheCm=" + formatFileCentimeters(size.heightMillimeters()),
+                "verlegeabstandCm=" + formatFileCentimeters(spacingMillimeters),
+                "variante=" + routingVariant.fileValue(),
+                "schlangenMittellinie=" + serpentineMiddleLineCheckBox.isSelected(),
+                "vorlaufRücklaufGetauscht=" + flowInvertedCheckBox.isSelected(),
+                "rotationViertel=" + rotationQuarterTurns,
+                "generatorVergleich=" + (routingVariant != RoutingVariant.MANUELL),
+                "kanonischeKommandos=" + canonicalCommands(commands.toString()),
+                "kommandos=" + commands
+        ) + System.lineSeparator();
+    }
+
+    private String canonicalCommands(String commandText) {
+        return pipeCommands(commandText, true) + "|" + pipeCommands(commandText, false);
+    }
+
+    private String pipeCommands(String commandText, boolean supply) {
+        StringBuilder result = new StringBuilder();
+        for (int index = 0; index < commandText.length(); index++) {
+            char command = commandText.charAt(index);
+            if (Character.isUpperCase(command) == supply) {
+                result.append(command);
+            }
+        }
+        return result.toString();
     }
 
     private void undo() {
@@ -675,6 +1074,16 @@ final class HeatingCircuitRoutingWindow {
         return String.format(Locale.GERMANY, "%.2f", centimeters);
     }
 
+    private String formatFileCentimeters(double millimeters) {
+        double centimeters = millimeters / 10.0;
+        if (Math.abs(centimeters - Math.rint(centimeters)) < 0.0001) {
+            return String.format(Locale.ROOT, "%.0f", centimeters);
+        }
+        return String.format(Locale.ROOT, "%.3f", centimeters)
+                .replaceFirst("0+$", "")
+                .replaceFirst("\\.$", "");
+    }
+
     private void applyTooltip(javafx.scene.Node node, String text) {
         Tooltip tooltip = new Tooltip(text);
         tooltip.setWrapText(true);
@@ -686,6 +1095,28 @@ final class HeatingCircuitRoutingWindow {
     }
 
     private record RoutingState(String protocol, String commands) {
+    }
+
+    private enum RoutingVariant {
+        MANUELL("manuell", "Manuell"),
+        VARIO("vario", "Vario"),
+        MEANDER("meander", "Meander");
+
+        private final String fileNamePart;
+        private final String fileValue;
+
+        RoutingVariant(String fileNamePart, String fileValue) {
+            this.fileNamePart = fileNamePart;
+            this.fileValue = fileValue;
+        }
+
+        private String fileNamePart() {
+            return fileNamePart;
+        }
+
+        private String fileValue() {
+            return fileValue;
+        }
     }
 
     private record ViewTransform(
