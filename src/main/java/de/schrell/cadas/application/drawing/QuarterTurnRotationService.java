@@ -108,7 +108,7 @@ public final class QuarterTurnRotationService {
     }
 
     private HeatingZone rotateHeatingZone(HydronicHeating heating, HeatingZone zone, boolean clockwise) {
-        PlanPoint center = center(zone.outline());
+        PlanPoint center = zone.routingStartPoint();
         HeatingZone rotated = new HeatingZone(
                 zone.id(),
                 zone.name(),
@@ -140,14 +140,6 @@ public final class QuarterTurnRotationService {
                 Length.ofMillimeters(heating.manifoldFreeAreaDepth().toMillimeters()),
                 Length.ofMillimeters(heating.manifoldFreeAreaWidth().toMillimeters())
         );
-    }
-
-    private PlanPoint center(List<PlanPoint> points) {
-        double minX = points.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0);
-        double maxX = points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0);
-        double minY = points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0);
-        double maxY = points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0);
-        return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
     }
 
     private PlanPoint midpoint(PlanPoint first, PlanPoint second) {

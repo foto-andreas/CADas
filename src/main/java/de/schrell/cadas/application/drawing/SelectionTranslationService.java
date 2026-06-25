@@ -179,20 +179,7 @@ public final class SelectionTranslationService {
     }
 
     private HeatingZone translateHeatingZone(HeatingZone zone, double deltaXMillimeters, double deltaYMillimeters) {
-        return new HeatingZone(
-                zone.id(),
-                zone.name(),
-                zone.outline().stream()
-                        .map(point -> translatePoint(point, deltaXMillimeters, deltaYMillimeters))
-                        .toList(),
-                zone.layoutPattern(),
-                zone.flowInverted(),
-                translatePoint(zone.supplyConnectionPoint(), deltaXMillimeters, deltaYMillimeters),
-                translatePoint(zone.returnConnectionPoint(), deltaXMillimeters, deltaYMillimeters),
-                zone.routingCommands(),
-                zone.serpentineMiddleLine(),
-                zone.heatOutputWattsPerSquareMeter()
-        );
+        return zone.translatedBy(deltaXMillimeters, deltaYMillimeters);
     }
 
     private HydronicHeating translateHeatingManifold(

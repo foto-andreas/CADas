@@ -148,6 +148,7 @@ class QuarterTurnRotationServiceTest {
                 false
         ), heating);
         level.addHydronicHeating(heating.withZones(List.of(zone)));
+        PlanPoint routingStartPoint = zone.routingStartPoint();
 
         QuarterTurnRotationService.RotationResult result = service.rotate(level, Set.of(
                 new SelectionKey(RenderableKind.HEATING_ZONE, level.name(), zone.id().toString())
@@ -158,6 +159,7 @@ class QuarterTurnRotationServiceTest {
         assertEquals(2_000_000.0, rotated.areaSquareMillimeters(), 0.001);
         assertTrue(rotated.hasRoutingCommands());
         assertEquals(1_500.0, rotated.outline().getFirst().xMillimeters(), 0.001);
+        assertEquals(routingStartPoint, rotated.routingStartPoint());
     }
 
     @Test

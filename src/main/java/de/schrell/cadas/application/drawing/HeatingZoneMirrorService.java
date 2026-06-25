@@ -46,7 +46,7 @@ public final class HeatingZoneMirrorService {
     }
 
     private HeatingZone mirrorHeatingZone(HydronicHeating heating, HeatingZone zone, boolean horizontally) {
-        PlanPoint center = center(zone.outline());
+        PlanPoint center = zone.routingStartPoint();
         HeatingZone mirrored = new HeatingZone(
                 zone.id(),
                 zone.name(),
@@ -72,14 +72,6 @@ public final class HeatingZoneMirrorService {
                         mirrored, heating, mirrored.routingCommands(), mirrored.serpentineMiddleLine()
                 )
                 : mirrored;
-    }
-
-    private PlanPoint center(List<PlanPoint> points) {
-        double minX = points.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0);
-        double maxX = points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0);
-        double minY = points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0);
-        double maxY = points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0);
-        return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
     }
 
     private PlanPoint mirrorPoint(PlanPoint point, PlanPoint center, boolean horizontally) {

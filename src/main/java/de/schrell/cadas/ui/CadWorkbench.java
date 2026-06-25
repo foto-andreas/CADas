@@ -3379,7 +3379,25 @@ public final class CadWorkbench extends BorderPane {
                 drawHeatingConnectionMarker(graphics, circuit.supplyPort(), "V", Color.web("#1f62d0"));
                 drawHeatingConnectionMarker(graphics, circuit.returnPort(), "R", Color.web("#d33b32"));
             }
+            for (HeatingZone zone : heating.zones()) {
+                boolean selected = selectedSelections.contains(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), zone.id().toString()));
+                drawHeatingRoutingStartMarker(graphics, zone.routingStartPoint(), selected);
+            }
         }
+    }
+
+    private void drawHeatingRoutingStartMarker(GraphicsContext graphics, PlanPoint point, boolean selected) {
+        double radius = selected ? 5.0 : 4.0;
+        double x = toScreenProjectedX(point, 0.0);
+        double y = toScreenProjectedY(point, 0.0);
+        graphics.save();
+        graphics.setLineDashes();
+        graphics.setFill(Color.web("#d00000"));
+        graphics.fillOval(x - radius, y - radius, radius * 2.0, radius * 2.0);
+        graphics.setStroke(Color.web("#ffffff"));
+        graphics.setLineWidth(selected ? 1.6 : 1.0);
+        graphics.strokeOval(x - radius, y - radius, radius * 2.0, radius * 2.0);
+        graphics.restore();
     }
 
     private void drawHeatingManifold(GraphicsContext graphics, HydronicHeating heating) {

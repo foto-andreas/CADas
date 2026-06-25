@@ -215,7 +215,7 @@ class SelectionTranslationServiceTest {
                 new PlanPoint(1_500, 600),
                 new PlanPoint(1_500, 1_600),
                 new PlanPoint(500, 1_600)
-        ));
+        )).withRoutingCommands("IR", false).withRoutingTransform(2, true, false);
         level.addHydronicHeating(HydronicHeating.create(
                 java.util.UUID.randomUUID(),
                 HeatingSurfacePosition.FLOOR,
@@ -236,7 +236,12 @@ class SelectionTranslationServiceTest {
         );
 
         assertTrue(result.changed());
-        assertEquals(new PlanPoint(620, 520), result.hydronicHeatings().getFirst().zones().getFirst().outline().getFirst());
+        HeatingZone translated = result.hydronicHeatings().getFirst().zones().getFirst();
+        assertEquals(new PlanPoint(620, 520), translated.outline().getFirst());
+        assertEquals(new PlanPoint(1_120, 1_020), translated.routingStartPoint());
+        assertEquals("IR", translated.routingCommands());
+        assertEquals(2, translated.routingQuarterTurns());
+        assertTrue(translated.routingMirroredHorizontally());
     }
 
     @Test

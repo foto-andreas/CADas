@@ -114,6 +114,14 @@ public record HeatingZone(
         return areaSquareMeters() * heatOutputWattsPerSquareMeter;
     }
 
+    public PlanPoint routingStartPoint() {
+        double minX = outline.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0);
+        double maxX = outline.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0);
+        double minY = outline.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0);
+        double maxY = outline.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0);
+        return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+    }
+
     public boolean hasRoutingCommands() {
         return !routingCommands.isBlank();
     }
@@ -195,6 +203,26 @@ public record HeatingZone(
         );
     }
 
+    public HeatingZone translatedBy(double deltaXMillimeters, double deltaYMillimeters) {
+        return new HeatingZone(
+                id,
+                name,
+                outline.stream()
+                        .map(point -> translatePoint(point, deltaXMillimeters, deltaYMillimeters))
+                        .toList(),
+                layoutPattern,
+                flowInverted,
+                translatePoint(supplyConnectionPoint, deltaXMillimeters, deltaYMillimeters),
+                translatePoint(returnConnectionPoint, deltaXMillimeters, deltaYMillimeters),
+                routingCommands,
+                serpentineMiddleLine,
+                heatOutputWattsPerSquareMeter,
+                routingQuarterTurns,
+                routingMirroredHorizontally,
+                routingMirroredVertically
+        );
+    }
+
     public HeatingZone withRoutingTransform(
             int newRoutingQuarterTurns,
             boolean newRoutingMirroredHorizontally,
@@ -249,6 +277,10 @@ public record HeatingZone(
     private static boolean samePoint(PlanPoint first, PlanPoint second) {
         return Math.abs(first.xMillimeters() - second.xMillimeters()) <= 0.001
                 && Math.abs(first.yMillimeters() - second.yMillimeters()) <= 0.001;
+    }
+
+    private static PlanPoint translatePoint(PlanPoint point, double deltaXMillimeters, double deltaYMillimeters) {
+        return new PlanPoint(point.xMillimeters() + deltaXMillimeters, point.yMillimeters() + deltaYMillimeters);
     }
 
     private static String normalizeRoutingCommands(String commands) {
