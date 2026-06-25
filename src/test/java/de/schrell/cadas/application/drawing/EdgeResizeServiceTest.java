@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
+import de.schrell.cadas.domain.geometry.Grid;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
@@ -294,6 +295,84 @@ class EdgeResizeServiceTest {
         assertEquals(3_000_000.0, resized.areaSquareMillimeters(), 0.001);
         assertNotEquals(zone.routingCommands(), resized.routingCommands());
         assertEquals(HeatingLayoutPattern.VARIO, resized.layoutPattern());
+    }
+
+    @Test
+    void behaeltSprachroutingBeimAendernEinesHeizkreisRechtecksWennAutoRoutingAusIst() {
+        Level level = new Level("Erdgeschoss");
+        HydronicHeating heating = HydronicHeating.create(
+                UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.VARIO,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        );
+        HeatingZone zone = new HeatingCircuitRoutingService().regenerate(new HeatingZone(
+                UUID.randomUUID(),
+                "HK 1",
+                rectangle(1_000, 1_000, 3_000, 2_000),
+                HeatingLayoutPattern.VARIO,
+                false
+        ), heating);
+        level.addHydronicHeating(heating.withZones(java.util.List.of(zone)));
+        EdgeResizeService.EdgeHandle handle = new EdgeResizeService.EdgeHandle(
+                EdgeResizeService.EdgeHandleKind.RECTANGLE_EAST,
+                RenderableKind.HEATING_ZONE,
+                zone.id(),
+                null,
+                new PlanPoint(3_000, 1_500)
+        );
+
+        EdgeResizeService.ResizeResult result = service.resize(
+                level,
+                handle,
+                new PlanPoint(4_000, 1_500),
+                new EdgeResizeService.ResizeOptions(false, null)
+        );
+
+        HeatingZone resized = result.hydronicHeatings().getFirst().zones().getFirst();
+        assertEquals(3_000_000.0, resized.areaSquareMillimeters(), 0.001);
+        assertEquals(zone.routingCommands(), resized.routingCommands());
+    }
+
+    @Test
+    void rastetHeizkreisRoutingStartBeimRechteckaendernAmRasterEin() {
+        Level level = new Level("Erdgeschoss");
+        HeatingZone zone = HeatingZone.create("HK 1", rectangle(1_000, 1_000, 2_000, 2_000));
+        HydronicHeating heating = HydronicHeating.create(
+                UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.SPIRAL,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        ).withZones(java.util.List.of(zone));
+        level.addHydronicHeating(heating);
+        EdgeResizeService.EdgeHandle handle = new EdgeResizeService.EdgeHandle(
+                EdgeResizeService.EdgeHandleKind.RECTANGLE_EAST,
+                RenderableKind.HEATING_ZONE,
+                zone.id(),
+                null,
+                new PlanPoint(2_000, 1_500)
+        );
+
+        EdgeResizeService.ResizeResult result = service.resize(
+                level,
+                handle,
+                new PlanPoint(2_333, 1_500),
+                new EdgeResizeService.ResizeOptions(false, new Grid(Length.ofMillimeters(100)))
+        );
+
+        HeatingZone resized = result.hydronicHeatings().getFirst().zones().getFirst();
+        assertEquals(new PlanPoint(1_700, 1_500), resized.routingStartPoint());
+        assertEquals(2_366.5, resized.outline().get(1).xMillimeters(), 0.001);
     }
 
     @Test

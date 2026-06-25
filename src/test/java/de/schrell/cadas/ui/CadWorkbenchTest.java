@@ -10,6 +10,7 @@ import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -555,6 +556,36 @@ class CadWorkbenchTest {
         });
 
         Assertions.assertTrue(aufFxThread(() -> workbench.automationHeatingExclusionArea(0).widthMillimeters()) > vorherigeBreite);
+    }
+
+    @Test
+    void ziehtHeizkreisRechteckMitGerastertemRoutingStartAuf() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("HEATING_ZONE_RECTANGLE");
+            workbench.automationCanvasPress(50.3, 50.4, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(180.8, 160.7, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(180.8, 160.7, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(workbench::automationHydronicHeatingCount),
+                aufFxThread(() -> workbench.automationSnapshot().statusText()));
+        HeatingZone zone = aufFxThread(() -> workbench.automationHydronicHeating(0).zones().getFirst());
+        Assertions.assertEquals(new PlanPoint(1_160, 1_060), zone.routingStartPoint());
+        Assertions.assertEquals(507.5, zone.outline().getFirst().xMillimeters(), 0.001);
     }
 
     @Test

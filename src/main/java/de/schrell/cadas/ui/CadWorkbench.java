@@ -305,6 +305,7 @@ public final class CadWorkbench extends BorderPane {
     private final BooleanProperty showGuideDistances = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToGuides = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToWalls = new SimpleBooleanProperty(true);
+    private final BooleanProperty autoRouteHeatingZoneOnResize = new SimpleBooleanProperty(true);
 
     private final Canvas drawingCanvas = new Canvas();
     private final Canvas horizontalRuler = new Canvas();
@@ -399,6 +400,7 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> heatingReturnYUnit = new ComboBox<>();
     private final ListView<String> heatingZoneList = new ListView<>();
     private final TextArea heatingRoutingCommandArea = new TextArea();
+    private final CheckBox autoRouteHeatingZoneOnResizeCheckBox = new CheckBox("Auto-Routing nach Rechteckänderung");
     private final Label heatingSummaryLabel = new Label("Keine Heizfläche angelegt.");
     private final ComboBox<SurfaceType> surfaceTypeSelector = new ComboBox<>();
     private final ComboBox<SurfaceCoveringPreset> surfacePresetSelector = new ComboBox<>();
@@ -1202,6 +1204,7 @@ public final class CadWorkbench extends BorderPane {
                         planHeatingButton,
                         heatingZoneList,
                         propertyRow("Routing", heatingRoutingCommandArea),
+                        autoRouteHeatingZoneOnResizeCheckBox,
                         new HBox(6.0, addHeatingZoneButton, editHeatingZoneButton),
                         new HBox(6.0, applyHeatingRoutingCommandButton, generateHeatingZoneRoutingButton),
                         removeHeatingZoneButton,
@@ -1727,6 +1730,8 @@ public final class CadWorkbench extends BorderPane {
         heatingZoneList.setPrefHeight(110.0);
         heatingRoutingCommandArea.setPrefRowCount(3);
         heatingRoutingCommandArea.setWrapText(true);
+        autoRouteHeatingZoneOnResizeCheckBox.setSelected(autoRouteHeatingZoneOnResize.get());
+        autoRouteHeatingZoneOnResizeCheckBox.selectedProperty().bindBidirectional(autoRouteHeatingZoneOnResize);
         heatingSummaryLabel.setWrapText(true);
         heatingSummaryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
         heatingSurfacePositionSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
@@ -1861,6 +1866,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(heatingReturnYUnit, "Bestimmt die Einheit für die Y-Koordinate des Rücklaufanschlusses.");
         applyTooltip(heatingZoneList, "Listet die getrennten Heizkreise der gewählten Boden- oder Deckenfläche mit Routingart, HKL, Heizfläche und berechneter Heizleistung auf. Ein markierter Bereich kann bearbeitet oder neu generiert werden.");
         applyTooltip(heatingRoutingCommandArea, "Zeigt und bearbeitet die Routing-Sprache des markierten Heizkreises. `I/i` verlängern Vorlauf/Rücklauf um eine Rasterlinie, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt.");
+        applyTooltip(autoRouteHeatingZoneOnResizeCheckBox, "Legt fest, ob ein Heizkreis nach dem Ziehen seines Rechtecks automatisch neu geroutet wird. Ausgeschaltet bleiben die vorhandenen Routing-Befehle erhalten.");
         applyTooltip(heatingSummaryLabel, "Zeigt Fläche, Verlegeart, Anzahl der Heizkreise, gesamte HKL und die aufsummierte Heizleistung der gewählten Flächenheizung.");
         applyTooltip(roomObjectPresetSelector, "Wählt ein Objekt zum Platzieren aus und übernimmt dessen Standardmaße. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
         applyTooltip(roomObjectNameField, "Legt die sichtbare Bezeichnung eines neuen oder ausgewählten Objekts fest. Bei Quadern wird sie im Grundriss angezeigt.");
@@ -2082,7 +2088,10 @@ public final class CadWorkbench extends BorderPane {
         }
 
         DraftingConstraints constraints = currentConstraints(currentTool() == DrawingTool.WALL && !event.isShiftDown());
-        draftStart = snapDrawingPoint(screenToWorld(event.getX(), event.getY()), constraints);
+        PlanPoint rawStart = screenToWorld(event.getX(), event.getY());
+        draftStart = currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
+                ? rawStart
+                : snapDrawingPoint(rawStart, constraints);
         previewSegment = new PlanSegment(draftStart, draftStart);
         if (currentTool() == DrawingTool.DOOR) {
             placeDoor(draftStart);
@@ -2151,13 +2160,23 @@ public final class CadWorkbench extends BorderPane {
                                 .filter(wall -> !wall.id().equals(activeEdgeHandle.hostWallId()))
                                 .toList()
                         : edgeResizeBaseWalls;
-                PlanPoint snappedPoint = snapService.snap(
-                        screenToWorld(event.getX(), event.getY()),
-                        currentConstraints(false),
-                        snapWalls,
-                        currentAlignmentSnapTargets(excludedWallIds)
-                );
-                EdgeResizeService.ResizeResult result = edgeResizeService.resize(baseLevel, activeEdgeHandle, snappedPoint);
+                boolean heatingZoneHandle = isHeatingZoneHandle(activeEdgeHandle);
+                PlanPoint rawPoint = screenToWorld(event.getX(), event.getY());
+                PlanPoint resizePoint = heatingZoneHandle
+                        ? rawPoint
+                        : snapService.snap(
+                                rawPoint,
+                                currentConstraints(false),
+                                snapWalls,
+                                currentAlignmentSnapTargets(excludedWallIds)
+                        );
+                EdgeResizeService.ResizeOptions resizeOptions = heatingZoneHandle
+                        ? new EdgeResizeService.ResizeOptions(
+                                autoRouteHeatingZoneOnResize.get(),
+                                snapToGrid.get() ? currentGrid() : null
+                        )
+                        : EdgeResizeService.ResizeOptions.defaults();
+                EdgeResizeService.ResizeResult result = edgeResizeService.resize(baseLevel, activeEdgeHandle, resizePoint, resizeOptions);
                 activeLevel.get().replaceWalls(result.walls());
                 activeLevel.get().replaceDoors(result.doors());
                 activeLevel.get().replaceWindows(result.windows());
@@ -2244,9 +2263,11 @@ public final class CadWorkbench extends BorderPane {
                     rememberStateForUndo();
                     historyCapturedForDrag = true;
                 }
-                DraftingConstraints constraints = currentConstraints(false);
-                PlanPoint snappedPoint = snapService.snap(screenToWorld(event.getX(), event.getY()), constraints, activeLevel.get().walls());
-                translateSelectedComponents(snappedPoint);
+                PlanPoint rawPoint = screenToWorld(event.getX(), event.getY());
+                PlanPoint dragPoint = hasSelectedHeatingZone()
+                        ? rawPoint
+                        : snapService.snap(rawPoint, currentConstraints(false), activeLevel.get().walls());
+                translateSelectedComponents(dragPoint);
                 render();
             }
             return;
@@ -2257,9 +2278,17 @@ public final class CadWorkbench extends BorderPane {
         }
 
         DraftingConstraints constraints = currentConstraints(currentTool() == DrawingTool.WALL && !event.isShiftDown());
-        PlanPoint snappedPoint = snapDrawingPoint(screenToWorld(event.getX(), event.getY()), constraints);
-        previewSegment = draftingService.createSegment(draftStart, snappedPoint, constraints);
-        if ((snapToGuides.get() || snapToWalls.get()) && constraints.manualLength().isEmpty() && constraints.manualAngle().isEmpty()) {
+        PlanPoint rawPoint = screenToWorld(event.getX(), event.getY());
+        if (currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE) {
+            previewSegment = new PlanSegment(draftStart, rawPoint);
+        } else {
+            PlanPoint snappedPoint = snapDrawingPoint(rawPoint, constraints);
+            previewSegment = draftingService.createSegment(draftStart, snappedPoint, constraints);
+        }
+        if (currentTool() != DrawingTool.HEATING_ZONE_RECTANGLE
+                && (snapToGuides.get() || snapToWalls.get())
+                && constraints.manualLength().isEmpty()
+                && constraints.manualAngle().isEmpty()) {
             previewSegment = guideSnapService.snapWallSegment(
                     previewSegment,
                     currentWallThickness(),
@@ -5197,6 +5226,7 @@ public final class CadWorkbench extends BorderPane {
         );
         try {
             zone = heatingCircuitRoutingService.regenerate(zone, heating);
+            zone = snapHeatingZoneRoutingStartIfNeeded(zone);
         } catch (RuntimeException exception) {
             draftLabel.setText("Heizkreis nicht erzeugt: " + UiErrorDialogs.userMessage(exception));
             return;
@@ -6785,7 +6815,9 @@ public final class CadWorkbench extends BorderPane {
     private void generateSelectedHeatingZoneRouting() {
         HeatingZoneContext context = selectedHeatingZoneContext()
                 .orElseThrow(() -> new IllegalStateException("Zuerst einen Heizkreis auswählen."));
-        HeatingZone replacement = heatingCircuitRoutingService.regenerate(context.zone(), context.heating());
+        HeatingZone replacement = snapHeatingZoneRoutingStartIfNeeded(
+                heatingCircuitRoutingService.regenerate(context.zone(), context.heating())
+        );
         replaceHeatingZone(context, replacement, "Routing für Heizkreis neu erzeugt.");
     }
 
@@ -8570,6 +8602,9 @@ public final class CadWorkbench extends BorderPane {
             deltaX = translation.deltaX();
             deltaY = translation.deltaY();
         }
+        TranslationDelta snappedDelta = snapHeatingZoneTranslationToGrid(selectionDragBaseHydronicHeatings, deltaX, deltaY);
+        deltaX = snappedDelta.deltaX();
+        deltaY = snappedDelta.deltaY();
         Level dragLevel = new Level(activeLevel.get().name());
         dragLevel.replaceWalls(selectionDragBaseWalls);
         dragLevel.replaceStaircases(selectionDragBaseStaircases);
@@ -8589,6 +8624,36 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceHydronicHeatings(translationResult.hydronicHeatings());
         synchronizeRoomsFromWalls(activeLevel.get());
         markThreeDDirty();
+    }
+
+    private boolean isHeatingZoneHandle(EdgeResizeService.EdgeHandle handle) {
+        return handle.elementKind() == RenderableKind.HEATING_ZONE;
+    }
+
+    private boolean hasSelectedHeatingZone() {
+        return selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.HEATING_ZONE);
+    }
+
+    private Optional<HeatingZone> firstSelectedHeatingZone(List<HydronicHeating> heatings) {
+        return heatings.stream()
+                .flatMap(heating -> heating.zones().stream())
+                .filter(zone -> selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.HEATING_ZONE
+                        && selection.elementId().equals(zone.id().toString())))
+                .findFirst();
+    }
+
+    private HeatingZone snapHeatingZoneRoutingStartIfNeeded(HeatingZone zone) {
+        if (!snapToGrid.get()) {
+            return zone;
+        }
+        PlanPoint start = zone.routingStartPoint();
+        PlanPoint snappedStart = currentGrid().snap(start);
+        double deltaX = snappedStart.xMillimeters() - start.xMillimeters();
+        double deltaY = snappedStart.yMillimeters() - start.yMillimeters();
+        if (Math.abs(deltaX) <= 0.001 && Math.abs(deltaY) <= 0.001) {
+            return zone;
+        }
+        return zone.translatedBy(deltaX, deltaY);
     }
 
     private boolean moveSelectionWithArrowKey(KeyCode keyCode) {
@@ -8622,8 +8687,9 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void moveSelectedComponents(double deltaX, double deltaY) {
+        TranslationDelta snappedDelta = snapHeatingZoneTranslationToGrid(activeLevel.get().hydronicHeatings(), deltaX, deltaY);
         SelectionTranslationService.TranslationResult result = selectionTranslationService.translate(
-                activeLevel.get(), Set.copyOf(selectedSelections), deltaX, deltaY
+                activeLevel.get(), Set.copyOf(selectedSelections), snappedDelta.deltaX(), snappedDelta.deltaY()
         );
         if (!result.changed()) {
             return;
@@ -8639,6 +8705,23 @@ public final class CadWorkbench extends BorderPane {
         markThreeDDirty();
         draftLabel.setText("Auswahl um eine Rasterweite verschoben.");
         render();
+    }
+
+    private TranslationDelta snapHeatingZoneTranslationToGrid(List<HydronicHeating> heatings, double deltaX, double deltaY) {
+        if (!snapToGrid.get()) {
+            return new TranslationDelta(deltaX, deltaY);
+        }
+        Optional<HeatingZone> heatingZone = firstSelectedHeatingZone(heatings);
+        if (heatingZone.isEmpty()) {
+            return new TranslationDelta(deltaX, deltaY);
+        }
+        PlanPoint start = heatingZone.orElseThrow().routingStartPoint();
+        PlanPoint movedStart = new PlanPoint(start.xMillimeters() + deltaX, start.yMillimeters() + deltaY);
+        PlanPoint snappedStart = currentGrid().snap(movedStart);
+        return new TranslationDelta(
+                deltaX + snappedStart.xMillimeters() - movedStart.xMillimeters(),
+                deltaY + snappedStart.yMillimeters() - movedStart.yMillimeters()
+        );
     }
 
     private void correctSelectedComponentsOrthogonally() {
@@ -9516,6 +9599,9 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private record SurfaceSelectionContext(SurfaceType surfaceType, List<String> targetKeys, String label, String hint) {
+    }
+
+    private record TranslationDelta(double deltaX, double deltaY) {
     }
 
     private MouseEvent mouseEvent(javafx.event.EventType<MouseEvent> type,

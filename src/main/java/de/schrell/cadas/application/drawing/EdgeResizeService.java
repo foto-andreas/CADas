@@ -3,6 +3,7 @@ package de.schrell.cadas.application.drawing;
 import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
+import de.schrell.cadas.domain.geometry.Grid;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
@@ -24,7 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-    public final class EdgeResizeService {
+public final class EdgeResizeService {
 
     private static final double MINIMUM_LENGTH = 1.0;
     private static final double MINIMUM_RECTANGLE_SIZE = 100.0;
@@ -126,6 +127,11 @@ import java.util.UUID;
     }
 
     public ResizeResult resize(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+        return resize(level, handle, targetPoint, ResizeOptions.defaults());
+    }
+
+    public ResizeResult resize(Level level, EdgeHandle handle, PlanPoint targetPoint, ResizeOptions options) {
+        ResizeOptions effectiveOptions = options == null ? ResizeOptions.defaults() : options;
         return switch (handle.kind()) {
             case WALL_START, WALL_END -> resizeWall(level, handle, targetPoint);
             case DOOR_START, DOOR_END -> resizeDoor(level, handle, targetPoint);
@@ -133,7 +139,7 @@ import java.util.UUID;
             case STAIR_FIRST_CORNER, STAIR_OPPOSITE_CORNER -> resizeStaircase(level, handle, targetPoint);
             case RECTANGLE_NORTH_WEST, RECTANGLE_NORTH, RECTANGLE_NORTH_EAST, RECTANGLE_EAST,
                  RECTANGLE_SOUTH_EAST, RECTANGLE_SOUTH, RECTANGLE_SOUTH_WEST, RECTANGLE_WEST ->
-                    resizeRectangle(level, handle, targetPoint);
+                    resizeRectangle(level, handle, targetPoint, effectiveOptions);
         };
     }
 
@@ -226,12 +232,12 @@ import java.util.UUID;
                 level.floorOpenings(), level.heatingExclusionAreas(), level.hydronicHeatings());
     }
 
-    private ResizeResult resizeRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+    private ResizeResult resizeRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint, ResizeOptions options) {
         return switch (handle.elementKind()) {
             case STAIR -> resizeStaircaseRectangle(level, handle, targetPoint);
             case FLOOR_OPENING -> resizeFloorOpeningRectangle(level, handle, targetPoint);
             case HEATING_EXCLUSION -> resizeHeatingExclusionRectangle(level, handle, targetPoint);
-            case HEATING_ZONE -> resizeHeatingZoneRectangle(level, handle, targetPoint);
+            case HEATING_ZONE -> resizeHeatingZoneRectangle(level, handle, targetPoint, options);
             case HEATING_MANIFOLD -> resizeHeatingManifoldRectangle(level, handle, targetPoint);
             default -> throw new IllegalArgumentException("Bauteil kann nicht rechteckig geändert werden: " + handle.elementKind());
         };
@@ -305,7 +311,7 @@ import java.util.UUID;
                 level.hydronicHeatings());
     }
 
-    private ResizeResult resizeHeatingZoneRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
+    private ResizeResult resizeHeatingZoneRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint, ResizeOptions options) {
         HydronicHeating heating = level.hydronicHeatings().stream()
                 .filter(candidate -> candidate.zones().stream().anyMatch(zone -> zone.id().equals(handle.elementId())))
                 .findFirst()
@@ -316,9 +322,10 @@ import java.util.UUID;
                 .orElseThrow();
         RectangleBounds bounds = resizeBounds(bounds(zone.outline()), handle.kind(), targetPoint);
         HeatingZone resized = zone.withOutline(rectanglePoints(bounds));
-        if (resized.hasRoutingCommands()) {
+        if (resized.hasRoutingCommands() && options.regenerateHeatingZoneRouting()) {
             resized = heatingCircuitRoutingService.regenerate(resized, heating);
         }
+        resized = snapRoutingStart(resized, options.heatingZoneRoutingStartSnapGrid());
         HeatingZone resizedZone = resized;
         HydronicHeating resizedHeating = heating.withZones(heating.zones().stream()
                 .map(candidate -> candidate.id().equals(zone.id()) ? resizedZone : candidate)
@@ -327,7 +334,21 @@ import java.util.UUID;
                 level.floorOpenings(), level.heatingExclusionAreas(),
                 level.hydronicHeatings().stream()
                         .map(candidate -> candidate.id().equals(heating.id()) ? resizedHeating : candidate)
-                        .toList());
+                .toList());
+    }
+
+    private HeatingZone snapRoutingStart(HeatingZone zone, Grid grid) {
+        if (grid == null) {
+            return zone;
+        }
+        PlanPoint start = zone.routingStartPoint();
+        PlanPoint snapped = grid.snap(start);
+        double deltaX = snapped.xMillimeters() - start.xMillimeters();
+        double deltaY = snapped.yMillimeters() - start.yMillimeters();
+        if (Math.abs(deltaX) <= 0.001 && Math.abs(deltaY) <= 0.001) {
+            return zone;
+        }
+        return zone.translatedBy(deltaX, deltaY);
     }
 
     private ResizeResult resizeHeatingManifoldRectangle(Level level, EdgeHandle handle, PlanPoint targetPoint) {
@@ -513,6 +534,12 @@ import java.util.UUID;
         RECTANGLE_SOUTH,
         RECTANGLE_SOUTH_WEST,
         RECTANGLE_WEST
+    }
+
+    public record ResizeOptions(boolean regenerateHeatingZoneRouting, Grid heatingZoneRoutingStartSnapGrid) {
+        public static ResizeOptions defaults() {
+            return new ResizeOptions(true, null);
+        }
     }
 
     private record RectangleBounds(double minX, double minY, double maxX, double maxY) {
