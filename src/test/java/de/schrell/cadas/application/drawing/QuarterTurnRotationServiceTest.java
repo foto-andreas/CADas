@@ -5,10 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
+import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
+import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -20,6 +25,7 @@ import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -113,5 +119,122 @@ class QuarterTurnRotationServiceTest {
 
         assertTrue(result.changed());
         assertEquals(295.0, result.roomObjects().getFirst().rotationDegrees(), 0.001);
+    }
+
+    @Test
+    void drehtAusgewaehlteHeizkreisRechteckeMitSprachrouting() {
+        Level level = new Level("Erdgeschoss");
+        HydronicHeating heating = HydronicHeating.create(
+                java.util.UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.VARIO,
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.of(1.6, LengthUnit.CENTIMETER),
+                Length.of(80, LengthUnit.METER),
+                Length.of(10, LengthUnit.CENTIMETER),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        );
+        HeatingZone zone = new HeatingCircuitRoutingService().regenerate(new HeatingZone(
+                java.util.UUID.randomUUID(),
+                "HK 1",
+                List.of(
+                        new PlanPoint(1_000, 1_000),
+                        new PlanPoint(3_000, 1_000),
+                        new PlanPoint(3_000, 2_000),
+                        new PlanPoint(1_000, 2_000)
+                ),
+                HeatingLayoutPattern.VARIO,
+                false
+        ), heating);
+        level.addHydronicHeating(heating.withZones(List.of(zone)));
+
+        QuarterTurnRotationService.RotationResult result = service.rotate(level, Set.of(
+                new SelectionKey(RenderableKind.HEATING_ZONE, level.name(), zone.id().toString())
+        ), true);
+
+        HeatingZone rotated = result.hydronicHeatings().getFirst().zones().getFirst();
+        assertTrue(result.changed());
+        assertEquals(2_000_000.0, rotated.areaSquareMillimeters(), 0.001);
+        assertTrue(rotated.hasRoutingCommands());
+        assertEquals(1_500.0, rotated.outline().getFirst().xMillimeters(), 0.001);
+    }
+
+    @Test
+    void drehtHeizkreisRoutingAuchBeiZweiVierteldrehungenWeiter() {
+        Level level = new Level("Erdgeschoss");
+        HydronicHeating heating = HydronicHeating.create(
+                java.util.UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.VARIO,
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.of(1.6, LengthUnit.CENTIMETER),
+                Length.of(80, LengthUnit.METER),
+                Length.of(10, LengthUnit.CENTIMETER),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        );
+        HeatingZone zone = new HeatingCircuitRoutingService().regenerate(new HeatingZone(
+                java.util.UUID.randomUUID(),
+                "HK 1",
+                List.of(
+                        new PlanPoint(1_000, 1_000),
+                        new PlanPoint(3_000, 1_000),
+                        new PlanPoint(3_000, 2_000),
+                        new PlanPoint(1_000, 2_000)
+                ),
+                HeatingLayoutPattern.VARIO,
+                false
+        ), heating);
+        level.addHydronicHeating(heating.withZones(List.of(zone)));
+        var originalRouting = new HeatingCircuitRoutingService().placedRoutingResult(zone, heating);
+
+        QuarterTurnRotationService.RotationResult first = service.rotate(level, Set.of(
+                new SelectionKey(RenderableKind.HEATING_ZONE, level.name(), zone.id().toString())
+        ), true);
+        level.replaceHydronicHeatings(first.hydronicHeatings());
+        QuarterTurnRotationService.RotationResult second = service.rotate(level, Set.of(
+                new SelectionKey(RenderableKind.HEATING_ZONE, level.name(), zone.id().toString())
+        ), true);
+
+        HeatingZone rotatedTwice = second.hydronicHeatings().getFirst().zones().getFirst();
+        var rotatedRouting = new HeatingCircuitRoutingService().placedRoutingResult(rotatedTwice, second.hydronicHeatings().getFirst());
+        assertTrue(rotatedTwice.routingQuarterTurns() != 0
+                || rotatedTwice.routingMirroredHorizontally()
+                || rotatedTwice.routingMirroredVertically());
+        assertTrue(Math.abs(originalRouting.supplyPath().endPoint().xMillimeters()
+                - rotatedRouting.supplyPath().endPoint().xMillimeters()) > 0.001
+                || Math.abs(originalRouting.supplyPath().endPoint().yMillimeters()
+                - rotatedRouting.supplyPath().endPoint().yMillimeters()) > 0.001);
+    }
+
+    @Test
+    void drehtHkvAnschlusspaarUndFreiflaeche() {
+        Level level = new Level("Erdgeschoss");
+        HydronicHeating heating = HydronicHeating.create(
+                java.util.UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.VARIO,
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.of(1.6, LengthUnit.CENTIMETER),
+                Length.of(80, LengthUnit.METER),
+                Length.of(10, LengthUnit.CENTIMETER),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        ).withManifoldFreeArea(Length.ofMillimeters(600), Length.ofMillimeters(1_000));
+        level.addHydronicHeating(heating);
+
+        QuarterTurnRotationService.RotationResult result = service.rotate(level, Set.of(
+                new SelectionKey(RenderableKind.HEATING_MANIFOLD, level.name(), heating.id().toString())
+        ), true);
+
+        HydronicHeating rotated = result.hydronicHeatings().getFirst();
+        assertTrue(result.changed());
+        assertEquals(25.0, rotated.supplyPoint().xMillimeters(), 0.001);
+        assertEquals(25.0, rotated.supplyPoint().yMillimeters(), 0.001);
+        assertEquals(25.0, rotated.returnPoint().xMillimeters(), 0.001);
+        assertEquals(-25.0, rotated.returnPoint().yMillimeters(), 0.001);
+        assertEquals(1_000.0, rotated.manifoldFreeAreaWidth().toMillimeters(), 0.001);
+        assertEquals(600.0, rotated.manifoldFreeAreaDepth().toMillimeters(), 0.001);
     }
 }

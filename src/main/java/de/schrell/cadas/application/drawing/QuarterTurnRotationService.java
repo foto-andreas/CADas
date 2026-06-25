@@ -1,9 +1,13 @@
 package de.schrell.cadas.application.drawing;
 
+import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
+import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
+import de.schrell.cadas.domain.model.HeatingZone;
+import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
@@ -15,11 +19,15 @@ import java.util.Set;
 
 public final class QuarterTurnRotationService {
 
+    private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
+
     public RotationResult rotate(Level level, Set<SelectionKey> selections, boolean clockwise) {
         Set<String> selectedWalls = selectedIds(selections, RenderableKind.WALL);
         Set<String> selectedRooms = selectedIds(selections, RenderableKind.ROOM_VOLUME, RenderableKind.ROOM_FLOOR, RenderableKind.ROOM_CEILING);
         Set<String> selectedStairs = selectedIds(selections, RenderableKind.STAIR);
         Set<String> selectedRoomObjects = selectedIds(selections, RenderableKind.ROOM_OBJECT);
+        Set<String> selectedHeatingZones = selectedIds(selections, RenderableKind.HEATING_ZONE);
+        Set<String> selectedHeatingManifolds = selectedIds(selections, RenderableKind.HEATING_MANIFOLD);
 
         List<Wall> rotatedWalls = level.walls().stream()
                 .map(wall -> selectedWalls.contains(wall.id().toString()) ? rotateWall(wall, clockwise) : wall)
@@ -37,8 +45,19 @@ public final class QuarterTurnRotationService {
                         ? roomObject.withRotationDegrees(roomObject.rotationDegrees() + (clockwise ? 90.0 : -90.0))
                         : roomObject)
                 .toList();
-        boolean changed = !selectedWalls.isEmpty() || !selectedRooms.isEmpty() || !selectedStairs.isEmpty() || !selectedRoomObjects.isEmpty();
-        return new RotationResult(rotatedWalls, rotatedRooms, rotatedStaircases, rotatedRoomObjects, changed);
+        List<HydronicHeating> rotatedHydronicHeatings = level.hydronicHeatings().stream()
+                .map(heating -> rotateHeatingZones(heating, selectedHeatingZones, clockwise))
+                .map(heating -> selectedHeatingManifolds.contains(heating.id().toString())
+                        ? rotateHeatingManifold(heating, clockwise)
+                        : heating)
+                .toList();
+        boolean changed = !selectedWalls.isEmpty()
+                || !selectedRooms.isEmpty()
+                || !selectedStairs.isEmpty()
+                || !selectedRoomObjects.isEmpty()
+                || !selectedHeatingZones.isEmpty()
+                || !selectedHeatingManifolds.isEmpty();
+        return new RotationResult(rotatedWalls, rotatedRooms, rotatedStaircases, rotatedRoomObjects, rotatedHydronicHeatings, changed);
     }
 
     private Set<String> selectedIds(Set<SelectionKey> selections, RenderableKind... kinds) {
@@ -77,6 +96,60 @@ public final class QuarterTurnRotationService {
         );
     }
 
+    private HydronicHeating rotateHeatingZones(HydronicHeating heating, Set<String> selectedHeatingZones, boolean clockwise) {
+        if (heating.zones().stream().noneMatch(zone -> selectedHeatingZones.contains(zone.id().toString()))) {
+            return heating;
+        }
+        return heating.withZones(heating.zones().stream()
+                .map(zone -> selectedHeatingZones.contains(zone.id().toString())
+                        ? rotateHeatingZone(heating, zone, clockwise)
+                        : zone)
+                .toList());
+    }
+
+    private HeatingZone rotateHeatingZone(HydronicHeating heating, HeatingZone zone, boolean clockwise) {
+        PlanPoint center = center(zone.outline());
+        HeatingZone rotated = new HeatingZone(
+                zone.id(),
+                zone.name(),
+                zone.outline().stream()
+                        .map(point -> rotatePoint(point, center, clockwise))
+                        .toList(),
+                zone.layoutPattern(),
+                zone.flowInverted(),
+                rotatePoint(zone.supplyConnectionPoint(), center, clockwise),
+                rotatePoint(zone.returnConnectionPoint(), center, clockwise),
+                zone.routingCommands(),
+                zone.serpentineMiddleLine(),
+                zone.heatOutputWattsPerSquareMeter(),
+                zone.routingQuarterTurns(),
+                zone.routingMirroredHorizontally(),
+                zone.routingMirroredVertically()
+        ).withRoutingRotated(clockwise);
+        return rotated.hasRoutingCommands()
+                ? heatingCircuitRoutingService.withRoutingCommands(rotated, heating, rotated.routingCommands(), rotated.serpentineMiddleLine())
+                : rotated;
+    }
+
+    private HydronicHeating rotateHeatingManifold(HydronicHeating heating, boolean clockwise) {
+        PlanPoint center = midpoint(heating.supplyPoint(), heating.returnPoint());
+        return heating.withManifold(
+                rotatePoint(heating.supplyPoint(), center, clockwise),
+                rotatePoint(heating.returnPoint(), center, clockwise)
+        ).withManifoldFreeArea(
+                Length.ofMillimeters(heating.manifoldFreeAreaDepth().toMillimeters()),
+                Length.ofMillimeters(heating.manifoldFreeAreaWidth().toMillimeters())
+        );
+    }
+
+    private PlanPoint center(List<PlanPoint> points) {
+        double minX = points.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0);
+        double maxX = points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0);
+        double minY = points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0);
+        double maxY = points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0);
+        return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+    }
+
     private PlanPoint midpoint(PlanPoint first, PlanPoint second) {
         return new PlanPoint(
                 (first.xMillimeters() + second.xMillimeters()) / 2.0,
@@ -92,6 +165,13 @@ public final class QuarterTurnRotationService {
         return new PlanPoint(center.xMillimeters() + rotatedX, center.yMillimeters() + rotatedY);
     }
 
-    public record RotationResult(List<Wall> walls, List<Room> rooms, List<Staircase> staircases, List<RoomObject> roomObjects, boolean changed) {
+    public record RotationResult(
+            List<Wall> walls,
+            List<Room> rooms,
+            List<Staircase> staircases,
+            List<RoomObject> roomObjects,
+            List<HydronicHeating> hydronicHeatings,
+            boolean changed
+    ) {
     }
 }

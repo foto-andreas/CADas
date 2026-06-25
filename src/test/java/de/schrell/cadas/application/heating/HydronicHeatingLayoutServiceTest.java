@@ -41,6 +41,34 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void verwendetGespeicherteRoutingKommandosFürManuelleRechtecke() {
+        Room room = rectangularRoom();
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.VARIO, 300_000);
+        HeatingZone zone = new HeatingCircuitRoutingService().regenerate(new HeatingZone(
+                java.util.UUID.randomUUID(),
+                "Vario 1",
+                List.of(
+                        new PlanPoint(500, 500),
+                        new PlanPoint(3_500, 500),
+                        new PlanPoint(3_500, 2_500),
+                        new PlanPoint(500, 2_500)
+                ),
+                HeatingLayoutPattern.VARIO,
+                false
+        ), heating).withHeatOutputWattsPerSquareMeter(55.0);
+
+        HydronicHeatingLayoutService.CircuitLayout circuit = service.layout(heating.withZones(List.of(zone))).getFirst();
+
+        assertTrue(zone.hasRoutingCommands());
+        assertEquals(zone.supplyConnectionPoint(), circuit.fieldSupplyPath().getFirst());
+        assertEquals(zone.returnConnectionPoint(), circuit.fieldReturnPath().getLast());
+        assertTrue(circuit.fieldSupplyPath().size() > 8);
+        assertTrue(circuit.fieldReturnPath().size() > 8);
+        assertTrue(circuit.pipeLength().toMillimeters() > 10_000);
+        assertEquals(330.0, zone.heatOutputWatts(), 0.001);
+    }
+
+    @Test
     void erzeugtFürSchneckeAnderenRohrverlauf() {
         Room room = rectangularRoom();
         HydronicHeating meander = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, 80_000)

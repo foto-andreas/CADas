@@ -100,6 +100,32 @@ class HeatingCircuitCommandRouterTest {
     }
 
     @Test
+    void loeschtMitXDenLetztenSchrittJeRohrrolle() {
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "IIXiix");
+
+        Assertions.assertEquals(1, result.supplyPath().primitives().size());
+        Assertions.assertEquals(1, result.returnPath().primitives().size());
+        Assertions.assertEquals(100.0, result.supplyPath().endPoint().yMillimeters(), 0.001);
+        Assertions.assertEquals(-100.0, result.returnPath().endPoint().yMillimeters(), 0.001);
+    }
+
+    @Test
+    void spiegeltRoutingErgebnisHorizontalUndVertikal() {
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "R");
+        RoutingResult horizontal = result.mirroredHorizontally();
+        QuarterArc horizontalArc = (QuarterArc) horizontal.supplyPath().primitives().getFirst();
+        RoutingResult vertical = result.mirroredVertically();
+        QuarterArc verticalArc = (QuarterArc) vertical.supplyPath().primitives().getFirst();
+
+        Assertions.assertEquals(-50.0, horizontal.supplyPath().endPoint().xMillimeters(), 0.001);
+        Assertions.assertEquals(50.0, horizontal.supplyPath().endPoint().yMillimeters(), 0.001);
+        Assertions.assertEquals(Turn.LEFT, horizontalArc.turn());
+        Assertions.assertEquals(50.0, vertical.supplyPath().endPoint().xMillimeters(), 0.001);
+        Assertions.assertEquals(-50.0, vertical.supplyPath().endPoint().yMillimeters(), 0.001);
+        Assertions.assertEquals(Turn.LEFT, verticalArc.turn());
+    }
+
+    @Test
     void erzeugtQuadratischenVarioRouterAusWachsenderDoppelspirale() {
         String commands = router.squareVarioCommands(1_300.0, 100.0);
 

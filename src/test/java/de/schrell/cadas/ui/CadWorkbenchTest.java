@@ -575,6 +575,7 @@ class CadWorkbenchTest {
         aufFxThread(() -> {
             workbench.automationSetTool("HEATING_MANIFOLD");
             workbench.automationCanvasPress(50, 70, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(50, 70, javafx.scene.input.MouseButton.PRIMARY);
             return null;
         });
 
@@ -583,6 +584,36 @@ class CadWorkbenchTest {
         Assertions.assertEquals(new PlanPoint(500, 700), heating.supplyPoint());
         Assertions.assertEquals(new PlanPoint(550, 700), heating.returnPoint());
         Assertions.assertEquals(1, aufFxThread(() -> workbench.automationSnapshot().selectionCount()));
+    }
+
+    @Test
+    void ziehtVertikalesHkvRechteckImRaumAuf() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("HEATING_MANIFOLD");
+            workbench.automationCanvasPress(50, 70, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(110, 190, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(110, 190, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        HydronicHeating heating = aufFxThread(() -> workbench.automationHydronicHeating(0));
+        Assertions.assertEquals(new PlanPoint(800, 1_275), heating.supplyPoint());
+        Assertions.assertEquals(new PlanPoint(800, 1_325), heating.returnPoint());
+        Assertions.assertEquals(600.0, heating.manifoldFreeAreaWidth().toMillimeters(), 0.001);
+        Assertions.assertEquals(1_200.0, heating.manifoldFreeAreaDepth().toMillimeters(), 0.001);
     }
 
     @Test

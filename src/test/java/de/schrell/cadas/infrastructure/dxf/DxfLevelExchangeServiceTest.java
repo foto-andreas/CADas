@@ -115,7 +115,10 @@ class DxfLevelExchangeServiceTest {
                 new PlanPoint(100, 100), new PlanPoint(3_800, 100), new PlanPoint(3_800, 1_600),
                 new PlanPoint(2_000, 1_600), new PlanPoint(2_000, 3_300), new PlanPoint(100, 3_300)
         )).withSupplyConnectionPoint(new PlanPoint(100, 1_000))
-                .withReturnConnectionPoint(new PlanPoint(3_800, 800));
+                .withReturnConnectionPoint(new PlanPoint(3_800, 800))
+                .withRoutingCommands("iiiiRRIIIIrr", false)
+                .withHeatOutputWattsPerSquareMeter(48.0)
+                .withRoutingTransform(2, true, false);
         HydronicHeating ceilingHeating = HydronicHeating.create(
                 level.rooms().getFirst().id(), HeatingSurfacePosition.CEILING, HeatingLayoutPattern.MEANDER,
                 Length.ofMillimeters(200), Length.ofMillimeters(18), Length.ofMillimeters(75_000),
@@ -162,6 +165,12 @@ class DxfLevelExchangeServiceTest {
         assertEquals(6, importedHeating.zones().getFirst().outline().size());
         assertEquals(new PlanPoint(100, 1_000), importedHeating.zones().getFirst().supplyConnectionPoint());
         assertEquals(new PlanPoint(3_800, 800), importedHeating.zones().getFirst().returnConnectionPoint());
+        assertEquals("iiiiRRIIIIrr", importedHeating.zones().getFirst().routingCommands());
+        assertFalse(importedHeating.zones().getFirst().serpentineMiddleLine());
+        assertEquals(48.0, importedHeating.zones().getFirst().heatOutputWattsPerSquareMeter(), 0.001);
+        assertEquals(2, importedHeating.zones().getFirst().routingQuarterTurns());
+        assertTrue(importedHeating.zones().getFirst().routingMirroredHorizontally());
+        assertFalse(importedHeating.zones().getFirst().routingMirroredVertically());
     }
 
     @Test

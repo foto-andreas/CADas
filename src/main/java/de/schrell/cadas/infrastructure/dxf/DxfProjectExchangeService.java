@@ -553,12 +553,15 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             for (HeatingZone zone : heating.zones()) {
                 appendMetadataText(dxf, context, zone.outline().getFirst(), String.format(
                         Locale.US,
-                        "HZONE|%s|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f",
+                        "HZONE|%s|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%s|%s|%.3f|%d|%s|%s",
                         DxfMetadataCodec.encode(level.name()), heating.id(), zone.id(),
                         DxfMetadataCodec.encode(zone.name()), zone.layoutPattern().name(),
                         zone.flowInverted(), serializePoints(zone.outline()),
                         zone.supplyConnectionPoint().xMillimeters(), zone.supplyConnectionPoint().yMillimeters(),
-                        zone.returnConnectionPoint().xMillimeters(), zone.returnConnectionPoint().yMillimeters()
+                        zone.returnConnectionPoint().xMillimeters(), zone.returnConnectionPoint().yMillimeters(),
+                        DxfMetadataCodec.encode(zone.routingCommands()), zone.serpentineMiddleLine(),
+                        zone.heatOutputWattsPerSquareMeter(), zone.routingQuarterTurns(),
+                        zone.routingMirroredHorizontally(), zone.routingMirroredVertically()
                 ));
             }
         }
@@ -782,6 +785,23 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
     }
 
     private HeatingZone deserializeProjectHeatingZone(String[] parts, boolean encodedFields) {
+        if (parts.length >= 15) {
+            return new HeatingZone(
+                    UUID.fromString(parts[3]),
+                    DxfMetadataCodec.decode(parts[4], encodedFields),
+                    deserializePoints(parts[7]),
+                    HeatingLayoutPattern.valueOf(parts[5]),
+                    Boolean.parseBoolean(parts[6]),
+                    new PlanPoint(parseDouble(parts[8]), parseDouble(parts[9])),
+                    new PlanPoint(parseDouble(parts[10]), parseDouble(parts[11])),
+                    DxfMetadataCodec.decode(parts[12], encodedFields),
+                    Boolean.parseBoolean(parts[13]),
+                    parseDouble(parts[14]),
+                    parts.length >= 18 ? Integer.parseInt(parts[15]) : 0,
+                    parts.length >= 18 && Boolean.parseBoolean(parts[16]),
+                    parts.length >= 18 && Boolean.parseBoolean(parts[17])
+            );
+        }
         if (parts.length >= 12) {
             return new HeatingZone(
                     UUID.fromString(parts[3]),

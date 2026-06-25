@@ -228,7 +228,12 @@ public final class ConstructionDrawingPdfService {
                 viewport.x(center.xMillimeters()) + 4.0,
                 viewport.y(center.yMillimeters()) + 4.0,
                 6.5f,
-                String.format(Locale.GERMAN, "%s | %s | %.1f m", zone.name(), zone.layoutPattern(), pipeLength / 1_000.0)
+                String.format(
+                        Locale.GERMAN,
+                        "%s | %s | HKL %.1f m | %.2f m² | %.0f W",
+                        zone.name(), zone.layoutPattern(), pipeLength / 1_000.0,
+                        zone.areaSquareMeters(), zone.heatOutputWatts()
+                )
         );
     }
 

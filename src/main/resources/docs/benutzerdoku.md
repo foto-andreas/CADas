@@ -427,9 +427,9 @@ Wähle im Werkzeug `Bearbeiten` genau einen Raum. Der Bereich `Flächenheizung` 
 
 1. Wähle die Fläche und als Raumvorgabe für die Verlegung `Meander` oder `Schnecke`.
 2. Gib Verlegeabstand, Rohrdurchmesser, maximale Rohrlänge und Mindestabstand zur Wand ein. Die Startwerte passen zum Variotherm-Trockenbau-System mit 100 mm Verlegeabstand, 11,6 mm Rohr und 18 mm Plattenstärke.
-3. Gib die X-/Y-Koordinaten von Vorlauf und Rücklauf am Verteiler ein. Ein HKV-Anschlusspaar ist 5 cm breit.
+3. Gib die X-/Y-Koordinaten von Vorlauf und Rücklauf am Verteiler ein oder zeichne mit dem Werkzeug `HKV` ein horizontales beziehungsweise vertikales Verteilerrechteck. Ein HKV-Anschlusspaar ist 5 cm breit.
 4. Wähle `Heizkreise planen`. CADas schlägt die nötige Aufteilung vor, übernimmt die Raumvorgabe zunächst in alle Heizkreise, spart Treppenbereiche aus und trennt einen Raum so lange, bis jeder Heizkreis die maximale Rohrlänge einhält.
-5. Wähle einen Heizkreis in der Liste. Mit `Bereich bearbeiten` änderst du Name, Verlegeart, Vorlauf-/Rücklauf-Invertierung und Polygon-Eckpunkte als `X; Y` in Zentimetern. Dadurch sind auch L- und U-förmige Bereiche möglich.
+5. Wähle einen Heizkreis in der Liste. Das Feld `Routing` zeigt die Routing-Sprache direkt an: `I/i` verlängern Vorlauf/Rücklauf, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt. Mit `Bereich bearbeiten` änderst du Name, Verlegeart, Vorlauf-/Rücklauf-Invertierung und Polygon-Eckpunkte als `X; Y` in Zentimetern. Dadurch sind auch L- und U-förmige Bereiche möglich.
 6. Mit `Rechteck hinzufügen` ergänzt du einen neuen Heizkreis als rechteckiges Startfeld in einem freien Bereich. Mit `Bereich entfernen` löschst du den markierten Heizkreis. Bereiche außerhalb des Raums und bearbeitete Kreise oberhalb der maximalen Rohrlänge werden abgelehnt.
 7. Wenn ein Anschluss nicht kreuzungsfrei geroutet werden kann, versucht CADas bis zu zehn Reparaturschritte mit kleineren Heizbereichen und alternativen HKV-Positionen. Bleibt ein Heizkreis unroutebar, wird der funktionierende Teil geplant und CADas warnt mit dem ausgelassenen Heizkreis und der konkreten Begründung.
 

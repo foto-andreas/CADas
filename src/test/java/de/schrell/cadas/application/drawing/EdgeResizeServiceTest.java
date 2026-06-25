@@ -1,7 +1,9 @@
 package de.schrell.cadas.application.drawing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.domain.geometry.Length;
@@ -254,6 +256,44 @@ class EdgeResizeServiceTest {
         HeatingZone resized = result.hydronicHeatings().getFirst().zones().getFirst();
         assertEquals(1_400_000.0, resized.areaSquareMillimeters(), 0.001);
         assertEquals(2_400.0, resized.outline().get(1).xMillimeters(), 0.001);
+    }
+
+    @Test
+    void regeneriertSprachroutingBeimAendernEinesHeizkreisRechtecks() {
+        Level level = new Level("Erdgeschoss");
+        HydronicHeating heating = HydronicHeating.create(
+                UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.VARIO,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(11.6),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        );
+        HeatingZone zone = new HeatingCircuitRoutingService().regenerate(new HeatingZone(
+                UUID.randomUUID(),
+                "HK 1",
+                rectangle(1_000, 1_000, 3_000, 2_000),
+                HeatingLayoutPattern.VARIO,
+                false
+        ), heating);
+        level.addHydronicHeating(heating.withZones(java.util.List.of(zone)));
+        EdgeResizeService.EdgeHandle handle = new EdgeResizeService.EdgeHandle(
+                EdgeResizeService.EdgeHandleKind.RECTANGLE_EAST,
+                RenderableKind.HEATING_ZONE,
+                zone.id(),
+                null,
+                new PlanPoint(3_000, 1_500)
+        );
+
+        EdgeResizeService.ResizeResult result = service.resize(level, handle, new PlanPoint(4_000, 1_500));
+
+        HeatingZone resized = result.hydronicHeatings().getFirst().zones().getFirst();
+        assertEquals(3_000_000.0, resized.areaSquareMillimeters(), 0.001);
+        assertNotEquals(zone.routingCommands(), resized.routingCommands());
+        assertEquals(HeatingLayoutPattern.VARIO, resized.layoutPattern());
     }
 
     @Test

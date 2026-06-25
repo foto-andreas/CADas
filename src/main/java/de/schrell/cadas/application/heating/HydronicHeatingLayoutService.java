@@ -36,6 +36,8 @@ public final class HydronicHeatingLayoutService {
     private static final double MANIFOLD_PAIR_PITCH_MILLIMETERS = 50.0;
     private static final int COMPUTATION_CACHE_SIZE = 128;
 
+    private final HeatingCircuitRoutingService circuitRoutingService = new HeatingCircuitRoutingService();
+
     private final Map<HydronicHeating, LayoutComputation> computationCache = Collections.synchronizedMap(
             new LinkedHashMap<>(COMPUTATION_CACHE_SIZE, 0.75f, true) {
                 @Override
@@ -318,7 +320,12 @@ public final class HydronicHeatingLayoutService {
                 connectors = ConnectorPlan.failed(pair, pattern);
             }
             List<PlanPoint> fullPath = concatenate(connectors.supplyPath(), pattern.fullPath(), connectors.returnPath());
-            Length length = Length.ofMillimeters(roundedLength(fullPath, heating.bendRadius().toMillimeters()));
+            double lengthMillimeters = pattern.hasExactLength()
+                    ? roundedLength(connectors.supplyPath(), heating.bendRadius().toMillimeters())
+                    + pattern.exactFieldLengthMillimeters()
+                    + roundedLength(connectors.returnPath(), heating.bendRadius().toMillimeters())
+                    : roundedLength(fullPath, heating.bendRadius().toMillimeters());
+            Length length = Length.ofMillimeters(lengthMillimeters);
             circuits.add(new CircuitLayout(
                     zone.id(),
                     fullPath,
@@ -945,6 +952,9 @@ public final class HydronicHeatingLayoutService {
     }
 
     private FieldPattern createPattern(HydronicHeating heating, HeatingZone zone) {
+        if (zone.hasRoutingCommands()) {
+            return routedCommandPattern(heating, zone);
+        }
         double clearance = heating.wallClearance().toMillimeters();
         double pitch = heating.pipeSpacing().toMillimeters();
         List<FieldPattern> candidates = switch (zone.layoutPattern()) {
@@ -957,6 +967,87 @@ public final class HydronicHeatingLayoutService {
             return new FieldPattern(List.of(center), List.of(center), List.of(center));
         }
         return withZoneConnections(zone, pattern, pitch);
+    }
+
+    private FieldPattern routedCommandPattern(HydronicHeating heating, HeatingZone zone) {
+        HeatingCircuitCommandRouter.RoutingResult result = circuitRoutingService.placedRoutingResult(zone, heating);
+        List<PlanPoint> supplyFromCenter = sampledPath(result.supplyPath());
+        List<PlanPoint> supplyPath = new ArrayList<>();
+        appendDistinct(supplyPath, zone.supplyConnectionPoint());
+        for (PlanPoint point : reversed(supplyFromCenter)) {
+            appendDistinct(supplyPath, point);
+        }
+        List<PlanPoint> returnPath = new ArrayList<>(sampledPath(result.returnPath()));
+        appendDistinct(returnPath, zone.returnConnectionPoint());
+        List<PlanPoint> fullPath = new ArrayList<>(supplyPath);
+        for (PlanPoint point : returnPath) {
+            appendDistinct(fullPath, point);
+        }
+        double exactLength = pathLength(result.supplyPath()) + pathLength(result.returnPath())
+                + zone.supplyConnectionPoint().distanceTo(supplyFromCenter.getLast()).toMillimeters()
+                + zone.returnConnectionPoint().distanceTo(returnPath.get(Math.max(0, returnPath.size() - 2))).toMillimeters();
+        return new FieldPattern(fullPath, supplyPath, returnPath, exactLength);
+    }
+
+    private List<PlanPoint> sampledPath(HeatingCircuitCommandRouter.PipePath path) {
+        List<PlanPoint> points = new ArrayList<>();
+        points.add(toPlanPoint(path.startPoint()));
+        for (HeatingCircuitCommandRouter.PipePrimitive primitive : path.primitives()) {
+            if (primitive instanceof HeatingCircuitCommandRouter.LineSegment) {
+                appendDistinct(points, toPlanPoint(primitive.endPoint()));
+            } else if (primitive instanceof HeatingCircuitCommandRouter.QuarterArc arc) {
+                appendArcPoints(points, arc);
+            }
+        }
+        return List.copyOf(points);
+    }
+
+    private void appendArcPoints(List<PlanPoint> points, HeatingCircuitCommandRouter.QuarterArc arc) {
+        double startAngle = Math.atan2(
+                arc.startPoint().yMillimeters() - arc.centerPoint().yMillimeters(),
+                arc.startPoint().xMillimeters() - arc.centerPoint().xMillimeters()
+        );
+        double endAngle = Math.atan2(
+                arc.endPoint().yMillimeters() - arc.centerPoint().yMillimeters(),
+                arc.endPoint().xMillimeters() - arc.centerPoint().xMillimeters()
+        );
+        double delta = endAngle - startAngle;
+        if (arc.turn() == HeatingCircuitCommandRouter.Turn.RIGHT) {
+            while (delta > 0.0) {
+                delta -= Math.PI * 2.0;
+            }
+        } else {
+            while (delta < 0.0) {
+                delta += Math.PI * 2.0;
+            }
+        }
+        int samples = 6;
+        for (int step = 1; step <= samples; step++) {
+            double angle = startAngle + delta * step / samples;
+            appendDistinct(points, new PlanPoint(
+                    arc.centerPoint().xMillimeters() + Math.cos(angle) * arc.radiusMillimeters(),
+                    arc.centerPoint().yMillimeters() + Math.sin(angle) * arc.radiusMillimeters()
+            ));
+        }
+    }
+
+    private PlanPoint toPlanPoint(HeatingCircuitCommandRouter.RoutingPoint point) {
+        return new PlanPoint(point.xMillimeters(), point.yMillimeters());
+    }
+
+    private double pathLength(HeatingCircuitCommandRouter.PipePath path) {
+        double length = 0.0;
+        for (HeatingCircuitCommandRouter.PipePrimitive primitive : path.primitives()) {
+            if (primitive instanceof HeatingCircuitCommandRouter.QuarterArc arc) {
+                length += arc.radiusMillimeters() * Math.PI / 2.0;
+            } else {
+                length += Math.hypot(
+                        primitive.endPoint().xMillimeters() - primitive.startPoint().xMillimeters(),
+                        primitive.endPoint().yMillimeters() - primitive.startPoint().yMillimeters()
+                );
+            }
+        }
+        return length;
     }
 
     private FieldPattern selectPattern(List<FieldPattern> candidates, HeatingZone zone) {
@@ -2127,15 +2218,28 @@ public final class HydronicHeatingLayoutService {
     private record SplitPath(List<PlanPoint> first, List<PlanPoint> second) {
     }
 
-    private record FieldPattern(List<PlanPoint> fullPath, List<PlanPoint> supplyPath, List<PlanPoint> returnPath) {
+    private record FieldPattern(
+            List<PlanPoint> fullPath,
+            List<PlanPoint> supplyPath,
+            List<PlanPoint> returnPath,
+            double exactFieldLengthMillimeters
+    ) {
+        private FieldPattern(List<PlanPoint> fullPath, List<PlanPoint> supplyPath, List<PlanPoint> returnPath) {
+            this(fullPath, supplyPath, returnPath, -1.0);
+        }
+
         private FieldPattern {
             fullPath = List.copyOf(fullPath);
             supplyPath = List.copyOf(supplyPath);
             returnPath = List.copyOf(returnPath);
         }
 
+        private boolean hasExactLength() {
+            return exactFieldLengthMillimeters >= 0.0;
+        }
+
         private FieldPattern inverted() {
-            return new FieldPattern(reversed(fullPath), reversed(returnPath), reversed(supplyPath));
+            return new FieldPattern(reversed(fullPath), reversed(returnPath), reversed(supplyPath), exactFieldLengthMillimeters);
         }
     }
 

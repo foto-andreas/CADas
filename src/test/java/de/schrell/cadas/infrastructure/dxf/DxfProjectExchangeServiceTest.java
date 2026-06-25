@@ -98,7 +98,9 @@ class DxfProjectExchangeServiceTest {
                 new PlanPoint(120, 120), new PlanPoint(4_800, 120),
                 new PlanPoint(4_800, 3_800), new PlanPoint(120, 3_800)
         )).withSupplyConnectionPoint(new PlanPoint(120, 2_000))
-                .withReturnConnectionPoint(new PlanPoint(4_800, 2_000));
+                .withReturnConnectionPoint(new PlanPoint(4_800, 2_000))
+                .withRoutingCommands("rrRRiiIIRr", true)
+                .withHeatOutputWattsPerSquareMeter(52.5);
         HydronicHeating floorHeating = HydronicHeating.create(
                 heatedRoom.id(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL,
                 Length.ofMillimeters(150), Length.ofMillimeters(16), Length.ofMillimeters(90_000),
@@ -184,6 +186,9 @@ class DxfProjectExchangeServiceTest {
         assertEquals(floorHeating.zones().getFirst().outline(), importedHeating.zones().getFirst().outline());
         assertEquals(new PlanPoint(120, 2_000), importedHeating.zones().getFirst().supplyConnectionPoint());
         assertEquals(new PlanPoint(4_800, 2_000), importedHeating.zones().getFirst().returnConnectionPoint());
+        assertEquals("rrRRiiIIRr", importedHeating.zones().getFirst().routingCommands());
+        assertTrue(importedHeating.zones().getFirst().serpentineMiddleLine());
+        assertEquals(52.5, importedHeating.zones().getFirst().heatOutputWattsPerSquareMeter(), 0.001);
     }
 
     @Test

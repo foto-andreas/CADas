@@ -2,6 +2,7 @@ package de.schrell.cadas.application.drawing;
 
 import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.application.view.RenderableKind;
+import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
@@ -27,6 +28,7 @@ import java.util.UUID;
 
     private static final double MINIMUM_LENGTH = 1.0;
     private static final double MINIMUM_RECTANGLE_SIZE = 100.0;
+    private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
     public Optional<EdgeHandle> findHandle(Level level, Set<SelectionKey> selections, PlanPoint point, Length tolerance) {
         return handles(level, selections).stream()
@@ -314,8 +316,12 @@ import java.util.UUID;
                 .orElseThrow();
         RectangleBounds bounds = resizeBounds(bounds(zone.outline()), handle.kind(), targetPoint);
         HeatingZone resized = zone.withOutline(rectanglePoints(bounds));
+        if (resized.hasRoutingCommands()) {
+            resized = heatingCircuitRoutingService.regenerate(resized, heating);
+        }
+        HeatingZone resizedZone = resized;
         HydronicHeating resizedHeating = heating.withZones(heating.zones().stream()
-                .map(candidate -> candidate.id().equals(zone.id()) ? resized : candidate)
+                .map(candidate -> candidate.id().equals(zone.id()) ? resizedZone : candidate)
                 .toList());
         return new ResizeResult(level.walls(), level.doors(), level.windows(), level.staircases(),
                 level.floorOpenings(), level.heatingExclusionAreas(),

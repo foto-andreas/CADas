@@ -35,6 +35,8 @@ public final class HeatingCircuitCommandRouter {
                 case 'r' -> returnCursor = appendArc(returnPrimitives, returnCursor, spacingMillimeters, Turn.RIGHT);
                 case 'L' -> supplyCursor = appendArc(supplyPrimitives, supplyCursor, spacingMillimeters, Turn.LEFT);
                 case 'l' -> returnCursor = appendArc(returnPrimitives, returnCursor, spacingMillimeters, Turn.LEFT);
+                case 'X' -> supplyCursor = removeLastPrimitive(supplyPrimitives, supplyCursor);
+                case 'x' -> returnCursor = removeLastPrimitive(returnPrimitives, returnCursor);
                 default -> throw new IllegalArgumentException("Unbekannter Routing-Befehl `" + command + "`.");
             }
         }
@@ -50,7 +52,7 @@ public final class HeatingCircuitCommandRouter {
 
     public boolean isCommandCharacter(char character) {
         return switch (character) {
-            case 'I', 'i', 'R', 'r', 'L', 'l' -> true;
+            case 'I', 'i', 'R', 'r', 'L', 'l', 'X', 'x' -> true;
             default -> false;
         };
     }
@@ -391,6 +393,15 @@ public final class HeatingCircuitCommandRouter {
         return new PipeCursor(endPoint, endDirection);
     }
 
+    private PipeCursor removeLastPrimitive(List<PipePrimitive> primitives, PipeCursor cursor) {
+        if (primitives.isEmpty()) {
+            return cursor;
+        }
+        PipePrimitive removed = primitives.remove(primitives.size() - 1);
+        CardinalDirection direction = removed instanceof QuarterArc arc ? arc.startDirection() : cursor.direction();
+        return new PipeCursor(removed.startPoint(), direction);
+    }
+
     private record PipeCursor(RoutingPoint position, CardinalDirection direction) {
     }
 
@@ -433,6 +444,30 @@ public final class HeatingCircuitCommandRouter {
                     returnPath.rotatedClockwise()
             );
         }
+
+        public RoutingResult rotatedCounterClockwise() {
+            return rotatedClockwise().rotatedClockwise().rotatedClockwise();
+        }
+
+        public RoutingResult mirroredHorizontally() {
+            return new RoutingResult(
+                    widthMillimeters,
+                    heightMillimeters,
+                    spacingMillimeters,
+                    supplyPath.mirroredHorizontally(),
+                    returnPath.mirroredHorizontally()
+            );
+        }
+
+        public RoutingResult mirroredVertically() {
+            return new RoutingResult(
+                    widthMillimeters,
+                    heightMillimeters,
+                    spacingMillimeters,
+                    supplyPath.mirroredVertically(),
+                    returnPath.mirroredVertically()
+            );
+        }
     }
 
     public record PipePath(
@@ -473,6 +508,30 @@ public final class HeatingCircuitCommandRouter {
                     rotatedPrimitives
             );
         }
+
+        PipePath mirroredHorizontally() {
+            List<PipePrimitive> mirroredPrimitives = primitives.stream()
+                    .map(PipePrimitive::mirroredHorizontally)
+                    .toList();
+            return new PipePath(
+                    startPoint.mirroredHorizontally(),
+                    endPoint.mirroredHorizontally(),
+                    endDirection.mirroredHorizontally(),
+                    mirroredPrimitives
+            );
+        }
+
+        PipePath mirroredVertically() {
+            List<PipePrimitive> mirroredPrimitives = primitives.stream()
+                    .map(PipePrimitive::mirroredVertically)
+                    .toList();
+            return new PipePath(
+                    startPoint.mirroredVertically(),
+                    endPoint.mirroredVertically(),
+                    endDirection.mirroredVertically(),
+                    mirroredPrimitives
+            );
+        }
     }
 
     public sealed interface PipePrimitive permits LineSegment, QuarterArc {
@@ -484,6 +543,10 @@ public final class HeatingCircuitCommandRouter {
         PipePrimitive translatedBy(double xMillimeters, double yMillimeters);
 
         PipePrimitive rotatedClockwise();
+
+        PipePrimitive mirroredHorizontally();
+
+        PipePrimitive mirroredVertically();
     }
 
     public record LineSegment(RoutingPoint startPoint, RoutingPoint endPoint) implements PipePrimitive {
@@ -504,6 +567,16 @@ public final class HeatingCircuitCommandRouter {
         @Override
         public LineSegment rotatedClockwise() {
             return new LineSegment(startPoint.rotatedClockwise(), endPoint.rotatedClockwise());
+        }
+
+        @Override
+        public LineSegment mirroredHorizontally() {
+            return new LineSegment(startPoint.mirroredHorizontally(), endPoint.mirroredHorizontally());
+        }
+
+        @Override
+        public LineSegment mirroredVertically() {
+            return new LineSegment(startPoint.mirroredVertically(), endPoint.mirroredVertically());
         }
     }
 
@@ -554,6 +627,32 @@ public final class HeatingCircuitCommandRouter {
                     endDirection.rotatedClockwise()
             );
         }
+
+        @Override
+        public QuarterArc mirroredHorizontally() {
+            return new QuarterArc(
+                    startPoint.mirroredHorizontally(),
+                    endPoint.mirroredHorizontally(),
+                    centerPoint.mirroredHorizontally(),
+                    radiusMillimeters,
+                    turn.opposite(),
+                    startDirection.mirroredHorizontally(),
+                    endDirection.mirroredHorizontally()
+            );
+        }
+
+        @Override
+        public QuarterArc mirroredVertically() {
+            return new QuarterArc(
+                    startPoint.mirroredVertically(),
+                    endPoint.mirroredVertically(),
+                    centerPoint.mirroredVertically(),
+                    radiusMillimeters,
+                    turn.opposite(),
+                    startDirection.mirroredVertically(),
+                    endDirection.mirroredVertically()
+            );
+        }
     }
 
     public record RoutingPoint(double xMillimeters, double yMillimeters) {
@@ -572,11 +671,23 @@ public final class HeatingCircuitCommandRouter {
         public RoutingPoint rotatedClockwise() {
             return new RoutingPoint(yMillimeters, -xMillimeters);
         }
+
+        public RoutingPoint mirroredHorizontally() {
+            return new RoutingPoint(-xMillimeters, yMillimeters);
+        }
+
+        public RoutingPoint mirroredVertically() {
+            return new RoutingPoint(xMillimeters, -yMillimeters);
+        }
     }
 
     public enum Turn {
         LEFT,
-        RIGHT
+        RIGHT;
+
+        Turn opposite() {
+            return this == LEFT ? RIGHT : LEFT;
+        }
     }
 
     public enum CardinalDirection {
@@ -613,6 +724,24 @@ public final class HeatingCircuitCommandRouter {
 
         CardinalDirection rotatedClockwise() {
             return turn(Turn.RIGHT);
+        }
+
+        CardinalDirection mirroredHorizontally() {
+            return switch (this) {
+                case UP -> UP;
+                case RIGHT -> LEFT;
+                case DOWN -> DOWN;
+                case LEFT -> RIGHT;
+            };
+        }
+
+        CardinalDirection mirroredVertically() {
+            return switch (this) {
+                case UP -> DOWN;
+                case RIGHT -> RIGHT;
+                case DOWN -> UP;
+                case LEFT -> LEFT;
+            };
         }
     }
 }

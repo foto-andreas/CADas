@@ -188,7 +188,10 @@ public final class SelectionTranslationService {
                 zone.layoutPattern(),
                 zone.flowInverted(),
                 translatePoint(zone.supplyConnectionPoint(), deltaXMillimeters, deltaYMillimeters),
-                translatePoint(zone.returnConnectionPoint(), deltaXMillimeters, deltaYMillimeters)
+                translatePoint(zone.returnConnectionPoint(), deltaXMillimeters, deltaYMillimeters),
+                zone.routingCommands(),
+                zone.serpentineMiddleLine(),
+                zone.heatOutputWattsPerSquareMeter()
         );
     }
 

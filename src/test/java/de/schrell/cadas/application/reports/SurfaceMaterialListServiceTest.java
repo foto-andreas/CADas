@@ -88,7 +88,7 @@ class SurfaceMaterialListServiceTest {
                         new PlanPoint(1_900, 100),
                         new PlanPoint(1_900, 1_400),
                         new PlanPoint(100, 1_400)
-                ), HeatingLayoutPattern.SPIRAL)));
+                ), HeatingLayoutPattern.SPIRAL).withHeatOutputWattsPerSquareMeter(45.0)));
         project.primaryLevel().addHydronicHeating(heating);
         project.primaryLevel().addHeatingExclusionArea(HeatingExclusionArea.create(
                 room.id(),
@@ -102,12 +102,15 @@ class SurfaceMaterialListServiceTest {
         assertEquals(1, report.heatingPlans().size());
         assertEquals("FBH 1", report.heatingPlans().getFirst().zoneName());
         assertEquals("Schnecke", report.heatingPlans().getFirst().layoutPattern());
+        assertEquals(45.0, report.heatingPlans().getFirst().heatOutputWattsPerSquareMeter(), 0.001);
+        assertEquals(105.3, report.heatingPlans().getFirst().heatOutputWatts(), 0.1);
         assertTrue(report.heatingPlans().getFirst().svg().contains("<svg"));
         assertTrue(report.heatingPlans().getFirst().svg().contains("id=\"sperrflaechen\""));
         assertTrue(report.heatingPlans().getFirst().svg().contains("800.000,500.000 1200.000,500.000"));
         assertTrue(report.heatingPlans().getFirst().svg().contains("V1"));
         assertTrue(report.toMarkdown().contains("## Flächenheizungen"));
         assertTrue(report.toMarkdown().contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
+        assertTrue(report.toMarkdown().contains("105 W"));
     }
 
     @Test

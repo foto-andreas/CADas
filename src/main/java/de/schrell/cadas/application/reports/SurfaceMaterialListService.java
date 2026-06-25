@@ -104,9 +104,11 @@ public final class SurfaceMaterialListService {
                             heating.surfacePosition().toString(),
                             zone.layoutPattern().toString(),
                             zone.name(),
-                            zone.areaSquareMillimeters() / 1_000_000.0,
+                            zone.areaSquareMeters(),
                             pipeLength / 1_000.0,
                             heating.maximumPipeLength().toMillimeters() / 1_000.0,
+                            zone.heatOutputWattsPerSquareMeter(),
+                            zone.heatOutputWatts(),
                             svg
                     ));
                 }
@@ -891,8 +893,8 @@ public final class SurfaceMaterialListService {
                 markdown.append("Keine Flächenheizungen vorhanden.\n\n");
                 return;
             }
-            markdown.append("| Raum | Fläche | Verlegung | Heizkreis | Heizfläche | Rohrlänge | Maximum |\n");
-            markdown.append("|---|---|---|---|---:|---:|---:|\n");
+            markdown.append("| Raum | Fläche | Verlegung | Heizkreis | Heizfläche | HKL | Maximum | W/m² | Leistung |\n");
+            markdown.append("|---|---|---|---|---:|---:|---:|---:|---:|\n");
             for (HeatingPlanSummary plan : heatingPlans) {
                 markdown.append("| ")
                         .append(markdownCell(plan.levelName() + " / " + plan.roomName()))
@@ -908,6 +910,10 @@ public final class SurfaceMaterialListService {
                         .append(decimal(plan.pipeLengthMeters(), 1)).append(" m")
                         .append(" | ")
                         .append(decimal(plan.maximumPipeLengthMeters(), 1)).append(" m")
+                        .append(" | ")
+                        .append(decimal(plan.heatOutputWattsPerSquareMeter(), 1))
+                        .append(" | ")
+                        .append(decimal(plan.heatOutputWatts(), 0)).append(" W")
                         .append(" |\n");
             }
             markdown.append('\n');
@@ -1053,6 +1059,8 @@ public final class SurfaceMaterialListService {
             double areaSquareMeters,
             double pipeLengthMeters,
             double maximumPipeLengthMeters,
+            double heatOutputWattsPerSquareMeter,
+            double heatOutputWatts,
             String svg
     ) {
     }
