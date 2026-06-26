@@ -8,5 +8,5 @@ schlangenMittellinie=false
 vorlaufRücklaufGetauscht=false
 rotationViertel=0
 generatorVergleich=false
-kanonischeKommandos=IIIIRRIIIIIIILLIIIIIIIRRIIIIIII|iiirriiiiiiilliiiiiiirriiiiiii
-kommandos=iiirriiiiiiilliiiiiiirriiiiiiiIIIIRRIIIIIIILLIIIIIIIRRIIIIIII
+kanon-scheKommandos=====RR=======LL=======RR=======|---rr-------ll-------rr-------
+kommandos=---rr-------ll-------rr-------====RR=======LL=======RR=======
