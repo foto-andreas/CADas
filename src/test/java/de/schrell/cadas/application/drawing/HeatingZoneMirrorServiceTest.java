@@ -48,8 +48,8 @@ class HeatingZoneMirrorServiceTest {
         HeatingZone mirrored = vertical.hydronicHeatings().getFirst().zones().getFirst();
         assertTrue(horizontal.changed());
         assertTrue(vertical.changed());
-        assertEquals(3_000.0, mirrored.outline().getFirst().xMillimeters(), 0.001);
-        assertEquals(2_000.0, mirrored.outline().getFirst().yMillimeters(), 0.001);
+        assertEquals(2_858.0, mirrored.outline().getFirst().xMillimeters(), 0.001);
+        assertEquals(2_058.0, mirrored.outline().getFirst().yMillimeters(), 0.001);
         assertEquals(routingStartPoint, mirrored.routingStartPoint());
         assertTrue(mirrored.routingQuarterTurns() == 2
                 || mirrored.routingMirroredHorizontally()

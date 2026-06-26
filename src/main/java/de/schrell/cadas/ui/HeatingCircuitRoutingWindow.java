@@ -58,6 +58,7 @@ final class HeatingCircuitRoutingWindow {
     private static final double MINIMUM_ZOOM = 0.25;
     private static final double MAXIMUM_ZOOM = 6.0;
     private static final double ZOOM_STEP = 1.2;
+    private static final int TRAILING_CONNECTOR_PRIMITIVES = 2;
     private static final Path ROUTING_TEST_DIRECTORY = Path.of("src/test/resources/heizkreise");
     private static final DateTimeFormatter TEST_FILE_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
 
@@ -979,30 +980,31 @@ final class HeatingCircuitRoutingWindow {
             return result;
         }
         Bounds bounds = routeBounds(result);
-        double halfSpacing = spacingMillimeters / 2.0;
-        double upOffset = halfSpacing;
-        double downOffset = -halfSpacing;
-        double offset = verticalAlignmentScore(bounds, size.heightMillimeters(), downOffset)
-                <= verticalAlignmentScore(bounds, size.heightMillimeters(), upOffset)
-                ? downOffset
-                : upOffset;
+        double offset = verticalAlignmentScore(bounds, size.heightMillimeters())
+                <= verticalAlignmentScore(bounds, size.heightMillimeters())
+                ? 0
+                : 0;
         return result.translatedBy(0.0, offset);
     }
 
-    private double verticalAlignmentScore(Bounds bounds, double heightMillimeters, double offsetMillimeters) {
+    private double verticalAlignmentScore(Bounds bounds, double heightMillimeters) {
         double bottom = -heightMillimeters / 2.0;
         double top = heightMillimeters / 2.0;
-        double shiftedMinY = bounds.minY() + offsetMillimeters;
-        double shiftedMaxY = bounds.maxY() + offsetMillimeters;
+        double shiftedMinY = bounds.minY() ;
+        double shiftedMaxY = bounds.maxY();
         double overflow = Math.max(0.0, bottom - shiftedMinY) + Math.max(0.0, shiftedMaxY - top);
         double edgeDistance = Math.min(Math.abs(shiftedMinY - bottom), Math.abs(top - shiftedMaxY));
         return overflow * 1_000.0 + edgeDistance;
     }
 
-    private Bounds routeBounds(RoutingResult result) {
+    Bounds routeBounds(RoutingResult result) {
+        return routeBounds(result, TRAILING_CONNECTOR_PRIMITIVES);
+    }
+
+    Bounds routeBounds(RoutingResult result, int trailingPrimitivesToIgnore) {
         return new Bounds(0.0, 0.0, 0.0, 0.0)
-                .include(result.supplyPath())
-                .include(result.returnPath());
+                .include(result.supplyPath(), trailingPrimitivesToIgnore)
+                .include(result.returnPath(), trailingPrimitivesToIgnore);
     }
 
     private void drawStartPoint(GraphicsContext gc, RoutingPoint startPoint, ViewTransform transform) {
@@ -1026,8 +1028,8 @@ final class HeatingCircuitRoutingWindow {
                 -size.heightMillimeters() / 2.0,
                 size.heightMillimeters() / 2.0
         );
-        bounds = bounds.include(result.supplyPath());
-        bounds = bounds.include(result.returnPath());
+        bounds = bounds.include(result.supplyPath(), TRAILING_CONNECTOR_PRIMITIVES);
+        bounds = bounds.include(result.returnPath(), TRAILING_CONNECTOR_PRIMITIVES);
         double width = Math.max(bounds.width(), 1.0);
         double height = Math.max(bounds.height(), 1.0);
         double scale = Math.min(
@@ -1139,19 +1141,56 @@ final class HeatingCircuitRoutingWindow {
         }
     }
 
-    private record Bounds(double minX, double maxX, double minY, double maxY) {
+    record Bounds(double minX, double maxX, double minY, double maxY) {
 
         Bounds include(PipePath path) {
-            Bounds result = this;
-            for (PipePrimitive primitive : path.primitives()) {
+            return include(path, 0);
+        }
+
+        Bounds include(PipePath path, int trailingPrimitivesToIgnore) {
+            if (trailingPrimitivesToIgnore <= 0 || path.primitives().size() <= trailingPrimitivesToIgnore) {
+                Bounds result = this;
+                for (PipePrimitive primitive : path.primitives()) {
+                    result = result.include(primitive.startPoint()).include(primitive.endPoint());
+                    if (primitive instanceof QuarterArc arc) {
+                        result = result.include(arc);
+                    }
+                }
+                return result;
+            }
+            Bounds result = include(path.startPoint());
+            int includedPrimitiveCount = path.primitives().size() - trailingPrimitivesToIgnore;
+            for (int index = 0; index < includedPrimitiveCount; index++) {
+                PipePrimitive primitive = path.primitives().get(index);
                 result = result.include(primitive.startPoint()).include(primitive.endPoint());
                 if (primitive instanceof QuarterArc arc) {
+                    result = result.include(arc);
+                }
+            }
+            return result;
+        }
+
+        Bounds include(QuarterArc arc) {
+            Bounds result = include(arc.startPoint()).include(arc.endPoint());
+            double startAngle = Math.atan2(
+                    arc.startPoint().yMillimeters() - arc.centerPoint().yMillimeters(),
+                    arc.startPoint().xMillimeters() - arc.centerPoint().xMillimeters()
+            );
+            double endAngle = Math.atan2(
+                    arc.endPoint().yMillimeters() - arc.centerPoint().yMillimeters(),
+                    arc.endPoint().xMillimeters() - arc.centerPoint().xMillimeters()
+            );
+            if (startAngle < 0.0) {
+                startAngle += Math.PI * 2.0;
+            }
+            if (endAngle < 0.0) {
+                endAngle += Math.PI * 2.0;
+            }
+            for (double candidateAngle : new double[]{0.0, Math.PI / 2.0, Math.PI, Math.PI * 1.5}) {
+                if (angleLiesOnArc(startAngle, endAngle, candidateAngle, arc.turn())) {
                     result = result.include(new RoutingPoint(
-                            arc.centerPoint().xMillimeters() - arc.radiusMillimeters(),
-                            arc.centerPoint().yMillimeters() - arc.radiusMillimeters()
-                    )).include(new RoutingPoint(
-                            arc.centerPoint().xMillimeters() + arc.radiusMillimeters(),
-                            arc.centerPoint().yMillimeters() + arc.radiusMillimeters()
+                            arc.centerPoint().xMillimeters() + Math.cos(candidateAngle) * arc.radiusMillimeters(),
+                            arc.centerPoint().yMillimeters() + Math.sin(candidateAngle) * arc.radiusMillimeters()
                     ));
                 }
             }
@@ -1165,6 +1204,23 @@ final class HeatingCircuitRoutingWindow {
                     Math.min(minY, point.yMillimeters()),
                     Math.max(maxY, point.yMillimeters())
             );
+        }
+
+        private boolean angleLiesOnArc(double startAngle, double endAngle, double candidateAngle, Turn turn) {
+            double fullTurn = Math.PI * 2.0;
+            double adjustedCandidate = candidateAngle;
+            if (turn == Turn.RIGHT) {
+                double adjustedEnd = endAngle > startAngle ? endAngle - fullTurn : endAngle;
+                if (adjustedCandidate > startAngle) {
+                    adjustedCandidate -= fullTurn;
+                }
+                return adjustedCandidate <= startAngle + 0.000_001 && adjustedCandidate >= adjustedEnd - 0.000_001;
+            }
+            double adjustedEnd = endAngle < startAngle ? endAngle + fullTurn : endAngle;
+            if (adjustedCandidate < startAngle) {
+                adjustedCandidate += fullTurn;
+            }
+            return adjustedCandidate >= startAngle - 0.000_001 && adjustedCandidate <= adjustedEnd + 0.000_001;
         }
 
         double width() {

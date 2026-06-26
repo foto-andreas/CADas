@@ -156,9 +156,9 @@ class QuarterTurnRotationServiceTest {
 
         HeatingZone rotated = result.hydronicHeatings().getFirst().zones().getFirst();
         assertTrue(result.changed());
-        assertEquals(2_000_000.0, rotated.areaSquareMillimeters(), 0.001);
+        assertEquals(1_663_456.0, rotated.areaSquareMillimeters(), 0.001);
         assertTrue(rotated.hasRoutingCommands());
-        assertEquals(1_500.0, rotated.outline().getFirst().xMillimeters(), 0.001);
+        assertEquals(1_492.0, rotated.outline().getFirst().xMillimeters(), 0.001);
         assertEquals(routingStartPoint, rotated.routingStartPoint());
     }
 

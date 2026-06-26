@@ -246,6 +246,14 @@ public record HeatingZone(
         );
     }
 
+    public HeatingZone withRoutingStartPoint(PlanPoint newRoutingStartPoint) {
+        return new HeatingZone(
+                id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint,
+                newRoutingStartPoint, routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
+        );
+    }
+
     public HeatingZone translatedBy(double deltaXMillimeters, double deltaYMillimeters) {
         return new HeatingZone(
                 id,

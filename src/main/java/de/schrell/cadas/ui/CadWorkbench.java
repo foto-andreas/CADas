@@ -128,6 +128,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -239,6 +240,7 @@ public final class CadWorkbench extends BorderPane {
     private static final double VARIOTHERM_DETAIL_MIN_SCREEN_SPACING = 28.0;
     private static final int LENGTH_INPUT_DECIMALS = 3;
     private static final Font DIMENSION_LABEL_FONT = Font.font("Menlo", 12);
+    private static final Font ROUTING_COMMAND_FONT = Font.font("Serif", 14);
     private static final double DIMENSION_TEXT_AWAY_DISTANCE = 8.0;
     private static final double DIMENSION_PARALLEL_TEXT_AWAY_DISTANCE = 14.0;
     private static final double DIMENSION_TEXT_PADDING = 6.0;
@@ -254,7 +256,6 @@ public final class CadWorkbench extends BorderPane {
     private final Set<UUID> heatingZonesPendingRoutingRegeneration = new HashSet<>();
     private final Set<UUID> heatingLayoutsDirty = new HashSet<>();
     private final PauseTransition heatingLayoutRecalculationPause = new PauseTransition(Duration.seconds(1));
-    private final PauseTransition heatingRoutingAutoApplyPause = new PauseTransition(Duration.millis(200));
     private final RoofSlopeWallService roofSlopeWallService = new RoofSlopeWallService();
     private final RoofWindowPlacementService roofWindowPlacementService = new RoofWindowPlacementService();
     private final StairUnderbuildService stairUnderbuildService = new StairUnderbuildService();
@@ -410,6 +411,12 @@ public final class CadWorkbench extends BorderPane {
     private final TextField heatingReturnYField = new TextField("0");
     private final ComboBox<LengthUnit> heatingReturnYUnit = new ComboBox<>();
     private final ListView<String> heatingZoneList = new ListView<>();
+    private final TextField heatingZoneNameField = new TextField("Heizkreis");
+    private final ComboBox<HeatingLayoutPattern> heatingZoneLayoutPatternSelector = new ComboBox<>();
+    private final CheckBox heatingZoneFlowInvertedCheckBox = new CheckBox("Vorlauf und Rücklauf tauschen");
+    private final CheckBox heatingZoneSerpentineMiddleLineCheckBox = new CheckBox("Mittelschlange aktiv");
+    private final TextField heatingZoneHeatOutputField = new TextField("0");
+    private final TextArea heatingZonePointArea = new TextArea();
     private final TextArea heatingRoutingCommandArea = new TextArea();
     private final CheckBox autoRouteHeatingZoneOnResizeCheckBox = new CheckBox("Auto-Routing nach Rechteckänderung");
     private final Label heatingSummaryLabel = new Label("Keine Heizfläche angelegt.");
@@ -482,12 +489,9 @@ public final class CadWorkbench extends BorderPane {
     private final Button addDwgBlockAsSurfaceButton = new Button("Als Belag");
     private final Button addDwgBlockAsObjectButton = new Button("Als Objekt");
     private final Button planHeatingButton = new Button("Raumplanung pausiert");
-    private final Button addHeatingZoneButton = new Button("Rechteck hinzufügen");
-    private final Button editHeatingZoneButton = new Button("Bereich bearbeiten");
+    private final Button applyHeatingZoneSettingsButton = new Button("Heizkreis übernehmen");
     private final Button generateHeatingZoneRoutingButton = new Button("Routing generieren");
     private final Button applyHeatingRoutingCommandButton = new Button("Routing übernehmen");
-    private final Button removeHeatingZoneButton = new Button("Bereich entfernen");
-    private final Button removeHeatingButton = new Button("Heizung entfernen");
     private final ContextMenu selectionContextMenu = new ContextMenu();
     private final Label cadLibrarySummaryLabel = new Label("Keine externen CAD-Bibliotheken registriert.");
 
@@ -516,6 +520,7 @@ public final class CadWorkbench extends BorderPane {
     private PlanPoint contextMenuWorldPoint;
     private boolean updatingLengthInput;
     private boolean updatingHeatingRoutingInput;
+    private boolean updatingHeatingZoneSelection;
     private PlanPoint draftStart;
     private PlanSegment previewSegment;
     private PlanPoint lastCursor = new PlanPoint(0.0, 0.0);
@@ -1212,12 +1217,15 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Wandabstand", heatingWallClearanceField, heatingWallClearanceUnit),
                         planHeatingButton,
                         heatingZoneList,
+                        propertyRow("Name", heatingZoneNameField),
+                        propertyRow("Verlegung", heatingZoneLayoutPatternSelector),
+                        propertyRow("Rollen", heatingZoneFlowInvertedCheckBox),
+                        propertyRow("Mittelschlange", heatingZoneSerpentineMiddleLineCheckBox),
+                        propertyRow("W/m²", heatingZoneHeatOutputField),
                         propertyRow("Routing", heatingRoutingCommandArea),
                         autoRouteHeatingZoneOnResizeCheckBox,
-                        new HBox(6.0, addHeatingZoneButton, editHeatingZoneButton),
-                        generateHeatingZoneRoutingButton,
-                        removeHeatingZoneButton,
-                        removeHeatingButton
+                        applyHeatingZoneSettingsButton,
+                        generateHeatingZoneRoutingButton
                 ),
                 createPropertySection(
                         "Tür",
@@ -1350,12 +1358,9 @@ public final class CadWorkbench extends BorderPane {
         addDwgBlockAsSurfaceButton.setOnAction(event -> runGuardedAction("DWG-Block als Belag", this::addSelectedDwgBlockAsSurfacePreset));
         addDwgBlockAsObjectButton.setOnAction(event -> runGuardedAction("DWG-Block als Objekt", this::addSelectedDwgBlockAsObjectPreset));
         planHeatingButton.setOnAction(event -> runGuardedAction("Heizkreise planen", this::planHydronicHeating));
-        addHeatingZoneButton.setOnAction(event -> runGuardedAction("Heizbereich hinzufügen", () -> editHeatingZone(true)));
-        editHeatingZoneButton.setOnAction(event -> runGuardedAction("Heizbereich bearbeiten", () -> editHeatingZone(false)));
+        applyHeatingZoneSettingsButton.setOnAction(event -> runGuardedAction("Heizkreis übernehmen", this::applySelectedHeatingZoneSettings));
         generateHeatingZoneRoutingButton.setOnAction(event -> runGuardedAction("Heizkreis-Routing generieren", this::generateSelectedHeatingZoneRouting));
         applyHeatingRoutingCommandButton.setOnAction(event -> runGuardedAction("Heizkreis-Routing übernehmen", this::applySelectedHeatingZoneRouting));
-        removeHeatingZoneButton.setOnAction(event -> runGuardedAction("Heizbereich entfernen", this::removeHeatingZone));
-        removeHeatingButton.setOnAction(event -> runGuardedAction("Heizung entfernen", this::removeHydronicHeating));
         rebuildSelectionContextMenu();
         applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
         applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
@@ -1375,12 +1380,9 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(addDwgBlockAsSurfaceButton, "Übernimmt den ausgewählten DWG-Block mit echten Blockmaßen als Belags-Preset.");
         applyTooltip(addDwgBlockAsObjectButton, "Übernimmt den ausgewählten DWG-Block mit echtem Footprint als Objekt-Preset.");
         applyTooltip(planHeatingButton, "Die automatische Planung ganzer Räume ist vorübergehend deaktiviert. Heizkreise werden aktuell halbautomatisch als Rechtecke mit dem Werkzeug `Heizkreis` angelegt und danach direkt in der Zeichenfläche bearbeitet.");
-        applyTooltip(addHeatingZoneButton, "Ergänzt einen neuen Heizkreis als rechteckiges Startfeld in einem freien Bereich des ausgewählten Raums. Das Rechteck kann im Dialog über Eckpunkte, Verlegeart und Rollenorientierung angepasst werden.");
-        applyTooltip(editHeatingZoneButton, "Bearbeitet Name, Verlegeart, Rollenorientierung und sämtliche Eckpunkte des in der Liste markierten Heizbereichs. Danach wird dessen Rohrverlauf neu berechnet.");
+        applyTooltip(applyHeatingZoneSettingsButton, "Übernimmt Name, Verlegung, Rollenorientierung, Mittelschlange, Heizleistung und Polygon-Eckpunkte aus der Eigenschaftenleiste auf den markierten Heizkreis.");
         applyTooltip(generateHeatingZoneRoutingButton, "Erzeugt für den markierten rechteckigen Heizkreis die gespeicherte FBH-Routing-Sprache neu. Vorhandene manuelle Korrekturen im Routing-String werden dabei ersetzt.");
-        applyTooltip(applyHeatingRoutingCommandButton, "Übernimmt den Routing-Text auf den markierten Heizkreis. Großbuchstaben steuern den Vorlauf, Kleinbuchstaben den Rücklauf; `X` und `x` löschen jeweils den letzten Vorlauf- oder Rücklauf-Schritt.");
-        applyTooltip(removeHeatingZoneButton, "Entfernt den in der Liste markierten Heizbereich einschließlich seines berechneten Rohrverlaufs.");
-        applyTooltip(removeHeatingButton, "Entfernt die Flächenheizung der ausgewählten Boden- oder Deckenfläche vollständig aus dem Raum.");
+        applyTooltip(applyHeatingRoutingCommandButton, "Übernimmt den Routing-Text auf den markierten Heizkreis. Großbuchstaben steuern den Vorlauf, Kleinbuchstaben den Rücklauf; `X` und `x` löschen jeweils den letzten Vorlauf- oder Rücklauf-Schritt. Der rote Startpunkt markiert den tatsächlichen Routing-Start, nicht das Rechteck.");
         applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf.");
         applyTooltip(dwgStatusLabel, "Zeigt, welcher externe DWG-Konverter gefunden wurde und ob die letzte Analyse erfolgreich war.");
         applyTooltip(dwgBlockSearchField, "Filtert die analysierten DWG-Blöcke nach Blockname, Layer oder Dateiname.");
@@ -1526,14 +1528,18 @@ public final class CadWorkbench extends BorderPane {
         addDwgBlockAsObjectButton.setDisable(!hasDwgBlock);
         HydronicHeating selectedHeating = selectedHydronicHeating().orElse(null);
         int selectedZoneIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
+        boolean hasSelectedHeatingZone = selectedHeating != null && selectedZoneIndex >= 0;
         planHeatingButton.setDisable(true);
-        addHeatingZoneButton.setDisable(selectedHeating == null);
-        editHeatingZoneButton.setDisable(selectedHeating == null || selectedZoneIndex < 0);
-        generateHeatingZoneRoutingButton.setDisable(selectedHeating == null || selectedZoneIndex < 0);
-        applyHeatingRoutingCommandButton.setDisable(selectedHeating == null || selectedZoneIndex < 0);
-        heatingRoutingCommandArea.setDisable(selectedHeating == null || selectedZoneIndex < 0);
-        removeHeatingZoneButton.setDisable(selectedHeating == null || selectedZoneIndex < 0);
-        removeHeatingButton.setDisable(selectedHeating == null);
+        applyHeatingZoneSettingsButton.setDisable(!hasSelectedHeatingZone);
+        generateHeatingZoneRoutingButton.setDisable(!hasSelectedHeatingZone);
+        applyHeatingRoutingCommandButton.setDisable(!hasSelectedHeatingZone);
+        heatingZoneNameField.setDisable(!hasSelectedHeatingZone);
+        heatingZoneLayoutPatternSelector.setDisable(!hasSelectedHeatingZone);
+        heatingZoneFlowInvertedCheckBox.setDisable(!hasSelectedHeatingZone);
+        heatingZoneSerpentineMiddleLineCheckBox.setDisable(!hasSelectedHeatingZone);
+        heatingZoneHeatOutputField.setDisable(!hasSelectedHeatingZone);
+        heatingZonePointArea.setDisable(!hasSelectedHeatingZone);
+        heatingRoutingCommandArea.setDisable(!hasSelectedHeatingZone);
     }
 
     private MenuItem menuItem(String label, Runnable action, KeyCombination accelerator) {
@@ -1735,10 +1741,14 @@ public final class CadWorkbench extends BorderPane {
         heatingSurfacePositionSelector.setValue(HeatingSurfacePosition.FLOOR);
         heatingLayoutPatternSelector.getItems().setAll(HeatingLayoutPattern.MEANDER, HeatingLayoutPattern.VARIO);
         heatingLayoutPatternSelector.setValue(HeatingLayoutPattern.VARIO);
+        heatingZoneLayoutPatternSelector.getItems().setAll(HeatingLayoutPattern.MEANDER, HeatingLayoutPattern.VARIO);
+        heatingZoneLayoutPatternSelector.setValue(HeatingLayoutPattern.VARIO);
         heatingZoneList.setPrefHeight(110.0);
-        heatingRoutingCommandArea.setPrefRowCount(3);
+        heatingZonePointArea.setPrefRowCount(6);
+        heatingZonePointArea.setWrapText(true);
+        heatingRoutingCommandArea.setPrefRowCount(4);
+        heatingRoutingCommandArea.setFont(ROUTING_COMMAND_FONT);
         heatingRoutingCommandArea.setWrapText(true);
-        heatingRoutingAutoApplyPause.setOnFinished(event -> runGuardedAction("Heizkreis-Routing übernehmen", this::applySelectedHeatingZoneRouting));
         autoRouteHeatingZoneOnResizeCheckBox.setSelected(autoRouteHeatingZoneOnResize.get());
         autoRouteHeatingZoneOnResizeCheckBox.selectedProperty().bindBidirectional(autoRouteHeatingZoneOnResize);
         heatingSummaryLabel.setWrapText(true);
@@ -1754,9 +1764,13 @@ public final class CadWorkbench extends BorderPane {
             if (Optional.ofNullable(newValue).orElse("").trim().isBlank()) {
                 return;
             }
-            heatingRoutingAutoApplyPause.playFromStart();
+            runGuardedAction("Heizkreis-Routing übernehmen", this::applySelectedHeatingZoneRouting);
         });
         heatingZoneList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> {
+            if (updatingHeatingZoneSelection) {
+                return;
+            }
+            syncHeatingZoneSettingsInputs();
             syncHeatingRoutingCommandArea();
             updateActionButtons();
         });
@@ -1882,8 +1896,14 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(heatingReturnXUnit, "Bestimmt die Einheit für die X-Koordinate des Rücklaufanschlusses.");
         applyTooltip(heatingReturnYField, "Legt die Y-Koordinate des Rücklaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
         applyTooltip(heatingReturnYUnit, "Bestimmt die Einheit für die Y-Koordinate des Rücklaufanschlusses.");
-        applyTooltip(heatingZoneList, "Listet die getrennten Heizkreise der gewählten Boden- oder Deckenfläche mit Routingart, HKL, Heizfläche und berechneter Heizleistung auf. Ein markierter Bereich kann bearbeitet oder neu generiert werden.");
-        applyTooltip(heatingRoutingCommandArea, "Zeigt und bearbeitet die Routing-Sprache des markierten Heizkreises. `I/i` verlängern Vorlauf/Rücklauf um eine Rasterlinie, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt.");
+        applyTooltip(heatingZoneList, "Listet die getrennten Heizkreise der gewählten Boden- oder Deckenfläche mit Routingart, HKL, Heizfläche und berechneter Heizleistung auf. Die darunterliegenden Eingaben beziehen sich immer auf den markierten Heizkreis.");
+        applyTooltip(heatingZoneNameField, "Legt die sichtbare Bezeichnung des markierten Heizkreises fest.");
+        applyTooltip(heatingZoneLayoutPatternSelector, "Legt fest, ob der markierte Heizkreis als Vario-Doppelspirale oder Meander neu generiert wird. Die Auswahl wirkt auf `Routing generieren` und auf das Übernehmen des Heizkreises.");
+        applyTooltip(heatingZoneFlowInvertedCheckBox, "Tauscht beim markierten Heizkreis Vorlauf und Rücklauf, ohne die rote Startmarke vom tatsächlichen Routing-Beginn wegzubewegen.");
+        applyTooltip(heatingZoneSerpentineMiddleLineCheckBox, "Aktiviert bei passenden rechteckigen Heizkreisen eine schlangenförmige Mittellinie für Vario- oder Meander-Routing.");
+        applyTooltip(heatingZoneHeatOutputField, "Speichert die angenommene Heizleistung des markierten Heizkreises in Watt pro Quadratmeter für Übersicht, PDF und Materialliste.");
+        applyTooltip(heatingZonePointArea, "Erfasst pro Zeile einen Polygon-Eckpunkt des markierten Heizkreises als `X; Y` in Zentimetern. Das Rechteck dient nur als Größenrahmen; nach dem Routing richtet CADas es an der äußeren Rohrkante aus.");
+        applyTooltip(heatingRoutingCommandArea, "Zeigt und bearbeitet die Routing-Sprache des markierten Heizkreises. `I/i` verlängern Vorlauf/Rücklauf um eine Rasterlinie, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt. Der rote Startpunkt bleibt an der tatsächlichen Startkante des Heizrohrs; das Rechteck ist nur der Größenrahmen.");
         applyTooltip(autoRouteHeatingZoneOnResizeCheckBox, "Legt fest, ob ein Heizkreis nach dem Ziehen seines Rechtecks automatisch neu geroutet wird. Ausgeschaltet bleiben die vorhandenen Routing-Befehle erhalten.");
         applyTooltip(heatingSummaryLabel, "Zeigt Fläche, Verlegeart, Anzahl der Heizkreise, gesamte HKL und die aufsummierte Heizleistung der gewählten Flächenheizung.");
         applyTooltip(roomObjectPresetSelector, "Wählt ein Objekt zum Platzieren aus und übernimmt dessen Standardmaße. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
@@ -6488,6 +6508,7 @@ public final class CadWorkbench extends BorderPane {
         if (room == null) {
             heatingSummaryLabel.setText("Für die Heizflächenplanung zuerst genau einen Raum auswählen.");
             heatingZoneList.getItems().clear();
+            syncHeatingZoneSettingsInputs(null);
             syncHeatingRoutingCommandArea(null);
             updateActionButtons();
             return;
@@ -6495,6 +6516,7 @@ public final class CadWorkbench extends BorderPane {
         if (heating == null) {
             heatingSummaryLabel.setText("Für " + heatingSurfacePositionSelector.getValue() + " ist noch keine Heizung angelegt.");
             heatingZoneList.getItems().clear();
+            syncHeatingZoneSettingsInputs(null);
             syncHeatingRoutingCommandArea(null);
             updateActionButtons();
             return;
@@ -6517,12 +6539,18 @@ public final class CadWorkbench extends BorderPane {
                 .filter(context -> context.heating().id().equals(heating.id()))
                 .map(HeatingZoneContext::zoneIndex)
                 .orElse(heatingZoneList.getSelectionModel().getSelectedIndex());
-        heatingZoneList.getItems().setAll(heating.zones().stream()
-                .map(zone -> describeHeatingZone(zone, circuits))
-                .toList());
-        if (!heatingZoneList.getItems().isEmpty()) {
-            heatingZoneList.getSelectionModel().select(Math.max(0, Math.min(selectedIndex, heatingZoneList.getItems().size() - 1)));
+        updatingHeatingZoneSelection = true;
+        try {
+            heatingZoneList.getItems().setAll(heating.zones().stream()
+                    .map(zone -> describeHeatingZone(zone, circuits))
+                    .toList());
+            if (!heatingZoneList.getItems().isEmpty()) {
+                heatingZoneList.getSelectionModel().select(Math.max(0, Math.min(selectedIndex, heatingZoneList.getItems().size() - 1)));
+            }
+        } finally {
+            updatingHeatingZoneSelection = false;
         }
+        syncHeatingZoneSettingsInputs(heating);
         syncHeatingRoutingCommandArea(heating);
         double totalLength = circuits.stream().mapToDouble(circuit -> circuit.pipeLength().toMillimeters()).sum();
         double totalArea = heating.zones().stream().mapToDouble(HeatingZone::areaSquareMeters).sum();
@@ -6547,13 +6575,69 @@ public final class CadWorkbench extends BorderPane {
         String routingText = "";
         if (heating != null && selectedIndex >= 0 && selectedIndex < heating.zones().size()) {
             routingText = heating.zones().get(selectedIndex).routingCommands();
+            if (Objects.equals(normalizeRoutingEditorText(heatingRoutingCommandArea.getText()), routingText)) {
+                return;
+            }
         }
+        replaceTextPreservingCaretAndScroll(heatingRoutingCommandArea, routingText);
+    }
+
+    private void syncHeatingZoneSettingsInputs() {
+        syncHeatingZoneSettingsInputs(selectedHydronicHeating().orElse(null));
+    }
+
+    private void syncHeatingZoneSettingsInputs(HydronicHeating heating) {
+        int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
+        if (heating == null || selectedIndex < 0 || selectedIndex >= heating.zones().size()) {
+            heatingZoneNameField.setText("");
+            heatingZoneLayoutPatternSelector.setValue(HeatingLayoutPattern.VARIO);
+            heatingZoneFlowInvertedCheckBox.setSelected(false);
+            heatingZoneSerpentineMiddleLineCheckBox.setSelected(false);
+            heatingZoneHeatOutputField.setText("0");
+            heatingZonePointArea.setText("");
+            return;
+        }
+        HeatingZone zone = heating.zones().get(selectedIndex);
+        heatingZoneNameField.setText(zone.name());
+        heatingZoneLayoutPatternSelector.setValue(heatingCircuitRoutingService.manualPattern(zone.layoutPattern()));
+        heatingZoneFlowInvertedCheckBox.setSelected(zone.flowInverted());
+        heatingZoneSerpentineMiddleLineCheckBox.setSelected(zone.serpentineMiddleLine());
+        heatingZoneHeatOutputField.setText(String.format(Locale.GERMAN, "%.1f", zone.heatOutputWattsPerSquareMeter()));
+        heatingZonePointArea.setText(zone.outline().stream()
+                .map(point -> String.format(Locale.GERMAN, "%.3f; %.3f", point.xMillimeters() / 10.0, point.yMillimeters() / 10.0))
+                .collect(java.util.stream.Collectors.joining(System.lineSeparator())));
+    }
+
+    private void replaceTextPreservingCaretAndScroll(TextArea textArea, String text) {
+        String replacement = Optional.ofNullable(text).orElse("");
+        String currentText = Optional.ofNullable(textArea.getText()).orElse("");
+        if (Objects.equals(currentText, replacement)) {
+            return;
+        }
+        int caretPosition = textArea.getCaretPosition();
+        double scrollTop = textArea.getScrollTop();
         updatingHeatingRoutingInput = true;
         try {
-            heatingRoutingCommandArea.setText(routingText);
+            textArea.setText(replacement);
         } finally {
             updatingHeatingRoutingInput = false;
         }
+        textArea.positionCaret(Math.min(caretPosition, textArea.getLength()));
+        textArea.setScrollTop(scrollTop);
+    }
+
+    private String normalizeRoutingEditorText(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        StringBuilder normalized = new StringBuilder(text.length());
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (!Character.isWhitespace(character)) {
+                normalized.append(character);
+            }
+        }
+        return normalized.toString();
     }
 
     private String describeHeatingZone(HeatingZone zone, List<HydronicHeatingLayoutService.CircuitLayout> circuits) {
@@ -6838,123 +6922,49 @@ public final class CadWorkbench extends BorderPane {
         return inside;
     }
 
-    private void editHeatingZone(boolean createNewZone) {
-        Room room = selectedRoom().orElseThrow(() -> new IllegalStateException("Für Heizbereiche muss ein Raum ausgewählt sein."));
-        HydronicHeating heating = selectedHydronicHeating()
-                .orElseThrow(() -> new IllegalStateException("Zuerst eine Heizung für die ausgewählte Fläche planen."));
-        int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
-        if (!createNewZone && (selectedIndex < 0 || selectedIndex >= heating.zones().size())) {
-            throw new IllegalStateException("Zuerst einen Heizbereich in der Liste auswählen.");
-        }
-        HeatingZone initialZone = createNewZone
-                ? defaultHeatingZone(room, heating)
-                : heating.zones().get(selectedIndex);
-        editHeatingZoneDialog(heating, initialZone).ifPresent(updatedZone -> {
-            List<HeatingZone> zones = new ArrayList<>(heating.zones());
-            if (createNewZone) {
-                zones.add(updatedZone);
-            } else {
-                zones.set(selectedIndex, updatedZone);
-            }
-            applyHeatingZones(heating, zones, createNewZone ? zones.size() - 1 : selectedIndex);
-        });
+    private void applySelectedHeatingZoneSettings() {
+        HeatingZoneContext context = selectedHeatingZoneContext()
+                .orElseThrow(() -> new IllegalStateException("Zuerst einen Heizkreis auswählen."));
+        HeatingZone draft = heatingZoneDraft(
+                context.zone(),
+                heatingRoutingCommandArea.getText(),
+                heatingZoneLayoutPatternSelector.getValue(),
+                heatingZoneSerpentineMiddleLineCheckBox.isSelected()
+        );
+        HeatingZone replacement = draft.hasRoutingCommands()
+                ? heatingCircuitRoutingService.withRoutingCommands(draft, context.heating(), draft.routingCommands(), draft.serpentineMiddleLine())
+                : heatingCircuitRoutingService.regenerateWithPattern(
+                draft,
+                context.heating(),
+                draft.layoutPattern(),
+                draft.serpentineMiddleLine()
+        );
+        replacement = snapHeatingZoneRoutingStartIfNeeded(replacement);
+        replaceHeatingZone(context, replacement, "Heizkreis aktualisiert.");
     }
 
-    private Optional<HeatingZone> editHeatingZoneDialog(HydronicHeating heating, HeatingZone initialZone) {
-        Dialog<HeatingZoneInput> dialog = new Dialog<>();
-        dialog.setTitle("Heizbereich bearbeiten");
-        dialog.setHeaderText("Name, Verlegung, Leistung, Routing und Eckpunkte in Zentimetern");
-        TextField nameField = new TextField(initialZone.name());
-        ComboBox<HeatingLayoutPattern> layoutPatternSelector = new ComboBox<>();
-        layoutPatternSelector.getItems().setAll(HeatingLayoutPattern.MEANDER, HeatingLayoutPattern.VARIO);
-        layoutPatternSelector.setValue(heatingCircuitRoutingService.manualPattern(initialZone.layoutPattern()));
-        CheckBox flowInvertedCheckBox = new CheckBox("Vorlauf und Rücklauf im Heizkreis tauschen");
-        flowInvertedCheckBox.setSelected(initialZone.flowInverted());
-        CheckBox serpentineMiddleLineCheckBox = new CheckBox("Mittellinie schlangenförmig ausführen");
-        serpentineMiddleLineCheckBox.setSelected(initialZone.serpentineMiddleLine());
-        TextField heatOutputField = new TextField(String.format(Locale.GERMAN, "%.1f", initialZone.heatOutputWattsPerSquareMeter()));
-        TextArea routingCommandArea = new TextArea(initialZone.routingCommands());
-        routingCommandArea.setPrefRowCount(4);
-        Button generateRoutingButton = new Button("Routing generieren");
-        TextArea pointArea = new TextArea(initialZone.outline().stream()
-                .map(point -> String.format(Locale.GERMAN, "%.3f; %.3f", point.xMillimeters() / 10.0, point.yMillimeters() / 10.0))
-                .collect(java.util.stream.Collectors.joining(System.lineSeparator())));
-        pointArea.setPrefRowCount(10);
-        applyTooltip(nameField, "Legt die eindeutige sichtbare Bezeichnung des Heizkreises fest.");
-        applyTooltip(layoutPatternSelector, "Legt für diesen Heizkreis fest, ob die gespeicherte Routing-Sprache als Vario-Doppelspirale oder Meander erzeugt wird. Schnecke wird für neue manuelle Heizkreise auf Vario abgebildet.");
-        applyTooltip(flowInvertedCheckBox, "Dreht die Rollenorientierung dieses Heizkreises um, sodass der bisherige Rücklaufpfad als Vorlaufpfad beginnt und umgekehrt.");
-        applyTooltip(serpentineMiddleLineCheckBox, "Ersetzt die mittlere Gerade bei geeigneten rechteckigen Heizkreisen durch eine schlangenförmige Führung nach dem getesteten FBH-Router.");
-        applyTooltip(heatOutputField, "Speichert die angenommene Heizleistung dieses Heizkreises in Watt pro Quadratmeter für Übersicht, PDF und Material-/Raumliste.");
-        applyTooltip(routingCommandArea, "Enthält die editierbare FBH-Routing-Sprache. Großbuchstaben steuern den Vorlauf, Kleinbuchstaben den Rücklauf; I/i sind Rasterlinien, R/r und L/l Viertelkreise, X/x löschen den letzten Schritt.");
-        applyTooltip(generateRoutingButton, "Ersetzt den Routing-String aus Rechteckgröße, Verlegeabstand, Verlegeart und optionaler Mittelschlange. Manuelle Korrekturen im Text werden dabei überschrieben.");
-        applyTooltip(pointArea, "Erfasst pro Zeile einen Polygon-Eckpunkt als `X; Y` in Zentimetern. Die Punkte werden umlaufend verbunden und erlauben Rechtecke, L-Formen sowie weitere Polygone.");
-        generateRoutingButton.setOnAction(event -> {
-            try {
-                HeatingZone draft = new HeatingZone(
-                        initialZone.id(),
-                        nameField.getText(),
-                        parseHeatingZonePoints(pointArea.getText()),
-                        heatingCircuitRoutingService.manualPattern(layoutPatternSelector.getValue()),
-                        flowInvertedCheckBox.isSelected(),
-                        null,
-                        null,
-                        routingCommandArea.getText(),
-                        serpentineMiddleLineCheckBox.isSelected(),
-                        parseNonNegativeDouble(heatOutputField.getText(), "Heizleistung pro m²")
-                );
-                HeatingZone generated = heatingCircuitRoutingService.regenerateWithPattern(
-                        draft, heating, layoutPatternSelector.getValue(), serpentineMiddleLineCheckBox.isSelected()
-                );
-                routingCommandArea.setText(generated.routingCommands());
-                dialog.setHeaderText("Routing neu erzeugt.");
-            } catch (RuntimeException exception) {
-                dialog.setHeaderText("Routing nicht erzeugt: " + UiErrorDialogs.userMessage(exception));
-            }
-        });
-        dialog.getDialogPane().setContent(new VBox(
-                8.0,
-                propertyRow("Name", nameField),
-                propertyRow("Verlegung", layoutPatternSelector),
-                propertyRow("Rollen", flowInvertedCheckBox),
-                propertyRow("Mittelschlange", serpentineMiddleLineCheckBox),
-                propertyRow("W/m²", heatOutputField),
-                propertyRow("Routing", routingCommandArea),
-                generateRoutingButton,
-                propertyRow("Eckpunkte X; Y in cm", pointArea)
-        ));
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        Window owner = currentWindow();
-        if (owner != null) {
-            dialog.initOwner(owner);
-        }
-        dialog.setResultConverter(buttonType -> ButtonType.OK.equals(buttonType)
-                ? new HeatingZoneInput(
-                nameField.getText(),
-                pointArea.getText(),
-                layoutPatternSelector.getValue(),
-                flowInvertedCheckBox.isSelected(),
-                routingCommandArea.getText(),
-                serpentineMiddleLineCheckBox.isSelected(),
-                heatOutputField.getText()
-        )
-                : null);
-        return dialog.showAndWait().map(input -> {
-            HeatingZone zone = new HeatingZone(
-                    initialZone.id(),
-                    input.name(),
-                    parseHeatingZonePoints(input.pointsText()),
-                    heatingCircuitRoutingService.manualPattern(input.layoutPattern()),
-                    input.flowInverted(),
-                    null,
-                    null,
-                    input.routingCommands(),
-                    input.serpentineMiddleLine(),
-                    parseNonNegativeDouble(input.heatOutputWattsPerSquareMeterText(), "Heizleistung pro m²")
-            );
-            return zone.hasRoutingCommands()
-                    ? heatingCircuitRoutingService.withRoutingCommands(zone, heating, zone.routingCommands(), zone.serpentineMiddleLine())
-                    : heatingCircuitRoutingService.regenerate(zone, heating);
-        });
+    private HeatingZone heatingZoneDraft(
+            HeatingZone baseZone,
+            String routingCommands,
+            HeatingLayoutPattern layoutPattern,
+            boolean serpentineMiddleLine
+    ) {
+        return new HeatingZone(
+                baseZone.id(),
+                heatingZoneNameField.getText(),
+                parseHeatingZonePoints(heatingZonePointArea.getText()),
+                heatingCircuitRoutingService.manualPattern(layoutPattern),
+                heatingZoneFlowInvertedCheckBox.isSelected(),
+                baseZone.supplyConnectionPoint(),
+                baseZone.returnConnectionPoint(),
+                baseZone.routingStartPoint(),
+                Optional.ofNullable(routingCommands).orElse(""),
+                serpentineMiddleLine,
+                parseNonNegativeDouble(heatingZoneHeatOutputField.getText(), "Heizleistung pro m²"),
+                baseZone.routingQuarterTurns(),
+                baseZone.routingMirroredHorizontally(),
+                baseZone.routingMirroredVertically()
+        );
     }
 
     private List<PlanPoint> parseHeatingZonePoints(String text) {
@@ -6994,23 +7004,22 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
-    private void removeHeatingZone() {
-        HydronicHeating heating = selectedHydronicHeating()
-                .orElseThrow(() -> new IllegalStateException("Keine Heizung ausgewählt."));
-        int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
-        if (selectedIndex < 0 || selectedIndex >= heating.zones().size()) {
-            throw new IllegalStateException("Zuerst einen Heizbereich in der Liste auswählen.");
-        }
-        List<HeatingZone> zones = new ArrayList<>(heating.zones());
-        zones.remove(selectedIndex);
-        applyHeatingZones(heating, zones, Math.min(selectedIndex, zones.size() - 1));
-    }
-
     private void generateSelectedHeatingZoneRouting() {
         HeatingZoneContext context = selectedHeatingZoneContext()
                 .orElseThrow(() -> new IllegalStateException("Zuerst einen Heizkreis auswählen."));
+        HeatingZone draft = heatingZoneDraft(
+                context.zone(),
+                heatingRoutingCommandArea.getText(),
+                Optional.ofNullable(heatingZoneLayoutPatternSelector.getValue()).orElse(HeatingLayoutPattern.VARIO),
+                heatingZoneSerpentineMiddleLineCheckBox.isSelected()
+        );
         HeatingZone replacement = snapHeatingZoneRoutingStartIfNeeded(
-                heatingCircuitRoutingService.regenerate(context.zone(), context.heating())
+                heatingCircuitRoutingService.regenerateWithPattern(
+                        draft,
+                        context.heating(),
+                        draft.layoutPattern(),
+                        draft.serpentineMiddleLine()
+                )
         );
         replaceHeatingZone(context, replacement, "Routing für Heizkreis neu erzeugt.");
     }
@@ -7021,13 +7030,20 @@ public final class CadWorkbench extends BorderPane {
         }
         HeatingZoneContext context = selectedHeatingZoneContext()
                 .orElseThrow(() -> new IllegalStateException("Zuerst einen Heizkreis auswählen."));
-        String commands = Optional.ofNullable(heatingRoutingCommandArea.getText()).orElse("").trim();
-        if (commands.isBlank()) {
+        String commands = Optional.ofNullable(heatingRoutingCommandArea.getText()).orElse("");
+        if (normalizeRoutingEditorText(commands).isBlank()) {
             throw new IllegalArgumentException("Routing darf nicht leer sein.");
         }
-        HeatingZone replacement = heatingCircuitRoutingService.withRoutingCommands(
-                context.zone(), context.heating(), commands, context.zone().serpentineMiddleLine()
+        HeatingZone draft = heatingZoneDraft(
+                context.zone(),
+                commands,
+                Optional.ofNullable(heatingZoneLayoutPatternSelector.getValue()).orElse(HeatingLayoutPattern.VARIO),
+                heatingZoneSerpentineMiddleLineCheckBox.isSelected()
         );
+        HeatingZone replacement = heatingCircuitRoutingService.withRoutingCommands(
+                draft, context.heating(), commands, draft.serpentineMiddleLine()
+        );
+        replacement = snapHeatingZoneRoutingStartIfNeeded(replacement);
         replaceHeatingZone(context, replacement, "Routing für Heizkreis übernommen.");
     }
 
@@ -7055,17 +7071,6 @@ public final class CadWorkbench extends BorderPane {
         recomputeHeatingLayoutNow(heating.id());
     }
 
-    private void removeHydronicHeating() {
-        HydronicHeating heating = selectedHydronicHeating()
-                .orElseThrow(() -> new IllegalStateException("Keine Heizung ausgewählt."));
-        rememberStateForUndo();
-        activeLevel.get().removeHydronicHeating(heating.id());
-        refreshHeatingSection();
-        draftLabel.setText("Heizung für " + heating.surfacePosition() + " entfernt.");
-        clearHeatingLayoutCache();
-        render();
-    }
-
     private boolean resetHydronicManifoldById(UUID heatingId) {
         HydronicHeating heating = activeLevel.get().hydronicHeatings().stream()
                 .filter(candidate -> candidate.id().equals(heatingId))
@@ -7090,17 +7095,6 @@ public final class CadWorkbench extends BorderPane {
                         )
         );
         return true;
-    }
-
-    private record HeatingZoneInput(
-            String name,
-            String pointsText,
-            HeatingLayoutPattern layoutPattern,
-            boolean flowInverted,
-            String routingCommands,
-            boolean serpentineMiddleLine,
-            String heatOutputWattsPerSquareMeterText
-    ) {
     }
 
     private record HeatingZoneContext(
@@ -9365,6 +9359,38 @@ public final class CadWorkbench extends BorderPane {
         render();
     }
 
+    public void automationSetHeatingRoutingCommandAreaText(String text) {
+        replaceTextPreservingCaretAndScroll(heatingRoutingCommandArea, text);
+        render();
+    }
+
+    public void automationSetHeatingZonePointAreaText(String text) {
+        heatingZonePointArea.setText(Optional.ofNullable(text).orElse(""));
+        render();
+    }
+
+    public void automationSetHeatingRoutingCommandAreaCaretPosition(int position) {
+        heatingRoutingCommandArea.positionCaret(Math.max(0, Math.min(position, heatingRoutingCommandArea.getLength())));
+        render();
+    }
+
+    public void automationSetHeatingRoutingCommandAreaScrollTop(double scrollTop) {
+        heatingRoutingCommandArea.setScrollTop(scrollTop);
+        render();
+    }
+
+    public int automationHeatingRoutingCommandAreaCaretPosition() {
+        return heatingRoutingCommandArea.getCaretPosition();
+    }
+
+    public double automationHeatingRoutingCommandAreaScrollTop() {
+        return heatingRoutingCommandArea.getScrollTop();
+    }
+
+    public String automationHeatingRoutingCommandAreaText() {
+        return heatingRoutingCommandArea.getText();
+    }
+
     public String automationFieldValue(String fieldName) {
         return textFieldByName(fieldName).getText();
     }
@@ -9516,6 +9542,9 @@ public final class CadWorkbench extends BorderPane {
             case "deleteSelection" -> deleteSelection();
             case "applySelectionProperties" -> applyCurrentInputsToSelection();
             case "applyEndpointHeight" -> applyEndpointHeightToSelection();
+            case "applyHeatingZoneSettings" -> applySelectedHeatingZoneSettings();
+            case "applyHeatingRouting" -> applySelectedHeatingZoneRouting();
+            case "generateHeatingRouting" -> generateSelectedHeatingZoneRouting();
             case "recognizeRoomFromSelectedWalls" -> recognizeRoomFromSelectedWalls();
             case "toggleSurfaceLayerVisibility" -> toggleSurfaceLayerVisibility();
             case "addSurfaceLayer" -> addSurfaceLayer();
@@ -9752,6 +9781,8 @@ public final class CadWorkbench extends BorderPane {
             case "heatingSupplyY" -> heatingSupplyYField;
             case "heatingReturnX" -> heatingReturnXField;
             case "heatingReturnY" -> heatingReturnYField;
+            case "heatingZoneName" -> heatingZoneNameField;
+            case "heatingZoneHeatOutput" -> heatingZoneHeatOutputField;
             default -> throw new IllegalArgumentException("Eingabefeld `" + fieldName + "` ist unbekannt.");
         };
     }

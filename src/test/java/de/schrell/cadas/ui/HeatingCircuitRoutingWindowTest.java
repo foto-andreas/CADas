@@ -1,6 +1,8 @@
 package de.schrell.cadas.ui;
 
+import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingPoint;
+import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -197,6 +199,30 @@ class HeatingCircuitRoutingWindowTest {
 
             window.automationShortenReturn();
             Assertions.assertEquals("Ii", window.automationCommands());
+            return null;
+        });
+    }
+
+    @Test
+    void berechnetRenderBoundsFürIiUndiIrrOhneÜberstehendeEndsegmente() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+        HeatingCircuitCommandRouter router = new HeatingCircuitCommandRouter();
+        RoutingResult ii = router.route(2_000.0, 3_000.0, 100.0, "Ii");
+        RoutingResult iIrr = router.route(2_000.0, 3_000.0, 100.0, "iIrr");
+
+        aufFxThread(() -> {
+            HeatingCircuitRoutingWindow.Bounds iiBounds = window.routeBounds(ii);
+            HeatingCircuitRoutingWindow.Bounds iIrrBounds = window.routeBounds(iIrr);
+
+            Assertions.assertEquals(0.0, iiBounds.minX(), 0.001);
+            Assertions.assertEquals(0.0, iiBounds.maxX(), 0.001);
+            Assertions.assertEquals(-100.0, iiBounds.minY(), 0.001);
+            Assertions.assertEquals(100.0, iiBounds.maxY(), 0.001);
+
+            Assertions.assertEquals(0.0, iIrrBounds.minX(), 0.001);
+            Assertions.assertEquals(0.0, iIrrBounds.maxX(), 0.001);
+            Assertions.assertEquals(-100.0, iIrrBounds.minY(), 0.001);
+            Assertions.assertEquals(100.0, iIrrBounds.maxY(), 0.001);
             return null;
         });
     }

@@ -21,6 +21,7 @@ import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -35,6 +36,7 @@ import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ToolBar;
+import javafx.scene.control.TextArea;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.Scene;
@@ -613,8 +615,82 @@ class CadWorkbenchTest {
         Assertions.assertEquals(1, aufFxThread(workbench::automationHydronicHeatingCount),
                 aufFxThread(() -> workbench.automationSnapshot().statusText()));
         HeatingZone zone = aufFxThread(() -> workbench.automationHydronicHeating(0).zones().getFirst());
-        Assertions.assertEquals(new PlanPoint(1_160, 1_060), zone.routingStartPoint());
-        Assertions.assertEquals(507.5, zone.outline().getFirst().xMillimeters(), 0.001);
+        Assertions.assertEquals(new PlanPoint(1_160, 1_010), zone.routingStartPoint());
+        Assertions.assertEquals(504.2, zone.outline().getFirst().xMillimeters(), 0.001);
+    }
+
+    @Test
+    void übernimmtRoutingEingabenOhneDebounceBeimSchnellenLöschen() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("HEATING_ZONE_RECTANGLE");
+            workbench.automationCanvasPress(50.3, 50.4, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(180.8, 160.7, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(180.8, 160.7, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetHeatingRoutingCommandAreaText("Ii");
+            workbench.automationInvoke("applyHeatingRouting", null);
+            heatingRoutingCommandArea(workbench).setText("I");
+            return null;
+        });
+
+        Assertions.assertEquals("I", aufFxThread(() -> workbench.automationHydronicHeating(0).zones().getFirst().routingCommands()));
+    }
+
+    @Test
+    void behaeltCursorUndScrollpositionBeiMehrzeiligemSprachrouting() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("HEATING_ZONE_RECTANGLE");
+            workbench.automationCanvasPress(50.3, 50.4, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(180.8, 160.7, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(180.8, 160.7, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        String routingText = "II\nRR\nii\nrr\nI\ni\n";
+        double scrollTop = aufFxThread(() -> {
+            workbench.automationSetHeatingRoutingCommandAreaText(routingText);
+            workbench.automationSetHeatingRoutingCommandAreaCaretPosition(routingText.length());
+            workbench.automationSetHeatingRoutingCommandAreaScrollTop(120.0);
+            return workbench.automationHeatingRoutingCommandAreaScrollTop();
+        });
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("applyHeatingRouting", null);
+            return null;
+        });
+
+        Assertions.assertEquals(routingText.length(), aufFxThread(workbench::automationHeatingRoutingCommandAreaCaretPosition));
+        Assertions.assertEquals(scrollTop, aufFxThread(workbench::automationHeatingRoutingCommandAreaScrollTop), 0.001);
+        Assertions.assertEquals(routingText, aufFxThread(workbench::automationHeatingRoutingCommandAreaText));
     }
 
     @Test
@@ -1981,6 +2057,16 @@ class CadWorkbenchTest {
                 throw fehler;
             }
             throw new RuntimeException(ursache);
+        }
+    }
+
+    private static TextArea heatingRoutingCommandArea(CadWorkbench workbench) {
+        try {
+            Field field = CadWorkbench.class.getDeclaredField("heatingRoutingCommandArea");
+            field.setAccessible(true);
+            return (TextArea) field.get(workbench);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Heizkreis-Textfeld konnte nicht gefunden werden.", exception);
         }
     }
 
