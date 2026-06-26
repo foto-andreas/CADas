@@ -47,6 +47,7 @@ public final class HeatingCircuitRoutingService {
                 zone.flowInverted(),
                 zone.supplyConnectionPoint(),
                 zone.returnConnectionPoint(),
+                zone.routingStartPoint(),
                 zone.routingCommands(),
                 serpentineMiddleLine,
                 zone.heatOutputWattsPerSquareMeter(),
@@ -71,6 +72,7 @@ public final class HeatingCircuitRoutingService {
                 zone.flowInverted(),
                 zone.supplyConnectionPoint(),
                 zone.returnConnectionPoint(),
+                zone.routingStartPoint(),
                 commands,
                 serpentineMiddleLine,
                 zone.heatOutputWattsPerSquareMeter(),
@@ -79,15 +81,15 @@ public final class HeatingCircuitRoutingService {
                 zone.routingMirroredVertically()
         );
         RoutingResult result = placedRoutingResult(routed, heating);
-        Bounds bounds = bounds(routed.outline());
         return new HeatingZone(
                 routed.id(),
                 routed.name(),
                 routed.outline(),
                 routed.layoutPattern(),
                 routed.flowInverted(),
-                nearestBoundaryPoint(bounds, result.supplyPath().endPoint()),
-                nearestBoundaryPoint(bounds, result.returnPath().endPoint()),
+                new PlanPoint(result.supplyPath().endPoint().xMillimeters(), result.supplyPath().endPoint().yMillimeters()),
+                new PlanPoint(result.returnPath().endPoint().xMillimeters(), result.returnPath().endPoint().yMillimeters()),
+                routed.routingStartPoint(),
                 routed.routingCommands(),
                 routed.serpentineMiddleLine(),
                 routed.heatOutputWattsPerSquareMeter(),

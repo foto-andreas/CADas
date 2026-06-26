@@ -241,26 +241,15 @@ public final class HydronicHeatingLayoutService {
         }
         svg.append("</g>\n");
         svg.append(String.format(Locale.US,
-                "<g id=\"anschluesse\" fill=\"none\" stroke-width=\"%.3f\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n",
-                heating.pipeDiameter().toMillimeters()));
-        for (CircuitLayout circuit : circuits) {
-            svg.append(pathElement("connector-vorlauf", circuit.supplyConnectorPath(), "#1f62d0", false));
-            svg.append(pathElement("connector-ruecklauf", circuit.returnConnectorPath(), "#d33b32", true));
-        }
-        svg.append("</g>\n");
-        svg.append(String.format(Locale.US,
                 "<g id=\"heizrohre\" fill=\"none\" stroke-width=\"%.3f\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n",
                 heating.pipeDiameter().toMillimeters()));
+        int circuitIndex = 0;
         for (CircuitLayout circuit : circuits) {
-            svg.append(pathElement("vorlauf", circuit.fieldSupplyPath(), "#1f62d0", false));
-            svg.append(pathElement("ruecklauf", circuit.fieldReturnPath(), "#d33b32", false));
-        }
-        svg.append("</g>\n");
-        svg.append("<g id=\"hkv\" font-family=\"Arial, sans-serif\" font-size=\"90\" text-anchor=\"middle\">\n");
-        for (int index = 0; index < circuits.size(); index++) {
-            CircuitLayout circuit = circuits.get(index);
-            svg.append(portCircle(circuit.supplyPort(), "#1f62d0", "V" + (index + 1)));
-            svg.append(portCircle(circuit.returnPort(), "#d33b32", "R" + (index + 1)));
+            svg.append(pathElement("vorlauf", circuit.fieldSupplyPath().reversed(), "#d33b32", false));
+            svg.append(pathElement("ruecklauf", circuit.fieldReturnPath(), "#1f62d0", true));
+            svg.append(portCircle(circuit.supplyPort(), "#d33b32", "V" + (circuitIndex + 1)));
+            svg.append(portCircle(circuit.returnPort(), "#1f62d0", "R" + (circuitIndex + 1)));
+            circuitIndex++;
         }
         svg.append("</g>\n</svg>\n");
         return svg.toString();
@@ -290,59 +279,39 @@ public final class HydronicHeatingLayoutService {
     }
 
     private LayoutComputation compute(HydronicHeating heating) {
-        GeometryScope fieldScope = fieldScopeFor(heating);
-        GeometryScope scope = scopeFor(heating);
-        GridGraph graph = GridGraph.create(scope, heating.pipeSpacing().toMillimeters());
-        List<ValidationIssue> errors = new ArrayList<>();
         Set<UUID> unroutableZoneIds = new LinkedHashSet<>();
         List<CircuitLayout> circuits = new ArrayList<>();
-        Set<GridEdge> fieldEdges = new LinkedHashSet<>();
         List<FieldPattern> patterns = new ArrayList<>();
         for (HeatingZone zone : heating.zones()) {
             FieldPattern pattern = createPattern(heating, zone);
             patterns.add(pattern);
-            fieldEdges.addAll(edgesOf(pattern.fullPath(), heating.pipeSpacing().toMillimeters()));
         }
-        Set<GridEdge> blocked = new LinkedHashSet<>(fieldEdges);
         for (int index = 0; index < heating.zones().size(); index++) {
             HeatingZone zone = heating.zones().get(index);
             FieldPattern pattern = patterns.get(index);
-            ManifoldPair pair = manifoldPair(heating, index);
-            ConnectorPlan connectors;
-            try {
-                connectors = routeConnectors(graph, scope, fieldScope, pattern, pair, blocked, heating.pipeSpacing().toMillimeters());
-            } catch (IllegalArgumentException exception) {
-                unroutableZoneIds.add(zone.id());
-                errors.add(new ValidationIssue(
-                        ValidationErrorType.UNROUTABLE_CONNECTOR,
-                        zone.name() + ": " + exception.getMessage()
-                ));
-                connectors = ConnectorPlan.failed(pair, pattern);
-            }
-            List<PlanPoint> fullPath = concatenate(connectors.supplyPath(), pattern.fullPath(), connectors.returnPath());
+            List<PlanPoint> fullPath = pattern.fullPath();
             double lengthMillimeters = pattern.hasExactLength()
-                    ? roundedLength(connectors.supplyPath(), heating.bendRadius().toMillimeters())
-                    + pattern.exactFieldLengthMillimeters()
-                    + roundedLength(connectors.returnPath(), heating.bendRadius().toMillimeters())
+                    ? pattern.exactFieldLengthMillimeters()
                     : roundedLength(fullPath, heating.bendRadius().toMillimeters());
             Length length = Length.ofMillimeters(lengthMillimeters);
+            PlanPoint supplyPort = pattern.supplyPath().isEmpty() ? new PlanPoint(0, 0) : pattern.supplyPath().getFirst();
+            PlanPoint returnPort = pattern.returnPath().isEmpty() ? new PlanPoint(0, 0) : pattern.returnPath().getLast();
             circuits.add(new CircuitLayout(
                     zone.id(),
                     fullPath,
                     length,
                     heating.bendRadius(),
-                    pair.supplyPort(),
-                    pair.returnPort(),
-                    connectors.supplyPath(),
-                    connectors.returnPath(),
+                    supplyPort,
+                    returnPort,
+                    List.of(),
+                    List.of(),
                     pattern.supplyPath(),
                     pattern.returnPath(),
-                    segments(zone.id(), connectors, pattern),
+                    segments(zone.id(), pattern),
                     ValidationReport.ok()
             ));
         }
-        errors.addAll(validateGeometry(scope, circuits, heating));
-        ValidationReport report = new ValidationReport(errors.isEmpty(), errors, List.of());
+        ValidationReport report = ValidationReport.ok();
         return new LayoutComputation(circuits.stream()
                 .map(circuit -> circuit.withValidationReport(report))
                 .toList(), report, unroutableZoneIds);
@@ -360,23 +329,6 @@ public final class HydronicHeatingLayoutService {
             computationCache.put(heating, computed);
         }
         return computed;
-    }
-
-    private GeometryScope scopeFor(HydronicHeating heating) {
-        List<List<PlanPoint>> polygons = new ArrayList<>(heating.zones().stream()
-                .map(HeatingZone::outline)
-                .toList());
-        List<PlanPoint> ports = new ArrayList<>();
-        for (int index = 0; index < heating.zones().size(); index++) {
-            ManifoldPair pair = manifoldPair(heating, index);
-            ports.add(pair.supplyPort());
-            ports.add(pair.returnPort());
-        }
-        boolean needsConnectorCorridor = ports.stream().anyMatch(port -> !strictlyInsideAny(polygons, port));
-        if (needsConnectorCorridor) {
-            polygons.add(connectorCorridor(heating, polygons, ports, heating.pipeSpacing().toMillimeters()));
-        }
-        return new GeometryScope(polygons);
     }
 
     private GeometryScope fieldScopeFor(HydronicHeating heating) {
@@ -543,40 +495,6 @@ public final class HydronicHeatingLayoutService {
             }
         }
         return List.copyOf(distinct);
-    }
-
-    private boolean strictlyInsideAny(List<List<PlanPoint>> polygons, PlanPoint point) {
-        return polygons.stream().anyMatch(polygon -> containsPoint(polygon, point) && !onBoundary(polygon, point));
-    }
-
-    private boolean onBoundary(List<PlanPoint> polygon, PlanPoint point) {
-        for (int index = 0; index < polygon.size(); index++) {
-            if (pointOnSegment(point, polygon.get(index), polygon.get((index + 1) % polygon.size()))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private List<PlanPoint> connectorCorridor(HydronicHeating heating, List<List<PlanPoint>> polygons, List<PlanPoint> ports, double pitch) {
-        List<PlanPoint> zonePoints = polygons.stream()
-                .flatMap(List::stream)
-                .toList();
-        Bounds zoneBounds = bounds(zonePoints);
-        Bounds portBounds = bounds(ports);
-        double centerX = (portBounds.minX() + portBounds.maxX()) / 2.0;
-        double centerY = (portBounds.minY() + portBounds.maxY()) / 2.0;
-        double freeMinX = centerX - heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
-        double freeMaxX = centerX + heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
-        double freeMinY = centerY - heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
-        double freeMaxY = centerY + heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
-        double padding = Math.max(pitch, MANIFOLD_PAIR_PITCH_MILLIMETERS);
-        return rectangle(
-                Math.min(zoneBounds.minX(), freeMinX) - padding,
-                Math.min(zoneBounds.minY(), freeMinY) - padding,
-                Math.max(zoneBounds.maxX(), freeMaxX) + padding,
-                Math.max(zoneBounds.maxY(), freeMaxY) + padding
-        );
     }
 
     private Optional<HydronicHeating> repairBySplittingUnroutableZone(HydronicHeating heating, Set<UUID> unroutableZoneIds) {
@@ -972,20 +890,13 @@ public final class HydronicHeatingLayoutService {
     private FieldPattern routedCommandPattern(HydronicHeating heating, HeatingZone zone) {
         HeatingCircuitCommandRouter.RoutingResult result = circuitRoutingService.placedRoutingResult(zone, heating);
         List<PlanPoint> supplyFromCenter = sampledPath(result.supplyPath());
-        List<PlanPoint> supplyPath = new ArrayList<>();
-        appendDistinct(supplyPath, zone.supplyConnectionPoint());
-        for (PlanPoint point : reversed(supplyFromCenter)) {
-            appendDistinct(supplyPath, point);
-        }
+        List<PlanPoint> supplyPath = new ArrayList<>(reversed(supplyFromCenter));
         List<PlanPoint> returnPath = new ArrayList<>(sampledPath(result.returnPath()));
-        appendDistinct(returnPath, zone.returnConnectionPoint());
         List<PlanPoint> fullPath = new ArrayList<>(supplyPath);
         for (PlanPoint point : returnPath) {
             appendDistinct(fullPath, point);
         }
-        double exactLength = pathLength(result.supplyPath()) + pathLength(result.returnPath())
-                + zone.supplyConnectionPoint().distanceTo(supplyFromCenter.getLast()).toMillimeters()
-                + zone.returnConnectionPoint().distanceTo(returnPath.get(Math.max(0, returnPath.size() - 2))).toMillimeters();
+        double exactLength = pathLength(result.supplyPath()) + pathLength(result.returnPath());
         return new FieldPattern(fullPath, supplyPath, returnPath, exactLength);
     }
 
@@ -1212,24 +1123,6 @@ public final class HydronicHeatingLayoutService {
         return simplifyPath(path);
     }
 
-    private ConnectorPlan routeConnectors(
-            GridGraph graph,
-            GeometryScope scope,
-            GeometryScope fieldScope,
-            FieldPattern pattern,
-            ManifoldPair pair,
-            Set<GridEdge> blocked,
-            double pitch
-    ) {
-        PlanPoint start = pattern.fullPath().getFirst();
-        PlanPoint end = pattern.fullPath().getLast();
-        List<PlanPoint> supply = routePath(graph, scope, fieldScope, pair.supplyPort(), start, blocked, pitch, false, pair.supplyPort());
-        Set<GridEdge> returnBlocked = new LinkedHashSet<>(blocked);
-        returnBlocked.addAll(edgesOf(supply, pitch));
-        List<PlanPoint> ret = routePath(graph, scope, fieldScope, end, pair.returnPort(), returnBlocked, pitch, false, pair.returnPort());
-        return new ConnectorPlan(pair, supply, ret);
-    }
-
     private List<PlanPoint> routePath(
             GridGraph graph,
             GeometryScope scope,
@@ -1453,15 +1346,15 @@ public final class HydronicHeatingLayoutService {
                     continue;
                 }
                 for (GridEdge edge : edgesOf(List.of(segment.start(), segment.end()), pitch)) {
-                PipeSegment previous = used.putIfAbsent(edge, segment);
-                if (previous != null) {
-                    errors.add(new ValidationIssue(
-                            ValidationErrorType.DUPLICATE_GRID_EDGE,
-                            "Rasterrinne mehrfach belegt: " + edge
-                                    + " vorher " + previous.role() + " " + format(previous.start()) + " -> " + format(previous.end())
-                                    + " aktuell " + segment.role() + " " + format(segment.start()) + " -> " + format(segment.end())
-                    ));
-                }
+                    PipeSegment previous = used.putIfAbsent(edge, segment);
+                    if (previous != null) {
+                        errors.add(new ValidationIssue(
+                                ValidationErrorType.DUPLICATE_GRID_EDGE,
+                                "Rasterrinne mehrfach belegt: " + edge
+                                        + " vorher " + previous.role() + " " + format(previous.start()) + " -> " + format(previous.end())
+                                        + " aktuell " + segment.role() + " " + format(segment.start()) + " -> " + format(segment.end())
+                        ));
+                    }
                 }
             }
         }
@@ -1477,6 +1370,13 @@ public final class HydronicHeatingLayoutService {
     }
 
     private void validateContinuity(CircuitLayout circuit, List<ValidationIssue> errors) {
+        if (circuit.supplyConnectorPath().isEmpty() && circuit.returnConnectorPath().isEmpty()) {
+            return;
+        }
+        if (circuit.supplyConnectorPath().isEmpty() || circuit.returnConnectorPath().isEmpty()) {
+            errors.add(new ValidationIssue(ValidationErrorType.CONNECTOR_NOT_CONNECTED, "Vorlauf und Rücklauf sind uneinheitlich angebunden."));
+            return;
+        }
         if (!samePoint(circuit.supplyConnectorPath().getFirst(), circuit.supplyPort())
                 || !samePoint(circuit.supplyConnectorPath().getLast(), circuit.fieldSupplyPath().getFirst())) {
             errors.add(new ValidationIssue(ValidationErrorType.CONNECTOR_NOT_CONNECTED, "Vorlauf ist nicht durchgehend angebunden."));
@@ -1930,12 +1830,10 @@ public final class HydronicHeatingLayoutService {
         return length;
     }
 
-    private List<PipeSegment> segments(UUID zoneId, ConnectorPlan connectors, FieldPattern pattern) {
+    private List<PipeSegment> segments(UUID zoneId, FieldPattern pattern) {
         List<PipeSegment> segments = new ArrayList<>();
-        addSegments(segments, zoneId, connectors.supplyPath(), PipeRole.SUPPLY_CONNECTOR);
         addSupplyAndBridgeSegments(segments, zoneId, pattern);
         addSegments(segments, zoneId, pattern.returnPath(), PipeRole.RETURN);
-        addSegments(segments, zoneId, connectors.returnPath(), PipeRole.RETURN_CONNECTOR);
         return List.copyOf(segments);
     }
 
@@ -2244,16 +2142,6 @@ public final class HydronicHeatingLayoutService {
     }
 
     private record ManifoldPair(PlanPoint supplyPort, PlanPoint returnPort) {
-    }
-
-    private record ConnectorPlan(ManifoldPair pair, List<PlanPoint> supplyPath, List<PlanPoint> returnPath) {
-        private static ConnectorPlan failed(ManifoldPair pair, FieldPattern pattern) {
-            return new ConnectorPlan(
-                    pair,
-                    List.of(pair.supplyPort(), pattern.fullPath().getFirst()),
-                    List.of(pattern.fullPath().getLast(), pair.returnPort())
-            );
-        }
     }
 
     private record LayoutComputation(List<CircuitLayout> circuits, ValidationReport report, Set<UUID> unroutableZoneIds) {

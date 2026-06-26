@@ -14,6 +14,7 @@ public record HeatingZone(
         boolean flowInverted,
         PlanPoint supplyConnectionPoint,
         PlanPoint returnConnectionPoint,
+        PlanPoint routingStartPoint,
         String routingCommands,
         boolean serpentineMiddleLine,
         double heatOutputWattsPerSquareMeter,
@@ -41,14 +42,9 @@ public record HeatingZone(
         outline = List.copyOf(outline);
         supplyConnectionPoint = connectionOrDefault(supplyConnectionPoint, outline, true);
         returnConnectionPoint = connectionOrDefault(returnConnectionPoint, outline, false);
+        routingStartPoint = routingStartPoint != null ? routingStartPoint : defaultRoutingStartPoint(outline);
         if (areaSquareMillimeters(outline) < 0.001) {
             throw new IllegalArgumentException("Ein Heizbereich muss eine positive Fläche besitzen.");
-        }
-        if (!isPointOnBoundary(supplyConnectionPoint, outline)) {
-            throw new IllegalArgumentException("Der Vorlaufanschluss muss auf dem Rand des Heizbereichs liegen.");
-        }
-        if (!isPointOnBoundary(returnConnectionPoint, outline)) {
-            throw new IllegalArgumentException("Der Rücklaufanschluss muss auf dem Rand des Heizbereichs liegen.");
         }
     }
 
@@ -61,7 +57,7 @@ public record HeatingZone(
             PlanPoint supplyConnectionPoint,
             PlanPoint returnConnectionPoint
     ) {
-        this(id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint, "", false, 0.0);
+        this(id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint, null, "", false, 0.0);
     }
 
     public HeatingZone(
@@ -76,8 +72,58 @@ public record HeatingZone(
             boolean serpentineMiddleLine,
             double heatOutputWattsPerSquareMeter
     ) {
-        this(id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint,
+        this(id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint, null,
                 routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter, 0, false, false);
+    }
+
+    public HeatingZone(
+            UUID id,
+            String name,
+            List<PlanPoint> outline,
+            HeatingLayoutPattern layoutPattern,
+            boolean flowInverted,
+            PlanPoint supplyConnectionPoint,
+            PlanPoint returnConnectionPoint,
+            PlanPoint routingStartPoint
+    ) {
+        this(id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint, routingStartPoint, "", false, 0.0);
+    }
+
+    public HeatingZone(
+            UUID id,
+            String name,
+            List<PlanPoint> outline,
+            HeatingLayoutPattern layoutPattern,
+            boolean flowInverted,
+            PlanPoint supplyConnectionPoint,
+            PlanPoint returnConnectionPoint,
+            PlanPoint routingStartPoint,
+            String routingCommands,
+            boolean serpentineMiddleLine,
+            double heatOutputWattsPerSquareMeter
+    ) {
+        this(id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint, routingStartPoint,
+                routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter, 0, false, false);
+    }
+
+    public HeatingZone(
+            UUID id,
+            String name,
+            List<PlanPoint> outline,
+            HeatingLayoutPattern layoutPattern,
+            boolean flowInverted,
+            PlanPoint supplyConnectionPoint,
+            PlanPoint returnConnectionPoint,
+            String routingCommands,
+            boolean serpentineMiddleLine,
+            double heatOutputWattsPerSquareMeter,
+            int routingQuarterTurns,
+            boolean routingMirroredHorizontally,
+            boolean routingMirroredVertically
+    ) {
+        this(id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint, null,
+                routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically);
     }
 
     public HeatingZone(
@@ -87,7 +133,7 @@ public record HeatingZone(
             HeatingLayoutPattern layoutPattern,
             boolean flowInverted
     ) {
-        this(id, name, outline, layoutPattern, flowInverted, null, null);
+        this(id, name, outline, layoutPattern, flowInverted, null, null, null);
     }
 
     public HeatingZone(UUID id, String name, List<PlanPoint> outline) {
@@ -115,11 +161,7 @@ public record HeatingZone(
     }
 
     public PlanPoint routingStartPoint() {
-        double minX = outline.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0);
-        double maxX = outline.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0);
-        double minY = outline.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0);
-        double maxY = outline.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0);
-        return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+        return routingStartPoint;
     }
 
     public boolean hasRoutingCommands() {
@@ -142,6 +184,7 @@ public record HeatingZone(
                 id, name, newOutline, layoutPattern, flowInverted,
                 isPointOnBoundary(supplyConnectionPoint, newOutline) ? supplyConnectionPoint : null,
                 isPointOnBoundary(returnConnectionPoint, newOutline) ? returnConnectionPoint : null,
+                routingStartPoint,
                 routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
                 routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
         );
@@ -150,7 +193,7 @@ public record HeatingZone(
     public HeatingZone withName(String newName) {
         return new HeatingZone(
                 id, newName, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint,
-                routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingStartPoint, routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
                 routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
         );
     }
@@ -158,7 +201,7 @@ public record HeatingZone(
     public HeatingZone withLayoutPattern(HeatingLayoutPattern newLayoutPattern) {
         return new HeatingZone(
                 id, name, outline, newLayoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint,
-                routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingStartPoint, routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
                 routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
         );
     }
@@ -166,7 +209,7 @@ public record HeatingZone(
     public HeatingZone withFlowInverted(boolean newFlowInverted) {
         return new HeatingZone(
                 id, name, outline, layoutPattern, newFlowInverted, supplyConnectionPoint, returnConnectionPoint,
-                routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingStartPoint, routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
                 routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
         );
     }
@@ -174,7 +217,7 @@ public record HeatingZone(
     public HeatingZone withSupplyConnectionPoint(PlanPoint point) {
         return new HeatingZone(
                 id, name, outline, layoutPattern, flowInverted, point, returnConnectionPoint,
-                routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingStartPoint, routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
                 routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
         );
     }
@@ -182,7 +225,7 @@ public record HeatingZone(
     public HeatingZone withReturnConnectionPoint(PlanPoint point) {
         return new HeatingZone(
                 id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, point,
-                routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingStartPoint, routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
                 routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
         );
     }
@@ -190,7 +233,7 @@ public record HeatingZone(
     public HeatingZone withRoutingCommands(String newRoutingCommands, boolean newSerpentineMiddleLine) {
         return new HeatingZone(
                 id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint,
-                newRoutingCommands, newSerpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingStartPoint, newRoutingCommands, newSerpentineMiddleLine, heatOutputWattsPerSquareMeter,
                 routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
         );
     }
@@ -198,7 +241,7 @@ public record HeatingZone(
     public HeatingZone withHeatOutputWattsPerSquareMeter(double newHeatOutputWattsPerSquareMeter) {
         return new HeatingZone(
                 id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint,
-                routingCommands, serpentineMiddleLine, newHeatOutputWattsPerSquareMeter,
+                routingStartPoint, routingCommands, serpentineMiddleLine, newHeatOutputWattsPerSquareMeter,
                 routingQuarterTurns, routingMirroredHorizontally, routingMirroredVertically
         );
     }
@@ -214,6 +257,7 @@ public record HeatingZone(
                 flowInverted,
                 translatePoint(supplyConnectionPoint, deltaXMillimeters, deltaYMillimeters),
                 translatePoint(returnConnectionPoint, deltaXMillimeters, deltaYMillimeters),
+                translatePoint(routingStartPoint, deltaXMillimeters, deltaYMillimeters),
                 routingCommands,
                 serpentineMiddleLine,
                 heatOutputWattsPerSquareMeter,
@@ -230,7 +274,7 @@ public record HeatingZone(
     ) {
         return new HeatingZone(
                 id, name, outline, layoutPattern, flowInverted, supplyConnectionPoint, returnConnectionPoint,
-                routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
+                routingStartPoint, routingCommands, serpentineMiddleLine, heatOutputWattsPerSquareMeter,
                 newRoutingQuarterTurns, newRoutingMirroredHorizontally, newRoutingMirroredVertically
         );
     }
@@ -272,6 +316,14 @@ public record HeatingZone(
                 (start.xMillimeters() + end.xMillimeters()) / 2.0,
                 (start.yMillimeters() + end.yMillimeters()) / 2.0
         );
+    }
+
+    private static PlanPoint defaultRoutingStartPoint(List<PlanPoint> outline) {
+        double minX = outline.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0);
+        double maxX = outline.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0);
+        double minY = outline.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0);
+        double maxY = outline.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0);
+        return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
     }
 
     private static boolean samePoint(PlanPoint first, PlanPoint second) {

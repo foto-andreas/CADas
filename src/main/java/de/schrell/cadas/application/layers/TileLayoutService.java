@@ -3,11 +3,28 @@ package de.schrell.cadas.application.layers;
 import de.schrell.cadas.domain.geometry.Length;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class TileLayoutService {
 
+    private static final int CACHE_SIZE = 128;
+    private final Map<TileLayoutRequest, List<TilePlacement>> cache = Collections.synchronizedMap(
+            new LinkedHashMap<>(CACHE_SIZE, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<TileLayoutRequest, List<TilePlacement>> eldest) {
+                    return size() > CACHE_SIZE;
+                }
+            }
+    );
+
     public List<TilePlacement> fillSurface(TileLayoutRequest request) {
+        List<TilePlacement> cached = cache.get(request);
+        if (cached != null) {
+            return cached;
+        }
         List<TilePlacement> placements = new ArrayList<>();
         double surfaceWidth = request.surfaceWidth().toMillimeters();
         double surfaceHeight = request.surfaceHeight().toMillimeters();
@@ -52,7 +69,9 @@ public final class TileLayoutService {
                 ));
             }
         }
-        return placements;
+        List<TilePlacement> result = List.copyOf(placements);
+        cache.put(request, result);
+        return result;
     }
 
     private double boundedStartTrim(double surfaceHeight, double tileHeight, double minimumStartEndMargin) {

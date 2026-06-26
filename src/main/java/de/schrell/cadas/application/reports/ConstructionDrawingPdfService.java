@@ -167,20 +167,16 @@ public final class ConstructionDrawingPdfService {
             Color zoneColor = surfacePosition == HeatingSurfacePosition.FLOOR
                     ? new Color(180, 45, 38)
                     : new Color(35, 105, 160);
-            Color supplyColor = new Color(31, 98, 208);
-            Color returnColor = new Color(211, 59, 50);
+            Color supplyColor = new Color(211, 59, 50);
+            Color returnColor = new Color(31, 98, 208);
             for (HydronicHeating heating : heatings) {
                 List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layoutBestEffort(heating).circuits();
                 for (HeatingZone zone : heating.zones()) {
                     drawHeatingZone(canvas, viewport, zone, circuits, zoneColor);
                 }
                 for (HydronicHeatingLayoutService.CircuitLayout circuit : circuits) {
-                    drawHeatingPath(canvas, viewport, heating, circuit.supplyConnectorPath(), circuit, supplyColor);
-                    drawHeatingPath(canvas, viewport, heating, circuit.returnConnectorPath(), circuit, returnColor);
-                    drawHeatingPath(canvas, viewport, heating, circuit.fieldSupplyPath(), circuit, supplyColor);
+                    drawHeatingPath(canvas, viewport, heating, circuit.fieldSupplyPath().reversed(), circuit, supplyColor);
                     drawHeatingPath(canvas, viewport, heating, circuit.fieldReturnPath(), circuit, returnColor);
-                    drawHeatingConnectorLabel(canvas, viewport, circuit.supplyPort(), "V", supplyColor);
-                    drawHeatingConnectorLabel(canvas, viewport, circuit.returnPort(), "R", returnColor);
                 }
             }
         }
@@ -194,6 +190,9 @@ public final class ConstructionDrawingPdfService {
             HydronicHeatingLayoutService.CircuitLayout circuit,
             Color color
     ) throws IOException {
+        if (path.size() < 2) {
+            return;
+        }
         List<ScreenPoint> screenPath = path.stream()
                 .map(point -> new ScreenPoint(viewport.x(point.xMillimeters()), viewport.y(point.yMillimeters())))
                 .toList();

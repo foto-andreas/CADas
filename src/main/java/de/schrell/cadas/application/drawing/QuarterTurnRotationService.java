@@ -1,6 +1,5 @@
 package de.schrell.cadas.application.drawing;
 
-import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.domain.geometry.Length;
@@ -18,8 +17,6 @@ import java.util.List;
 import java.util.Set;
 
 public final class QuarterTurnRotationService {
-
-    private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
     public RotationResult rotate(Level level, Set<SelectionKey> selections, boolean clockwise) {
         Set<String> selectedWalls = selectedIds(selections, RenderableKind.WALL);
@@ -119,6 +116,7 @@ public final class QuarterTurnRotationService {
                 zone.flowInverted(),
                 rotatePoint(zone.supplyConnectionPoint(), center, clockwise),
                 rotatePoint(zone.returnConnectionPoint(), center, clockwise),
+                zone.routingStartPoint(),
                 zone.routingCommands(),
                 zone.serpentineMiddleLine(),
                 zone.heatOutputWattsPerSquareMeter(),
@@ -126,9 +124,7 @@ public final class QuarterTurnRotationService {
                 zone.routingMirroredHorizontally(),
                 zone.routingMirroredVertically()
         ).withRoutingRotated(clockwise);
-        return rotated.hasRoutingCommands()
-                ? heatingCircuitRoutingService.withRoutingCommands(rotated, heating, rotated.routingCommands(), rotated.serpentineMiddleLine())
-                : rotated;
+        return rotated;
     }
 
     private HydronicHeating rotateHeatingManifold(HydronicHeating heating, boolean clockwise) {

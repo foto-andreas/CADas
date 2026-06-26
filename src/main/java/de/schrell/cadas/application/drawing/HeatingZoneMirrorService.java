@@ -1,6 +1,5 @@
 package de.schrell.cadas.application.drawing;
 
-import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -13,8 +12,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class HeatingZoneMirrorService {
-
-    private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
     public MirrorResult mirror(Level level, Set<SelectionKey> selections, boolean horizontally) {
         Set<String> selectedHeatingZones = selections.stream()
@@ -57,6 +54,7 @@ public final class HeatingZoneMirrorService {
                 zone.flowInverted(),
                 mirrorPoint(zone.supplyConnectionPoint(), center, horizontally),
                 mirrorPoint(zone.returnConnectionPoint(), center, horizontally),
+                zone.routingStartPoint(),
                 zone.routingCommands(),
                 zone.serpentineMiddleLine(),
                 zone.heatOutputWattsPerSquareMeter(),
@@ -64,14 +62,9 @@ public final class HeatingZoneMirrorService {
                 zone.routingMirroredHorizontally(),
                 zone.routingMirroredVertically()
         );
-        mirrored = horizontally
+        return horizontally
                 ? mirrored.withRoutingMirroredHorizontally()
                 : mirrored.withRoutingMirroredVertically();
-        return mirrored.hasRoutingCommands()
-                ? heatingCircuitRoutingService.withRoutingCommands(
-                        mirrored, heating, mirrored.routingCommands(), mirrored.serpentineMiddleLine()
-                )
-                : mirrored;
     }
 
     private PlanPoint mirrorPoint(PlanPoint point, PlanPoint center, boolean horizontally) {
