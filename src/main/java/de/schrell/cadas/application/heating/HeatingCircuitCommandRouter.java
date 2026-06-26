@@ -1,10 +1,21 @@
 package de.schrell.cadas.application.heating;
 
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 public final class HeatingCircuitCommandRouter {
+
+    private static final char SUPPLY_LINE = HeatingRoutingLanguage.SUPPLY_LINE;
+    private static final char RETURN_LINE = HeatingRoutingLanguage.RETURN_LINE;
+    private static final char SUPPLY_TURN_RIGHT = HeatingRoutingLanguage.SUPPLY_TURN_RIGHT;
+    private static final char RETURN_TURN_RIGHT = HeatingRoutingLanguage.RETURN_TURN_RIGHT;
+    private static final char SUPPLY_TURN_LEFT = HeatingRoutingLanguage.SUPPLY_TURN_LEFT;
+    private static final char RETURN_TURN_LEFT = HeatingRoutingLanguage.RETURN_TURN_LEFT;
+    private static final char SUPPLY_DELETE = HeatingRoutingLanguage.SUPPLY_DELETE;
+    private static final char RETURN_DELETE = HeatingRoutingLanguage.RETURN_DELETE;
 
     public RoutingResult route(double widthMillimeters, double heightMillimeters, double spacingMillimeters, String commands) {
         if (widthMillimeters <= 0.0) {
@@ -17,28 +28,42 @@ public final class HeatingCircuitCommandRouter {
             throw new IllegalArgumentException("Der Verlegeabstand muss größer als null sein.");
         }
         Objects.requireNonNull(commands, "commands darf nicht null sein.");
+        String normalizedCommands = HeatingRoutingLanguage.normalizeCommands(commands);
 
         PipeCursor supplyCursor = new PipeCursor(new RoutingPoint(0.0, 0.0), CardinalDirection.UP);
         PipeCursor returnCursor = new PipeCursor(new RoutingPoint(0.0, 0.0), CardinalDirection.DOWN);
         List<PipePrimitive> supplyPrimitives = new ArrayList<>();
         List<PipePrimitive> returnPrimitives = new ArrayList<>();
+        int fieldSupplyPrimitiveCount = -1;
+        int fieldReturnPrimitiveCount = -1;
 
-        for (int index = 0; index < commands.length(); index++) {
-            char command = commands.charAt(index);
+        for (int index = 0; index < normalizedCommands.length(); index++) {
+            char command = normalizedCommands.charAt(index);
             if (isIgnoredCharacter(command)) {
                 continue;
             }
+            if (HeatingRoutingLanguage.isSeparator(command)) {
+                if (fieldSupplyPrimitiveCount < 0) {
+                    fieldSupplyPrimitiveCount = supplyPrimitives.size();
+                    fieldReturnPrimitiveCount = returnPrimitives.size();
+                }
+                continue;
+            }
             switch (command) {
-                case 'I' -> supplyCursor = appendLine(supplyPrimitives, supplyCursor, spacingMillimeters);
-                case 'i' -> returnCursor = appendLine(returnPrimitives, returnCursor, spacingMillimeters);
-                case 'R' -> supplyCursor = appendArc(supplyPrimitives, supplyCursor, spacingMillimeters, Turn.RIGHT);
-                case 'r' -> returnCursor = appendArc(returnPrimitives, returnCursor, spacingMillimeters, Turn.RIGHT);
-                case 'L' -> supplyCursor = appendArc(supplyPrimitives, supplyCursor, spacingMillimeters, Turn.LEFT);
-                case 'l' -> returnCursor = appendArc(returnPrimitives, returnCursor, spacingMillimeters, Turn.LEFT);
-                case 'X' -> supplyCursor = removeLastPrimitive(supplyPrimitives, supplyCursor);
-                case 'x' -> returnCursor = removeLastPrimitive(returnPrimitives, returnCursor);
+                case SUPPLY_LINE -> supplyCursor = appendLine(supplyPrimitives, supplyCursor, spacingMillimeters);
+                case RETURN_LINE -> returnCursor = appendLine(returnPrimitives, returnCursor, spacingMillimeters);
+                case SUPPLY_TURN_RIGHT -> supplyCursor = appendArc(supplyPrimitives, supplyCursor, spacingMillimeters, Turn.RIGHT);
+                case RETURN_TURN_RIGHT -> returnCursor = appendArc(returnPrimitives, returnCursor, spacingMillimeters, Turn.RIGHT);
+                case SUPPLY_TURN_LEFT -> supplyCursor = appendArc(supplyPrimitives, supplyCursor, spacingMillimeters, Turn.LEFT);
+                case RETURN_TURN_LEFT -> returnCursor = appendArc(returnPrimitives, returnCursor, spacingMillimeters, Turn.LEFT);
+                case SUPPLY_DELETE -> supplyCursor = removeLastPrimitive(supplyPrimitives, supplyCursor);
+                case RETURN_DELETE -> returnCursor = removeLastPrimitive(returnPrimitives, returnCursor);
                 default -> throw new IllegalArgumentException("Unbekannter Routing-Befehl `" + command + "`.");
             }
+        }
+        if (fieldSupplyPrimitiveCount < 0) {
+            fieldSupplyPrimitiveCount = supplyPrimitives.size();
+            fieldReturnPrimitiveCount = returnPrimitives.size();
         }
 
         return new RoutingResult(
@@ -46,19 +71,18 @@ public final class HeatingCircuitCommandRouter {
                 heightMillimeters,
                 spacingMillimeters,
                 new PipePath(new RoutingPoint(0.0, 0.0), supplyCursor.position(), supplyCursor.direction(), supplyPrimitives),
-                new PipePath(new RoutingPoint(0.0, 0.0), returnCursor.position(), returnCursor.direction(), returnPrimitives)
+                new PipePath(new RoutingPoint(0.0, 0.0), returnCursor.position(), returnCursor.direction(), returnPrimitives),
+                fieldSupplyPrimitiveCount,
+                fieldReturnPrimitiveCount
         );
     }
 
     public boolean isCommandCharacter(char character) {
-        return switch (character) {
-            case 'I', 'i', 'R', 'r', 'L', 'l', 'X', 'x' -> true;
-            default -> false;
-        };
+        return HeatingRoutingLanguage.isCommandCharacter(character);
     }
 
     public boolean isIgnoredCharacter(char character) {
-        return Character.isWhitespace(character);
+        return HeatingRoutingLanguage.isIgnoredCharacter(character);
     }
 
     public String squareVarioCommands(double sideMillimeters, double spacingMillimeters) {
@@ -74,23 +98,27 @@ public final class HeatingCircuitCommandRouter {
         }
         int supplyMaximum = sideSteps - 2;
         int returnMaximum = sideSteps - 1;
-        StringBuilder commands = new StringBuilder("rrRR");
+        StringBuilder commands = new StringBuilder()
+                .append(RETURN_TURN_RIGHT)
+                .append(RETURN_TURN_RIGHT)
+                .append(SUPPLY_TURN_RIGHT)
+                .append(SUPPLY_TURN_RIGHT);
         int maximum = Math.max(supplyMaximum, returnMaximum);
         for (int length = 1; length <= maximum; length++) {
             if (length <= supplyMaximum) {
-                appendRepeated(commands, 'I', length);
+                appendRepeated(commands, SUPPLY_LINE, length);
             }
             if (length <= returnMaximum) {
-                appendRepeated(commands, 'i', length);
+                appendRepeated(commands, RETURN_LINE, length);
             }
             if (length < supplyMaximum) {
-                commands.append('R');
+                commands.append(SUPPLY_TURN_RIGHT);
             }
             if (length <= returnMaximum) {
-                commands.append('r');
+                commands.append(RETURN_TURN_RIGHT);
             }
         }
-        appendRepeated(commands, 'i', returnMaximum);
+        appendRepeated(commands, RETURN_LINE, returnMaximum);
         return commands.toString();
     }
 
@@ -133,9 +161,9 @@ public final class HeatingCircuitCommandRouter {
             appendMeanderReturnSnake(commands, extension, lineSteps, oddLongSide);
             appendMeanderRows(
                     commands,
-                    'i',
-                    startWithLeftTurns ? 'r' : 'l',
-                    startWithLeftTurns ? 'l' : 'r',
+                    RETURN_LINE,
+                    startWithLeftTurns ? RETURN_TURN_RIGHT : RETURN_TURN_LEFT,
+                    startWithLeftTurns ? RETURN_TURN_LEFT : RETURN_TURN_RIGHT,
                     turnCount - 1,
                     lineSteps,
                     lineSteps,
@@ -145,9 +173,9 @@ public final class HeatingCircuitCommandRouter {
             appendMeanderSupplySnake(commands, lineSteps, oddLongSide);
             appendMeanderRows(
                     commands,
-                    'I',
-                    startWithLeftTurns ? 'R' : 'L',
-                    startWithLeftTurns ? 'L' : 'R',
+                    SUPPLY_LINE,
+                    startWithLeftTurns ? SUPPLY_TURN_RIGHT : SUPPLY_TURN_LEFT,
+                    startWithLeftTurns ? SUPPLY_TURN_LEFT : SUPPLY_TURN_RIGHT,
                     turnCount,
                     lineSteps,
                     lineSteps,
@@ -158,9 +186,9 @@ public final class HeatingCircuitCommandRouter {
         }
         appendMeanderPipe(
                 commands,
-                'i',
-                startWithLeftTurns ? 'l' : 'r',
-                startWithLeftTurns ? 'r' : 'l',
+                RETURN_LINE,
+                startWithLeftTurns ? RETURN_TURN_LEFT : RETURN_TURN_RIGHT,
+                startWithLeftTurns ? RETURN_TURN_RIGHT : RETURN_TURN_LEFT,
                 returnInitialSteps,
                 firstLineSteps,
                 lineSteps,
@@ -168,9 +196,9 @@ public final class HeatingCircuitCommandRouter {
         );
         appendMeanderPipe(
                 commands,
-                'I',
-                startWithLeftTurns ? 'L' : 'R',
-                startWithLeftTurns ? 'R' : 'L',
+                SUPPLY_LINE,
+                startWithLeftTurns ? SUPPLY_TURN_LEFT : SUPPLY_TURN_RIGHT,
+                startWithLeftTurns ? SUPPLY_TURN_RIGHT : SUPPLY_TURN_LEFT,
                 supplyInitialSteps,
                 firstLineSteps,
                 lineSteps,
@@ -212,19 +240,19 @@ public final class HeatingCircuitCommandRouter {
         int returnInitialLength = extension / 2;
         int supplyInitialLength = extension - returnInitialLength;
         StringBuilder commands = new StringBuilder();
-        appendRepeated(commands, 'i', returnInitialLength);
-        appendRepeated(commands, 'I', supplyInitialLength);
-        commands.append("RRrr");
+        appendRepeated(commands, RETURN_LINE, returnInitialLength);
+        appendRepeated(commands, SUPPLY_LINE, supplyInitialLength);
+        commands.append(SUPPLY_TURN_RIGHT).append(SUPPLY_TURN_RIGHT).append(RETURN_TURN_RIGHT).append(RETURN_TURN_RIGHT);
         for (int baseLength = 1; baseLength <= supplyBaseMaximum; baseLength++) {
             if (baseLength < returnBaseMaximum) {
-                appendRepeated(commands, 'i', rectangularVarioLength(baseLength, extension));
-                commands.append('r');
+                appendRepeated(commands, RETURN_LINE, rectangularVarioLength(baseLength, extension));
+                commands.append(RETURN_TURN_RIGHT);
             }
-            appendRepeated(commands, 'I', rectangularVarioLength(baseLength, extension));
-            commands.append('R');
+            appendRepeated(commands, SUPPLY_LINE, rectangularVarioLength(baseLength, extension));
+            commands.append(SUPPLY_TURN_RIGHT);
         }
-        appendRepeated(commands, 'I', supplyBaseMaximum + extension);
-        appendRepeated(commands, 'i', returnBaseMaximum + extension);
+        appendRepeated(commands, SUPPLY_LINE, supplyBaseMaximum + extension);
+        appendRepeated(commands, RETURN_LINE, returnBaseMaximum + extension);
         return commands.toString();
     }
 
@@ -233,13 +261,19 @@ public final class HeatingCircuitCommandRouter {
             throw new IllegalArgumentException("Eine schlangenförmige Vario-Mittellinie benötigt mindestens sieben Verlegeabstände auf der kurzen Seite.");
         }
         int snakeLength = serpentineVarioSnakeLength(extension);
-        StringBuilder commands = new StringBuilder("rLRR");
+        StringBuilder commands = new StringBuilder()
+                .append(RETURN_TURN_RIGHT)
+                .append(SUPPLY_TURN_LEFT)
+                .append(SUPPLY_TURN_RIGHT)
+                .append(SUPPLY_TURN_RIGHT);
         boolean lowerSnakeGroup = true;
         for (int length = 2; length < snakeLength; length += 2) {
-            commands.append(lowerSnakeGroup ? "llrr" : "LLRR");
+            commands.append(lowerSnakeGroup
+                    ? "" + RETURN_TURN_LEFT + RETURN_TURN_LEFT + RETURN_TURN_RIGHT + RETURN_TURN_RIGHT
+                    : "" + SUPPLY_TURN_LEFT + SUPPLY_TURN_LEFT + SUPPLY_TURN_RIGHT + SUPPLY_TURN_RIGHT);
             lowerSnakeGroup = !lowerSnakeGroup;
         }
-        commands.append("iIRr");
+        commands.append(RETURN_LINE).append(SUPPLY_LINE).append(SUPPLY_TURN_RIGHT).append(RETURN_TURN_RIGHT);
         int supplyBaseMaximum = largestEvenGridSteps(shortSideSteps) - 2;
         int returnBaseMaximum = supplyBaseMaximum - 1;
         for (int baseLength = 1; baseLength <= supplyBaseMaximum; baseLength++) {
@@ -248,14 +282,14 @@ public final class HeatingCircuitCommandRouter {
                 lineLength = Math.max(lineLength, snakeLength);
             }
             if (baseLength < returnBaseMaximum) {
-                appendRepeated(commands, 'i', lineLength);
-                commands.append('r');
+                appendRepeated(commands, RETURN_LINE, lineLength);
+                commands.append(RETURN_TURN_RIGHT);
             }
-            appendRepeated(commands, 'I', lineLength);
-            commands.append('R');
+            appendRepeated(commands, SUPPLY_LINE, lineLength);
+            commands.append(SUPPLY_TURN_RIGHT);
         }
-        appendRepeated(commands, 'I', serpentineVarioFinalLength(supplyBaseMaximum, extension));
-        appendRepeated(commands, 'i', serpentineVarioFinalLength(returnBaseMaximum, extension));
+        appendRepeated(commands, SUPPLY_LINE, serpentineVarioFinalLength(supplyBaseMaximum, extension));
+        appendRepeated(commands, RETURN_LINE, serpentineVarioFinalLength(returnBaseMaximum, extension));
         return commands.toString();
     }
 
@@ -295,26 +329,28 @@ public final class HeatingCircuitCommandRouter {
 
     private void appendMeanderReturnSnake(StringBuilder commands, int extension, int lineSteps, boolean oddLongSide) {
         int groupCount = meanderSnakeGroupCount(lineSteps, 5);
-        commands.append('r');
-        appendRepeated(commands, "llrr", groupCount);
+        commands.append(RETURN_TURN_RIGHT);
+        appendRepeated(commands, "" + RETURN_TURN_LEFT + RETURN_TURN_LEFT + RETURN_TURN_RIGHT + RETURN_TURN_RIGHT, groupCount);
         if (oddLongSide) {
-            commands.append('i');
+            commands.append(RETURN_LINE);
             return;
         }
-        commands.append('l');
+        commands.append(RETURN_TURN_LEFT);
         if (groupCount == extension / 2) {
-            commands.append('i');
+            commands.append(RETURN_LINE);
         }
     }
 
     private void appendMeanderSupplySnake(StringBuilder commands, int lineSteps, boolean oddLongSide) {
         int groupCount = meanderSnakeGroupCount(lineSteps, 6);
         if (oddLongSide) {
-            commands.append('I');
+            commands.append(SUPPLY_LINE);
         }
-        commands.append('L');
-        appendRepeated(commands, "RRLL", groupCount);
-        commands.append(oddLongSide ? "RRI" : "RRL");
+        commands.append(SUPPLY_TURN_LEFT);
+        appendRepeated(commands, "" + SUPPLY_TURN_RIGHT + SUPPLY_TURN_RIGHT + SUPPLY_TURN_LEFT + SUPPLY_TURN_LEFT, groupCount);
+        commands.append(oddLongSide
+                ? "" + SUPPLY_TURN_RIGHT + SUPPLY_TURN_RIGHT + SUPPLY_LINE
+                : "" + SUPPLY_TURN_RIGHT + SUPPLY_TURN_RIGHT + SUPPLY_TURN_LEFT);
     }
 
     private int meanderSnakeGroupCount(int lineSteps, int fixedSnakeCommandsIncludingClosingArcs) {
@@ -410,19 +446,35 @@ public final class HeatingCircuitCommandRouter {
             double heightMillimeters,
             double spacingMillimeters,
             PipePath supplyPath,
-            PipePath returnPath
+            PipePath returnPath,
+            int fieldSupplyPrimitiveCount,
+            int fieldReturnPrimitiveCount
     ) {
 
         public RoutingResult {
             Objects.requireNonNull(supplyPath, "supplyPath darf nicht null sein.");
             Objects.requireNonNull(returnPath, "returnPath darf nicht null sein.");
+            if (fieldSupplyPrimitiveCount < 0 || fieldSupplyPrimitiveCount > supplyPath.primitives().size()) {
+                throw new IllegalArgumentException("Die Feldprimitive des Vorlaufs sind ungültig.");
+            }
+            if (fieldReturnPrimitiveCount < 0 || fieldReturnPrimitiveCount > returnPath.primitives().size()) {
+                throw new IllegalArgumentException("Die Feldprimitive des Rücklaufs sind ungültig.");
+            }
         }
 
         public RoutingResult withFlowInverted(boolean flowInverted) {
             if (!flowInverted) {
                 return this;
             }
-            return new RoutingResult(widthMillimeters, heightMillimeters, spacingMillimeters, returnPath, supplyPath);
+            return new RoutingResult(
+                    widthMillimeters,
+                    heightMillimeters,
+                    spacingMillimeters,
+                    returnPath,
+                    supplyPath,
+                    fieldReturnPrimitiveCount,
+                    fieldSupplyPrimitiveCount
+            );
         }
 
         public RoutingResult translatedBy(double xMillimeters, double yMillimeters) {
@@ -431,7 +483,9 @@ public final class HeatingCircuitCommandRouter {
                     heightMillimeters,
                     spacingMillimeters,
                     supplyPath.translatedBy(xMillimeters, yMillimeters),
-                    returnPath.translatedBy(xMillimeters, yMillimeters)
+                    returnPath.translatedBy(xMillimeters, yMillimeters),
+                    fieldSupplyPrimitiveCount,
+                    fieldReturnPrimitiveCount
             );
         }
 
@@ -441,7 +495,9 @@ public final class HeatingCircuitCommandRouter {
                     widthMillimeters,
                     spacingMillimeters,
                     supplyPath.rotatedClockwise(),
-                    returnPath.rotatedClockwise()
+                    returnPath.rotatedClockwise(),
+                    fieldSupplyPrimitiveCount,
+                    fieldReturnPrimitiveCount
             );
         }
 
@@ -455,7 +511,9 @@ public final class HeatingCircuitCommandRouter {
                     heightMillimeters,
                     spacingMillimeters,
                     supplyPath.mirroredHorizontally(),
-                    returnPath.mirroredHorizontally()
+                    returnPath.mirroredHorizontally(),
+                    fieldSupplyPrimitiveCount,
+                    fieldReturnPrimitiveCount
             );
         }
 
@@ -465,7 +523,9 @@ public final class HeatingCircuitCommandRouter {
                     heightMillimeters,
                     spacingMillimeters,
                     supplyPath.mirroredVertically(),
-                    returnPath.mirroredVertically()
+                    returnPath.mirroredVertically(),
+                    fieldSupplyPrimitiveCount,
+                    fieldReturnPrimitiveCount
             );
         }
     }

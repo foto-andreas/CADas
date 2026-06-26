@@ -344,28 +344,7 @@ public record HeatingZone(
     }
 
     private static String normalizeRoutingCommands(String commands) {
-        if (commands == null || commands.isBlank()) {
-            return "";
-        }
-        StringBuilder normalized = new StringBuilder();
-        for (int index = 0; index < commands.length(); index++) {
-            char character = commands.charAt(index);
-            if (Character.isWhitespace(character)) {
-                continue;
-            }
-            if (!isRoutingCommand(character)) {
-                throw new IllegalArgumentException("Unbekannter Routing-Befehl `" + character + "`.");
-            }
-            normalized.append(character);
-        }
-        return normalized.toString();
-    }
-
-    private static boolean isRoutingCommand(char character) {
-        return switch (character) {
-            case 'I', 'i', 'R', 'r', 'L', 'l', 'X', 'x' -> true;
-            default -> false;
-        };
+        return HeatingRoutingLanguage.normalizeCommands(commands);
     }
 
     private static boolean isPointOnBoundary(PlanPoint point, List<PlanPoint> outline) {

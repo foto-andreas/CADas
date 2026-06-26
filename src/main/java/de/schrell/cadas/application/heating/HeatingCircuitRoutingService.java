@@ -2,6 +2,7 @@ package de.schrell.cadas.application.heating;
 
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 
@@ -16,7 +17,6 @@ import java.util.Objects;
 
 public final class HeatingCircuitRoutingService {
 
-    private static final int TRAILING_CONNECTOR_PRIMITIVES = 2;
     private final HeatingCircuitCommandRouter commandRouter = new HeatingCircuitCommandRouter();
 
     public HeatingZone regenerate(HeatingZone zone, HydronicHeating heating) {
@@ -140,28 +140,29 @@ public final class HeatingCircuitRoutingService {
             double spacingMillimeters,
             boolean serpentineMiddleLine
     ) {
-        return switch (manualPattern(pattern)) {
+        String commands = switch (manualPattern(pattern)) {
             case MEANDER -> commandRouter.meanderCommands(widthMillimeters, heightMillimeters, spacingMillimeters, serpentineMiddleLine);
             case VARIO -> commandRouter.rectangularVarioCommands(widthMillimeters, heightMillimeters, spacingMillimeters, serpentineMiddleLine);
             case SPIRAL -> throw new IllegalStateException("Schnecke wird für neue manuelle Heizkreise nicht mehr generiert.");
         };
+        return HeatingRoutingLanguage.ensureConnectorSeparator(commands);
     }
 
     public HeatingLayoutPattern manualPattern(HeatingLayoutPattern pattern) {
         return pattern == HeatingLayoutPattern.MEANDER ? HeatingLayoutPattern.MEANDER : HeatingLayoutPattern.VARIO;
     }
 
-    private Bounds routeBounds(RoutingResult result, int trailingPrimitivesToIgnore) {
-Ï        return Bounds.from(result.supplyPath().startPoint())
-                .include(result.supplyPath(), trailingPrimitivesToIgnore)
-                .include(result.returnPath(), trailingPrimitivesToIgnore);
+    private Bounds routeBounds(RoutingResult result) {
+        return Bounds.from(result.supplyPath().startPoint())
+                .include(result.supplyPath(), result.fieldSupplyPrimitiveCount())
+                .include(result.returnPath(), result.fieldReturnPrimitiveCount());
     }
 
     private List<PlanPoint> adjustedOutline(List<PlanPoint> outline, RoutingResult result, HydronicHeating heating) {
         if (!isAxisAlignedRectangle(outline)) {
             return outline;
         }
-        Bounds routeBounds = routeBounds(result, TRAILING_CONNECTOR_PRIMITIVES).expanded(heating.pipeDiameter().toMillimeters() / 2.0);
+        Bounds routeBounds = routeBounds(result).expanded(heating.pipeDiameter().toMillimeters() / 2.0);
         return List.of(
                 new PlanPoint(routeBounds.minX(), routeBounds.minY()),
                 new PlanPoint(routeBounds.maxX(), routeBounds.minY()),
@@ -236,24 +237,13 @@ public final class HeatingCircuitRoutingService {
         }
 
         private Bounds include(PipePath path) {
-            return include(path, 0);
+            return include(path, path.primitives().size());
         }
 
-        private Bounds include(PipePath path, int trailingPrimitivesToIgnore) {
-            if (trailingPrimitivesToIgnore <= 0 || path.primitives().size() <= trailingPrimitivesToIgnore) {
-                Bounds result = include(path.startPoint()).include(path.endPoint());
-                for (PipePrimitive primitive : path.primitives()) {
-                    if (primitive instanceof QuarterArc arc) {
-                        result = result.include(arc);
-                    } else {
-                        result = result.include(primitive.startPoint()).include(primitive.endPoint());
-                    }
-                }
-                return result;
-            }
+        private Bounds include(PipePath path, int includedPrimitiveCount) {
             Bounds result = include(path.startPoint());
-            int includedPrimitiveCount = path.primitives().size() - trailingPrimitivesToIgnore;
-            for (int index = 0; index < includedPrimitiveCount; index++) {
+            int primitiveCount = Math.max(0, Math.min(includedPrimitiveCount, path.primitives().size()));
+            for (int index = 0; index < primitiveCount; index++) {
                 PipePrimitive primitive = path.primitives().get(index);
                 if (primitive instanceof QuarterArc arc) {
                     result = result.include(arc);

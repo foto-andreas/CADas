@@ -3,6 +3,7 @@ package de.schrell.cadas.ui;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingPoint;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingResult;
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,16 +29,16 @@ class HeatingCircuitRoutingWindowTest {
         aufFxThread(() -> {
             window.automationInput("I");
             window.automationInput("a");
-            Assertions.assertEquals("Ix", window.automationProtocol());
-            Assertions.assertEquals("I", window.automationCommands());
+            Assertions.assertEquals("=x", window.automationProtocol());
+            Assertions.assertEquals("=", window.automationCommands());
 
             window.automationUndo();
-            Assertions.assertEquals("I", window.automationProtocol());
-            Assertions.assertEquals("I", window.automationCommands());
+            Assertions.assertEquals("=", window.automationProtocol());
+            Assertions.assertEquals("=", window.automationCommands());
 
             window.automationRedo();
-            Assertions.assertEquals("Ix", window.automationProtocol());
-            Assertions.assertEquals("I", window.automationCommands());
+            Assertions.assertEquals("=x", window.automationProtocol());
+            Assertions.assertEquals("=", window.automationCommands());
             return null;
         });
     }
@@ -53,8 +54,8 @@ class HeatingCircuitRoutingWindowTest {
             window.automationInput("i");
             window.automationRedo();
 
-            Assertions.assertEquals("Ii", window.automationProtocol());
-            Assertions.assertEquals("Ii", window.automationCommands());
+            Assertions.assertEquals("=-", window.automationProtocol());
+            Assertions.assertEquals("=-", window.automationCommands());
             return null;
         });
     }
@@ -69,8 +70,8 @@ class HeatingCircuitRoutingWindowTest {
             window.automationSetProtocolText("I R\nzi");
             window.automationRenderProtocolText();
 
-            Assertions.assertEquals("IRxi", window.automationProtocol());
-            Assertions.assertEquals("IRi", window.automationCommands());
+            Assertions.assertEquals("=Rx-", window.automationProtocol());
+            Assertions.assertEquals("=R-", window.automationCommands());
             return null;
         });
     }
@@ -99,6 +100,7 @@ class HeatingCircuitRoutingWindowTest {
             Assertions.assertEquals("200x300", window.automationAreaSizeText());
             Assertions.assertFalse(window.automationCommands().isBlank());
             Assertions.assertEquals(window.automationCommands(), window.automationProtocol());
+            Assertions.assertTrue(window.automationCommands().endsWith("+"));
             return null;
         });
     }
@@ -117,10 +119,11 @@ class HeatingCircuitRoutingWindowTest {
 
             Assertions.assertNotEquals(standardCommands, window.automationCommands());
             Assertions.assertTrue(window.automationCommands().startsWith(
-                    "rLRRllrrLLRRllrrLLRRllrriIRr"
+                    modern("rLRRllrrLLRRllrrLLRRllrriIRr"
                             + "iiiiiiiiiiiirIIIIIIIIIIIIR"
-                            + "iiirIIIR"
+                            + "iiirIIIR")
             ));
+            Assertions.assertTrue(window.automationCommands().endsWith("+"));
             return null;
         });
     }
@@ -135,7 +138,8 @@ class HeatingCircuitRoutingWindowTest {
             Assertions.assertEquals("200x300", window.automationAreaSizeText());
             Assertions.assertFalse(window.automationCommands().isBlank());
             Assertions.assertEquals(window.automationCommands(), window.automationProtocol());
-            Assertions.assertTrue(window.automationCommands().startsWith("i".repeat(14) + "ll"));
+            Assertions.assertTrue(window.automationCommands().startsWith(modern("i".repeat(14) + "ll")));
+            Assertions.assertTrue(window.automationCommands().endsWith("+"));
             return null;
         });
     }
@@ -188,78 +192,59 @@ class HeatingCircuitRoutingWindowTest {
             window.automationInput("Ii");
 
             window.automationExtendSupply();
-            Assertions.assertEquals("IiI", window.automationCommands());
+            Assertions.assertEquals("=-+=", window.automationCommands());
             Assertions.assertEquals(window.automationCommands(), window.automationProtocol());
 
             window.automationShortenSupply();
-            Assertions.assertEquals("Ii", window.automationCommands());
+            Assertions.assertEquals("=-+", window.automationCommands());
 
             window.automationExtendReturn();
-            Assertions.assertEquals("Iii", window.automationCommands());
+            Assertions.assertEquals("=-+-", window.automationCommands());
 
             window.automationShortenReturn();
-            Assertions.assertEquals("Ii", window.automationCommands());
+            Assertions.assertEquals("=-+", window.automationCommands());
             return null;
         });
     }
 
     @Test
-    void berechnetRenderBoundsFürIiUndiIrrOhneÜberstehendeEndsegmente() throws Exception {
+    void berechnetRenderBoundsFürSeparatorZuläufeOhneÜberstehendeEndsegmente() throws Exception {
         HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
         HeatingCircuitCommandRouter router = new HeatingCircuitCommandRouter();
-        RoutingResult ii = router.route(2_000.0, 3_000.0, 100.0, "Ii");
-        RoutingResult iIrr = router.route(2_000.0, 3_000.0, 100.0, "iIrr");
+        RoutingResult ii = router.route(2_000.0, 3_000.0, 100.0, "=-");
+        RoutingResult separated = router.route(2_000.0, 3_000.0, 100.0, "=+-");
 
         aufFxThread(() -> {
             HeatingCircuitRoutingWindow.Bounds iiBounds = window.routeBounds(ii);
-            HeatingCircuitRoutingWindow.Bounds iIrrBounds = window.routeBounds(iIrr);
+            HeatingCircuitRoutingWindow.Bounds separatedBounds = window.routeBounds(separated);
 
             Assertions.assertEquals(0.0, iiBounds.minX(), 0.001);
             Assertions.assertEquals(0.0, iiBounds.maxX(), 0.001);
             Assertions.assertEquals(-100.0, iiBounds.minY(), 0.001);
             Assertions.assertEquals(100.0, iiBounds.maxY(), 0.001);
 
-            Assertions.assertEquals(0.0, iIrrBounds.minX(), 0.001);
-            Assertions.assertEquals(0.0, iIrrBounds.maxX(), 0.001);
-            Assertions.assertEquals(-100.0, iIrrBounds.minY(), 0.001);
-            Assertions.assertEquals(100.0, iIrrBounds.maxY(), 0.001);
+            Assertions.assertEquals(0.0, separatedBounds.minX(), 0.001);
+            Assertions.assertEquals(0.0, separatedBounds.maxX(), 0.001);
+            Assertions.assertEquals(0.0, separatedBounds.minY(), 0.001);
+            Assertions.assertEquals(100.0, separatedBounds.maxY(), 0.001);
             return null;
         });
     }
 
     @Test
-    void maltVarioKantenMitPlusUndMinus() throws Exception {
-        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
-
-        aufFxThread(() -> {
-            window.automationInput("+");
-            String firstEdge = window.automationCommands();
-            Assertions.assertFalse(firstEdge.isBlank());
-            Assertions.assertEquals(firstEdge, window.automationProtocol());
-
-            window.automationInput("+");
-            Assertions.assertTrue(window.automationCommands().length() > firstEdge.length());
-
-            window.automationInput("-");
-            Assertions.assertEquals(firstEdge, window.automationCommands());
-            Assertions.assertEquals(firstEdge, window.automationProtocol());
-            return null;
-        });
-    }
-
-    @Test
-    void ergänztNachVollemVarioRechteckGemeinsameVorlaufUndRücklaufSeite() throws Exception {
+    void verwendetPlusAlsFeldgrenzeUndNichtAlsEigenesSegment() throws Exception {
         HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
 
         aufFxThread(() -> {
             window.automationGenerateVario();
             String fullRectangle = window.automationCommands();
+            Assertions.assertTrue(fullRectangle.endsWith("+"));
 
-            window.automationInput("+");
-            Assertions.assertEquals(fullRectangle + "Ii", window.automationCommands());
+            window.automationExtendSupply();
+            window.automationExtendReturn();
 
-            window.automationInput("-");
-            Assertions.assertEquals(fullRectangle, window.automationCommands());
+            Assertions.assertEquals(fullRectangle + "=-", window.automationCommands());
+            Assertions.assertEquals(window.automationCommands(), window.automationProtocol());
             return null;
         });
     }
@@ -269,7 +254,7 @@ class HeatingCircuitRoutingWindowTest {
         HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
 
         aufFxThread(() -> {
-            window.automationInput("I");
+            window.automationInput("=");
             RoutingPoint before = window.automationSupplyEndPoint();
             window.automationRotateArea();
             RoutingPoint after = window.automationSupplyEndPoint();
@@ -278,6 +263,10 @@ class HeatingCircuitRoutingWindowTest {
             Assertions.assertTrue(Math.abs(after.xMillimeters()) > 0.001);
             return null;
         });
+    }
+
+    private String modern(String legacyCommands) {
+        return HeatingRoutingLanguage.normalizeCommands(legacyCommands);
     }
 
     private static <T> T aufFxThread(FxCallable<T> aufgabe) throws Exception {

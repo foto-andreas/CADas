@@ -87,6 +87,7 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
@@ -134,9 +135,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 
-import javafx.animation.PauseTransition;
 import javafx.application.Platform;
-import javafx.util.Duration;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.beans.property.BooleanProperty;
@@ -255,7 +254,6 @@ public final class CadWorkbench extends BorderPane {
     private final Map<UUID, HydronicHeatingLayoutService.PlanningResult> heatingLayoutCache = new HashMap<>();
     private final Set<UUID> heatingZonesPendingRoutingRegeneration = new HashSet<>();
     private final Set<UUID> heatingLayoutsDirty = new HashSet<>();
-    private final PauseTransition heatingLayoutRecalculationPause = new PauseTransition(Duration.seconds(1));
     private final RoofSlopeWallService roofSlopeWallService = new RoofSlopeWallService();
     private final RoofWindowPlacementService roofWindowPlacementService = new RoofWindowPlacementService();
     private final StairUnderbuildService stairUnderbuildService = new StairUnderbuildService();
@@ -579,7 +577,6 @@ public final class CadWorkbench extends BorderPane {
         configureLayout();
         configureCanvas();
         threeDViewport.syncLevels(availableLevels, activeLevel.get().name());
-        heatingLayoutRecalculationPause.setOnFinished(event -> runHeatingLayoutRecalculation());
         selectedSelection.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.setSelectedSelection(newValue);
             threeDViewport.setSelectedSelections(Set.copyOf(selectedSelections));
@@ -3443,12 +3440,12 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         heatingLayoutsDirty.addAll(affected);
-        heatingLayoutRecalculationPause.playFromStart();
+        runHeatingLayoutRecalculation();
     }
 
     private void scheduleHeatingLayoutRecalculation(UUID heatingId) {
         heatingLayoutsDirty.add(heatingId);
-        heatingLayoutRecalculationPause.playFromStart();
+        runHeatingLayoutRecalculation();
     }
 
     private void scheduleHeatingLayoutRecalculationForZone(UUID zoneId) {
@@ -3489,12 +3486,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void recomputeHeatingLayoutsNow() {
-        heatingLayoutRecalculationPause.stop();
         runHeatingLayoutRecalculation();
     }
 
     private void recomputeHeatingLayoutNow(UUID heatingId) {
-        heatingLayoutRecalculationPause.stop();
         heatingLayoutsDirty.remove(heatingId);
         activeLevel.get().hydronicHeatings().stream()
                 .filter(heating -> heating.id().equals(heatingId))
@@ -3535,7 +3530,6 @@ public final class CadWorkbench extends BorderPane {
         heatingLayoutCache.clear();
         heatingZonesPendingRoutingRegeneration.clear();
         heatingLayoutsDirty.clear();
-        heatingLayoutRecalculationPause.stop();
     }
 
     private void drawHydronicHeatings(GraphicsContext graphics) {
@@ -6627,17 +6621,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private String normalizeRoutingEditorText(String text) {
-        if (text == null || text.isBlank()) {
-            return "";
-        }
-        StringBuilder normalized = new StringBuilder(text.length());
-        for (int index = 0; index < text.length(); index++) {
-            char character = text.charAt(index);
-            if (!Character.isWhitespace(character)) {
-                normalized.append(character);
-            }
-        }
-        return normalized.toString();
+        return HeatingRoutingLanguage.stripWhitespaceAndNormalizeAliases(text);
     }
 
     private String describeHeatingZone(HeatingZone zone, List<HydronicHeatingLayoutService.CircuitLayout> circuits) {

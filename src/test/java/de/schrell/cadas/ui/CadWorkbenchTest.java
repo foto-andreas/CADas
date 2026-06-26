@@ -9,6 +9,7 @@ import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
@@ -615,7 +616,7 @@ class CadWorkbenchTest {
         Assertions.assertEquals(1, aufFxThread(workbench::automationHydronicHeatingCount),
                 aufFxThread(() -> workbench.automationSnapshot().statusText()));
         HeatingZone zone = aufFxThread(() -> workbench.automationHydronicHeating(0).zones().getFirst());
-        Assertions.assertEquals(new PlanPoint(1_160, 1_010), zone.routingStartPoint());
+        Assertions.assertEquals(new PlanPoint(1_160, 1_060), zone.routingStartPoint());
         Assertions.assertEquals(504.2, zone.outline().getFirst().xMillimeters(), 0.001);
     }
 
@@ -649,7 +650,7 @@ class CadWorkbenchTest {
             return null;
         });
 
-        Assertions.assertEquals("I", aufFxThread(() -> workbench.automationHydronicHeating(0).zones().getFirst().routingCommands()));
+        Assertions.assertEquals("=", aufFxThread(() -> workbench.automationHydronicHeating(0).zones().getFirst().routingCommands()));
     }
 
     @Test
@@ -690,7 +691,10 @@ class CadWorkbenchTest {
 
         Assertions.assertEquals(routingText.length(), aufFxThread(workbench::automationHeatingRoutingCommandAreaCaretPosition));
         Assertions.assertEquals(scrollTop, aufFxThread(workbench::automationHeatingRoutingCommandAreaScrollTop), 0.001);
-        Assertions.assertEquals(routingText, aufFxThread(workbench::automationHeatingRoutingCommandAreaText));
+        Assertions.assertEquals(
+                HeatingRoutingLanguage.normalizeCommands(routingText),
+                HeatingRoutingLanguage.stripWhitespaceAndNormalizeAliases(aufFxThread(workbench::automationHeatingRoutingCommandAreaText))
+        );
     }
 
     @Test

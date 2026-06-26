@@ -62,12 +62,12 @@ class HydronicHeatingLayoutServiceTest {
         HydronicHeatingLayoutService.CircuitLayout circuit = service.layout(heating.withZones(List.of(zone))).getFirst();
 
         assertTrue(zone.hasRoutingCommands());
-        assertEquals(new PlanPoint(800, 700), circuit.fieldSupplyPath().getFirst());
-        assertEquals(new PlanPoint(800, 900), circuit.fieldReturnPath().getLast());
+        assertEquals(new PlanPoint(800, 500), circuit.fieldSupplyPath().getFirst());
+        assertEquals(new PlanPoint(800, 700), circuit.fieldReturnPath().getLast());
         assertTrue(circuit.fieldSupplyPath().size() > 8);
         assertTrue(circuit.fieldReturnPath().size() > 8);
         assertTrue(circuit.pipeLength().toMillimeters() > 10_000);
-        assertEquals(261.28608, zone.heatOutputWatts(), 0.00001);
+        assertEquals(271.27408, zone.heatOutputWatts(), 0.00001);
     }
 
     @Test

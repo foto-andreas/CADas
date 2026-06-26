@@ -8,6 +8,7 @@ import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.QuarterA
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingPoint;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingResult;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.Turn;
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -58,9 +59,11 @@ final class HeatingCircuitRoutingWindow {
     private static final double MINIMUM_ZOOM = 0.25;
     private static final double MAXIMUM_ZOOM = 6.0;
     private static final double ZOOM_STEP = 1.2;
-    private static final int TRAILING_CONNECTOR_PRIMITIVES = 2;
     private static final Path ROUTING_TEST_DIRECTORY = Path.of("src/test/resources/heizkreise");
     private static final DateTimeFormatter TEST_FILE_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
+    private static final char SUPPLY_LINE = HeatingRoutingLanguage.SUPPLY_LINE;
+    private static final char RETURN_LINE = HeatingRoutingLanguage.RETURN_LINE;
+    private static final char CONNECTOR_SEPARATOR = HeatingRoutingLanguage.CONNECTOR_SEPARATOR;
 
     private final HeatingCircuitCommandRouter router = new HeatingCircuitCommandRouter();
     private final Canvas canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -136,17 +139,17 @@ final class HeatingCircuitRoutingWindow {
         generateMeanderButton.setOnAction(event -> generateMeander());
         applyTooltip(generateMeanderButton, "Erzeugt aus dem aktuellen Heizbereich einen Meander-Verlauf. Der Schalter `Mittellinie schlängeln` ergänzt optional eine zweireihige Schlangenlinie in der Mitte.");
 
-        extendSupplyButton.setOnAction(event -> extendPipeEnd('I', "Vorlauf"));
-        applyTooltip(extendSupplyButton, "Verlängert das Vorlauf-Ende um ein gerades Rastersegment, indem ein `I` an die Routingsprache angehängt wird.");
+        extendSupplyButton.setOnAction(event -> extendPipeEnd(SUPPLY_LINE, "Vorlauf"));
+        applyTooltip(extendSupplyButton, "Verlängert den Zulauf des Vorlaufs um ein gerades Rastersegment. Falls noch keine Trennmarke vorhanden ist, wird vorher ein `+` als Feldgrenze eingefügt.");
 
-        shortenSupplyButton.setOnAction(event -> shortenPipeEnd('I', "Vorlauf"));
-        applyTooltip(shortenSupplyButton, "Kürzt das Vorlauf-Ende um ein gerades Rastersegment, wenn das letzte Vorlauf-Kommando ein `I` ist.");
+        shortenSupplyButton.setOnAction(event -> shortenPipeEnd(SUPPLY_LINE, "Vorlauf"));
+        applyTooltip(shortenSupplyButton, "Kürzt den Zulauf des Vorlaufs um ein gerades Rastersegment, wenn das letzte Vorlauf-Kommando hinter der `+`-Grenze ein `=` ist.");
 
-        extendReturnButton.setOnAction(event -> extendPipeEnd('i', "Rücklauf"));
-        applyTooltip(extendReturnButton, "Verlängert das Rücklauf-Ende um ein gerades Rastersegment, indem ein `i` an die Routingsprache angehängt wird.");
+        extendReturnButton.setOnAction(event -> extendPipeEnd(RETURN_LINE, "Rücklauf"));
+        applyTooltip(extendReturnButton, "Verlängert den Zulauf des Rücklaufs um ein gerades Rastersegment. Falls noch keine Trennmarke vorhanden ist, wird vorher ein `+` als Feldgrenze eingefügt.");
 
-        shortenReturnButton.setOnAction(event -> shortenPipeEnd('i', "Rücklauf"));
-        applyTooltip(shortenReturnButton, "Kürzt das Rücklauf-Ende um ein gerades Rastersegment, wenn das letzte Rücklauf-Kommando ein `i` ist.");
+        shortenReturnButton.setOnAction(event -> shortenPipeEnd(RETURN_LINE, "Rücklauf"));
+        applyTooltip(shortenReturnButton, "Kürzt den Zulauf des Rücklaufs um ein gerades Rastersegment, wenn das letzte Rücklauf-Kommando hinter der `+`-Grenze ein `-` ist.");
 
         saveTestFileButton.setOnAction(event -> saveRoutingTestFile());
         applyTooltip(saveTestFileButton, "Sichert den aktuellen Heizkreis als `.cadasfbh`-Testdatei unter `src/test/resources/heizkreise`, inklusive Maße, FBH-Parametern und Routing-Kommandos.");
@@ -211,7 +214,7 @@ final class HeatingCircuitRoutingWindow {
 
         applyTooltip(areaSizeField, "Erfasst Breite und Länge des rechteckigen Heizbereichs in Zentimetern, zum Beispiel `200x300`.");
         applyTooltip(spacingField, "Legt den Verlegeabstand `v` in Zentimetern fest. Geraden sind `v` lang, Bögen besitzen den Durchmesser `v`.");
-        applyTooltip(protocolArea, "Editierbarer Text der Routingkommandos: `I/R/L` für Vorlauf und `i/r/l` für Rücklauf. Ausschneiden, Kopieren und Einfügen funktionieren über die normalen Tastenkürzel; `Rendern` übernimmt den Text in die Zeichnung.");
+        applyTooltip(protocolArea, "Editierbarer Text der Routingkommandos: `=/R/L` für Vorlauf und `-/r/l` für Rücklauf. `+` markiert die Grenze zwischen Heizfeld und Zulauf. Alte `I`/`i` werden beim Rendern automatisch zu `=`/`-` normalisiert.");
         applyTooltip(serpentineMiddleLineCheckBox, "Erzeugt die Mitte beim nächsten Klick auf `Vario erzeugen` oder `Meander erzeugen` schlangenförmig. Die Schlangenlänge wird aus der Rasterdifferenz zwischen langer und kurzer Seite berechnet.");
         applyTooltip(flowInvertedCheckBox, "Tauscht die Darstellung von Vorlauf und Rücklauf, ohne eine HKV-Verbindung zu erzeugen.");
         updateUndoRedoButtons();
@@ -266,19 +269,19 @@ final class HeatingCircuitRoutingWindow {
     }
 
     void automationExtendSupply() {
-        extendPipeEnd('I', "Vorlauf");
+        extendPipeEnd(SUPPLY_LINE, "Vorlauf");
     }
 
     void automationShortenSupply() {
-        shortenPipeEnd('I', "Vorlauf");
+        shortenPipeEnd(SUPPLY_LINE, "Vorlauf");
     }
 
     void automationExtendReturn() {
-        extendPipeEnd('i', "Rücklauf");
+        extendPipeEnd(RETURN_LINE, "Rücklauf");
     }
 
     void automationShortenReturn() {
-        shortenPipeEnd('i', "Rücklauf");
+        shortenPipeEnd(RETURN_LINE, "Rücklauf");
     }
 
     Path automationSaveRoutingTestFile() {
@@ -324,22 +327,15 @@ final class HeatingCircuitRoutingWindow {
             if (router.isIgnoredCharacter(character)) {
                 continue;
             }
-            if (character == '+') {
-                paintNextVarioEdge();
-                continue;
-            }
-            if (character == '-') {
-                removeLastVarioEdge();
-                continue;
-            }
             if (!changed) {
                 rememberUndoState();
                 redoStack.clear();
                 changed = true;
             }
             if (router.isCommandCharacter(character)) {
-                commands.append(character);
-                protocol.append(character);
+                char normalized = HeatingRoutingLanguage.normalizeCharacter(character);
+                commands.append(normalized);
+                protocol.append(normalized);
             } else {
                 protocol.append('x');
             }
@@ -360,8 +356,9 @@ final class HeatingCircuitRoutingWindow {
                 continue;
             }
             if (router.isCommandCharacter(character)) {
-                renderedProtocol.append(character);
-                renderedCommands.append(character);
+                char normalized = HeatingRoutingLanguage.normalizeCharacter(character);
+                renderedProtocol.append(normalized);
+                renderedCommands.append(normalized);
             } else {
                 renderedProtocol.append('x');
             }
@@ -428,12 +425,12 @@ final class HeatingCircuitRoutingWindow {
             double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
             double sideMillimeters = Math.min(size.widthMillimeters(), size.heightMillimeters());
             double longSideMillimeters = Math.max(size.widthMillimeters(), size.heightMillimeters());
-            String generatedCommands = router.rectangularVarioCommands(
+            String generatedCommands = HeatingRoutingLanguage.ensureConnectorSeparator(router.rectangularVarioCommands(
                     size.widthMillimeters(),
                     size.heightMillimeters(),
                     spacingMillimeters,
                     serpentineMiddleLineCheckBox.isSelected()
-            );
+            ));
             rememberUndoState();
             redoStack.clear();
             commands.setLength(0);
@@ -462,12 +459,12 @@ final class HeatingCircuitRoutingWindow {
             double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
             double sideMillimeters = Math.min(size.widthMillimeters(), size.heightMillimeters());
             double longSideMillimeters = Math.max(size.widthMillimeters(), size.heightMillimeters());
-            String generatedCommands = router.meanderCommands(
+            String generatedCommands = HeatingRoutingLanguage.ensureConnectorSeparator(router.meanderCommands(
                     size.widthMillimeters(),
                     size.heightMillimeters(),
                     spacingMillimeters,
                     serpentineMiddleLineCheckBox.isSelected()
-            );
+            ));
             rememberUndoState();
             redoStack.clear();
             commands.setLength(0);
@@ -554,7 +551,7 @@ final class HeatingCircuitRoutingWindow {
         while (index < generatedCommands.length()) {
             int startIndex = index;
             char command = generatedCommands.charAt(index);
-            if (command == 'I' || command == 'i') {
+            if (command == SUPPLY_LINE || command == RETURN_LINE) {
                 char lineCommand = command;
                 while (index < generatedCommands.length() && generatedCommands.charAt(index) == lineCommand) {
                     index++;
@@ -565,8 +562,8 @@ final class HeatingCircuitRoutingWindow {
             } else {
                 while (index < generatedCommands.length()
                         && samePipe(command, generatedCommands.charAt(index))
-                        && generatedCommands.charAt(index) != 'I'
-                        && generatedCommands.charAt(index) != 'i') {
+                        && generatedCommands.charAt(index) != SUPPLY_LINE
+                        && generatedCommands.charAt(index) != RETURN_LINE) {
                     index++;
                 }
             }
@@ -606,33 +603,39 @@ final class HeatingCircuitRoutingWindow {
     }
 
     private boolean samePipe(char leftCommand, char rightCommand) {
-        return Character.isUpperCase(leftCommand) == Character.isUpperCase(rightCommand);
+        return HeatingRoutingLanguage.isSupplyCommand(leftCommand) == HeatingRoutingLanguage.isSupplyCommand(rightCommand)
+                && HeatingRoutingLanguage.isReturnCommand(leftCommand) == HeatingRoutingLanguage.isReturnCommand(rightCommand);
     }
 
     private record VarioPaintState(List<String> generatedSteps, int generatedStepCount, int additionalStepCount) {
 
-        private static final String ADDITIONAL_STEP = "Ii";
+        private static final String ADDITIONAL_STEP = "" + SUPPLY_LINE + RETURN_LINE;
 
         static VarioPaintState of(List<String> generatedSteps, String currentCommands) {
+            String normalizedCurrentCommands = HeatingRoutingLanguage.normalizeCommands(currentCommands);
             StringBuilder prefix = new StringBuilder();
             int generatedStepCount = 0;
             for (String step : generatedSteps) {
-                if (currentCommands.contentEquals(prefix)) {
+                if (normalizedCurrentCommands.contentEquals(prefix)) {
                     break;
                 }
                 prefix.append(step);
-                if (!currentCommands.startsWith(prefix.toString())) {
+                if (!normalizedCurrentCommands.startsWith(prefix.toString())) {
                     throw new IllegalArgumentException("Die aktuelle Eingabe ist kein Prefix des berechneten Vario-Routers.");
                 }
                 generatedStepCount++;
             }
-            if (currentCommands.contentEquals(prefix)) {
+            if (normalizedCurrentCommands.contentEquals(prefix)
+                    || normalizedCurrentCommands.contentEquals(prefix.toString() + CONNECTOR_SEPARATOR)) {
                 return new VarioPaintState(generatedSteps, generatedStepCount, 0);
             }
             if (generatedStepCount != generatedSteps.size()) {
                 throw new IllegalArgumentException("Die aktuelle Eingabe ist kein Prefix des berechneten Vario-Routers.");
             }
-            String extraCommands = currentCommands.substring(prefix.length());
+            if (!normalizedCurrentCommands.startsWith(prefix.toString() + CONNECTOR_SEPARATOR)) {
+                throw new IllegalArgumentException("Die aktuelle Eingabe ist kein Prefix des berechneten Vario-Routers.");
+            }
+            String extraCommands = normalizedCurrentCommands.substring(prefix.length() + 1);
             if (extraCommands.length() % ADDITIONAL_STEP.length() != 0) {
                 throw new IllegalArgumentException("Die zusätzlichen Vario-Seiten sind nicht vollständig.");
             }
@@ -669,8 +672,12 @@ final class HeatingCircuitRoutingWindow {
     private void extendPipeEnd(char command, String pipeName) {
         rememberUndoState();
         redoStack.clear();
-        commands.append(command);
-        protocol.append(command);
+        String extendedCommands = HeatingRoutingLanguage.ensureConnectorSeparator(commands.toString())
+                + HeatingRoutingLanguage.normalizeCharacter(command);
+        commands.setLength(0);
+        commands.append(extendedCommands);
+        protocol.setLength(0);
+        protocol.append(extendedCommands);
         updateProtocolArea();
         redraw();
         statusLabel.setText(pipeName + " um ein gerades Rastersegment verlängert.");
@@ -698,9 +705,21 @@ final class HeatingCircuitRoutingWindow {
     }
 
     private int lastPipeCommandIndex(char lineCommand) {
-        boolean supply = Character.isUpperCase(lineCommand);
+        int separatorIndex = commands.indexOf(String.valueOf(CONNECTOR_SEPARATOR));
+        if (separatorIndex < 0 || separatorIndex + 1 >= commands.length()) {
+            return -1;
+        }
+        boolean supply = HeatingRoutingLanguage.isSupplyCommand(lineCommand);
         for (int index = commands.length() - 1; index >= 0; index--) {
-            if (Character.isUpperCase(commands.charAt(index)) == supply) {
+            if (index <= separatorIndex) {
+                return -1;
+            }
+            char command = commands.charAt(index);
+            if (HeatingRoutingLanguage.isSeparator(command)) {
+                return -1;
+            }
+            if (HeatingRoutingLanguage.isSupplyCommand(command) == supply
+                    && HeatingRoutingLanguage.isReturnCommand(command) != supply) {
                 return index;
             }
         }
@@ -796,7 +815,7 @@ final class HeatingCircuitRoutingWindow {
         StringBuilder result = new StringBuilder();
         for (int index = 0; index < commandText.length(); index++) {
             char command = commandText.charAt(index);
-            if (Character.isUpperCase(command) == supply) {
+            if (supply ? HeatingRoutingLanguage.isSupplyCommand(command) : HeatingRoutingLanguage.isReturnCommand(command)) {
                 result.append(command);
             }
         }
@@ -879,7 +898,7 @@ final class HeatingCircuitRoutingWindow {
             drawStartPoint(gc, result.supplyPath().startPoint(), transform);
             statusLabel.setText(String.format(
                     Locale.GERMANY,
-                    "Bereit. Gültige Befehle: I/R/L und i/r/l. Zoom %.0f %%.",
+                    "Bereit. Gültige Befehle: =/R/L und -/r/l, dazu + als Feldgrenze. Zoom %.0f %%.",
                     zoomFactor * 100.0
             ));
         } catch (IllegalArgumentException exception) {
@@ -998,13 +1017,15 @@ final class HeatingCircuitRoutingWindow {
     }
 
     Bounds routeBounds(RoutingResult result) {
-        return routeBounds(result, TRAILING_CONNECTOR_PRIMITIVES);
+        return new Bounds(0.0, 0.0, 0.0, 0.0)
+                .include(result.supplyPath(), result.fieldSupplyPrimitiveCount())
+                .include(result.returnPath(), result.fieldReturnPrimitiveCount());
     }
 
-    Bounds routeBounds(RoutingResult result, int trailingPrimitivesToIgnore) {
+    Bounds routeBounds(RoutingResult result, int includedPrimitiveCount) {
         return new Bounds(0.0, 0.0, 0.0, 0.0)
-                .include(result.supplyPath(), trailingPrimitivesToIgnore)
-                .include(result.returnPath(), trailingPrimitivesToIgnore);
+                .include(result.supplyPath(), includedPrimitiveCount)
+                .include(result.returnPath(), includedPrimitiveCount);
     }
 
     private void drawStartPoint(GraphicsContext gc, RoutingPoint startPoint, ViewTransform transform) {
@@ -1028,8 +1049,8 @@ final class HeatingCircuitRoutingWindow {
                 -size.heightMillimeters() / 2.0,
                 size.heightMillimeters() / 2.0
         );
-        bounds = bounds.include(result.supplyPath(), TRAILING_CONNECTOR_PRIMITIVES);
-        bounds = bounds.include(result.returnPath(), TRAILING_CONNECTOR_PRIMITIVES);
+        bounds = bounds.include(result.supplyPath(), result.fieldSupplyPrimitiveCount());
+        bounds = bounds.include(result.returnPath(), result.fieldReturnPrimitiveCount());
         double width = Math.max(bounds.width(), 1.0);
         double height = Math.max(bounds.height(), 1.0);
         double scale = Math.min(
@@ -1144,23 +1165,13 @@ final class HeatingCircuitRoutingWindow {
     record Bounds(double minX, double maxX, double minY, double maxY) {
 
         Bounds include(PipePath path) {
-            return include(path, 0);
+            return include(path, path.primitives().size());
         }
 
-        Bounds include(PipePath path, int trailingPrimitivesToIgnore) {
-            if (trailingPrimitivesToIgnore <= 0 || path.primitives().size() <= trailingPrimitivesToIgnore) {
-                Bounds result = this;
-                for (PipePrimitive primitive : path.primitives()) {
-                    result = result.include(primitive.startPoint()).include(primitive.endPoint());
-                    if (primitive instanceof QuarterArc arc) {
-                        result = result.include(arc);
-                    }
-                }
-                return result;
-            }
+        Bounds include(PipePath path, int includedPrimitiveCount) {
             Bounds result = include(path.startPoint());
-            int includedPrimitiveCount = path.primitives().size() - trailingPrimitivesToIgnore;
-            for (int index = 0; index < includedPrimitiveCount; index++) {
+            int primitiveCount = Math.max(0, Math.min(includedPrimitiveCount, path.primitives().size()));
+            for (int index = 0; index < primitiveCount; index++) {
                 PipePrimitive primitive = path.primitives().get(index);
                 result = result.include(primitive.startPoint()).include(primitive.endPoint());
                 if (primitive instanceof QuarterArc arc) {

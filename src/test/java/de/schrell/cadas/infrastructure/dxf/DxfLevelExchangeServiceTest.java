@@ -16,6 +16,7 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
@@ -165,7 +166,7 @@ class DxfLevelExchangeServiceTest {
         assertEquals(6, importedHeating.zones().getFirst().outline().size());
         assertEquals(new PlanPoint(100, 1_000), importedHeating.zones().getFirst().supplyConnectionPoint());
         assertEquals(new PlanPoint(3_800, 800), importedHeating.zones().getFirst().returnConnectionPoint());
-        assertEquals("iiiiRRIIIIrr", importedHeating.zones().getFirst().routingCommands());
+        assertEquals(HeatingRoutingLanguage.normalizeCommands("iiiiRRIIIIrr"), importedHeating.zones().getFirst().routingCommands());
         assertFalse(importedHeating.zones().getFirst().serpentineMiddleLine());
         assertEquals(48.0, importedHeating.zones().getFirst().heatOutputWattsPerSquareMeter(), 0.001);
         assertEquals(2, importedHeating.zones().getFirst().routingQuarterTurns());

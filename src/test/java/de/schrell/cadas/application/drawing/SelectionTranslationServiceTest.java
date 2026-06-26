@@ -15,6 +15,7 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
@@ -239,7 +240,7 @@ class SelectionTranslationServiceTest {
         HeatingZone translated = result.hydronicHeatings().getFirst().zones().getFirst();
         assertEquals(new PlanPoint(620, 520), translated.outline().getFirst());
         assertEquals(new PlanPoint(1_120, 1_020), translated.routingStartPoint());
-        assertEquals("IR", translated.routingCommands());
+        assertEquals(HeatingRoutingLanguage.normalizeCommands("IR"), translated.routingCommands());
         assertEquals(2, translated.routingQuarterTurns());
         assertTrue(translated.routingMirroredHorizontally());
     }

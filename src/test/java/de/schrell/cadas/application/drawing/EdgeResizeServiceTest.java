@@ -292,7 +292,7 @@ class EdgeResizeServiceTest {
         EdgeResizeService.ResizeResult result = service.resize(level, handle, new PlanPoint(4_000, 1_500));
 
         HeatingZone resized = result.hydronicHeatings().getFirst().zones().getFirst();
-        assertEquals(744.2, resized.outline().getFirst().xMillimeters(), 0.001);
+        assertEquals(694.2, resized.outline().getFirst().xMillimeters(), 0.001);
         assertEquals(3_455.8, resized.outline().get(1).xMillimeters(), 0.001);
         assertNotEquals(zone.routingCommands(), resized.routingCommands());
         assertEquals(HeatingLayoutPattern.VARIO, resized.layoutPattern());
@@ -336,7 +336,7 @@ class EdgeResizeServiceTest {
         );
 
         HeatingZone resized = result.hydronicHeatings().getFirst().zones().getFirst();
-        assertEquals(1_144.2, resized.outline().getFirst().xMillimeters(), 0.001);
+        assertEquals(1_094.2, resized.outline().getFirst().xMillimeters(), 0.001);
         assertEquals(4_000.0, resized.outline().get(1).xMillimeters(), 0.001);
         assertEquals(zone.routingCommands(), resized.routingCommands());
     }

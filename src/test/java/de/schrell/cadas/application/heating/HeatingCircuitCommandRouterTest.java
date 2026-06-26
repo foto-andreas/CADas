@@ -5,6 +5,7 @@ import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.LineSegm
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.QuarterArc;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingResult;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.Turn;
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,7 @@ class HeatingCircuitCommandRouterTest {
 
     @Test
     void startetVorlaufNachObenUndRücklaufNachUnten() {
-        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "Ii");
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "=-");
 
         LineSegment supply = (LineSegment) result.supplyPath().primitives().getFirst();
         LineSegment ret = (LineSegment) result.returnPath().primitives().getFirst();
@@ -56,7 +57,7 @@ class HeatingCircuitCommandRouterTest {
 
     @Test
     void ignoriertLeerzeichenUndEnter() {
-        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "I \n i");
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "= \n -");
 
         Assertions.assertEquals(1, result.supplyPath().primitives().size());
         Assertions.assertEquals(1, result.returnPath().primitives().size());
@@ -69,7 +70,7 @@ class HeatingCircuitCommandRouterTest {
 
     @Test
     void tauschtVorlaufUndRücklaufFürInvertierteDarstellung() {
-        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "Ii");
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "=-");
         RoutingResult inverted = result.withFlowInverted(true);
 
         Assertions.assertEquals(result.returnPath(), inverted.supplyPath());
@@ -78,7 +79,7 @@ class HeatingCircuitCommandRouterTest {
 
     @Test
     void verschiebtRoutingErgebnisOhneKommandosemantikZuVerändern() {
-        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "Ii");
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "=-");
         RoutingResult shifted = result.translatedBy(0.0, 50.0);
 
         Assertions.assertEquals(50.0, shifted.supplyPath().startPoint().yMillimeters(), 0.001);
@@ -89,7 +90,7 @@ class HeatingCircuitCommandRouterTest {
 
     @Test
     void drehtRoutingErgebnisUmNeunzigGradImUhrzeigersinn() {
-        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "I");
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "=");
         RoutingResult rotated = result.rotatedClockwise();
 
         Assertions.assertEquals(100.0, rotated.supplyPath().endPoint().xMillimeters(), 0.001);
@@ -101,7 +102,7 @@ class HeatingCircuitCommandRouterTest {
 
     @Test
     void loeschtMitXDenLetztenSchrittJeRohrrolle() {
-        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "IIXiix");
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "==X--x");
 
         Assertions.assertEquals(1, result.supplyPath().primitives().size());
         Assertions.assertEquals(1, result.returnPath().primitives().size());
@@ -130,11 +131,11 @@ class HeatingCircuitCommandRouterTest {
         String commands = router.squareVarioCommands(1_300.0, 100.0);
 
         Assertions.assertEquals(
-                "RRIRIIRIIIRIIIIRIIIIIRIIIIIIRIIIIIIIRIIIIIIIIRIIIIIIIIIRIIIIIIIIIIRIIIIIIIIIII",
+                modern("RRIRIIRIIIRIIIIRIIIIIRIIIIIIRIIIIIIIRIIIIIIIIRIIIIIIIIIRIIIIIIIIIIRIIIIIIIIIII"),
                 filter(commands, true)
         );
         Assertions.assertEquals(
-                "rririiriiiriiiiriiiiiriiiiiiriiiiiiiriiiiiiiiriiiiiiiiiriiiiiiiiiiriiiiiiiiiiiriiiiiiiiiiiiriiiiiiiiiiii",
+                modern("rririiriiiriiiiriiiiiriiiiiiriiiiiiiriiiiiiiiriiiiiiiiiriiiiiiiiiiriiiiiiiiiiiriiiiiiiiiiiiriiiiiiiiiiii"),
                 filter(commands, false)
         );
         RoutingResult result = router.route(1_300.0, 1_300.0, 100.0, commands);
@@ -146,8 +147,8 @@ class HeatingCircuitCommandRouterTest {
     void skaliertQuadratischenVarioRouterAusSeitenlängeUndVerlegeabstand() {
         String commands = router.squareVarioCommands(2_000.0, 100.0);
 
-        Assertions.assertTrue(filter(commands, true).contains("IIIIIIIIIIIIIIIIII"));
-        Assertions.assertTrue(filter(commands, false).contains("iiiiiiiiiiiiiiiiiii"));
+        Assertions.assertTrue(filter(commands, true).contains(repeated(HeatingRoutingLanguage.SUPPLY_LINE, 18)));
+        Assertions.assertTrue(filter(commands, false).contains(repeated(HeatingRoutingLanguage.RETURN_LINE, 19)));
         Assertions.assertDoesNotThrow(() -> router.route(2_000.0, 2_000.0, 100.0, commands));
     }
 
@@ -157,12 +158,12 @@ class HeatingCircuitCommandRouterTest {
         String supply = filter(commands, true);
         String ret = filter(commands, false);
 
-        Assertions.assertEquals(repeated('I', 5) + "RR", supply.substring(0, 7));
-        Assertions.assertEquals(repeated('i', 5) + "rr", ret.substring(0, 7));
-        Assertions.assertTrue(supply.contains(repeated('I', 27)));
-        Assertions.assertTrue(ret.contains(repeated('i', 25)));
-        Assertions.assertTrue(supply.endsWith(repeated('I', 28)));
-        Assertions.assertTrue(ret.endsWith(repeated('i', 27)));
+        Assertions.assertEquals(repeated(HeatingRoutingLanguage.SUPPLY_LINE, 5) + "RR", supply.substring(0, 7));
+        Assertions.assertEquals(repeated(HeatingRoutingLanguage.RETURN_LINE, 5) + "rr", ret.substring(0, 7));
+        Assertions.assertTrue(supply.contains(repeated(HeatingRoutingLanguage.SUPPLY_LINE, 27)));
+        Assertions.assertTrue(ret.contains(repeated(HeatingRoutingLanguage.RETURN_LINE, 25)));
+        Assertions.assertTrue(supply.endsWith(repeated(HeatingRoutingLanguage.SUPPLY_LINE, 28)));
+        Assertions.assertTrue(ret.endsWith(repeated(HeatingRoutingLanguage.RETURN_LINE, 27)));
         Assertions.assertDoesNotThrow(() -> router.route(2_000.0, 3_000.0, 100.0, commands));
     }
 
@@ -171,11 +172,11 @@ class HeatingCircuitCommandRouterTest {
         String commands = router.rectangularVarioCommands(700.0, 1_600.0, 100.0, true);
 
         Assertions.assertTrue(commands.startsWith(
-                "rLRRllrrLLRRllrrLLRRllrriIRr"
-                        + repeated('i', 12) + "r"
-                        + repeated('I', 12) + "R"
-                        + repeated('i', 3) + "r"
-                        + repeated('I', 3) + "R"
+                modern("rLRRllrrLLRRllrrLLRRllrriIRr")
+                        + repeated(HeatingRoutingLanguage.RETURN_LINE, 12) + "r"
+                        + repeated(HeatingRoutingLanguage.SUPPLY_LINE, 12) + "R"
+                        + repeated(HeatingRoutingLanguage.RETURN_LINE, 3) + "r"
+                        + repeated(HeatingRoutingLanguage.SUPPLY_LINE, 3) + "R"
         ));
         Assertions.assertDoesNotThrow(() -> router.route(700.0, 1_600.0, 100.0, commands));
     }
@@ -184,9 +185,9 @@ class HeatingCircuitCommandRouterTest {
     void berechnetSchlangenförmigeVarioMittellinieAusRasterdifferenz() {
         String commands = router.rectangularVarioCommands(900.0, 1_600.0, 100.0, true);
 
-        Assertions.assertTrue(commands.startsWith("rLRRllrrLLRRllrrLLRRiIRr"));
-        Assertions.assertTrue(commands.contains(repeated('i', 12)));
-        Assertions.assertTrue(commands.contains(repeated('I', 10)));
+        Assertions.assertTrue(commands.startsWith(modern("rLRRllrrLLRRllrrLLRRiIRr")));
+        Assertions.assertTrue(commands.contains(repeated(HeatingRoutingLanguage.RETURN_LINE, 12)));
+        Assertions.assertTrue(commands.contains(repeated(HeatingRoutingLanguage.SUPPLY_LINE, 10)));
         Assertions.assertDoesNotThrow(() -> router.route(900.0, 1_600.0, 100.0, commands));
     }
 
@@ -194,9 +195,9 @@ class HeatingCircuitCommandRouterTest {
     void rundetVarioSchlangeBeiUngerademRasterunterschiedAufVollständigeSchlangengruppe() {
         String commands = router.rectangularVarioCommands(2_100.0, 3_000.0, 100.0, true);
 
-        Assertions.assertTrue(commands.startsWith("rLRRllrrLLRRllrrLLRRllrriIRr"));
-        Assertions.assertTrue(filter(commands, true).contains(repeated('I', 12)));
-        Assertions.assertTrue(filter(commands, false).contains(repeated('i', 12)));
+        Assertions.assertTrue(commands.startsWith(modern("rLRRllrrLLRRllrrLLRRllrriIRr")));
+        Assertions.assertTrue(filter(commands, true).contains(repeated(HeatingRoutingLanguage.SUPPLY_LINE, 12)));
+        Assertions.assertTrue(filter(commands, false).contains(repeated(HeatingRoutingLanguage.RETURN_LINE, 12)));
         Assertions.assertDoesNotThrow(() -> router.route(2_100.0, 3_000.0, 100.0, commands));
     }
 
@@ -205,11 +206,11 @@ class HeatingCircuitCommandRouterTest {
         String commands = router.rectangularVarioCommands(1_100.0, 1_800.0, 100.0, true);
 
         Assertions.assertEquals(
-                "LRRLLRRLLRRIRIIIIIIIIIIRIIIRIIIIIIIIIIIIRIIIIIRIIIIIIIIIIIIIIRIIIIIIIRIIIIIIIIIIIIIIIIRIIIIIIIIIRIIIIIIIIIIIIIIIII",
+                modern("LRRLLRRLLRRIRIIIIIIIIIIRIIIRIIIIIIIIIIIIRIIIIIRIIIIIIIIIIIIIIRIIIIIIIRIIIIIIIIIIIIIIIIRIIIIIIIIIRIIIIIIIIIIIIIIIII"),
                 filter(commands, true)
         );
         Assertions.assertEquals(
-                "rllrrllrririiiiiiiiiiriiiriiiiiiiiiiiiriiiiiriiiiiiiiiiiiiiriiiiiiiriiiiiiiiiiiiiiii",
+                modern("rllrrllrririiiiiiiiiiriiiriiiiiiiiiiiiriiiiiriiiiiiiiiiiiiiriiiiiiiriiiiiiiiiiiiiiii"),
                 filter(commands, false)
         );
         Assertions.assertDoesNotThrow(() -> router.route(1_100.0, 1_800.0, 100.0, commands));
@@ -228,41 +229,43 @@ class HeatingCircuitCommandRouterTest {
         assertMeanderPipes(
                 500.0,
                 500.0,
-                "IIRRIIILLIIII",
-                "irriiilliiii"
+                modern("IIRRIIILLIIII"),
+                modern("irriiilliiii")
         );
         assertMeanderPipes(
                 600.0,
                 800.0,
-                "IIIIRRIIIIIIILLIIIIIIIRRIIIIIII",
-                "iiirriiiiiiilliiiiiiirriiiiiii"
+                modern("IIIIRRIIIIIIILLIIIIIIIRRIIIIIII"),
+                modern("iiirriiiiiiilliiiiiiirriiiiiii")
         );
         assertMeanderPipes(
                 800.0,
                 1_300.0,
-                "IIIIIIILLIIIIIIIIIIIIRRIIIIIIIIIIIILLIIIIIIIIIIIIRRIIIIIIIIIIII",
-                "iiiiilliiiiiiiiiiiirriiiiiiiiiiiilliiiiiiiiiiiirriiiiiiiiiiii"
+                modern("IIIIIIILLIIIIIIIIIIIIRRIIIIIIIIIIIILLIIIIIIIIIIIIRRIIIIIIIIIIII"),
+                modern("iiiiilliiiiiiiiiiiirriiiiiiiiiiiilliiiiiiiiiiiirriiiiiiiiiiii")
         );
 
-        String longSupply = repeated('I', 15) + ("LL" + repeated('I', 29) + "RR" + repeated('I', 29)).repeat(5);
-        String longReturn = repeated('i', 14) + ("ll" + repeated('i', 29) + "rr" + repeated('i', 29)).repeat(5);
+        String longSupply = repeated(HeatingRoutingLanguage.SUPPLY_LINE, 15)
+                + ("LL" + repeated(HeatingRoutingLanguage.SUPPLY_LINE, 29) + "RR" + repeated(HeatingRoutingLanguage.SUPPLY_LINE, 29)).repeat(5);
+        String longReturn = repeated(HeatingRoutingLanguage.RETURN_LINE, 14)
+                + ("ll" + repeated(HeatingRoutingLanguage.RETURN_LINE, 29) + "rr" + repeated(HeatingRoutingLanguage.RETURN_LINE, 29)).repeat(5);
         assertMeanderPipes(2_000.0, 3_000.0, longSupply, longReturn);
     }
 
     @Test
     void meanderSchlangenSchalterErsetztMittlereGerade() {
         String commands = router.meanderCommands(2_000.0, 3_100.0, 100.0, true);
-        String longLine = repeated('I', 30);
-        String longReturnLine = repeated('i', 30);
+        String longLine = repeated(HeatingRoutingLanguage.SUPPLY_LINE, 30);
+        String longReturnLine = repeated(HeatingRoutingLanguage.RETURN_LINE, 30);
 
         Assertions.assertEquals(
-                "IL" + "RRLL".repeat(7) + "RRIR" + longLine
+                modern("IL") + "RRLL".repeat(7) + modern("RRIR") + longLine
                         + ("LL" + longLine + "RR" + longLine).repeat(4)
                         + "LL" + longLine,
                 filter(commands, true)
         );
         Assertions.assertEquals(
-                "r" + "llrr".repeat(7) + "ir" + longReturnLine
+                "r" + "llrr".repeat(7) + modern("ir") + longReturnLine
                         + ("ll" + longReturnLine + "rr" + longReturnLine).repeat(4),
                 filter(commands, false)
         );
@@ -276,6 +279,16 @@ class HeatingCircuitCommandRouterTest {
         Assertions.assertTrue(filter(commands, false).startsWith("r" + "llrr".repeat(7) + "lrr"));
         Assertions.assertTrue(filter(commands, true).startsWith("L" + "RRLL".repeat(6) + "RRL" + "RR"));
         Assertions.assertDoesNotThrow(() -> router.route(2_000.0, 3_000.0, 100.0, commands));
+    }
+
+    @Test
+    void akzeptiertAlteIGeradeUndNormalisiertDieFeldgrenze() {
+        RoutingResult result = router.route(2_000.0, 3_000.0, 100.0, "Ii+=-");
+
+        Assertions.assertEquals(2, result.supplyPath().primitives().size());
+        Assertions.assertEquals(2, result.returnPath().primitives().size());
+        Assertions.assertEquals(1, result.fieldSupplyPrimitiveCount());
+        Assertions.assertEquals(1, result.fieldReturnPrimitiveCount());
     }
 
     private void assertMeanderPipes(double widthMillimeters, double heightMillimeters, String supply, String ret) {
@@ -294,10 +307,14 @@ class HeatingCircuitCommandRouterTest {
         StringBuilder filtered = new StringBuilder();
         for (int index = 0; index < commands.length(); index++) {
             char command = commands.charAt(index);
-            if (Character.isUpperCase(command) == supply) {
+            if (supply ? HeatingRoutingLanguage.isSupplyCommand(command) : HeatingRoutingLanguage.isReturnCommand(command)) {
                 filtered.append(command);
             }
         }
         return filtered.toString();
+    }
+
+    private String modern(String legacyCommands) {
+        return HeatingRoutingLanguage.normalizeCommands(legacyCommands);
     }
 }

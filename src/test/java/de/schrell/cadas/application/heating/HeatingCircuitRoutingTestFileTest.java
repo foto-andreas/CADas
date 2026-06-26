@@ -1,5 +1,7 @@
 package de.schrell.cadas.application.heating;
 
+import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -70,7 +72,7 @@ class HeatingCircuitRoutingTestFileTest {
 
     @Test
     void vergleichtKommandosRohrweiseUnabhängigVonDerEingabereihenfolge() {
-        Assertions.assertEquals(canonicalCommands("IRir"), canonicalCommands("IiRr"));
+        Assertions.assertEquals(canonicalCommands("=R-r"), canonicalCommands("IiRr"));
     }
 
     private void assertCanonicalCommandsMatch(Map<String, String> values, String commands, Path testFile) {
@@ -78,7 +80,11 @@ class HeatingCircuitRoutingTestFileTest {
         if (canonicalCommands == null) {
             return;
         }
-        Assertions.assertEquals(canonicalCommands(commands), canonicalCommands, () -> "Kanonische Kommandos weichen ab in " + testFile);
+        Assertions.assertEquals(
+                canonicalCommands(commands),
+                canonicalCommands(canonicalCommands),
+                () -> "Kanonische Kommandos weichen ab in " + testFile
+        );
     }
 
     private void assertGeneratedCommandsMatchTestFile(
@@ -123,9 +129,10 @@ class HeatingCircuitRoutingTestFileTest {
 
     private String pipeCommands(String commands, boolean supply) {
         StringBuilder result = new StringBuilder();
-        for (int index = 0; index < commands.length(); index++) {
-            char command = commands.charAt(index);
-            if (Character.isUpperCase(command) == supply) {
+        String normalizedCommands = HeatingRoutingLanguage.normalizeCommands(commands);
+        for (int index = 0; index < normalizedCommands.length(); index++) {
+            char command = normalizedCommands.charAt(index);
+            if (supply ? HeatingRoutingLanguage.isSupplyCommand(command) : HeatingRoutingLanguage.isReturnCommand(command)) {
                 result.append(command);
             }
         }
@@ -133,6 +140,12 @@ class HeatingCircuitRoutingTestFileTest {
     }
 
     private String canonicalCommands(String commands) {
+        int separatorIndex = commands.indexOf('|');
+        if (separatorIndex >= 0) {
+            return pipeCommands(commands.substring(0, separatorIndex), true)
+                    + "|"
+                    + pipeCommands(commands.substring(separatorIndex + 1), false);
+        }
         return pipeCommands(commands, true) + "|" + pipeCommands(commands, false);
     }
 
