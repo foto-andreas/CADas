@@ -427,13 +427,13 @@ Wähle im Werkzeug `Bearbeiten` genau einen Raum. Der Bereich `Flächenheizung` 
 
 1. Wähle die Fläche und als Raumvorgabe für die Verlegung `Meander` oder `Schnecke`.
 2. Gib Verlegeabstand, Rohrdurchmesser, maximale Rohrlänge und Mindestabstand zur Wand ein. Die Startwerte passen zum Variotherm-Trockenbau-System mit 100 mm Verlegeabstand, 11,6 mm Rohr und 18 mm Plattenstärke.
-3. Gib die X-/Y-Koordinaten von Vorlauf und Rücklauf am Verteiler ein oder zeichne mit dem Werkzeug `HKV` ein horizontales beziehungsweise vertikales Verteilerrechteck. Ein HKV-Anschlusspaar ist 5 cm breit.
+3. Gib die X-/Y-Koordinaten von Vorlauf und Rücklauf am Verteiler ein oder zeichne mit dem Werkzeug `HKV` ein horizontales beziehungsweise vertikales Verteilerrechteck. Der HKV darf bei ausgewähltem Raum oder ausgewählter Heizung frei außerhalb des Raums liegen. Ein HKV-Anschlusspaar ist 5 cm breit.
 4. Wähle `Heizkreise planen`. CADas schlägt die nötige Aufteilung vor, übernimmt die Raumvorgabe zunächst in alle Heizkreise, spart Treppenbereiche aus und trennt einen Raum so lange, bis jeder Heizkreis die maximale Rohrlänge einhält.
 5. Wähle einen Heizkreis in der Liste. Das Feld `Routing` zeigt die Routing-Sprache direkt an: `I/i` verlängern Vorlauf/Rücklauf, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt. Mit `Bereich bearbeiten` änderst du Name, Verlegeart, Vorlauf-/Rücklauf-Invertierung und Polygon-Eckpunkte als `X; Y` in Zentimetern. Dadurch sind auch L- und U-förmige Bereiche möglich.
 6. Mit `Rechteck hinzufügen` ergänzt du einen neuen Heizkreis als rechteckiges Startfeld in einem freien Bereich. Mit `Bereich entfernen` löschst du den markierten Heizkreis. Bereiche außerhalb des Raums und bearbeitete Kreise oberhalb der maximalen Rohrlänge werden abgelehnt.
-7. Wenn ein Anschluss nicht kreuzungsfrei geroutet werden kann, versucht CADas bis zu zehn Reparaturschritte mit kleineren Heizbereichen und alternativen HKV-Positionen. Bleibt ein Heizkreis unroutebar, wird der funktionierende Teil geplant und CADas warnt mit dem ausgelassenen Heizkreis und der konkreten Begründung.
+7. Die HKV-Anschlüsse dienen als freie Vorlauf-/Rücklauf-Marker. Direkte Verbindungsleitungen zwischen HKV und Heizkreis werden nicht mehr erzeugt.
 
-Die 2D-Ansicht zeichnet Heizbereiche als Umriss, Vorläufe blau und Rückläufe rot. Gestrichelte Leitungen führen zum HKV, durchgezogene Leitungen liegen in der Heizfläche. `V` und `R` markieren Vorlauf und Rücklauf. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen, Verlegeart und berechneter Rohrlänge. Die Materialliste enthält zusätzlich je Raum eine maßstäbliche SVG-Zeichnung der geplanten Flächenheizung. Allgemeine Hindernisse werden noch nicht automatisch ausgespart; Treppenbereiche werden beim automatischen Vorschlag berücksichtigt.
+Die 2D-Ansicht zeichnet Heizbereiche als Umriss, Vorläufe blau und Rückläufe rot. Die Leitungen liegen ausschließlich in der Heizfläche. `V` und `R` markieren Vorlauf und Rücklauf am HKV. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen, Verlegeart und berechneter Rohrlänge. Die Materialliste enthält zusätzlich je Raum eine maßstäbliche SVG-Zeichnung der geplanten Flächenheizung. Allgemeine Hindernisse werden noch nicht automatisch ausgespart; Treppenbereiche werden beim automatischen Vorschlag berücksichtigt.
 
 ### Ebenen auf Flächen
 
@@ -442,6 +442,7 @@ Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepfleg
 * Wähle im Werkzeug `Bearbeiten` zuerst eine Wand oder einen Raum aus.
 * Öffne links den Bereich `Ebenen`.
 * Wähle den Flächentyp, zum Beispiel `WALL_INTERIOR`, `WALL_EXTERIOR`, `FLOOR` oder `CEILING`.
+  Bei reiner Wandauswahl bleibt `WALL_EXTERIOR` der Standard; `WALL_INTERIOR` ist zusätzlich verfügbar, wenn CADas angrenzende Räume erkennt, und gilt dann für alle betroffenen Raumseiten.
 * Wähle optional ein Preset wie `Fliese`, `Variotherm Trockenbau-FBH-Platte 60 x 100 cm`, `Dämmplatte`, `Rigipsplatte`, `OSB-Platte`, `Tapete` oder eine registrierte `DWG-Referenz`.
 * Lege Name, Dicke, Platten- oder Fliesenmaß, Verlegeart, Mindestversatz und Mindestbreite fest.
 * Lege die Schnittbeschränkung fest: `frei`, `Schnitt nur außen` oder `Verlegerichtung, Schnitt nur außen`.

@@ -68,7 +68,6 @@ class HydronicHeatingTest {
 
         assertEquals(new PlanPoint(0, 500), zone.supplyConnectionPoint());
         assertEquals(new PlanPoint(1_000, 500), zone.returnConnectionPoint());
-        assertThrows(IllegalArgumentException.class, () -> zone.withSupplyConnectionPoint(new PlanPoint(500, 500)));
     }
 
     @Test

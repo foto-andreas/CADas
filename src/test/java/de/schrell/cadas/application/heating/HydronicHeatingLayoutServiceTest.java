@@ -34,8 +34,10 @@ class HydronicHeatingLayoutServiceTest {
 
         HydronicHeatingLayoutService.CircuitLayout circuit = service.layout(heating).getFirst();
 
-        assertEquals(heating.supplyPoint(), circuit.pipePath().getFirst());
-        assertEquals(heating.returnPoint(), circuit.pipePath().getLast());
+        assertEquals(circuit.fieldSupplyPath().getFirst(), circuit.pipePath().getFirst());
+        assertEquals(circuit.fieldReturnPath().getLast(), circuit.pipePath().getLast());
+        assertTrue(circuit.supplyConnectorPath().isEmpty());
+        assertTrue(circuit.returnConnectorPath().isEmpty());
         assertEquals(100.0, circuit.bendRadius().toMillimeters(), 0.001);
         assertTrue(circuit.pipeLength().toMillimeters() > 40_000);
     }
@@ -213,10 +215,8 @@ class HydronicHeatingLayoutServiceTest {
                 .distinct()
                 .count());
         for (HydronicHeatingLayoutService.CircuitLayout circuit : result.circuits()) {
-            assertEquals(circuit.supplyPort(), circuit.supplyConnectorPath().getFirst());
-            assertEquals(circuit.returnPort(), circuit.returnConnectorPath().getLast());
-            assertEquals(circuit.fieldSupplyPath().getFirst(), circuit.supplyConnectorPath().getLast());
-            assertEquals(circuit.fieldReturnPath().getLast(), circuit.returnConnectorPath().getFirst());
+            assertTrue(circuit.supplyConnectorPath().isEmpty());
+            assertTrue(circuit.returnConnectorPath().isEmpty());
             assertFalse(circuit.fieldSupplyPath().isEmpty());
             assertFalse(circuit.fieldReturnPath().isEmpty());
         }
@@ -250,6 +250,8 @@ class HydronicHeatingLayoutServiceTest {
         assertTrue(svg.contains("r=\"44.200\""));
         assertTrue(svg.contains("class=\"vorlauf\""));
         assertTrue(svg.contains("class=\"ruecklauf\""));
+        assertFalse(svg.contains("connector-vorlauf"));
+        assertFalse(svg.contains("connector-ruecklauf"));
         assertTrue(svg.contains("V1"));
         assertTrue(svg.contains("R1"));
     }
@@ -298,7 +300,7 @@ class HydronicHeatingLayoutServiceTest {
 
         List<PlanPoint> pipePath = service.layout(heating).getFirst().pipePath();
 
-        for (int index = 2; index + 2 < pipePath.size(); index++) {
+        for (int index = 1; index < pipePath.size(); index++) {
             assertSegmentInside(room.outline(), pipePath.get(index - 1), pipePath.get(index));
         }
     }

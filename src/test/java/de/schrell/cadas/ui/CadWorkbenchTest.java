@@ -178,7 +178,7 @@ class CadWorkbenchTest {
     }
 
     @Test
-    void setztHkvPerRaumKontextmenueFuerNaechsteHeizungsplanung() throws Exception {
+    void plantHeizkreisOhneSichtbareHkvEinstellungen() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instance = new CadWorkbench();
             new Scene(instance, 1200, 800);
@@ -195,23 +195,52 @@ class CadWorkbenchTest {
             return instance;
         });
 
-        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems).contains("HKV hier setzen"));
+        Assertions.assertFalse(aufFxThread(workbench::automationSelectionContextMenuItems).contains("HKV hier setzen"));
         aufFxThread(() -> {
-            workbench.automationInvokeSelectionContextMenuItem("HKV hier setzen");
             workbench.automationSetField("heatingMaximumPipeLength", "30000");
             workbench.automationPlanHydronicHeating("FLOOR", "MEANDER");
             return null;
         });
 
-        Assertions.assertEquals("100", aufFxThread(() -> workbench.automationFieldValue("heatingSupplyX")));
-        Assertions.assertEquals("80", aufFxThread(() -> workbench.automationFieldValue("heatingSupplyY")));
-        Assertions.assertEquals("105", aufFxThread(() -> workbench.automationFieldValue("heatingReturnX")));
-        Assertions.assertEquals("80", aufFxThread(() -> workbench.automationFieldValue("heatingReturnY")));
         HydronicHeating heating = aufFxThread(() -> workbench.automationHydronicHeating(0));
-        Assertions.assertEquals(1_000.0, heating.supplyPoint().xMillimeters(), 0.001);
-        Assertions.assertEquals(800.0, heating.supplyPoint().yMillimeters(), 0.001);
-        Assertions.assertEquals(1_050.0, heating.returnPoint().xMillimeters(), 0.001);
-        Assertions.assertEquals(800.0, heating.returnPoint().yMillimeters(), 0.001);
+        Assertions.assertEquals(1_975.0, heating.supplyPoint().xMillimeters(), 0.001);
+        Assertions.assertEquals(1_500.0, heating.supplyPoint().yMillimeters(), 0.001);
+        Assertions.assertEquals(2_025.0, heating.returnPoint().xMillimeters(), 0.001);
+        Assertions.assertEquals(1_500.0, heating.returnPoint().yMillimeters(), 0.001);
+    }
+
+    @Test
+    void loeschtHkvUeberAuswahl() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instance = new CadWorkbench();
+            new Scene(instance, 1200, 800);
+            instance.applyCss();
+            instance.layout();
+            Room room = Room.rectangular(
+                    "Schlafen", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            );
+            instance.automationAddRoom(room);
+            instance.automationSetTool("EDIT");
+            instance.automationSetViewport(1.0, 0.0, 0.0);
+            instance.automationPrepareSelectionContextMenu(100.0, 80.0);
+            return instance;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("HEATING_MANIFOLD");
+            workbench.automationCanvasPress(100, 80, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(100, 80, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(workbench::automationHydronicHeatingCount));
+        aufFxThread(() -> {
+            workbench.automationSelect("HKV", 0, false);
+            workbench.automationDeleteSelection();
+            return null;
+        });
+        Assertions.assertEquals(1, aufFxThread(workbench::automationHydronicHeatingCount));
     }
 
     @Test
@@ -615,6 +644,34 @@ class CadWorkbenchTest {
         Assertions.assertEquals(new PlanPoint(500, 700), heating.supplyPoint());
         Assertions.assertEquals(new PlanPoint(550, 700), heating.returnPoint());
         Assertions.assertEquals(1, aufFxThread(() -> workbench.automationSnapshot().selectionCount()));
+    }
+
+    @Test
+    void setztHkvFreiAusserhalbDesAusgewaehltenRaums() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetTool("HEATING_MANIFOLD");
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationCanvasPress(520, 520, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(520, 520, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        HydronicHeating heating = aufFxThread(() -> workbench.automationHydronicHeating(0));
+        Assertions.assertEquals(new PlanPoint(5_200, 5_200), heating.supplyPoint());
+        Assertions.assertEquals(new PlanPoint(5_250, 5_200), heating.returnPoint());
     }
 
     @Test
@@ -1313,7 +1370,7 @@ class CadWorkbenchTest {
     }
 
     @Test
-    void belagsauswahlZeigtBeiNurWandNurAussenwandAn() throws Exception {
+    void belagsauswahlZeigtBeiNurWandAussenwandUndInnenwandAn() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -1332,7 +1389,45 @@ class CadWorkbenchTest {
 
         WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
         Assertions.assertEquals("WALL_EXTERIOR", snapshot.surfaceType());
-        Assertions.assertEquals("WALL_EXTERIOR", snapshot.surfaceTypeOptions());
+        Assertions.assertEquals("WALL_EXTERIOR,WALL_INTERIOR", snapshot.surfaceTypeOptions());
+    }
+
+    @Test
+    void wandAlleinErlaubtDaemmplatteAlsInnenwandbelag() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        Path exportDatei = Files.createTempFile("cadas-innenwand-daemmplatte-", ".dxf");
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("WALL", 0, false);
+            instanz.automationSetSurfaceType("WALL_INTERIOR");
+            instanz.automationSetField("surfaceLayerName", "Dämmplatte");
+            instanz.automationSetField("surfaceLayerThickness", "4");
+            instanz.automationInvoke("addSurfaceLayer", null);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("exportProjectDxf", exportDatei);
+            return null;
+        });
+
+        SurfaceLayerStack stack = new DxfProjectExchangeService()
+                .importProject(exportDatei, "Innenwanddämmung")
+                .primaryLevel()
+                .surfaceLayerStacks()
+                .stream()
+                .filter(candidate -> candidate.surfaceType() == SurfaceType.WALL_INTERIOR)
+                .findFirst()
+                .orElseThrow();
+
+        Assertions.assertTrue(stack.targetKey().contains("@"));
+        Assertions.assertEquals("Dämmplatte", stack.layers().getFirst().name());
+        Assertions.assertEquals(40.0, stack.layers().getFirst().thickness().toMillimeters(), 0.001);
     }
 
     @Test
