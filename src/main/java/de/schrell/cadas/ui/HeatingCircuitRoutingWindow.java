@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
@@ -70,6 +72,7 @@ final class HeatingCircuitRoutingWindow {
     private final TextField areaSizeField = new TextField("200x300");
     private final TextField spacingField = new TextField("10");
     private final TextArea protocolArea = new TextArea();
+    private final CheckBox mirroredAliasCheckBox = new CheckBox("Einfach gespiegelt");
     private final CheckBox flowInvertedCheckBox = new CheckBox("V/R tauschen");
     private final CheckBox serpentineMiddleLineCheckBox = new CheckBox("Mittellinie schlängeln");
     private final Button undoButton = new Button("Rückgängig");
@@ -90,6 +93,12 @@ final class HeatingCircuitRoutingWindow {
     private RoutingVariant routingVariant = RoutingVariant.MANUELL;
     private double zoomFactor = 1.0;
     private int rotationQuarterTurns;
+    private boolean updatingProtocolInput;
+    private boolean controlsConfigured;
+
+    HeatingCircuitRoutingWindow() {
+        configureControls();
+    }
 
     void show(Window owner) {
         Stage stage = new Stage();
@@ -175,6 +184,7 @@ final class HeatingCircuitRoutingWindow {
                 shortenReturnButton,
                 saveTestFileButton,
                 serpentineMiddleLineCheckBox,
+                mirroredAliasCheckBox,
                 flowInvertedCheckBox,
                 clearButton,
                 statusLabel
@@ -198,6 +208,10 @@ final class HeatingCircuitRoutingWindow {
     }
 
     private void configureControls() {
+        if (controlsConfigured) {
+            return;
+        }
+        controlsConfigured = true;
         areaSizeField.setPrefColumnCount(10);
         spacingField.setPrefColumnCount(5);
         protocolArea.setPrefRowCount(3);
@@ -210,11 +224,23 @@ final class HeatingCircuitRoutingWindow {
         areaSizeField.textProperty().addListener((ignored, oldValue, newValue) -> redraw());
         spacingField.textProperty().addListener((ignored, oldValue, newValue) -> redraw());
         flowInvertedCheckBox.selectedProperty().addListener((ignored, oldValue, newValue) -> redraw());
+        mirroredAliasCheckBox.selectedProperty().addListener((ignored, oldValue, newValue) -> renderProtocolText());
+        protocolArea.textProperty().addListener((ignored, oldValue, newValue) -> {
+            if (updatingProtocolInput) {
+                return;
+            }
+            String normalizedDisplayText = normalizeProtocolEditorDisplayText(newValue);
+            if (!Objects.equals(Optional.ofNullable(newValue).orElse(""), normalizedDisplayText)) {
+                replaceProtocolTextPreservingCaretAndScroll(normalizedDisplayText);
+            }
+            renderProtocolText();
+        });
         canvas.setOnMouseClicked(event -> protocolArea.requestFocus());
 
         applyTooltip(areaSizeField, "Erfasst Breite und Länge des rechteckigen Heizbereichs in Zentimetern, zum Beispiel `200x300`.");
         applyTooltip(spacingField, "Legt den Verlegeabstand `v` in Zentimetern fest. Geraden sind `v` lang, Bögen besitzen den Durchmesser `v`.");
-        applyTooltip(protocolArea, "Editierbarer Text der Routingkommandos: `=/R/L` für Vorlauf und `-/r/l` für Rücklauf. `+` markiert die Grenze zwischen Heizfeld und Zulauf. Alte `I`/`i` werden beim Rendern automatisch zu `=`/`-` normalisiert.");
+        applyTooltip(protocolArea, "Editierbarer Text der Routingkommandos: `=/R/L` für Vorlauf und `-/r/l` für Rücklauf. `+` markiert die Grenze zwischen Heizfeld und Zulauf. Bei aktivierter einfacher Spiegelung werden zusätzlich `(` und `)` zu `L` und `R` sowie `8` und `9` zu `l` und `r`. Der Heizkreis rendert sofort bei jeder Eingabe.");
+        applyTooltip(mirroredAliasCheckBox, "Simuliert eine einfache Spiegelung für die Texteingabe. Dann werden `(` und `)` als `L` und `R` sowie `8` und `9` als `l` und `r` interpretiert.");
         applyTooltip(serpentineMiddleLineCheckBox, "Erzeugt die Mitte beim nächsten Klick auf `Vario erzeugen` oder `Meander erzeugen` schlangenförmig. Die Schlangenlänge wird aus der Rasterdifferenz zwischen langer und kurzer Seite berechnet.");
         applyTooltip(flowInvertedCheckBox, "Tauscht die Darstellung von Vorlauf und Rücklauf, ohne eine HKV-Verbindung zu erzeugen.");
         updateUndoRedoButtons();
@@ -300,6 +326,10 @@ final class HeatingCircuitRoutingWindow {
         protocolArea.setText(text);
     }
 
+    void automationSetSimpleMirrored(boolean selected) {
+        mirroredAliasCheckBox.setSelected(selected);
+    }
+
     void automationRenderProtocolText() {
         renderProtocolText();
     }
@@ -320,6 +350,10 @@ final class HeatingCircuitRoutingWindow {
         return areaSizeField.getText();
     }
 
+    private String normalizeProtocolEditorDisplayText(String text) {
+        return HeatingRoutingLanguage.replaceEditorAliasesPreservingWhitespace(text, mirroredAliasCheckBox.isSelected());
+    }
+
     private void applyInput(String text) {
         boolean changed = false;
         for (int index = 0; index < text.length(); index++) {
@@ -332,8 +366,8 @@ final class HeatingCircuitRoutingWindow {
                 redoStack.clear();
                 changed = true;
             }
-            if (router.isCommandCharacter(character)) {
-                char normalized = HeatingRoutingLanguage.normalizeCharacter(character);
+            char normalized = HeatingRoutingLanguage.normalizeEditorCharacter(character, mirroredAliasCheckBox.isSelected());
+            if (router.isCommandCharacter(normalized)) {
                 commands.append(normalized);
                 protocol.append(normalized);
             } else {
@@ -355,8 +389,8 @@ final class HeatingCircuitRoutingWindow {
             if (router.isIgnoredCharacter(character)) {
                 continue;
             }
-            if (router.isCommandCharacter(character)) {
-                char normalized = HeatingRoutingLanguage.normalizeCharacter(character);
+            char normalized = HeatingRoutingLanguage.normalizeEditorCharacter(character, mirroredAliasCheckBox.isSelected());
+            if (router.isCommandCharacter(normalized)) {
                 renderedProtocol.append(normalized);
                 renderedCommands.append(normalized);
             } else {
@@ -859,9 +893,26 @@ final class HeatingCircuitRoutingWindow {
     }
 
     private void updateProtocolArea() {
-        protocolArea.setText(protocol.toString());
-        protocolArea.positionCaret(protocolArea.getText().length());
+        replaceProtocolTextPreservingCaretAndScroll(protocol.toString());
         updateUndoRedoButtons();
+    }
+
+    private void replaceProtocolTextPreservingCaretAndScroll(String text) {
+        String replacement = text == null ? "" : text;
+        String currentText = protocolArea.getText() == null ? "" : protocolArea.getText();
+        if (Objects.equals(currentText, replacement)) {
+            return;
+        }
+        int caretPosition = protocolArea.getCaretPosition();
+        double scrollTop = protocolArea.getScrollTop();
+        updatingProtocolInput = true;
+        try {
+            protocolArea.setText(replacement);
+        } finally {
+            updatingProtocolInput = false;
+        }
+        protocolArea.positionCaret(Math.min(caretPosition, protocolArea.getLength()));
+        protocolArea.setScrollTop(scrollTop);
     }
 
     private void updateUndoRedoButtons() {

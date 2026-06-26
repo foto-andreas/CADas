@@ -13,6 +13,10 @@ public final class HeatingRoutingLanguage {
     public static final char CONNECTOR_SEPARATOR = '+';
     public static final char LEGACY_SUPPLY_LINE = 'I';
     public static final char LEGACY_RETURN_LINE = 'i';
+    public static final char MIRRORED_RETURN_TURN_LEFT_ALIAS = '8';
+    public static final char MIRRORED_RETURN_TURN_RIGHT_ALIAS = '9';
+    public static final char MIRRORED_SUPPLY_TURN_LEFT_ALIAS = '(';
+    public static final char MIRRORED_SUPPLY_TURN_RIGHT_ALIAS = ')';
 
     private HeatingRoutingLanguage() {
     }
@@ -59,6 +63,27 @@ public final class HeatingRoutingLanguage {
         };
     }
 
+    public static char normalizeCommandCharacter(char character) {
+        return switch (character) {
+            case MIRRORED_RETURN_TURN_LEFT_ALIAS -> RETURN_TURN_LEFT;
+            case MIRRORED_RETURN_TURN_RIGHT_ALIAS -> RETURN_TURN_RIGHT;
+            case MIRRORED_SUPPLY_TURN_LEFT_ALIAS -> SUPPLY_TURN_LEFT;
+            case MIRRORED_SUPPLY_TURN_RIGHT_ALIAS -> SUPPLY_TURN_RIGHT;
+            default -> normalizeCharacter(character);
+        };
+    }
+
+    public static boolean hasSimpleMirror(boolean mirroredHorizontally, boolean mirroredVertically) {
+        return mirroredHorizontally ^ mirroredVertically;
+    }
+
+    public static char normalizeEditorCharacter(char character, boolean simpleMirrored) {
+        if (!simpleMirrored) {
+            return normalizeCharacter(character);
+        }
+        return normalizeCommandCharacter(character);
+    }
+
     public static String normalizeCommands(String commands) {
         if (commands == null || commands.isBlank()) {
             return "";
@@ -69,7 +94,7 @@ public final class HeatingRoutingLanguage {
             if (isIgnoredCharacter(character)) {
                 continue;
             }
-            char normalizedCharacter = normalizeCharacter(character);
+            char normalizedCharacter = normalizeCommandCharacter(character);
             if (!isCommandCharacter(normalizedCharacter)) {
                 throw new IllegalArgumentException("Unbekannter Routing-Befehl `" + character + "`.");
             }
@@ -79,6 +104,10 @@ public final class HeatingRoutingLanguage {
     }
 
     public static String stripWhitespaceAndNormalizeAliases(String commands) {
+        return stripWhitespaceAndNormalizeAliases(commands, false);
+    }
+
+    public static String stripWhitespaceAndNormalizeAliases(String commands, boolean simpleMirrored) {
         if (commands == null || commands.isBlank()) {
             return "";
         }
@@ -86,8 +115,22 @@ public final class HeatingRoutingLanguage {
         for (int index = 0; index < commands.length(); index++) {
             char character = commands.charAt(index);
             if (!isIgnoredCharacter(character)) {
-                normalized.append(normalizeCharacter(character));
+                normalized.append(normalizeEditorCharacter(character, simpleMirrored));
             }
+        }
+        return normalized.toString();
+    }
+
+    public static String replaceEditorAliasesPreservingWhitespace(String commands, boolean simpleMirrored) {
+        if (commands == null || commands.isEmpty()) {
+            return "";
+        }
+        StringBuilder normalized = new StringBuilder(commands.length());
+        for (int index = 0; index < commands.length(); index++) {
+            char character = commands.charAt(index);
+            normalized.append(isIgnoredCharacter(character)
+                    ? character
+                    : normalizeEditorCharacter(character, simpleMirrored));
         }
         return normalized.toString();
     }

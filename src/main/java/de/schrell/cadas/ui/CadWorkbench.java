@@ -1379,7 +1379,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(planHeatingButton, "Die automatische Planung ganzer Räume ist vorübergehend deaktiviert. Heizkreise werden aktuell halbautomatisch als Rechtecke mit dem Werkzeug `Heizkreis` angelegt und danach direkt in der Zeichenfläche bearbeitet.");
         applyTooltip(applyHeatingZoneSettingsButton, "Übernimmt Name, Verlegung, Rollenorientierung, Mittelschlange, Heizleistung und Polygon-Eckpunkte aus der Eigenschaftenleiste auf den markierten Heizkreis.");
         applyTooltip(generateHeatingZoneRoutingButton, "Erzeugt für den markierten rechteckigen Heizkreis die gespeicherte FBH-Routing-Sprache neu. Vorhandene manuelle Korrekturen im Routing-String werden dabei ersetzt.");
-        applyTooltip(applyHeatingRoutingCommandButton, "Übernimmt den Routing-Text auf den markierten Heizkreis. Großbuchstaben steuern den Vorlauf, Kleinbuchstaben den Rücklauf; `X` und `x` löschen jeweils den letzten Vorlauf- oder Rücklauf-Schritt. Der rote Startpunkt markiert den tatsächlichen Routing-Start, nicht das Rechteck.");
+        applyTooltip(applyHeatingRoutingCommandButton, "Übernimmt den Routing-Text auf den markierten Heizkreis. `=` und `R/L` steuern den Vorlauf, `-` und `r/l` den Rücklauf; `X` und `x` löschen jeweils den letzten Vorlauf- oder Rücklauf-Schritt. Bei einfacher Spiegelung werden zusätzlich `(` und `)` zu `L` und `R` sowie `8` und `9` zu `l` und `r`. Der rote Startpunkt markiert den tatsächlichen Routing-Start, nicht das Rechteck.");
         applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf.");
         applyTooltip(dwgStatusLabel, "Zeigt, welcher externe DWG-Konverter gefunden wurde und ob die letzte Analyse erfolgreich war.");
         applyTooltip(dwgBlockSearchField, "Filtert die analysierten DWG-Blöcke nach Blockname, Layer oder Dateiname.");
@@ -1758,7 +1758,11 @@ public final class CadWorkbench extends BorderPane {
             if (updatingHeatingRoutingInput) {
                 return;
             }
-            if (Optional.ofNullable(newValue).orElse("").trim().isBlank()) {
+            String normalizedDisplayText = normalizeRoutingEditorDisplayText(newValue);
+            if (!Objects.equals(Optional.ofNullable(newValue).orElse(""), normalizedDisplayText)) {
+                replaceTextPreservingCaretAndScroll(heatingRoutingCommandArea, normalizedDisplayText);
+            }
+            if (Optional.ofNullable(normalizedDisplayText).orElse("").trim().isBlank()) {
                 return;
             }
             runGuardedAction("Heizkreis-Routing übernehmen", this::applySelectedHeatingZoneRouting);
@@ -1900,7 +1904,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(heatingZoneSerpentineMiddleLineCheckBox, "Aktiviert bei passenden rechteckigen Heizkreisen eine schlangenförmige Mittellinie für Vario- oder Meander-Routing.");
         applyTooltip(heatingZoneHeatOutputField, "Speichert die angenommene Heizleistung des markierten Heizkreises in Watt pro Quadratmeter für Übersicht, PDF und Materialliste.");
         applyTooltip(heatingZonePointArea, "Erfasst pro Zeile einen Polygon-Eckpunkt des markierten Heizkreises als `X; Y` in Zentimetern. Das Rechteck dient nur als Größenrahmen; nach dem Routing richtet CADas es an der äußeren Rohrkante aus.");
-        applyTooltip(heatingRoutingCommandArea, "Zeigt und bearbeitet die Routing-Sprache des markierten Heizkreises. `I/i` verlängern Vorlauf/Rücklauf um eine Rasterlinie, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt. Der rote Startpunkt bleibt an der tatsächlichen Startkante des Heizrohrs; das Rechteck ist nur der Größenrahmen.");
+        applyTooltip(heatingRoutingCommandArea, "Zeigt und bearbeitet die Routing-Sprache des markierten Heizkreises. `=` und `-` verlängern Vorlauf und Rücklauf um eine Rasterlinie, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt. Bei einfacher Spiegelung werden zusätzlich `(` und `)` zu `L` und `R` sowie `8` und `9` zu `l` und `r`. Der rote Startpunkt bleibt an der tatsächlichen Startkante des Heizrohrs; das Rechteck ist nur der Größenrahmen.");
         applyTooltip(autoRouteHeatingZoneOnResizeCheckBox, "Legt fest, ob ein Heizkreis nach dem Ziehen seines Rechtecks automatisch neu geroutet wird. Ausgeschaltet bleiben die vorhandenen Routing-Befehle erhalten.");
         applyTooltip(heatingSummaryLabel, "Zeigt Fläche, Verlegeart, Anzahl der Heizkreise, gesamte HKL und die aufsummierte Heizleistung der gewählten Flächenheizung.");
         applyTooltip(roomObjectPresetSelector, "Wählt ein Objekt zum Platzieren aus und übernimmt dessen Standardmaße. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
@@ -6568,8 +6572,9 @@ public final class CadWorkbench extends BorderPane {
         int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
         String routingText = "";
         if (heating != null && selectedIndex >= 0 && selectedIndex < heating.zones().size()) {
-            routingText = heating.zones().get(selectedIndex).routingCommands();
-            if (Objects.equals(normalizeRoutingEditorText(heatingRoutingCommandArea.getText()), routingText)) {
+            HeatingZone zone = heating.zones().get(selectedIndex);
+            routingText = zone.routingCommands();
+            if (Objects.equals(normalizeRoutingEditorText(heatingRoutingCommandArea.getText(), zone), routingText)) {
                 return;
             }
         }
@@ -6621,7 +6626,40 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private String normalizeRoutingEditorText(String text) {
-        return HeatingRoutingLanguage.stripWhitespaceAndNormalizeAliases(text);
+        return normalizeRoutingEditorText(text, activeHeatingZoneForRoutingInput().orElse(null));
+    }
+
+    private String normalizeRoutingEditorText(String text, HeatingZone zone) {
+        return HeatingRoutingLanguage.stripWhitespaceAndNormalizeAliases(text, usesMirroredRoutingAliases(zone));
+    }
+
+    private String normalizeRoutingEditorDisplayText(String text) {
+        return HeatingRoutingLanguage.replaceEditorAliasesPreservingWhitespace(
+                text,
+                activeHeatingZoneForRoutingInput()
+                        .map(this::usesMirroredRoutingAliases)
+                        .orElse(false)
+        );
+    }
+
+    private Optional<HeatingZone> activeHeatingZoneForRoutingInput() {
+        Optional<HeatingZoneContext> zoneContext = selectedHeatingZoneContext();
+        if (zoneContext.isPresent()) {
+            return Optional.of(zoneContext.orElseThrow().zone());
+        }
+        HydronicHeating heating = selectedHydronicHeating().orElse(null);
+        int selectedIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
+        if (heating == null || selectedIndex < 0 || selectedIndex >= heating.zones().size()) {
+            return Optional.empty();
+        }
+        return Optional.of(heating.zones().get(selectedIndex));
+    }
+
+    private boolean usesMirroredRoutingAliases(HeatingZone zone) {
+        return zone != null && HeatingRoutingLanguage.hasSimpleMirror(
+                zone.routingMirroredHorizontally(),
+                zone.routingMirroredVertically()
+        );
     }
 
     private String describeHeatingZone(HeatingZone zone, List<HydronicHeatingLayoutService.CircuitLayout> circuits) {
@@ -6942,7 +6980,7 @@ public final class CadWorkbench extends BorderPane {
                 baseZone.supplyConnectionPoint(),
                 baseZone.returnConnectionPoint(),
                 baseZone.routingStartPoint(),
-                Optional.ofNullable(routingCommands).orElse(""),
+                normalizeRoutingEditorText(routingCommands, baseZone),
                 serpentineMiddleLine,
                 parseNonNegativeDouble(heatingZoneHeatOutputField.getText(), "Heizleistung pro m²"),
                 baseZone.routingQuarterTurns(),
@@ -7014,8 +7052,8 @@ public final class CadWorkbench extends BorderPane {
         }
         HeatingZoneContext context = selectedHeatingZoneContext()
                 .orElseThrow(() -> new IllegalStateException("Zuerst einen Heizkreis auswählen."));
-        String commands = Optional.ofNullable(heatingRoutingCommandArea.getText()).orElse("");
-        if (normalizeRoutingEditorText(commands).isBlank()) {
+        String commands = normalizeRoutingEditorText(heatingRoutingCommandArea.getText(), context.zone());
+        if (commands.isBlank()) {
             throw new IllegalArgumentException("Routing darf nicht leer sein.");
         }
         HeatingZone draft = heatingZoneDraft(

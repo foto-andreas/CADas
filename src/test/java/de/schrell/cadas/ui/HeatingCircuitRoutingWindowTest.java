@@ -61,17 +61,30 @@ class HeatingCircuitRoutingWindowTest {
     }
 
     @Test
-    void rendertEditiertenKommandotext() throws Exception {
+    void rendertEditiertenKommandotextSofort() throws Exception {
         HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
 
         aufFxThread(() -> {
             Assertions.assertTrue(window.automationProtocolEditable());
 
             window.automationSetProtocolText("I R\nzi");
-            window.automationRenderProtocolText();
 
             Assertions.assertEquals("=Rx-", window.automationProtocol());
             Assertions.assertEquals("=R-", window.automationCommands());
+            return null;
+        });
+    }
+
+    @Test
+    void interpretiertGespiegelteKurvenAliaseImTestfensterSofort() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.automationSetSimpleMirrored(true);
+            window.automationSetProtocolText("89()");
+
+            Assertions.assertEquals("lrLR", window.automationProtocol());
+            Assertions.assertEquals("lrLR", window.automationCommands());
             return null;
         });
     }

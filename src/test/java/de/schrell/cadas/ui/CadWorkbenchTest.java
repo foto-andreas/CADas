@@ -654,6 +654,35 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void interpretiertGespiegelteKurvenAliaseImRoutingTextfeld() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 4_000),
+                    Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationSetTool("HEATING_ZONE_RECTANGLE");
+            workbench.automationCanvasPress(50.3, 50.4, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(180.8, 160.7, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasRelease(180.8, 160.7, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationInvoke("mirrorSelectedHeatingZonesHorizontally", null);
+            heatingRoutingCommandArea(workbench).setText("89()");
+            return null;
+        });
+
+        Assertions.assertEquals("lrLR", aufFxThread(() -> workbench.automationHydronicHeating(0).zones().getFirst().routingCommands()));
+        Assertions.assertEquals("lrLR", aufFxThread(workbench::automationHeatingRoutingCommandAreaText));
+    }
+
+    @Test
     void behaeltCursorUndScrollpositionBeiMehrzeiligemSprachrouting() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
