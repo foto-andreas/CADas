@@ -3431,15 +3431,19 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private HydronicHeatingLayoutService.PlanningResult heatingLayouts(HydronicHeating heating) {
-        return heatingLayoutCache.computeIfAbsent(heating.id(), id -> hydronicHeatingLayoutService.layoutBestEffort(heating));
+        return CadWorkbenchHeatingLayoutSupport.heatingLayouts(
+                heatingLayoutCache,
+                hydronicHeatingLayoutService,
+                heating
+        );
     }
 
     private boolean isHeatingLayoutDirty(HydronicHeating heating) {
-        return heatingLayoutsDirty.contains(heating.id());
+        return CadWorkbenchHeatingLayoutSupport.isHeatingLayoutDirty(heatingLayoutsDirty, heating);
     }
 
     private void scheduleHeatingLayoutRecalculation() {
-        Set<UUID> affected = affectedHeatingIdsFromSelection();
+        Set<UUID> affected = CadWorkbenchHeatingLayoutSupport.affectedHeatingIds(selectedSelections, activeLevel.get());
         if (affected.isEmpty()) {
             return;
         }
@@ -3453,197 +3457,56 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void scheduleHeatingLayoutRecalculationForZone(UUID zoneId) {
-        activeLevel.get().hydronicHeatings().stream()
-                .filter(heating -> heating.zones().stream().anyMatch(zone -> zone.id().equals(zoneId)))
-                .findFirst()
-                .ifPresent(heating -> scheduleHeatingLayoutRecalculation(heating.id()));
-    }
-
-    private Set<UUID> affectedHeatingIdsFromSelection() {
-        Set<UUID> affected = new HashSet<>();
-        for (SelectionKey selection : selectedSelections) {
-            switch (selection.kind()) {
-                case HEATING_ZONE -> activeLevel.get().hydronicHeatings().stream()
-                        .filter(heating -> heating.zones().stream().anyMatch(zone -> zone.id().toString().equals(selection.elementId())))
-                        .findFirst()
-                        .ifPresent(heating -> affected.add(heating.id()));
-                case HEATING_MANIFOLD -> affected.add(UUID.fromString(selection.elementId()));
-                default -> {
-                }
-            }
-        }
-        return affected;
+        CadWorkbenchHeatingLayoutSupport.heatingIdForZone(activeLevel.get(), zoneId)
+                .ifPresent(this::scheduleHeatingLayoutRecalculation);
     }
 
     private void runHeatingLayoutRecalculation() {
-        Set<UUID> regeneratedHeatingIds = regeneratePendingHeatingZoneRouting();
-        Set<UUID> toRecompute = new HashSet<>(heatingLayoutsDirty);
-        toRecompute.addAll(regeneratedHeatingIds);
-        for (UUID id : toRecompute) {
-            activeLevel.get().hydronicHeatings().stream()
-                    .filter(heating -> heating.id().equals(id))
-                    .findFirst()
-                    .ifPresent(heating -> heatingLayoutCache.put(id, hydronicHeatingLayoutService.layoutBestEffort(heating)));
-        }
-        heatingLayoutsDirty.clear();
+        CadWorkbenchHeatingLayoutSupport.runHeatingLayoutRecalculation(
+                activeLevel.get(),
+                heatingLayoutCache,
+                heatingZonesPendingRoutingRegeneration,
+                heatingLayoutsDirty,
+                heatingCircuitRoutingService,
+                hydronicHeatingLayoutService
+        );
         render();
     }
 
     private void recomputeHeatingLayoutNow(UUID heatingId) {
-        heatingLayoutsDirty.remove(heatingId);
-        activeLevel.get().hydronicHeatings().stream()
-                .filter(heating -> heating.id().equals(heatingId))
-                .findFirst()
-                .ifPresent(heating -> heatingLayoutCache.put(heatingId, hydronicHeatingLayoutService.layoutBestEffort(heating)));
+        CadWorkbenchHeatingLayoutSupport.recomputeHeatingLayoutNow(
+                heatingId,
+                activeLevel.get(),
+                heatingLayoutCache,
+                heatingLayoutsDirty,
+                hydronicHeatingLayoutService
+        );
         render();
     }
 
-    private Set<UUID> regeneratePendingHeatingZoneRouting() {
-        Set<UUID> regeneratedHeatingIds = new HashSet<>();
-        if (heatingZonesPendingRoutingRegeneration.isEmpty()) {
-            return regeneratedHeatingIds;
-        }
-        for (HydronicHeating heating : List.copyOf(activeLevel.get().hydronicHeatings())) {
-            List<HeatingZone> zones = new ArrayList<>(heating.zones());
-            boolean changed = false;
-            for (int index = 0; index < zones.size(); index++) {
-                HeatingZone zone = zones.get(index);
-                if (heatingZonesPendingRoutingRegeneration.contains(zone.id())) {
-                    try {
-                        zones.set(index, heatingCircuitRoutingService.regenerate(zone, heating));
-                        changed = true;
-                    } catch (RuntimeException exception) {
-                        // Bei fehlgeschlagener Neugenerierung bleibt das bestehende Routing erhalten.
-                    }
-                }
-            }
-            if (changed) {
-                activeLevel.get().replaceHydronicHeating(heating.withZones(zones));
-                regeneratedHeatingIds.add(heating.id());
-            }
-        }
-        heatingZonesPendingRoutingRegeneration.clear();
-        return regeneratedHeatingIds;
-    }
-
     private void clearHeatingLayoutCache() {
-        heatingLayoutCache.clear();
-        heatingZonesPendingRoutingRegeneration.clear();
-        heatingLayoutsDirty.clear();
+        CadWorkbenchHeatingLayoutSupport.clearHeatingLayoutCache(
+                heatingLayoutCache,
+                heatingZonesPendingRoutingRegeneration,
+                heatingLayoutsDirty
+        );
     }
 
     private void drawHydronicHeatings(GraphicsContext graphics) {
         if (!projectionService.isPlanView(activeView.get())) {
             return;
         }
-        for (HydronicHeating heating : activeLevel.get().hydronicHeatings()) {
-            Color color = heating.surfacePosition() == HeatingSurfacePosition.FLOOR
-                    ? Color.web("#c53b32")
-                    : Color.web("#2878a8");
-            boolean layoutDirty = isHeatingLayoutDirty(heating);
-            Map<UUID, HydronicHeatingLayoutService.CircuitLayout> circuitsByZone = layoutDirty
-                    ? Map.of()
-                    : heatingLayouts(heating).circuits().stream()
-                            .collect(Collectors.toMap(HydronicHeatingLayoutService.CircuitLayout::zoneId, circuit -> circuit));
-            graphics.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.55));
-            graphics.setLineWidth(1.0);
-            graphics.setLineDashes(5.0, 4.0);
-            for (HeatingZone zone : heating.zones()) {
-                boolean selected = selectedSelections.contains(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), zone.id().toString()));
-                graphics.setStroke(selected ? Color.web("#f2a900") : Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.55));
-                graphics.setLineWidth(selected ? 2.2 : 1.0);
-                double[] xPoints = zone.outline().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray();
-                double[] yPoints = zone.outline().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray();
-                graphics.strokePolygon(xPoints, yPoints, xPoints.length);
-                HydronicHeatingLayoutService.CircuitLayout circuit = circuitsByZone.get(zone.id());
-                if (circuit != null && !circuit.fieldSupplyPath().isEmpty() && !circuit.fieldReturnPath().isEmpty()) {
-                    drawHeatingConnectionMarker(graphics, circuit.fieldSupplyPath().getFirst(), "V", Color.web("#d33b32"));
-                    drawHeatingConnectionMarker(graphics, circuit.fieldReturnPath().getLast(), "R", Color.web("#1f62d0"));
-                }
-            }
-            graphics.setLineDashes();
-            graphics.setLineWidth(clamp(heating.pipeDiameter().toMillimeters() * scale(), 1.2, 5.0));
-            if (layoutDirty) {
-                continue;
-            }
-            for (HydronicHeatingLayoutService.CircuitLayout circuit : heatingLayouts(heating).circuits()) {
-                drawHeatingRolePath(graphics, circuit.fieldSupplyPath().reversed(), circuit.bendRadius().toMillimeters(), Color.web("#d33b32"), false);
-                drawHeatingRolePath(graphics, circuit.fieldReturnPath(), circuit.bendRadius().toMillimeters(), Color.web("#1f62d0"), false);
-            }
-            for (HeatingZone zone : heating.zones()) {
-                boolean selected = selectedSelections.contains(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), zone.id().toString()));
-                drawHeatingRoutingStartMarker(graphics, zone.routingStartPoint(), selected);
-            }
-        }
-    }
-
-    private void drawHeatingRoutingStartMarker(GraphicsContext graphics, PlanPoint point, boolean selected) {
-        double radius = selected ? 5.0 : 4.0;
-        double x = toScreenProjectedX(point, 0.0);
-        double y = toScreenProjectedY(point, 0.0);
-        graphics.save();
-        graphics.setLineDashes();
-        graphics.setFill(Color.web("#d00000"));
-        graphics.fillOval(x - radius, y - radius, radius * 2.0, radius * 2.0);
-        graphics.setStroke(Color.web("#ffffff"));
-        graphics.setLineWidth(selected ? 1.6 : 1.0);
-        graphics.strokeOval(x - radius, y - radius, radius * 2.0, radius * 2.0);
-        graphics.restore();
-    }
-
-    private void drawHeatingRolePath(GraphicsContext graphics, List<PlanPoint> path, double radiusMillimeters, Color color, boolean connector) {
-        graphics.setStroke(color);
-        graphics.setLineDashes(connector ? new double[]{6.0, 4.0} : new double[0]);
-        drawRoundedHeatingPath(graphics, path, radiusMillimeters);
-        graphics.setLineDashes();
-    }
-
-    private void drawRoundedHeatingPath(GraphicsContext graphics, List<PlanPoint> path, double radiusMillimeters) {
-        if (path.size() < 2) {
-            return;
-        }
-        graphics.beginPath();
-        graphics.moveTo(toScreenProjectedX(path.getFirst(), 0.0), toScreenProjectedY(path.getFirst(), 0.0));
-        for (int index = 1; index + 1 < path.size(); index++) {
-            PlanPoint previous = path.get(index - 1);
-            PlanPoint current = path.get(index);
-            PlanPoint next = path.get(index + 1);
-            double firstLength = previous.distanceTo(current).toMillimeters();
-            double secondLength = current.distanceTo(next).toMillimeters();
-            double trim = Math.min(radiusMillimeters, Math.min(firstLength, secondLength) / 2.0);
-            if (trim <= 0.001) {
-                graphics.lineTo(toScreenProjectedX(current, 0.0), toScreenProjectedY(current, 0.0));
-                continue;
-            }
-            PlanPoint before = interpolateToward(current, previous, trim / firstLength);
-            PlanPoint after = interpolateToward(current, next, trim / secondLength);
-            graphics.lineTo(toScreenProjectedX(before, 0.0), toScreenProjectedY(before, 0.0));
-            graphics.quadraticCurveTo(
-                    toScreenProjectedX(current, 0.0), toScreenProjectedY(current, 0.0),
-                    toScreenProjectedX(after, 0.0), toScreenProjectedY(after, 0.0)
-            );
-        }
-        graphics.lineTo(toScreenProjectedX(path.getLast(), 0.0), toScreenProjectedY(path.getLast(), 0.0));
-        graphics.stroke();
-    }
-
-    private PlanPoint interpolateToward(PlanPoint start, PlanPoint target, double ratio) {
-        return new PlanPoint(
-                start.xMillimeters() + (target.xMillimeters() - start.xMillimeters()) * ratio,
-                start.yMillimeters() + (target.yMillimeters() - start.yMillimeters()) * ratio
+        CadWorkbenchHeatingRenderer.drawHydronicHeatings(
+                graphics,
+                activeLevel.get().hydronicHeatings(),
+                activeLevel.get().name(),
+                selectedSelections,
+                this::isHeatingLayoutDirty,
+                this::heatingLayouts,
+                point -> toScreenProjectedX(point, 0.0),
+                point -> toScreenProjectedY(point, 0.0),
+                this::scale
         );
-    }
-
-    private void drawHeatingConnectionMarker(GraphicsContext graphics, PlanPoint point, String label, Color color) {
-        double x = toScreenProjectedX(point, 0.0);
-        double y = toScreenProjectedY(point, 0.0);
-        graphics.setFill(Color.web("#fcfaf5"));
-        graphics.fillOval(x - 7.0, y - 7.0, 14.0, 14.0);
-        graphics.setStroke(color);
-        graphics.setLineWidth(2.0);
-        graphics.strokeOval(x - 7.0, y - 7.0, 14.0, 14.0);
-        graphics.setFill(color);
-        graphics.fillText(label, x - 3.5, y + 4.0);
     }
 
     private void drawFloorOpenings(GraphicsContext graphics, Room room) {
@@ -4642,8 +4505,22 @@ public final class CadWorkbench extends BorderPane {
         PlanPoint returnPoint = horizontal
                 ? new PlanPoint(centerX + halfPitch, centerY)
                 : new PlanPoint(centerX, centerY + halfPitch);
-        drawHeatingConnectionMarker(graphics, supplyPoint, "V", Color.web("#1f62d0"));
-        drawHeatingConnectionMarker(graphics, returnPoint, "R", Color.web("#d33b32"));
+        CadWorkbenchHeatingRenderer.drawConnectionMarker(
+                graphics,
+                supplyPoint,
+                "V",
+                Color.web("#1f62d0"),
+                point -> toScreenProjectedX(point, 0.0),
+                point -> toScreenProjectedY(point, 0.0)
+        );
+        CadWorkbenchHeatingRenderer.drawConnectionMarker(
+                graphics,
+                returnPoint,
+                "R",
+                Color.web("#d33b32"),
+                point -> toScreenProjectedX(point, 0.0),
+                point -> toScreenProjectedY(point, 0.0)
+        );
     }
 
     private void drawDimensionLabel(GraphicsContext graphics, PlanSegment segment, String text) {
