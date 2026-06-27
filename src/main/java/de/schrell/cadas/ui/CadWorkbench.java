@@ -12,7 +12,9 @@ import de.schrell.cadas.application.drawing.EdgeResizeService;
 import de.schrell.cadas.application.drawing.GuideSnapService;
 import de.schrell.cadas.application.drawing.GuideSnapTargets;
 import de.schrell.cadas.application.drawing.HeatingZoneMirrorService;
+import de.schrell.cadas.application.drawing.WallIntersectionSplitService;
 import de.schrell.cadas.application.exchange.ExchangeFileNameService;
+import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.history.UndoRedoStack;
 import de.schrell.cadas.application.help.HelpContentService;
 import de.schrell.cadas.application.help.MarkdownNavigationService;
@@ -44,6 +46,7 @@ import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.application.layers.DwgBlockCatalogService;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.layers.SurfaceLayerConsistencyService;
+import de.schrell.cadas.application.layers.SurfaceRectangleTileLayoutService;
 import de.schrell.cadas.application.layers.TileLayoutRequest;
 import de.schrell.cadas.application.layers.TileLayoutService;
 import de.schrell.cadas.application.layers.TilePlacement;
@@ -292,10 +295,13 @@ public final class CadWorkbench extends BorderPane {
     private Path lastLevelSavePath;
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
+    private final SurfaceRectangleTileLayoutService surfaceRectangleTileLayoutService = new SurfaceRectangleTileLayoutService();
     private final SurfaceLayerConsistencyService surfaceLayerConsistencyService = new SurfaceLayerConsistencyService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
+    private final WallIntersectionSplitService wallIntersectionSplitService = new WallIntersectionSplitService();
+    private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
     private final GuideDistanceService guideDistanceService = new GuideDistanceService();
     private final PointerCursorService pointerCursorService = new PointerCursorService();
     private final TwoDZoomRange twoDZoomRange = new TwoDZoomRange();
@@ -3705,23 +3711,13 @@ public final class CadWorkbench extends BorderPane {
         if (!layer.visible()) {
             return;
         }
-        TileLayoutRequest request = new TileLayoutRequest(
-                Length.ofMillimeters(room.widthMillimeters()),
-                Length.ofMillimeters(room.depthMillimeters()),
-                layer.effectiveTileWidth(),
-                layer.effectiveTileHeight(),
-                layer.layoutMode(),
-                layer.layoutOffset(),
-                layer.minimumOffset(),
-                layer.minimumEdgeWidth(),
-                layer.minimumStartEndMargin()
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = surfaceRectangleTileLayoutService.tilesForRectangles(
+                floorOpeningGeometryService.floorRectangles(activeLevel.get(), room),
+                layer
         );
-        List<TilePlacement> tiles = tileLayoutService.fillSurface(request);
         if (tiles.isEmpty()) {
             return;
         }
-        double roomMinX = room.minXMillimeters();
-        double roomMinY = room.minYMillimeters();
         double jointPx = Math.max(0.4, layer.jointWidth().toMillimeters() * scale());
         graphics.save();
         graphics.beginPath();
@@ -3735,11 +3731,11 @@ public final class CadWorkbench extends BorderPane {
         graphics.setFill(Color.color(0.35, 0.25, 0.12, 0.55));
         var horizontalKeys = new java.util.HashSet<String>();
         var verticalKeys = new java.util.HashSet<String>();
-        for (TilePlacement tile : tiles) {
-            double tx = roomMinX + tile.xOffset().toMillimeters();
-            double ty = roomMinY + tile.yOffset().toMillimeters();
-            double tw = tile.width().toMillimeters();
-            double th = tile.height().toMillimeters();
+        for (SurfaceRectangleTileLayoutService.PlacedSurfaceTile tile : tiles) {
+            double tx = tile.x();
+            double ty = tile.y();
+            double tw = tile.width();
+            double th = tile.height();
             String hKey = String.format(Locale.US, "h:%.3f:%.3f:%.3f", ty + th, tx, tx + tw);
             if (horizontalKeys.add(hKey)) {
                 double screenX = toScreenX(tx);
@@ -7901,6 +7897,13 @@ public final class CadWorkbench extends BorderPane {
                     null
             ));
         }
+        if (contextWallSplitCandidate().isPresent()) {
+            selectionContextMenu.getItems().add(menuItem(
+                    "Wand an Kreuzung aufteilen",
+                    this::splitSelectedWallsAtContextIntersection,
+                    null
+            ));
+        }
         if (selectedWalls().size() >= 3) {
             selectionContextMenu.getItems().add(menuItem("Raum erkennen", this::recognizeRoomFromSelectedWalls, null));
         }
@@ -8088,6 +8091,42 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceSurfaceLayerStacks(result.surfaceLayerStacks());
         markThreeDDirty();
         draftLabel.setText("Dachschräge aus Wandinnenkante erzeugt.");
+        render();
+    }
+
+    private Optional<WallIntersectionSplitService.SplitCandidate> contextWallSplitCandidate() {
+        if (contextMenuWorldPoint == null) {
+            return Optional.empty();
+        }
+        return wallIntersectionSplitService.findCandidate(
+                activeLevel.get(),
+                selectedWalls().stream().map(Wall::id).toList(),
+                contextMenuWorldPoint,
+                SNAP_TOLERANCE
+        );
+    }
+
+    private void splitSelectedWallsAtContextIntersection() {
+        if (contextMenuWorldPoint == null || selectedWalls().isEmpty()) {
+            draftLabel.setText("Für die Wandteilung braucht es eine ausgewählte Wand und einen Kreuzungspunkt.");
+            return;
+        }
+        WallIntersectionSplitService.SplitResult result = wallIntersectionSplitService.split(
+                activeLevel.get(),
+                selectedWalls().stream().map(Wall::id).toList(),
+                contextMenuWorldPoint,
+                SNAP_TOLERANCE
+        );
+        rememberStateForUndo();
+        activeLevel.get().replaceWalls(result.walls());
+        activeLevel.get().replaceDoors(result.doors());
+        activeLevel.get().replaceWindows(result.windows());
+        activeLevel.get().replaceSurfaceLayerStacks(result.surfaceLayerStacks());
+        synchronizeRoomsFromWalls(activeLevel.get());
+        markThreeDDirty();
+        draftLabel.setText(result.splits().size() == 1
+                ? "Wand an der Kreuzung aufgeteilt."
+                : "Wände an der Kreuzung aufgeteilt.");
         render();
     }
 

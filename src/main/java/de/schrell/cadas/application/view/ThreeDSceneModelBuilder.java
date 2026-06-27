@@ -7,6 +7,7 @@ import de.schrell.cadas.application.dwg.Dxf3dObjectGeometryReader;
 import de.schrell.cadas.application.dwg.Ifc3dObjectGeometryReader;
 import de.schrell.cadas.application.dwg.Rfa3dObjectGeometryReader;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
+import de.schrell.cadas.application.layers.SurfaceRectangleTileLayoutService;
 import de.schrell.cadas.application.layers.TileLayoutRequest;
 import de.schrell.cadas.application.layers.TileLayoutService;
 import de.schrell.cadas.application.layers.TilePlacement;
@@ -68,6 +69,7 @@ public final class ThreeDSceneModelBuilder {
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
     private final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     private final TileLayoutService tileLayoutService = new TileLayoutService();
+    private final SurfaceRectangleTileLayoutService surfaceRectangleTileLayoutService = new SurfaceRectangleTileLayoutService();
     private final Dxf3dObjectGeometryReader dxf3dObjectGeometryReader = new Dxf3dObjectGeometryReader();
     private final Ifc3dObjectGeometryReader ifc3dObjectGeometryReader = new Ifc3dObjectGeometryReader();
     private final Rfa3dObjectGeometryReader rfa3dObjectGeometryReader = new Rfa3dObjectGeometryReader();
@@ -460,77 +462,48 @@ public final class ThreeDSceneModelBuilder {
         if (jointWidthMm < 0.001) return joints;
         double jointHeight = JOINT_HEIGHT;
         double jointCenterY = surfaceY + JOINT_SURFACE_OFFSET + jointHeight / 2.0;
-        TileLayoutRequest request = new TileLayoutRequest(
-                Length.ofMillimeters(room.widthMillimeters()),
-                Length.ofMillimeters(room.depthMillimeters()),
-                layer.effectiveTileWidth(),
-                layer.effectiveTileHeight(),
-                layer.layoutMode(),
-                layer.layoutOffset(),
-                layer.minimumOffset(),
-                layer.minimumEdgeWidth(),
-                layer.minimumStartEndMargin()
-        );
-        List<TilePlacement> tiles = tileLayoutService.fillSurface(request);
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = surfaceRectangleTileLayoutService.tilesForRectangles(rectangles, layer);
         if (tiles.isEmpty()) return joints;
-        double roomMinX = room.minXMillimeters();
-        double roomMinY = room.minYMillimeters();
         var horizontalKeys = new java.util.HashSet<String>();
         var verticalKeys = new java.util.HashSet<String>();
-        for (TilePlacement tile : tiles) {
-            double tx = roomMinX + tile.xOffset().toMillimeters();
-            double ty = roomMinY + tile.yOffset().toMillimeters();
-            double tw = tile.width().toMillimeters();
-            double th = tile.height().toMillimeters();
-            for (OrthogonalPolygonDecompositionService.CellRectangle rect : rectangles) {
-                double rx = rect.centerX() - rect.width() / 2.0;
-                double rz = rect.centerY() - rect.height() / 2.0;
-                double rxe = rx + rect.width();
-                double rze = rz + rect.height();
-                double jointX = Math.max(rx, tx);
-                double jointXe = Math.min(rxe, tx + tw);
-                double jointZ = ty + th - jointWidthMm / 2.0;
-                double jointZe = jointZ + jointWidthMm;
-                String hKey = String.format(java.util.Locale.US, "h:%.3f:%.3f:%.3f", jointZ, jointX, jointXe);
-                if (jointX < jointXe && jointZ < jointZe && jointZ >= rz && jointZe <= rze && horizontalKeys.add(hKey)) {
-                    joints.add(new RenderableBox(
-                            new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
-                            levelName,
-                            RenderableKind.SURFACE_LAYER,
-                            (jointX + jointXe) / 2.0,
-                            jointCenterY,
-                            (jointZ + jointZe) / 2.0,
-                            jointXe - jointX,
-                            jointHeight,
-                            jointZe - jointZ,
-                            RotationAxis.Y,
-                            0.0,
-                            "joint",
-                            1.0
-                    ));
-                }
-                double verticalJointX = tx + tw - jointWidthMm / 2.0;
-                double verticalJointXe = verticalJointX + jointWidthMm;
-                double verticalJointZ = Math.max(rz, ty);
-                double verticalJointZe = Math.min(rze, ty + th);
-                String vKey = String.format(java.util.Locale.US, "v:%.3f:%.3f:%.3f", verticalJointX, verticalJointZ, verticalJointZe);
-                if (verticalJointX >= rx && verticalJointXe <= rxe && verticalJointZ < verticalJointZe && verticalKeys.add(vKey)) {
-                    joints.add(new RenderableBox(
-                            new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
-                            levelName,
-                            RenderableKind.SURFACE_LAYER,
-                            (verticalJointX + verticalJointXe) / 2.0,
-                            jointCenterY,
-                            (verticalJointZ + verticalJointZe) / 2.0,
-                            verticalJointXe - verticalJointX,
-                            jointHeight,
-                            verticalJointZe - verticalJointZ,
-                            RotationAxis.Y,
-                            0.0,
-                            "joint",
-                            1.0
-                    ));
-                }
+        for (SurfaceRectangleTileLayoutService.PlacedSurfaceTile tile : tiles) {
+            double horizontalJointZ = tile.y() + tile.height();
+            String hKey = String.format(java.util.Locale.US, "h:%.3f:%.3f:%.3f", horizontalJointZ, tile.x(), tile.x() + tile.width());
+            if (horizontalKeys.add(hKey)) {
+                joints.add(new RenderableBox(
+                        new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
+                        levelName,
+                        RenderableKind.SURFACE_LAYER,
+                        tile.x() + tile.width() / 2.0,
+                        jointCenterY,
+                        horizontalJointZ,
+                        tile.width(),
+                        jointHeight,
+                        jointWidthMm,
+                        RotationAxis.Y,
+                        0.0,
+                        "joint",
+                        1.0
+                ));
+            }
+            double verticalJointX = tile.x() + tile.width();
+            String vKey = String.format(java.util.Locale.US, "v:%.3f:%.3f:%.3f", verticalJointX, tile.y(), tile.y() + tile.height());
+            if (verticalKeys.add(vKey)) {
+                joints.add(new RenderableBox(
+                        new SelectionKey(RenderableKind.SURFACE_LAYER, levelName, layer.id().toString()),
+                        levelName,
+                        RenderableKind.SURFACE_LAYER,
+                        verticalJointX,
+                        jointCenterY,
+                        tile.y() + tile.height() / 2.0,
+                        jointWidthMm,
+                        jointHeight,
+                        tile.height(),
+                        RotationAxis.Y,
+                        0.0,
+                        "joint",
+                        1.0
+                ));
             }
         }
         return joints;
