@@ -5375,7 +5375,7 @@ public final class CadWorkbench extends BorderPane {
         HeatingZone zone = new HeatingZone(
                 UUID.randomUUID(),
                 "Heizkreis " + (zones.size() + 1),
-                rectanglePoints(heatingZoneBounds(bounds)),
+                CadWorkbenchHeatingSupport.rectanglePoints(CadWorkbenchHeatingSupport.heatingZoneBounds(bounds)),
                 heatingCircuitRoutingService.manualPattern(Optional.ofNullable(heatingLayoutPatternSelector.getValue())
                         .orElse(HeatingLayoutPattern.VARIO)),
                 false
@@ -5444,7 +5444,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void placeHydronicManifold(PlanSegment bounds) {
-        HeatingZoneBounds freeArea = heatingZoneBounds(bounds);
+        CadWorkbenchHeatingSupport.HeatingZoneBounds freeArea = CadWorkbenchHeatingSupport.heatingZoneBounds(bounds);
         PlanPoint point = freeArea.center();
         Optional<ManifoldTarget> target = manifoldTarget(point);
         if (target.isEmpty()) {
@@ -6507,7 +6507,7 @@ public final class CadWorkbench extends BorderPane {
         updatingHeatingZoneSelection = true;
         try {
             heatingZoneList.getItems().setAll(heating.zones().stream()
-                    .map(zone -> describeHeatingZone(zone, circuits))
+                    .map(zone -> CadWorkbenchHeatingSupport.describeHeatingZone(zone, circuits))
                     .toList());
             if (!heatingZoneList.getItems().isEmpty()) {
                 heatingZoneList.getSelectionModel().select(Math.max(0, Math.min(selectedIndex, heatingZoneList.getItems().size() - 1)));
@@ -6522,7 +6522,7 @@ public final class CadWorkbench extends BorderPane {
         double totalHeatOutput = heating.zones().stream().mapToDouble(HeatingZone::heatOutputWatts).sum();
         boolean maximumExceeded = circuits.stream()
                 .anyMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) > 0);
-        String warning = heatingWarning(layoutResult.validationReport(), maximumExceeded);
+        String warning = CadWorkbenchHeatingSupport.heatingWarning(layoutResult.validationReport(), maximumExceeded);
         heatingSummaryLabel.setText(String.format(
                 Locale.GERMAN,
                 "%s · Raumvorgabe %s · %d Heizkreis(e) · %.2f m² · %.1f m HKL · %.0f W%s",
@@ -6625,42 +6625,12 @@ public final class CadWorkbench extends BorderPane {
         );
     }
 
-    private String describeHeatingZone(HeatingZone zone, List<HydronicHeatingLayoutService.CircuitLayout> circuits) {
-        double pipeLength = circuits.stream()
-                .filter(circuit -> circuit.zoneId().equals(zone.id()))
-                .findFirst()
-                .map(circuit -> circuit.pipeLength().toMillimeters())
-                .orElse(0.0);
-        String roleOrientation = zone.flowInverted() ? "invertiert" : "normal";
-        String routingMode = zone.hasRoutingCommands() ? "Sprachrouting" : "Alt";
-        return String.format(
-                Locale.GERMAN,
-                "%s · %s · %s · %s · HKL %.1f m · %.2f m² · %.0f W",
-                zone.name(), zone.layoutPattern(), routingMode, roleOrientation,
-                pipeLength / 1_000.0, zone.areaSquareMeters(), zone.heatOutputWatts()
-        );
-    }
-
     private String heatingUpdateMessage(HydronicHeating heating, String successPrefix) {
         HydronicHeatingLayoutService.PlanningResult layoutResult = hydronicHeatingLayoutService.layoutBestEffort(heating);
         boolean maximumExceeded = layoutResult.circuits().stream()
                 .anyMatch(circuit -> circuit.pipeLength().compareTo(heating.maximumPipeLength()) > 0);
-        String warning = heatingWarning(layoutResult.validationReport(), maximumExceeded);
+        String warning = CadWorkbenchHeatingSupport.heatingWarning(layoutResult.validationReport(), maximumExceeded);
         return successPrefix + (warning.isBlank() ? "" : " " + warning.strip());
-    }
-
-    private String heatingWarning(HydronicHeatingLayoutService.ValidationReport report, boolean maximumExceeded) {
-        List<String> warnings = new ArrayList<>();
-        if (!report.valid()) {
-            warnings.add(report.summary());
-        }
-        if (maximumExceeded) {
-            warnings.add("Mindestens ein Heizkreis überschreitet die maximale Rohrlänge.");
-        }
-        if (warnings.isEmpty()) {
-            return "";
-        }
-        return " · Warnung: " + String.join(" ", warnings);
     }
 
     private void planHydronicHeating() {
@@ -6733,7 +6703,10 @@ public final class CadWorkbench extends BorderPane {
                 .orElse(HeatingSurfacePosition.FLOOR);
         HeatingLayoutPattern layoutPattern = Optional.ofNullable(heatingLayoutPatternSelector.getValue())
                 .orElse(HeatingLayoutPattern.VARIO);
-        HydronicManifoldDefaults manifoldDefaults = defaultHydronicManifold(room);
+        CadWorkbenchHeatingSupport.HydronicManifoldDefaults manifoldDefaults = CadWorkbenchHeatingSupport.defaultHydronicManifold(
+                room,
+                DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS
+        );
         return new HydronicHeating(
                 heatingId, room.id(), surfacePosition, layoutPattern,
                 requiredPositiveLength(heatingPipeSpacingField, heatingPipeSpacingUnit, "Verlegeabstand"),
@@ -6744,19 +6717,6 @@ public final class CadWorkbench extends BorderPane {
                 manifoldDefaults.returnPoint(),
                 List.of()
         );
-    }
-
-    private HydronicManifoldDefaults defaultHydronicManifold(Room room) {
-        HeatingZoneBounds bounds = heatingZoneBounds(room.outline());
-        PlanPoint center = bounds.center();
-        boolean horizontal = bounds.width() >= bounds.height();
-        PlanPoint supplyPoint = horizontal
-                ? new PlanPoint(center.xMillimeters() - DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS / 2.0, center.yMillimeters())
-                : new PlanPoint(center.xMillimeters(), center.yMillimeters() - DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS / 2.0);
-        PlanPoint returnPoint = horizontal
-                ? new PlanPoint(center.xMillimeters() + DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS / 2.0, center.yMillimeters())
-                : new PlanPoint(center.xMillimeters(), center.yMillimeters() + DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS / 2.0);
-        return new HydronicManifoldDefaults(supplyPoint, returnPoint);
     }
 
     private Length requiredPositiveLength(TextField field, ComboBox<LengthUnit> unitSelector, String label) {
@@ -6775,130 +6735,6 @@ public final class CadWorkbench extends BorderPane {
             throw new IllegalArgumentException(label + " darf nicht negativ sein.");
         }
         return length;
-    }
-
-    private record HydronicManifoldDefaults(PlanPoint supplyPoint, PlanPoint returnPoint) {
-    }
-
-    private HeatingZone defaultHeatingZone(Room room, HydronicHeating heating) {
-        HeatingZone zone = new HeatingZone(
-                UUID.randomUUID(),
-                "Heizkreis " + (heating.zones().size() + 1),
-                defaultHeatingRectangle(room, heating),
-                heatingCircuitRoutingService.manualPattern(heating.layoutPattern()),
-                false
-        );
-        try {
-            return heatingCircuitRoutingService.regenerate(zone, heating);
-        } catch (RuntimeException ignored) {
-            return zone;
-        }
-    }
-
-    private List<PlanPoint> defaultHeatingRectangle(Room room, HydronicHeating heating) {
-        HeatingZoneBounds roomBounds = heatingZoneBounds(room.outline());
-        List<Double> xCoordinates = heatingSplitCoordinates(roomBounds, heating, true);
-        List<Double> yCoordinates = heatingSplitCoordinates(roomBounds, heating, false);
-        HeatingZoneBounds bestBounds = null;
-        double bestArea = 0.0;
-        for (int xIndex = 0; xIndex + 1 < xCoordinates.size(); xIndex++) {
-            for (int yIndex = 0; yIndex + 1 < yCoordinates.size(); yIndex++) {
-                HeatingZoneBounds candidate = new HeatingZoneBounds(
-                        xCoordinates.get(xIndex),
-                        yCoordinates.get(yIndex),
-                        xCoordinates.get(xIndex + 1),
-                        yCoordinates.get(yIndex + 1)
-                );
-                if (candidate.width() <= 0.0 || candidate.height() <= 0.0) {
-                    continue;
-                }
-                PlanPoint center = candidate.center();
-                if (!containsHeatingPoint(room.outline(), center) || heating.zones().stream()
-                        .anyMatch(zone -> containsHeatingPoint(zone.outline(), center))) {
-                    continue;
-                }
-                double area = candidate.area();
-                if (area > bestArea) {
-                    bestArea = area;
-                    bestBounds = candidate;
-                }
-            }
-        }
-        if (bestBounds == null) {
-            double inset = Math.min(
-                    Math.max(100.0, heating.wallClearance().toMillimeters()),
-                    Math.min(roomBounds.width(), roomBounds.height()) / 4.0
-            );
-            double maxX = roomBounds.minX() + Math.max(100.0, Math.min(2_000.0, roomBounds.width() - inset * 2.0));
-            double maxY = roomBounds.minY() + Math.max(100.0, Math.min(2_000.0, roomBounds.height() - inset * 2.0));
-            bestBounds = new HeatingZoneBounds(roomBounds.minX() + inset, roomBounds.minY() + inset, maxX, maxY);
-        }
-        return rectanglePoints(bestBounds);
-    }
-
-    private List<Double> heatingSplitCoordinates(HeatingZoneBounds roomBounds, HydronicHeating heating, boolean xAxis) {
-        List<Double> coordinates = new ArrayList<>();
-        coordinates.add(xAxis ? roomBounds.minX() : roomBounds.minY());
-        coordinates.add(xAxis ? roomBounds.maxX() : roomBounds.maxY());
-        for (HeatingZone zone : heating.zones()) {
-            HeatingZoneBounds bounds = heatingZoneBounds(zone.outline());
-            coordinates.add(xAxis ? bounds.minX() : bounds.minY());
-            coordinates.add(xAxis ? bounds.maxX() : bounds.maxY());
-        }
-        coordinates.sort(Double::compareTo);
-        List<Double> distinct = new ArrayList<>();
-        for (double coordinate : coordinates) {
-            if (distinct.isEmpty() || Math.abs(distinct.getLast() - coordinate) > 0.001) {
-                distinct.add(coordinate);
-            }
-        }
-        return List.copyOf(distinct);
-    }
-
-    private HeatingZoneBounds heatingZoneBounds(List<PlanPoint> points) {
-        return new HeatingZoneBounds(
-                points.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0),
-                points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0),
-                points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0),
-                points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0)
-        );
-    }
-
-    private HeatingZoneBounds heatingZoneBounds(PlanSegment segment) {
-        return new HeatingZoneBounds(
-                Math.min(segment.start().xMillimeters(), segment.end().xMillimeters()),
-                Math.min(segment.start().yMillimeters(), segment.end().yMillimeters()),
-                Math.max(segment.start().xMillimeters(), segment.end().xMillimeters()),
-                Math.max(segment.start().yMillimeters(), segment.end().yMillimeters())
-        );
-    }
-
-    private List<PlanPoint> rectanglePoints(HeatingZoneBounds bounds) {
-        return List.of(
-                new PlanPoint(bounds.minX(), bounds.minY()),
-                new PlanPoint(bounds.maxX(), bounds.minY()),
-                new PlanPoint(bounds.maxX(), bounds.maxY()),
-                new PlanPoint(bounds.minX(), bounds.maxY())
-        );
-    }
-
-    private boolean containsHeatingPoint(List<PlanPoint> polygon, PlanPoint point) {
-        boolean inside = false;
-        int previousIndex = polygon.size() - 1;
-        for (int index = 0; index < polygon.size(); index++) {
-            PlanPoint current = polygon.get(index);
-            PlanPoint previous = polygon.get(previousIndex);
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside;
     }
 
     private void applySelectedHeatingZoneSettings() {
@@ -6931,7 +6767,7 @@ public final class CadWorkbench extends BorderPane {
         return new HeatingZone(
                 baseZone.id(),
                 heatingZoneNameField.getText(),
-                parseHeatingZonePoints(heatingZonePointArea.getText()),
+                CadWorkbenchHeatingSupport.parseHeatingZonePoints(heatingZonePointArea.getText()),
                 heatingCircuitRoutingService.manualPattern(layoutPattern),
                 heatingZoneFlowInvertedCheckBox.isSelected(),
                 baseZone.supplyConnectionPoint(),
@@ -6939,48 +6775,11 @@ public final class CadWorkbench extends BorderPane {
                 baseZone.routingStartPoint(),
                 normalizeRoutingEditorText(routingCommands, baseZone),
                 serpentineMiddleLine,
-                parseNonNegativeDouble(heatingZoneHeatOutputField.getText(), "Heizleistung pro m²"),
+                CadWorkbenchHeatingSupport.parseNonNegativeDouble(heatingZoneHeatOutputField.getText(), "Heizleistung pro m²"),
                 baseZone.routingQuarterTurns(),
                 baseZone.routingMirroredHorizontally(),
                 baseZone.routingMirroredVertically()
         );
-    }
-
-    private List<PlanPoint> parseHeatingZonePoints(String text) {
-        List<PlanPoint> points = new ArrayList<>();
-        for (String line : Optional.ofNullable(text).orElse("").lines().toList()) {
-            if (line.isBlank()) {
-                continue;
-            }
-            String[] coordinates = line.trim().split("\\s*;\\s*", 2);
-            if (coordinates.length != 2) {
-                throw new IllegalArgumentException("Jeder Eckpunkt benötigt X und Y, getrennt durch Semikolon.");
-            }
-            try {
-                points.add(new PlanPoint(
-                        Double.parseDouble(coordinates[0].replace(',', '.')) * 10.0,
-                        Double.parseDouble(coordinates[1].replace(',', '.')) * 10.0
-                ));
-            } catch (NumberFormatException exception) {
-                throw new IllegalArgumentException("Ungültiger Heizbereichs-Eckpunkt: " + line, exception);
-            }
-        }
-        if (points.size() < 3) {
-            throw new IllegalArgumentException("Ein Heizbereich benötigt mindestens drei Eckpunkte.");
-        }
-        return List.copyOf(points);
-    }
-
-    private double parseNonNegativeDouble(String text, String label) {
-        try {
-            double value = Double.parseDouble(Optional.ofNullable(text).orElse("").trim().replace(',', '.'));
-            if (!Double.isFinite(value) || value < 0.0) {
-                throw new IllegalArgumentException(label + " darf nicht negativ sein.");
-            }
-            return value;
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException(label + " ist keine gültige Zahl.", exception);
-        }
     }
 
     private void generateSelectedHeatingZoneRouting() {
@@ -7065,7 +6864,10 @@ public final class CadWorkbench extends BorderPane {
         if (room == null) {
             return false;
         }
-        HydronicManifoldDefaults defaults = defaultHydronicManifold(room);
+        CadWorkbenchHeatingSupport.HydronicManifoldDefaults defaults = CadWorkbenchHeatingSupport.defaultHydronicManifold(
+                room,
+                DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS
+        );
         activeLevel.get().replaceHydronicHeating(
                 heating.withManifold(defaults.supplyPoint(), defaults.returnPoint())
                         .withManifoldFreeArea(
@@ -7094,24 +6896,6 @@ public final class CadWorkbench extends BorderPane {
             Room room,
             HydronicHeating heating
     ) {
-    }
-
-    private record HeatingZoneBounds(double minX, double minY, double maxX, double maxY) {
-        private double width() {
-            return maxX - minX;
-        }
-
-        private double height() {
-            return maxY - minY;
-        }
-
-        private double area() {
-            return width() * height();
-        }
-
-        private PlanPoint center() {
-            return new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
-        }
     }
 
     private void refreshSurfaceLayerSection() {
@@ -8230,10 +8014,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private Optional<HeatingZone> mergeableHeatingZone(HeatingZoneContext context) {
-        HeatingZoneBounds bounds = heatingZoneBounds(context.zone().outline());
+        CadWorkbenchHeatingSupport.HeatingZoneBounds bounds = CadWorkbenchHeatingSupport.heatingZoneBounds(context.zone().outline());
         return context.heating().zones().stream()
                 .filter(zone -> !zone.id().equals(context.zone().id()))
-                .filter(zone -> canMerge(bounds, heatingZoneBounds(zone.outline())))
+                .filter(zone -> CadWorkbenchHeatingSupport.canMerge(bounds, CadWorkbenchHeatingSupport.heatingZoneBounds(zone.outline())))
                 .findFirst();
     }
 
@@ -8242,8 +8026,11 @@ public final class CadWorkbench extends BorderPane {
                 .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
         HeatingZone neighbor = mergeableHeatingZone(context)
                 .orElseThrow(() -> new IllegalStateException("Kein exakt angrenzender Rechteck-Heizkreis gefunden."));
-        HeatingZoneBounds mergedBounds = union(heatingZoneBounds(context.zone().outline()), heatingZoneBounds(neighbor.outline()));
-        HeatingZone merged = context.zone().withOutline(rectanglePoints(mergedBounds))
+        CadWorkbenchHeatingSupport.HeatingZoneBounds mergedBounds = CadWorkbenchHeatingSupport.union(
+                CadWorkbenchHeatingSupport.heatingZoneBounds(context.zone().outline()),
+                CadWorkbenchHeatingSupport.heatingZoneBounds(neighbor.outline())
+        );
+        HeatingZone merged = context.zone().withOutline(CadWorkbenchHeatingSupport.rectanglePoints(mergedBounds))
                 .withName(context.zone().name() + "+" + neighbor.name());
         List<HeatingZone> zones = context.heating().zones().stream()
                 .filter(zone -> !zone.id().equals(neighbor.id()))
@@ -8256,29 +8043,6 @@ public final class CadWorkbench extends BorderPane {
         refreshHeatingSection();
         draftLabel.setText(heatingUpdateMessage(updatedHeating, "Angrenzende Heizkreise verbunden."));
         recomputeHeatingLayoutNow(context.heating().id());
-    }
-
-    private boolean canMerge(HeatingZoneBounds first, HeatingZoneBounds second) {
-        boolean sameY = sameCoordinate(first.minY(), second.minY()) && sameCoordinate(first.maxY(), second.maxY());
-        boolean sameX = sameCoordinate(first.minX(), second.minX()) && sameCoordinate(first.maxX(), second.maxX());
-        boolean verticalNeighbor = sameY
-                && (sameCoordinate(first.maxX(), second.minX()) || sameCoordinate(second.maxX(), first.minX()));
-        boolean horizontalNeighbor = sameX
-                && (sameCoordinate(first.maxY(), second.minY()) || sameCoordinate(second.maxY(), first.minY()));
-        return verticalNeighbor || horizontalNeighbor;
-    }
-
-    private boolean sameCoordinate(double first, double second) {
-        return Math.abs(first - second) <= 0.001;
-    }
-
-    private HeatingZoneBounds union(HeatingZoneBounds first, HeatingZoneBounds second) {
-        return new HeatingZoneBounds(
-                Math.min(first.minX(), second.minX()),
-                Math.min(first.minY(), second.minY()),
-                Math.max(first.maxX(), second.maxX()),
-                Math.max(first.maxY(), second.maxY())
-        );
     }
 
     private void createRoofSlopeFromSelectedWall() {
@@ -9087,7 +8851,7 @@ public final class CadWorkbench extends BorderPane {
                 .findFirst()
                 .orElseThrow();
         List<HeatingZone> zones = new ArrayList<>(heating.zones());
-        zones.add(defaultHeatingZone(room, heating));
+        zones.add(CadWorkbenchHeatingSupport.defaultHeatingZone(room, heating, heatingCircuitRoutingService));
         applyHeatingZones(heating, zones, zones.size() - 1);
     }
 

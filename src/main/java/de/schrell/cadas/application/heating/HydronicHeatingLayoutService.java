@@ -6,6 +6,7 @@ import de.schrell.cadas.application.heating.HydronicHeatingGridRoutingSupport.Gr
 import de.schrell.cadas.application.heating.HydronicHeatingGridRoutingSupport.GridPoint;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -140,8 +141,8 @@ public final class HydronicHeatingLayoutService {
     }
 
     private boolean shouldTryRelocation(Room room, HydronicHeating heating) {
-        return !containsPoint(room.outline(), heating.supplyPoint())
-                || !containsPoint(room.outline(), heating.returnPoint());
+        return !PlanPolygonSupport.containsPoint(room.outline(), heating.supplyPoint(), EPSILON)
+                || !PlanPolygonSupport.containsPoint(room.outline(), heating.returnPoint(), EPSILON);
     }
 
     public List<CircuitLayout> layout(HydronicHeating heating) {
@@ -296,7 +297,8 @@ public final class HydronicHeatingLayoutService {
                     continue;
                 }
                 PlanPoint center = new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
-                if (!containsPoint(room.outline(), center) || exclusions.stream().anyMatch(rect -> rect.contains(center))) {
+                if (!PlanPolygonSupport.containsPoint(room.outline(), center, EPSILON)
+                        || exclusions.stream().anyMatch(rect -> rect.contains(center))) {
                     continue;
                 }
                 zones.add(new HeatingZone(
@@ -334,7 +336,7 @@ public final class HydronicHeatingLayoutService {
             if (rectangle.width() <= EPSILON || rectangle.height() <= EPSILON) {
                 continue;
             }
-            if (containsPoint(room.outline(), rectangle.center())) {
+            if (PlanPolygonSupport.containsPoint(room.outline(), rectangle.center(), EPSILON)) {
                 exclusions.add(rectangle);
             }
         }
@@ -365,7 +367,7 @@ public final class HydronicHeatingLayoutService {
                 (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0,
                 (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0
         );
-        if (!containsPoint(room.outline(), center)) {
+        if (!PlanPolygonSupport.containsPoint(room.outline(), center, EPSILON)) {
             return;
         }
         double minX = center.xMillimeters() - heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
@@ -376,7 +378,8 @@ public final class HydronicHeatingLayoutService {
                 || maxX > roomBounds.maxX() - EPSILON
                 || minY < roomBounds.minY() + EPSILON
                 || maxY > roomBounds.maxY() - EPSILON
-                || rectangle(minX, minY, maxX, maxY).stream().anyMatch(point -> !containsPoint(room.outline(), point))) {
+                || rectangle(minX, minY, maxX, maxY).stream()
+                .anyMatch(point -> !PlanPolygonSupport.containsPoint(room.outline(), point, EPSILON))) {
             return;
         }
         appendExclusion(
@@ -408,7 +411,7 @@ public final class HydronicHeatingLayoutService {
         if (rectangle.width() <= EPSILON || rectangle.height() <= EPSILON) {
             return;
         }
-        if (containsPoint(room.outline(), rectangle.center())) {
+        if (PlanPolygonSupport.containsPoint(room.outline(), rectangle.center(), EPSILON)) {
             exclusions.add(rectangle);
         }
     }
@@ -993,7 +996,7 @@ public final class HydronicHeatingLayoutService {
         for (PlanPoint point : reversedReturn) {
             appendDistinct(full, point);
         }
-        if (full.stream().anyMatch(point -> !containsPoint(polygon, point))) {
+        if (full.stream().anyMatch(point -> !PlanPolygonSupport.containsPoint(polygon, point, EPSILON))) {
             return List.of(meanderPattern(polygon, clearance, pitch));
         }
         FieldPattern base = new FieldPattern(simplifyPath(full), simplifyPath(visibleSupply), simplifyPath(reversedReturn));
@@ -1669,33 +1672,11 @@ public final class HydronicHeatingLayoutService {
                     start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
                     start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
             );
-            if (!containsPoint(polygon, point)) {
+            if (!PlanPolygonSupport.containsPoint(polygon, point, EPSILON)) {
                 return false;
             }
         }
         return true;
-    }
-
-    private boolean containsPoint(List<PlanPoint> polygon, PlanPoint point) {
-        boolean inside = false;
-        int previousIndex = polygon.size() - 1;
-        for (int index = 0; index < polygon.size(); index++) {
-            PlanPoint current = polygon.get(index);
-            PlanPoint previous = polygon.get(previousIndex);
-            if (pointOnSegment(point, previous, current)) {
-                return true;
-            }
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside;
     }
 
     private boolean pointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end) {

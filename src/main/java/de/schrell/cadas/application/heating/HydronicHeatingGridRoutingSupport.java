@@ -1,6 +1,7 @@
 package de.schrell.cadas.application.heating;
 
 import de.schrell.cadas.domain.geometry.PlanPoint;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ final class HydronicHeatingGridRoutingSupport {
         }
 
         boolean contains(PlanPoint point) {
-            return polygons.stream().anyMatch(polygon -> containsPoint(polygon, point));
+            return polygons.stream().anyMatch(polygon -> PlanPolygonSupport.containsPoint(polygon, point, EPSILON));
         }
 
         boolean containsSegment(PlanPoint start, PlanPoint end) {
@@ -239,41 +240,4 @@ final class HydronicHeatingGridRoutingSupport {
         }
     }
 
-    private static boolean containsPoint(List<PlanPoint> polygon, PlanPoint point) {
-        boolean inside = false;
-        int previousIndex = polygon.size() - 1;
-        for (int index = 0; index < polygon.size(); index++) {
-            PlanPoint current = polygon.get(index);
-            PlanPoint previous = polygon.get(previousIndex);
-            if (pointOnSegment(point, previous, current)) {
-                return true;
-            }
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside;
-    }
-
-    private static boolean pointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end) {
-        double cross = orientation(start, end, point);
-        if (Math.abs(cross) > EPSILON) {
-            return false;
-        }
-        return point.xMillimeters() >= Math.min(start.xMillimeters(), end.xMillimeters()) - EPSILON
-                && point.xMillimeters() <= Math.max(start.xMillimeters(), end.xMillimeters()) + EPSILON
-                && point.yMillimeters() >= Math.min(start.yMillimeters(), end.yMillimeters()) - EPSILON
-                && point.yMillimeters() <= Math.max(start.yMillimeters(), end.yMillimeters()) + EPSILON;
-    }
-
-    private static double orientation(PlanPoint first, PlanPoint second, PlanPoint third) {
-        return (second.xMillimeters() - first.xMillimeters()) * (third.yMillimeters() - first.yMillimeters())
-                - (second.yMillimeters() - first.yMillimeters()) * (third.xMillimeters() - first.xMillimeters());
-    }
 }

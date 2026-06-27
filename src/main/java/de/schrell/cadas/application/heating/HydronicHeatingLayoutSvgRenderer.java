@@ -2,6 +2,7 @@ package de.schrell.cadas.application.heating;
 
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
@@ -110,7 +111,7 @@ final class HydronicHeatingLayoutSvgRenderer {
         for (double x = snapUp(bounds.minX(), pitch); x <= bounds.maxX() + EPSILON; x += pitch) {
             for (double y = snapUp(bounds.minY(), pitch); y <= bounds.maxY() + EPSILON; y += pitch) {
                 PlanPoint center = new PlanPoint(x, y);
-                if (containsPoint(room.outline(), center)) {
+                if (PlanPolygonSupport.containsPoint(room.outline(), center, EPSILON)) {
                     svg.append(String.format(Locale.US,
                             "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"%.3f\"/>\n",
                             x, y, radius));
@@ -180,44 +181,6 @@ final class HydronicHeatingLayoutSvgRenderer {
 
     private static double snapUp(double coordinate, double pitch) {
         return Math.ceil((coordinate - EPSILON) / pitch) * pitch;
-    }
-
-    private static boolean containsPoint(List<PlanPoint> polygon, PlanPoint point) {
-        boolean inside = false;
-        int previousIndex = polygon.size() - 1;
-        for (int index = 0; index < polygon.size(); index++) {
-            PlanPoint current = polygon.get(index);
-            PlanPoint previous = polygon.get(previousIndex);
-            if (pointOnSegment(point, previous, current)) {
-                return true;
-            }
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside;
-    }
-
-    private static boolean pointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end) {
-        double cross = orientation(start, end, point);
-        if (Math.abs(cross) > EPSILON) {
-            return false;
-        }
-        return point.xMillimeters() >= Math.min(start.xMillimeters(), end.xMillimeters()) - EPSILON
-                && point.xMillimeters() <= Math.max(start.xMillimeters(), end.xMillimeters()) + EPSILON
-                && point.yMillimeters() >= Math.min(start.yMillimeters(), end.yMillimeters()) - EPSILON
-                && point.yMillimeters() <= Math.max(start.yMillimeters(), end.yMillimeters()) + EPSILON;
-    }
-
-    private static double orientation(PlanPoint first, PlanPoint second, PlanPoint third) {
-        return (second.xMillimeters() - first.xMillimeters()) * (third.yMillimeters() - first.yMillimeters())
-                - (second.yMillimeters() - first.yMillimeters()) * (third.xMillimeters() - first.xMillimeters());
     }
 
     private record Bounds(double minX, double maxX, double minY, double maxY) {
