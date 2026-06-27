@@ -5,3 +5,5 @@ out/
 .idea/
 *.iml
 
+/.ai/mcp/mcp.json
+/.codex/config.toml
