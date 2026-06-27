@@ -1,6 +1,7 @@
 package de.schrell.cadas.infrastructure.dxf;
 
 import de.schrell.cadas.application.exchange.LevelExchangeService;
+import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
@@ -55,6 +56,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
     private static final Length DEFAULT_ROOM_HEIGHT = Length.ofMillimeters(2600.0);
     private static final Length DEFAULT_FLOOR_THICKNESS = Length.ofMillimeters(180.0);
     private static final Length DEFAULT_CEILING_THICKNESS = Length.ofMillimeters(1.0);
+    private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
     @Override
     public void exportLevel(Level level, Path targetFile) throws IOException {
@@ -272,11 +274,12 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             for (HeatingZone zone : heating.zones()) {
                 appendMetadataText(dxf, context, zone.outline().getFirst(), String.format(
                         Locale.US,
-                        "HZONE|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%s|%s|%.3f|%d|%s|%s",
+                        "HZONE|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%.3f|%d|%s|%s",
                         heating.id(), zone.id(), DxfMetadataCodec.encode(zone.name()),
                         zone.layoutPattern().name(), zone.flowInverted(), serializePoints(zone.outline()),
                         zone.supplyConnectionPoint().xMillimeters(), zone.supplyConnectionPoint().yMillimeters(),
                         zone.returnConnectionPoint().xMillimeters(), zone.returnConnectionPoint().yMillimeters(),
+                        zone.routingStartPoint().xMillimeters(), zone.routingStartPoint().yMillimeters(),
                         DxfMetadataCodec.encode(zone.routingCommands()), zone.serpentineMiddleLine(),
                         zone.heatOutputWattsPerSquareMeter(), zone.routingQuarterTurns(),
                         zone.routingMirroredHorizontally(), zone.routingMirroredVertically()
@@ -511,7 +514,10 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         level.replaceStaircases(importedStaircases);
         level.replaceSurfaceLayerStacks(importedStacks);
         level.replaceHydronicHeatings(importedHeatings.values().stream()
-                .map(heating -> heating.withZones(importedHeatingZones.getOrDefault(heating.id(), List.of())))
+                .map(heating -> heating.withZones(alignImportedHeatingZones(
+                        heating,
+                        importedHeatingZones.getOrDefault(heating.id(), List.of())
+                )))
                 .filter(heating -> importedRooms.stream().anyMatch(room -> room.id().equals(heating.roomId())))
                 .toList());
         pendingDoors.stream()
@@ -692,6 +698,24 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
     }
 
     private static HeatingZone deserializeHeatingZone(String[] parts, boolean encodedFields) {
+        if (parts.length >= 19) {
+            return new HeatingZone(
+                    UUID.fromString(parts[2]),
+                    DxfMetadataCodec.decode(parts[3], encodedFields),
+                    deserializePoints(parts[6]),
+                    HeatingLayoutPattern.valueOf(parts[4]),
+                    Boolean.parseBoolean(parts[5]),
+                    new PlanPoint(parseDouble(parts[7]), parseDouble(parts[8])),
+                    new PlanPoint(parseDouble(parts[9]), parseDouble(parts[10])),
+                    new PlanPoint(parseDouble(parts[11]), parseDouble(parts[12])),
+                    DxfMetadataCodec.decode(parts[13], encodedFields),
+                    Boolean.parseBoolean(parts[14]),
+                    parseDouble(parts[15]),
+                    Integer.parseInt(parts[16]),
+                    Boolean.parseBoolean(parts[17]),
+                    Boolean.parseBoolean(parts[18])
+            );
+        }
         if (parts.length >= 14) {
             return new HeatingZone(
                     UUID.fromString(parts[2]),
@@ -734,6 +758,12 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                 DxfMetadataCodec.decode(parts[3], encodedFields),
                 deserializePoints(parts[4])
         );
+    }
+
+    private List<HeatingZone> alignImportedHeatingZones(HydronicHeating heating, List<HeatingZone> zones) {
+        return zones.stream()
+                .map(zone -> heatingCircuitRoutingService.alignRoutingStartPointToOutline(zone, heating))
+                .toList();
     }
 
     private static double parseDouble(String value) {

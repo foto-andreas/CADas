@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -112,19 +113,18 @@ class DxfLevelExchangeServiceTest {
                 new PlanPoint(800, 600),
                 new PlanPoint(1_400, 1_300)
         ));
-        HeatingZone ceilingZone = HeatingZone.create("L-Heizkreis", java.util.List.of(
-                new PlanPoint(100, 100), new PlanPoint(3_800, 100), new PlanPoint(3_800, 1_600),
-                new PlanPoint(2_000, 1_600), new PlanPoint(2_000, 3_300), new PlanPoint(100, 3_300)
-        )).withSupplyConnectionPoint(new PlanPoint(100, 1_000))
-                .withReturnConnectionPoint(new PlanPoint(3_800, 800))
-                .withRoutingCommands("iiiiRRIIIIrr", false)
-                .withHeatOutputWattsPerSquareMeter(48.0)
-                .withRoutingTransform(2, true, false);
-        HydronicHeating ceilingHeating = HydronicHeating.create(
+        HydronicHeating baseCeilingHeating = HydronicHeating.create(
                 level.rooms().getFirst().id(), HeatingSurfacePosition.CEILING, HeatingLayoutPattern.MEANDER,
                 Length.ofMillimeters(200), Length.ofMillimeters(18), Length.ofMillimeters(75_000),
                 Length.ofMillimeters(100), new PlanPoint(150, 200), new PlanPoint(350, 200)
-        ).withManifoldFreeArea(Length.ofMillimeters(700), Length.ofMillimeters(900))
+        ).withManifoldFreeArea(Length.ofMillimeters(700), Length.ofMillimeters(900));
+        HeatingZone ceilingZone = new HeatingCircuitRoutingService().withRoutingCommands(HeatingZone.create("L-Heizkreis", java.util.List.of(
+                new PlanPoint(100, 100), new PlanPoint(3_800, 100), new PlanPoint(3_800, 1_600),
+                new PlanPoint(2_000, 1_600), new PlanPoint(2_000, 3_300), new PlanPoint(100, 3_300)
+        )).withRoutingStartPoint(new PlanPoint(1_800, 1_900))
+                .withHeatOutputWattsPerSquareMeter(48.0)
+                .withRoutingTransform(2, true, false), baseCeilingHeating, "iiiiRRIIIIrr", false);
+        HydronicHeating ceilingHeating = baseCeilingHeating
                 .withZones(java.util.List.of(ceilingZone));
         level.addHydronicHeating(ceilingHeating);
 
@@ -164,8 +164,9 @@ class DxfLevelExchangeServiceTest {
         assertEquals(900.0, importedHeating.manifoldFreeAreaDepth().toMillimeters(), 0.001);
         assertEquals("L-Heizkreis", importedHeating.zones().getFirst().name());
         assertEquals(6, importedHeating.zones().getFirst().outline().size());
-        assertEquals(new PlanPoint(100, 1_000), importedHeating.zones().getFirst().supplyConnectionPoint());
-        assertEquals(new PlanPoint(3_800, 800), importedHeating.zones().getFirst().returnConnectionPoint());
+        assertEquals(ceilingZone.routingStartPoint(), importedHeating.zones().getFirst().routingStartPoint());
+        assertEquals(ceilingZone.supplyConnectionPoint(), importedHeating.zones().getFirst().supplyConnectionPoint());
+        assertEquals(ceilingZone.returnConnectionPoint(), importedHeating.zones().getFirst().returnConnectionPoint());
         assertEquals(HeatingRoutingLanguage.normalizeCommands("iiiiRRIIIIrr"), importedHeating.zones().getFirst().routingCommands());
         assertFalse(importedHeating.zones().getFirst().serpentineMiddleLine());
         assertEquals(48.0, importedHeating.zones().getFirst().heatOutputWattsPerSquareMeter(), 0.001);
@@ -214,6 +215,58 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1, imported.windows().size());
         assertEquals(wallId, imported.doors().getFirst().wallId());
         assertEquals(wallId, imported.windows().getFirst().wallId());
+    }
+
+    @Test
+    void richtetLegacyHeizkreisStartpunktBeimImportAnDerGespeichertenHuelleAus() throws Exception {
+        Level level = new Level("Erdgeschoss");
+        Room room = Room.rectangular(
+                "Bad",
+                new PlanPoint(0, 0),
+                new PlanPoint(3000, 2500),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        level.addRoom(room);
+        HydronicHeating baseHeating = HydronicHeating.create(
+                room.id(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.VARIO,
+                Length.ofMillimeters(100), Length.ofMillimeters(16), Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100), new PlanPoint(100, 100), new PlanPoint(200, 100)
+        );
+        HeatingZone routedZone = new HeatingCircuitRoutingService().withRoutingCommands(
+                new HeatingZone(
+                        java.util.UUID.randomUUID(),
+                        "HK 1",
+                        java.util.List.of(
+                                new PlanPoint(0, 0),
+                                new PlanPoint(500, 0),
+                                new PlanPoint(500, 500),
+                                new PlanPoint(0, 500)
+                        ),
+                        HeatingLayoutPattern.VARIO,
+                        false,
+                        null,
+                        null,
+                        new PlanPoint(100, 100)
+                ),
+                baseHeating,
+                "=-",
+                false
+        );
+        level.addHydronicHeating(baseHeating.withZones(java.util.List.of(routedZone)));
+        Path file = tempDir.resolve("legacy-heating-zone.dxf");
+        exchangeService.exportLevel(level, file);
+        java.util.List<String> legacyLines = Files.readAllLines(file).stream()
+                .map(line -> line.startsWith("HZONE|") ? removeRoutingStartPointFromHzone(line) : line)
+                .toList();
+        Files.write(file, legacyLines);
+
+        Level imported = exchangeService.importLevel(file, "Import");
+        HeatingZone importedZone = imported.hydronicHeatings().getFirst().zones().getFirst();
+
+        assertEquals(routedZone.routingStartPoint(), importedZone.routingStartPoint());
+        assertEquals(routedZone.outline(), importedZone.outline());
     }
 
     @Test
@@ -656,5 +709,28 @@ class DxfLevelExchangeServiceTest {
         assertEquals(1500.0, imported.walls().getFirst().profile().get(1).offset().toMillimeters(), 0.001);
         assertEquals(4, imported.rooms().getFirst().ceilingVertexHeights().size());
         assertEquals(2600.0, imported.rooms().getFirst().ceilingVertexHeights().get(3).toMillimeters(), 0.001);
+    }
+
+    private String removeRoutingStartPointFromHzone(String metadata) {
+        String[] parts = metadata.split("\\|", -1);
+        return String.join("|",
+                parts[0],
+                parts[1],
+                parts[2],
+                parts[3],
+                parts[4],
+                parts[5],
+                parts[6],
+                parts[7],
+                parts[8],
+                parts[9],
+                parts[10],
+                parts[13],
+                parts[14],
+                parts[15],
+                parts[16],
+                parts[17],
+                parts[18]
+        );
     }
 }

@@ -216,8 +216,7 @@ public final class AutoRoomGenerationService {
     }
 
     private boolean overlaps(Room room, DetectedRoom detectedRoom) {
-        return containsPoint(detectedRoom.outline(), room.centerPoint())
-                || containsPoint(room.outline(), detectedRoom.centerPoint());
+        return overlapAreaSquareMillimeters(room.outline(), detectedRoom.outline()) > EPSILON;
     }
 
     private Set<CellIndex> floodFill(int startColumn, int startRow, boolean[][] occupied, boolean[][] visited) {
@@ -520,8 +519,20 @@ public final class AutoRoomGenerationService {
             Length derivedRoomHeight = Length.ofMillimeters(vertexHeights.stream().mapToDouble(Length::toMillimeters).max().orElse(defaults.roomHeight().toMillimeters()));
             Optional<Room> matchedRoom = existingRooms.stream()
                     .filter(room -> !matchedIds.contains(room.id()))
-                    .filter(room -> containsPoint(detectedRoom.outline(), room.centerPoint()) || containsPoint(room.outline(), detectedRoom.centerPoint()))
-                    .min(Comparator.comparingDouble(room -> room.centerPoint().distanceTo(detectedRoom.centerPoint()).toMillimeters()));
+                    .map(room -> new RoomMatch(
+                            room,
+                            overlapAreaSquareMillimeters(room.outline(), detectedRoom.outline()),
+                            room.centerPoint().distanceTo(detectedRoom.centerPoint()).toMillimeters(),
+                            Math.abs(room.area().toMillimeters() - polygonAreaSquareMillimeters(detectedRoom.outline()))
+                    ))
+                    .filter(match -> match.overlapAreaSquareMillimeters() > EPSILON
+                            || containsPoint(detectedRoom.outline(), match.room().centerPoint())
+                            || containsPoint(match.room().outline(), detectedRoom.centerPoint()))
+                    .max(Comparator
+                            .comparingDouble(RoomMatch::overlapAreaSquareMillimeters)
+                            .thenComparingDouble(match -> -match.areaDifferenceSquareMillimeters())
+                            .thenComparingDouble(match -> -match.centerDistanceMillimeters()))
+                    .map(RoomMatch::room);
             Room room;
             if (matchedRoom.isPresent()) {
                 Room previous = matchedRoom.orElseThrow();
@@ -619,6 +630,60 @@ public final class AutoRoomGenerationService {
                 && Math.abs(first.yMillimeters() - second.yMillimeters()) < EPSILON;
     }
 
+    private double overlapAreaSquareMillimeters(List<PlanPoint> firstOutline, List<PlanPoint> secondOutline) {
+        List<Double> xCoordinates = distinctCoordinates(firstOutline, secondOutline, true);
+        List<Double> yCoordinates = distinctCoordinates(firstOutline, secondOutline, false);
+        double areaSquareMillimeters = 0.0;
+        for (int xIndex = 0; xIndex < xCoordinates.size() - 1; xIndex++) {
+            double minX = xCoordinates.get(xIndex);
+            double maxX = xCoordinates.get(xIndex + 1);
+            if (maxX - minX <= EPSILON) {
+                continue;
+            }
+            for (int yIndex = 0; yIndex < yCoordinates.size() - 1; yIndex++) {
+                double minY = yCoordinates.get(yIndex);
+                double maxY = yCoordinates.get(yIndex + 1);
+                if (maxY - minY <= EPSILON) {
+                    continue;
+                }
+                PlanPoint center = new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+                if (containsPoint(firstOutline, center) && containsPoint(secondOutline, center)) {
+                    areaSquareMillimeters += (maxX - minX) * (maxY - minY);
+                }
+            }
+        }
+        return areaSquareMillimeters;
+    }
+
+    private List<Double> distinctCoordinates(List<PlanPoint> firstOutline, List<PlanPoint> secondOutline, boolean xAxis) {
+        List<Double> coordinates = new ArrayList<>();
+        for (PlanPoint point : firstOutline) {
+            addDistinctCoordinate(coordinates, xAxis ? point.xMillimeters() : point.yMillimeters());
+        }
+        for (PlanPoint point : secondOutline) {
+            addDistinctCoordinate(coordinates, xAxis ? point.xMillimeters() : point.yMillimeters());
+        }
+        coordinates.sort(Double::compareTo);
+        return List.copyOf(coordinates);
+    }
+
+    private void addDistinctCoordinate(List<Double> coordinates, double coordinate) {
+        if (coordinates.stream().noneMatch(existing -> Math.abs(existing - coordinate) <= EPSILON)) {
+            coordinates.add(coordinate);
+        }
+    }
+
+    private double polygonAreaSquareMillimeters(List<PlanPoint> outline) {
+        double doubleArea = 0.0;
+        for (int index = 0; index < outline.size(); index++) {
+            PlanPoint current = outline.get(index);
+            PlanPoint next = outline.get((index + 1) % outline.size());
+            doubleArea += current.xMillimeters() * next.yMillimeters()
+                    - next.xMillimeters() * current.yMillimeters();
+        }
+        return Math.abs(doubleArea) / 2.0;
+    }
+
     private record CellIndex(int column, int row) {
     }
 
@@ -679,6 +744,14 @@ public final class AutoRoomGenerationService {
             }
             return new PlanPoint(sumX / outline.size(), sumY / outline.size());
         }
+    }
+
+    private record RoomMatch(
+            Room room,
+            double overlapAreaSquareMillimeters,
+            double centerDistanceMillimeters,
+            double areaDifferenceSquareMillimeters
+    ) {
     }
 
     public record RoomDefaults(

@@ -176,4 +176,61 @@ class HeatingCircuitRoutingServiceTest {
         assertEquals(new PlanPoint(250, 450), routed.supplyConnectionPoint());
         assertEquals(new PlanPoint(250, 150), routed.returnConnectionPoint());
     }
+
+    @Test
+    void richtetLegacyStartpunktWiederAmGespeichertenHeizkreisrechteckAus() {
+        HydronicHeating heating = HydronicHeating.create(
+                UUID.randomUUID(),
+                HeatingSurfacePosition.FLOOR,
+                HeatingLayoutPattern.VARIO,
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(16),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                new PlanPoint(0, 0),
+                new PlanPoint(50, 0)
+        );
+        HeatingZone routed = service.withRoutingCommands(
+                new HeatingZone(
+                        UUID.randomUUID(),
+                        "HK 1",
+                        List.of(
+                                new PlanPoint(0, 0),
+                                new PlanPoint(500, 0),
+                                new PlanPoint(500, 500),
+                                new PlanPoint(0, 500)
+                        ),
+                        HeatingLayoutPattern.VARIO,
+                        false,
+                        null,
+                        null,
+                        new PlanPoint(100, 100)
+                ),
+                heating,
+                "=-",
+                false
+        );
+        HeatingZone legacyImported = new HeatingZone(
+                routed.id(),
+                routed.name(),
+                routed.outline(),
+                routed.layoutPattern(),
+                routed.flowInverted(),
+                routed.supplyConnectionPoint(),
+                routed.returnConnectionPoint(),
+                routed.routingCommands(),
+                routed.serpentineMiddleLine(),
+                routed.heatOutputWattsPerSquareMeter(),
+                routed.routingQuarterTurns(),
+                routed.routingMirroredHorizontally(),
+                routed.routingMirroredVertically()
+        );
+
+        HeatingZone aligned = service.alignRoutingStartPointToOutline(legacyImported, heating);
+
+        assertEquals(routed.routingStartPoint(), aligned.routingStartPoint());
+        assertEquals(routed.outline(), aligned.outline());
+        assertEquals(routed.supplyConnectionPoint(), aligned.supplyConnectionPoint());
+        assertEquals(routed.returnConnectionPoint(), aligned.returnConnectionPoint());
+    }
 }

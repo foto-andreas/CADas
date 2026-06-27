@@ -119,15 +119,28 @@ public final class HeatingCircuitRoutingService {
         if (!zone.hasRoutingCommands()) {
             throw new IllegalArgumentException("Der Heizkreis besitzt keine Routing-Kommandos.");
         }
-        OutlineBounds bounds = bounds(zone.outline());
-        double spacingMillimeters = heating.pipeSpacing().toMillimeters();
-        RoutingResult result = commandRouter.route(bounds.width(), bounds.height(), spacingMillimeters, zone.routingCommands())
-                .withFlowInverted(zone.flowInverted());
-        if (bounds.width() > bounds.height()) {
-            result = result.rotatedClockwise();
-        }
-        result = applyStoredTransform(result, zone);
+        RoutingResult result = transformedRoutingResult(zone, heating);
         return result.translatedBy(zone.routingStartPoint().xMillimeters(), zone.routingStartPoint().yMillimeters());
+    }
+
+    /**
+     * Richtet den gespeicherten Routing-Startpunkt so aus, dass das gerenderte Heizkreisfeld wieder exakt im
+     * gespeicherten Heizkreisrechteck liegt.
+     */
+    public HeatingZone alignRoutingStartPointToOutline(HeatingZone zone, HydronicHeating heating) {
+        Objects.requireNonNull(zone, "zone darf nicht null sein.");
+        Objects.requireNonNull(heating, "heating darf nicht null sein.");
+        if (!zone.hasRoutingCommands() || !isAxisAlignedRectangle(zone.outline())) {
+            return zone;
+        }
+        Bounds routeBounds = HeatingCircuitFieldBounds.fieldBounds(transformedRoutingResult(zone, heating))
+                .expanded(heating.pipeDiameter().toMillimeters() / 2.0);
+        OutlineBounds outlineBounds = bounds(zone.outline());
+        PlanPoint alignedStartPoint = new PlanPoint(
+                outlineBounds.centerX() - routeBounds.centerX(),
+                outlineBounds.centerY() - routeBounds.centerY()
+        );
+        return zone.withRoutingStartPoint(alignedStartPoint);
     }
 
     /**
@@ -167,6 +180,17 @@ public final class HeatingCircuitRoutingService {
             transformed = transformed.rotatedClockwise();
         }
         return transformed;
+    }
+
+    private RoutingResult transformedRoutingResult(HeatingZone zone, HydronicHeating heating) {
+        OutlineBounds bounds = bounds(zone.outline());
+        double spacingMillimeters = heating.pipeSpacing().toMillimeters();
+        RoutingResult result = commandRouter.route(bounds.width(), bounds.height(), spacingMillimeters, zone.routingCommands())
+                .withFlowInverted(zone.flowInverted());
+        if (bounds.width() > bounds.height()) {
+            result = result.rotatedClockwise();
+        }
+        return applyStoredTransform(result, zone);
     }
 
     private List<PlanPoint> adjustedOutline(List<PlanPoint> outline, RoutingResult result, HydronicHeating heating) {
@@ -217,6 +241,14 @@ public final class HeatingCircuitRoutingService {
     private record OutlineBounds(double minX, double minY, double maxX, double maxY) {
         private double width() {
             return maxX - minX;
+        }
+
+        private double centerX() {
+            return (minX + maxX) / 2.0;
+        }
+
+        private double centerY() {
+            return (minY + maxY) / 2.0;
         }
 
         private double height() {

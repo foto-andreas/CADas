@@ -3,6 +3,7 @@ package de.schrell.cadas.application.room;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -139,6 +140,39 @@ class AutoRoomGenerationServiceTest {
         assertEquals(firstRoom.id(), updatedRooms.getFirst().id());
         assertEquals("Dachraum", updatedRooms.getFirst().name());
         assertEquals(SlopedCeilingSide.NORTH, updatedRooms.getFirst().slopedCeilingProfile().orElseThrow().lowSide());
+    }
+
+    @Test
+    void ordnetLfoermigenFlurUndAngrenzendesBadStabilDenVorhandenenIdsZu() throws Exception {
+        Level level = new DxfProjectExchangeService()
+                .importProject(java.nio.file.Path.of("KIREP.cadas"), "KIREP")
+                .levels().stream()
+                .filter(candidate -> candidate.name().equals("Dachgeschoss"))
+                .findFirst()
+                .orElseThrow();
+        Room firstFlur = level.rooms().stream()
+                .filter(room -> room.name().equals("Flur"))
+                .findFirst()
+                .orElseThrow();
+        Room firstBad = level.rooms().stream()
+                .filter(room -> room.name().equals("Bad"))
+                .findFirst()
+                .orElseThrow();
+
+        List<Room> synchronizedRooms = service.synchronize(level, defaults());
+
+        Room synchronizedFlur = synchronizedRooms.stream()
+                .filter(room -> room.id().equals(firstFlur.id()))
+                .findFirst()
+                .orElseThrow();
+        Room synchronizedBad = synchronizedRooms.stream()
+                .filter(room -> room.id().equals(firstBad.id()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("Flur", synchronizedFlur.name());
+        assertTrue(synchronizedFlur.areaSquareMeters() > synchronizedBad.areaSquareMeters());
+        assertEquals("Bad", synchronizedBad.name());
+        assertTrue(synchronizedBad.areaSquareMeters() > 1.0);
     }
 
     @Test

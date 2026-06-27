@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Angle;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
@@ -95,18 +96,17 @@ class DxfProjectExchangeServiceTest {
                 Length.of(20, LengthUnit.CENTIMETER)
         ));
         Room heatedRoom = project.primaryLevel().rooms().getFirst();
-        HeatingZone floorZone = HeatingZone.create("Heizkreis Süd", java.util.List.of(
-                new PlanPoint(120, 120), new PlanPoint(4_800, 120),
-                new PlanPoint(4_800, 3_800), new PlanPoint(120, 3_800)
-        )).withSupplyConnectionPoint(new PlanPoint(120, 2_000))
-                .withReturnConnectionPoint(new PlanPoint(4_800, 2_000))
-                .withRoutingCommands("rrRRiiIIRr", true)
-                .withHeatOutputWattsPerSquareMeter(52.5);
-        HydronicHeating floorHeating = HydronicHeating.create(
+        HydronicHeating baseFloorHeating = HydronicHeating.create(
                 heatedRoom.id(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL,
                 Length.ofMillimeters(150), Length.ofMillimeters(16), Length.ofMillimeters(90_000),
                 Length.ofMillimeters(120), new PlanPoint(200, 300), new PlanPoint(400, 300)
-        ).withManifoldFreeArea(Length.ofMillimeters(650), Length.ofMillimeters(850))
+        ).withManifoldFreeArea(Length.ofMillimeters(650), Length.ofMillimeters(850));
+        HeatingZone floorZone = new HeatingCircuitRoutingService().withRoutingCommands(HeatingZone.create("Heizkreis Süd", java.util.List.of(
+                new PlanPoint(120, 120), new PlanPoint(4_800, 120),
+                new PlanPoint(4_800, 3_800), new PlanPoint(120, 3_800)
+        )).withRoutingStartPoint(new PlanPoint(2_460, 1_820))
+                .withHeatOutputWattsPerSquareMeter(52.5), baseFloorHeating, "rrRRiiIIRr", true);
+        HydronicHeating floorHeating = baseFloorHeating
                 .withZones(java.util.List.of(floorZone));
         project.primaryLevel().addHydronicHeating(floorHeating);
         project.primaryLevel().addFloorOpening(FloorOpening.create(
@@ -185,8 +185,9 @@ class DxfProjectExchangeServiceTest {
         assertEquals(850.0, importedHeating.manifoldFreeAreaDepth().toMillimeters(), 0.001);
         assertEquals("Heizkreis Süd", importedHeating.zones().getFirst().name());
         assertEquals(floorHeating.zones().getFirst().outline(), importedHeating.zones().getFirst().outline());
-        assertEquals(new PlanPoint(120, 2_000), importedHeating.zones().getFirst().supplyConnectionPoint());
-        assertEquals(new PlanPoint(4_800, 2_000), importedHeating.zones().getFirst().returnConnectionPoint());
+        assertEquals(floorZone.routingStartPoint(), importedHeating.zones().getFirst().routingStartPoint());
+        assertEquals(floorZone.supplyConnectionPoint(), importedHeating.zones().getFirst().supplyConnectionPoint());
+        assertEquals(floorZone.returnConnectionPoint(), importedHeating.zones().getFirst().returnConnectionPoint());
         assertEquals(HeatingRoutingLanguage.normalizeCommands("rrRRiiIIRr"), importedHeating.zones().getFirst().routingCommands());
         assertTrue(importedHeating.zones().getFirst().serpentineMiddleLine());
         assertEquals(52.5, importedHeating.zones().getFirst().heatOutputWattsPerSquareMeter(), 0.001);

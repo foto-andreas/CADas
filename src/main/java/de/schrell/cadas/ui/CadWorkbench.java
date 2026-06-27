@@ -8544,7 +8544,9 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceFloorOpenings(translationResult.floorOpenings());
         activeLevel.get().replaceHeatingExclusionAreas(translationResult.heatingExclusionAreas());
         activeLevel.get().replaceHydronicHeatings(translationResult.hydronicHeatings());
-        synchronizeRoomsFromWalls(activeLevel.get());
+        if (selectedTranslationAffectsRooms()) {
+            synchronizeRoomsFromWalls(activeLevel.get());
+        }
         markThreeDDirty();
     }
 
@@ -8623,7 +8625,9 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceFloorOpenings(result.floorOpenings());
         activeLevel.get().replaceHeatingExclusionAreas(result.heatingExclusionAreas());
         activeLevel.get().replaceHydronicHeatings(result.hydronicHeatings());
-        synchronizeRoomsFromWalls(activeLevel.get());
+        if (selectedTranslationAffectsRooms()) {
+            synchronizeRoomsFromWalls(activeLevel.get());
+        }
         markThreeDDirty();
         draftLabel.setText("Auswahl um eine Rasterweite verschoben.");
         if (selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.HEATING_ZONE
@@ -8648,6 +8652,11 @@ public final class CadWorkbench extends BorderPane {
                 deltaX + snappedStart.xMillimeters() - movedStart.xMillimeters(),
                 deltaY + snappedStart.yMillimeters() - movedStart.yMillimeters()
         );
+    }
+
+    private boolean selectedTranslationAffectsRooms() {
+        return selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.WALL
+                || selection.kind() == RenderableKind.STAIR);
     }
 
     private void correctSelectedComponentsOrthogonally() {
