@@ -2,6 +2,8 @@ package de.schrell.cadas.application.reports;
 
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.application.heating.RoomHeatingOutputService;
+import de.schrell.cadas.application.layers.SurfaceRectangleTileLayoutService;
+import de.schrell.cadas.application.layers.SurfaceRectangleTileLayoutService.PlacedSurfaceTile;
 import de.schrell.cadas.application.layers.TileLayoutRequest;
 import de.schrell.cadas.application.layers.TileLayoutService;
 import de.schrell.cadas.application.layers.TilePlacement;
@@ -177,7 +179,7 @@ public final class SurfaceMaterialListService {
                     continue;
                 }
                 for (SurfaceCoverage coverage : coverages(level, stack, openingsAbove)) {
-                    CoverageEstimate estimate = estimateCoverage(layer, coverage.rectangles());
+                    CoverageEstimate estimate = estimateCoverage(layer, coverage);
                     if (estimate.placedPieceCount() == 0) {
                         continue;
                     }
@@ -220,7 +222,7 @@ public final class SurfaceMaterialListService {
             }
             List<SurfaceRectangle> rectangles = roomSurfaceRectangles(level, room, stack.surfaceType(), openingsAbove);
             String surface = stack.surfaceType() == SurfaceType.FLOOR ? "Boden" : "Decke";
-            coverages.add(new SurfaceCoverage(level.name(), room.name(), surface, rectangles));
+            coverages.add(new SurfaceCoverage(level.name(), room.name(), surface, rectangles, true));
         }
         return coverages;
     }
@@ -230,7 +232,8 @@ public final class SurfaceMaterialListService {
                 level.name(),
                 extension.type().toString(),
                 "Oberseite " + extension.type(),
-                List.of(new SurfaceRectangle(extension.minX(), extension.minY(), extension.widthMillimeters(), extension.depthMillimeters()))
+                List.of(new SurfaceRectangle(extension.minX(), extension.minY(), extension.widthMillimeters(), extension.depthMillimeters())),
+                true
         );
     }
 
@@ -305,7 +308,7 @@ public final class SurfaceMaterialListService {
         String sideLabel = sideSign > 0.0 ? "+" : "-";
         String baseDescription = stack.surfaceType() + " Wand " + shortId(wall.id().toString()) + " Seite " + sideLabel;
         if (!wall.hasVariableTopHeight()) {
-            return List.of(new SurfaceCoverage(level.name(), roomName, baseDescription, rectangles));
+            return List.of(new SurfaceCoverage(level.name(), roomName, baseDescription, rectangles, false));
         }
         List<SurfaceRectangle> sockelRectangles = new ArrayList<>();
         List<SurfaceRectangle> slopeRectangles = new ArrayList<>();
@@ -314,13 +317,13 @@ public final class SurfaceMaterialListService {
         }
         List<SurfaceCoverage> coverages = new ArrayList<>();
         if (!sockelRectangles.isEmpty()) {
-            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription + " Sockel", List.copyOf(sockelRectangles)));
+            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription + " Sockel", List.copyOf(sockelRectangles), false));
         }
         if (!slopeRectangles.isEmpty()) {
-            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription + " Schräge", List.copyOf(slopeRectangles)));
+            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription + " Schräge", List.copyOf(slopeRectangles), false));
         }
         if (coverages.isEmpty()) {
-            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription, rectangles));
+            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription, rectangles, false));
         }
         return List.copyOf(coverages);
     }
@@ -396,10 +399,14 @@ public final class SurfaceMaterialListService {
                 || stack.targetKey().contains(room.name());
     }
 
-    private CoverageEstimate estimateCoverage(SurfaceLayer layer, List<SurfaceRectangle> rectangles) {
+    private CoverageEstimate estimateCoverage(SurfaceLayer layer, SurfaceCoverage coverage) {
         CoverageAccumulator accumulator = new CoverageAccumulator(layer);
-        for (SurfaceRectangle rectangle : rectangles) {
-            accumulator.add(rectangle);
+        if (coverage.continuousRoomRaster()) {
+            accumulator.addContinuousRectangles(coverage.rectangles());
+        } else {
+            for (SurfaceRectangle rectangle : coverage.rectangles()) {
+                accumulator.addRectangle(rectangle);
+            }
         }
         return accumulator.toEstimate();
     }
@@ -515,7 +522,8 @@ public final class SurfaceMaterialListService {
             String levelName,
             String roomName,
             String surfaceDescription,
-            List<SurfaceRectangle> rectangles
+            List<SurfaceRectangle> rectangles,
+            boolean continuousRoomRaster
     ) {
     }
 
@@ -542,7 +550,96 @@ public final class SurfaceMaterialListService {
             this.layer = layer;
         }
 
-        private void add(SurfaceRectangle rectangle) {
+        /**
+         * Bewertet eine zusammenhängende Boden- oder Deckenfläche mit einem globalen Raster.
+         */
+        private void addContinuousRectangles(List<SurfaceRectangle> rectangles) {
+            double tileWidth = layer.effectiveTileWidth().toMillimeters();
+            double tileHeight = layer.effectiveTileHeight().toMillimeters();
+            if (rectangles.isEmpty() || tileWidth <= EPSILON || tileHeight <= EPSILON) {
+                return;
+            }
+            List<OrthogonalPolygonDecompositionService.CellRectangle> cellRectangles = rectangles.stream()
+                    .map(rectangle -> new OrthogonalPolygonDecompositionService.CellRectangle(
+                            rectangle.minXMillimeters(),
+                            rectangle.maxXMillimeters(),
+                            rectangle.minYMillimeters(),
+                            rectangle.maxYMillimeters()
+                    ))
+                    .toList();
+            Map<TileKey, List<SurfaceRectangle>> tilePieces = new LinkedHashMap<>();
+            SurfaceRectangleTileLayoutService tileLayoutService = new SurfaceRectangleTileLayoutService();
+            for (PlacedSurfaceTile tile : tileLayoutService.tilesForRectangles(cellRectangles, layer)) {
+                for (SurfaceRectangle rectangle : rectangles) {
+                    double minX = Math.max(tile.x(), rectangle.minXMillimeters());
+                    double maxX = Math.min(tile.x() + tile.width(), rectangle.maxXMillimeters());
+                    double minY = Math.max(tile.y(), rectangle.minYMillimeters());
+                    double maxY = Math.min(tile.y() + tile.height(), rectangle.maxYMillimeters());
+                    if (maxX <= minX + EPSILON || maxY <= minY + EPSILON) {
+                        continue;
+                    }
+                    tilePieces.computeIfAbsent(new TileKey(tile.column(), tile.row()), ignored -> new ArrayList<>())
+                            .add(new SurfaceRectangle(minX, minY, maxX - minX, maxY - minY));
+                }
+            }
+            for (List<SurfaceRectangle> pieces : tilePieces.values()) {
+                for (SurfaceRectangle piece : mergeTouchingPieces(pieces)) {
+                    addPlacementDimensions(piece.widthMillimeters(), piece.heightMillimeters(), tileWidth, tileHeight);
+                }
+            }
+        }
+
+        private List<SurfaceRectangle> mergeTouchingPieces(List<SurfaceRectangle> pieces) {
+            List<SurfaceRectangle> merged = new ArrayList<>(pieces);
+            boolean changed = true;
+            while (changed) {
+                changed = false;
+                for (int firstIndex = 0; firstIndex < merged.size() && !changed; firstIndex++) {
+                    for (int secondIndex = firstIndex + 1; secondIndex < merged.size(); secondIndex++) {
+                        SurfaceRectangle combined = mergeIfTouching(merged.get(firstIndex), merged.get(secondIndex));
+                        if (combined == null) {
+                            continue;
+                        }
+                        merged.remove(secondIndex);
+                        merged.remove(firstIndex);
+                        merged.add(combined);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            return List.copyOf(merged);
+        }
+
+        private SurfaceRectangle mergeIfTouching(SurfaceRectangle first, SurfaceRectangle second) {
+            if (sameValue(first.minXMillimeters(), second.minXMillimeters())
+                    && sameValue(first.widthMillimeters(), second.widthMillimeters())) {
+                double firstMaxY = first.maxYMillimeters();
+                double secondMaxY = second.maxYMillimeters();
+                if (sameValue(firstMaxY, second.minYMillimeters()) || sameValue(secondMaxY, first.minYMillimeters())) {
+                    double minY = Math.min(first.minYMillimeters(), second.minYMillimeters());
+                    double maxY = Math.max(firstMaxY, secondMaxY);
+                    return new SurfaceRectangle(first.minXMillimeters(), minY, first.widthMillimeters(), maxY - minY);
+                }
+            }
+            if (sameValue(first.minYMillimeters(), second.minYMillimeters())
+                    && sameValue(first.heightMillimeters(), second.heightMillimeters())) {
+                double firstMaxX = first.maxXMillimeters();
+                double secondMaxX = second.maxXMillimeters();
+                if (sameValue(firstMaxX, second.minXMillimeters()) || sameValue(secondMaxX, first.minXMillimeters())) {
+                    double minX = Math.min(first.minXMillimeters(), second.minXMillimeters());
+                    double maxX = Math.max(firstMaxX, secondMaxX);
+                    return new SurfaceRectangle(minX, first.minYMillimeters(), maxX - minX, first.heightMillimeters());
+                }
+            }
+            return null;
+        }
+
+        private boolean sameValue(double first, double second) {
+            return Math.abs(first - second) <= EPSILON;
+        }
+
+        private void addRectangle(SurfaceRectangle rectangle) {
             double tileWidth = layer.effectiveTileWidth().toMillimeters();
             double tileHeight = layer.effectiveTileHeight().toMillimeters();
             if (rectangle.widthMillimeters() <= EPSILON || rectangle.heightMillimeters() <= EPSILON || tileWidth <= EPSILON || tileHeight <= EPSILON) {
@@ -560,13 +657,11 @@ public final class SurfaceMaterialListService {
                     layer.minimumStartEndMargin()
             ));
             for (TilePlacement placement : placements) {
-                addPlacement(placement, tileWidth, tileHeight);
+                addPlacementDimensions(placement.width().toMillimeters(), placement.height().toMillimeters(), tileWidth, tileHeight);
             }
         }
 
-        private void addPlacement(TilePlacement placement, double tileWidth, double tileHeight) {
-            double width = placement.width().toMillimeters();
-            double height = placement.height().toMillimeters();
+        private void addPlacementDimensions(double width, double height, double tileWidth, double tileHeight) {
             boolean cutsWidth = width < tileWidth - EPSILON;
             boolean cutsHeight = height < tileHeight - EPSILON;
             placedPieceCount++;
@@ -632,6 +727,9 @@ public final class SurfaceMaterialListService {
     }
 
     private record FitCandidate(int restIndex, double widthMillimeters, double heightMillimeters, double wasteSquareMillimeters) {
+    }
+
+    private record TileKey(int column, int row) {
     }
 
     private record MaterialCutOptimization(int requiredCutSheets, int[] requiredCutSheetsByOwner, List<RestPieceSummary> restPieces) {

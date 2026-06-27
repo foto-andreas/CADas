@@ -35,8 +35,12 @@ public final class TerrainCornerService {
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
     public Terrain synchronize(Level lowestLevel, Terrain existingTerrain) {
-        List<Wall> outerWalls = outerWalls(lowestLevel);
-        List<PlanPoint> outline = outlineFromOuterWalls(lowestLevel, outerWalls);
+        return synchronize(List.of(lowestLevel), existingTerrain);
+    }
+
+    public Terrain synchronize(List<Level> levels, Terrain existingTerrain) {
+        GridData grid = buildGrid(levels);
+        List<PlanPoint> outline = grid == null ? List.of() : outlineFromGrid(grid);
         if (outline.size() < 3) {
             return Terrain.empty();
         }
@@ -86,8 +90,17 @@ public final class TerrainCornerService {
     }
 
     private GridData buildGrid(Level level) {
-        List<WallRectangle> wallRectangles = wallRectangles(level);
-        if (wallRectangles.size() != level.walls().size()) {
+        return buildGrid(List.of(level));
+    }
+
+    private GridData buildGrid(List<Level> levels) {
+        List<WallRectangle> wallRectangles = new ArrayList<>();
+        int wallCount = 0;
+        for (Level level : levels) {
+            wallCount += level.walls().size();
+            wallRectangles.addAll(wallRectangles(level));
+        }
+        if (wallRectangles.size() != wallCount) {
             return null;
         }
         List<Double> xCoordinates = new ArrayList<>();
@@ -117,7 +130,121 @@ public final class TerrainCornerService {
                 occupied[column][row] = wallRectangles.stream().anyMatch(rectangle -> rectangle.contains(centerX, centerY));
             }
         }
-        return new GridData(xCoordinates, yCoordinates, floodFillExteriorAir(occupied));
+        return new GridData(xCoordinates, yCoordinates, occupied, floodFillExteriorAir(occupied));
+    }
+
+    private List<PlanPoint> outlineFromGrid(GridData grid) {
+        Map<PointKey, List<PointKey>> graph = new LinkedHashMap<>();
+        for (int column = 0; column < grid.occupied().length; column++) {
+            for (int row = 0; row < grid.occupied()[0].length; row++) {
+                if (!grid.occupied()[column][row]) {
+                    continue;
+                }
+                addBoundaryEdgeIfExterior(graph, grid, column, row, Side.BOTTOM);
+                addBoundaryEdgeIfExterior(graph, grid, column, row, Side.RIGHT);
+                addBoundaryEdgeIfExterior(graph, grid, column, row, Side.TOP);
+                addBoundaryEdgeIfExterior(graph, grid, column, row, Side.LEFT);
+            }
+        }
+        if (graph.isEmpty()) {
+            return List.of();
+        }
+        return extractLargestLoop(graph);
+    }
+
+    private void addBoundaryEdgeIfExterior(
+            Map<PointKey, List<PointKey>> graph,
+            GridData grid,
+            int column,
+            int row,
+            Side side
+    ) {
+        int neighborColumn = column + side.columnOffset();
+        int neighborRow = row + side.rowOffset();
+        if (neighborColumn >= 0
+                && neighborColumn < grid.occupied().length
+                && neighborRow >= 0
+                && neighborRow < grid.occupied()[0].length
+                && !grid.exteriorAir()[neighborColumn][neighborRow]) {
+            return;
+        }
+        BoundaryEdge edge = boundaryEdge(grid, column, row, side);
+        graph.computeIfAbsent(edge.start(), ignored -> new ArrayList<>()).add(edge.end());
+        graph.computeIfAbsent(edge.end(), ignored -> new ArrayList<>()).add(edge.start());
+    }
+
+    private BoundaryEdge boundaryEdge(GridData grid, int column, int row, Side side) {
+        double minX = grid.xCoordinates().get(column);
+        double maxX = grid.xCoordinates().get(column + 1);
+        double minY = grid.yCoordinates().get(row);
+        double maxY = grid.yCoordinates().get(row + 1);
+        return switch (side) {
+            case BOTTOM -> new BoundaryEdge(PointKey.of(new PlanPoint(minX, minY)), PointKey.of(new PlanPoint(maxX, minY)));
+            case RIGHT -> new BoundaryEdge(PointKey.of(new PlanPoint(maxX, minY)), PointKey.of(new PlanPoint(maxX, maxY)));
+            case TOP -> new BoundaryEdge(PointKey.of(new PlanPoint(maxX, maxY)), PointKey.of(new PlanPoint(minX, maxY)));
+            case LEFT -> new BoundaryEdge(PointKey.of(new PlanPoint(minX, maxY)), PointKey.of(new PlanPoint(minX, minY)));
+        };
+    }
+
+    private List<PlanPoint> extractLargestLoop(Map<PointKey, List<PointKey>> graph) {
+        Set<EdgeKey> visitedEdges = new LinkedHashSet<>();
+        List<PlanPoint> bestLoop = List.of();
+        double bestArea = -1.0;
+        for (Map.Entry<PointKey, List<PointKey>> entry : graph.entrySet()) {
+            for (PointKey neighbor : entry.getValue()) {
+                EdgeKey startEdge = EdgeKey.of(entry.getKey(), neighbor);
+                if (visitedEdges.contains(startEdge)) {
+                    continue;
+                }
+                List<PlanPoint> loop = traceLoop(graph, entry.getKey(), neighbor, visitedEdges);
+                double area = Math.abs(signedArea(loop));
+                if (loop.size() >= 3 && area > bestArea) {
+                    bestArea = area;
+                    bestLoop = simplify(loop);
+                }
+            }
+        }
+        return bestLoop;
+    }
+
+    private List<PlanPoint> traceLoop(
+            Map<PointKey, List<PointKey>> graph,
+            PointKey start,
+            PointKey firstNeighbor,
+            Set<EdgeKey> visitedEdges
+    ) {
+        List<PlanPoint> points = new ArrayList<>();
+        PointKey previous = start;
+        PointKey current = firstNeighbor;
+        points.add(start.toPoint());
+        visitedEdges.add(EdgeKey.of(start, current));
+        while (true) {
+            points.add(current.toPoint());
+            List<PointKey> neighbors = graph.getOrDefault(current, List.of());
+            PointKey next = null;
+            for (PointKey candidate : neighbors) {
+                if (!candidate.equals(previous)) {
+                    next = candidate;
+                    break;
+                }
+            }
+            if (next == null) {
+                return List.of();
+            }
+            if (next.equals(start)) {
+                return points;
+            }
+            EdgeKey nextEdge = EdgeKey.of(current, next);
+            if (visitedEdges.contains(nextEdge)) {
+                return List.of();
+            }
+            visitedEdges.add(nextEdge);
+            previous = current;
+            current = next;
+            if (points.size() > graph.size() + 1) {
+                return List.of();
+            }
+        }
     }
 
     private boolean[][] floodFillExteriorAir(boolean[][] occupied) {
@@ -193,8 +320,8 @@ public final class TerrainCornerService {
             if (isNearlyHorizontal(deltaX, deltaY)) {
                 double axisY = (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0;
                 rectangles.add(new WallRectangle(
-                        Math.min(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()),
-                        Math.max(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()),
+                        Math.min(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()) - halfThickness,
+                        Math.max(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()) + halfThickness,
                         axisY - halfThickness,
                         axisY + halfThickness
                 ));
@@ -203,8 +330,8 @@ public final class TerrainCornerService {
                 rectangles.add(new WallRectangle(
                         axisX - halfThickness,
                         axisX + halfThickness,
-                        Math.min(wall.axis().start().yMillimeters(), wall.axis().end().yMillimeters()),
-                        Math.max(wall.axis().start().yMillimeters(), wall.axis().end().yMillimeters())
+                        Math.min(wall.axis().start().yMillimeters(), wall.axis().end().yMillimeters()) - halfThickness,
+                        Math.max(wall.axis().start().yMillimeters(), wall.axis().end().yMillimeters()) + halfThickness
                 ));
             }
         }
@@ -486,7 +613,7 @@ public final class TerrainCornerService {
         return Math.hypot(first.xMillimeters() - second.xMillimeters(), first.yMillimeters() - second.yMillimeters());
     }
 
-    private record GridData(List<Double> xCoordinates, List<Double> yCoordinates, boolean[][] exteriorAir) {
+    private record GridData(List<Double> xCoordinates, List<Double> yCoordinates, boolean[][] occupied, boolean[][] exteriorAir) {
     }
 
     private record CellIndex(int column, int row) {
@@ -499,7 +626,7 @@ public final class TerrainCornerService {
         }
     }
 
-    private record PointKey(long x, long y) {
+    private record PointKey(long x, long y) implements Comparable<PointKey> {
 
         private static PointKey of(PlanPoint point) {
             return new PointKey(Math.round(point.xMillimeters() * 1000.0), Math.round(point.yMillimeters() * 1000.0));
@@ -507,6 +634,15 @@ public final class TerrainCornerService {
 
         private PlanPoint toPoint() {
             return new PlanPoint(x / 1000.0, y / 1000.0);
+        }
+
+        @Override
+        public int compareTo(PointKey other) {
+            int xComparison = Long.compare(x, other.x);
+            if (xComparison != 0) {
+                return xComparison;
+            }
+            return Long.compare(y, other.y);
         }
     }
 
@@ -517,5 +653,40 @@ public final class TerrainCornerService {
     }
 
     private record OffsetLine(PlanPoint start, PlanPoint end) {
+    }
+
+    private record BoundaryEdge(PointKey start, PointKey end) {
+    }
+
+    private record EdgeKey(PointKey first, PointKey second) {
+
+        private static EdgeKey of(PointKey first, PointKey second) {
+            return first.compareTo(second) <= 0
+                    ? new EdgeKey(first, second)
+                    : new EdgeKey(second, first);
+        }
+    }
+
+    private enum Side {
+        BOTTOM(0, -1),
+        RIGHT(1, 0),
+        TOP(0, 1),
+        LEFT(-1, 0);
+
+        private final int columnOffset;
+        private final int rowOffset;
+
+        Side(int columnOffset, int rowOffset) {
+            this.columnOffset = columnOffset;
+            this.rowOffset = rowOffset;
+        }
+
+        private int columnOffset() {
+            return columnOffset;
+        }
+
+        private int rowOffset() {
+            return rowOffset;
+        }
     }
 }

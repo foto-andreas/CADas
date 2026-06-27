@@ -55,6 +55,37 @@ class SurfaceRectangleTileLayoutServiceTest {
     }
 
     @Test
+    void hältDasRasterBeiRechteckigenTeilungenDurchgehend() {
+        SurfaceLayer layer = SurfaceLayer.create(
+                "Dämmplatte 60x120",
+                Length.ofMillimeters(18),
+                Length.ofMillimeters(1_200),
+                Length.ofMillimeters(600),
+                SurfaceLayoutMode.FIXED,
+                Length.ofMillimeters(200),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(2),
+                "Test"
+        );
+
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> full = service.tilesForRectangles(
+                List.of(new CellRectangle(0.0, 4_000.0, 0.0, 3_000.0)),
+                layer
+        );
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> split = service.tilesForRectangles(
+                List.of(
+                        new CellRectangle(0.0, 1_900.0, 0.0, 3_000.0),
+                        new CellRectangle(1_900.0, 4_000.0, 0.0, 3_000.0)
+                ),
+                layer
+        );
+
+        assertTrue(full.equals(split), "Eine reine Teilung des Raums darf das Belagsraster nicht neu starten.");
+    }
+
+    @Test
     void richtetDenDachgeschossFlurAusKirepAmSchmalenFlurarmAus() throws Exception {
         Level level = new DxfProjectExchangeService()
                 .importProject(Path.of("KIREP.cadas"), "KIREP")

@@ -1,6 +1,7 @@
 package de.schrell.cadas.application.terrain;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -53,10 +54,54 @@ class TerrainCornerServiceTest {
         assertEquals(new PlanPoint(1087.5, 1087.5), synchronizedTerrain.vertices().get(3).position());
     }
 
+    @Test
+    void berücksichtigtZusätzlicheKonkaveAußenkantenDesOberirdischenGrundrisses() {
+        Level keller = new Level("Keller");
+        addThinWall(keller, -7000, -10700, 1100, -10700);
+        addThinWall(keller, 1100, -10700, 1100, -7000);
+        addThinWall(keller, 1100, -7000, 4800, -7000);
+        addThinWall(keller, 4800, -7000, 4800, 0);
+        addThinWall(keller, 4800, 0, 0, 0);
+        addThinWall(keller, 0, 0, 0, -3400);
+        addThinWall(keller, 0, -3400, -7000, -3400);
+        addThinWall(keller, -7000, -3400, -7000, -10700);
+
+        Level erdgeschoss = new Level("Erdgeschoss");
+        addThinWall(erdgeschoss, -7000, -10700, 1320, -10700);
+        addThinWall(erdgeschoss, 1320, -10700, 1320, -7140);
+        addThinWall(erdgeschoss, 1320, -7140, 4800, -7140);
+        addThinWall(erdgeschoss, 4800, -7140, 4800, 0);
+        addThinWall(erdgeschoss, 4800, 0, 0, 0);
+        addThinWall(erdgeschoss, 0, 0, 0, -3630);
+        addThinWall(erdgeschoss, 0, -3630, -7000, -3630);
+        addThinWall(erdgeschoss, -7000, -3630, -7000, -10700);
+
+        List<Level> terrainLevels = List.of(keller, erdgeschoss).stream()
+                .filter(level -> !level.name().equals("Keller"))
+                .toList();
+        Terrain synchronizedTerrain = service.synchronize(terrainLevels, Terrain.empty());
+
+        assertEquals(8, synchronizedTerrain.vertices().size());
+        assertTrue(synchronizedTerrain.vertices().stream().anyMatch(vertex ->
+                Math.abs(vertex.position().xMillimeters() - 1320.5) < 0.01
+                        && Math.abs(vertex.position().yMillimeters() + 7140.5) < 0.01));
+        assertTrue(synchronizedTerrain.vertices().stream().anyMatch(vertex ->
+                Math.abs(vertex.position().xMillimeters() + 0.5) < 0.01
+                        && Math.abs(vertex.position().yMillimeters() + 3629.5) < 0.01));
+    }
+
     private void addWall(Level level, double x1, double y1, double x2, double y2) {
         level.addWall(Wall.create(
                 new PlanSegment(new PlanPoint(x1, y1), new PlanPoint(x2, y2)),
                 Length.ofMillimeters(175),
+                Length.ofMillimeters(2750)
+        ));
+    }
+
+    private void addThinWall(Level level, double x1, double y1, double x2, double y2) {
+        level.addWall(Wall.create(
+                new PlanSegment(new PlanPoint(x1, y1), new PlanPoint(x2, y2)),
+                Length.ofMillimeters(1),
                 Length.ofMillimeters(2750)
         ));
     }

@@ -1048,7 +1048,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void editTerrainElevations() {
-        Terrain synchronizedTerrain = terrainCornerService.synchronize(project.primaryLevel(), project.terrain());
+        Terrain synchronizedTerrain = terrainCornerService.synchronize(terrainSourceLevels(), project.terrain());
         if (!synchronizedTerrain.configured() && project.terrain().configured()) {
             synchronizedTerrain = project.terrain();
         }
@@ -1078,7 +1078,7 @@ public final class CadWorkbench extends BorderPane {
         ScrollPane scrollPane = new ScrollPane(rows);
         scrollPane.setFitToWidth(true);
         scrollPane.setPrefViewportHeight(Math.min(420.0, 52.0 * elevationFields.size()));
-        applyTooltip(scrollPane, "Zeigt alle automatisch aus dem untersten Gebäudegrundriss abgeleiteten äußeren Geländeecken.");
+        applyTooltip(scrollPane, "Zeigt alle automatisch aus der äußeren oberirdischen Projektkontur abgeleiteten Geländeecken des Gebäudes.");
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Geländehöhen bearbeiten");
         dialog.setHeaderText("Höhe über dem Boden der untersten Etage");
@@ -2757,6 +2757,20 @@ public final class CadWorkbench extends BorderPane {
         updateStatus();
     }
 
+    private List<Level> terrainSourceLevels() {
+        List<Level> aboveGroundLevels = project.levels().stream()
+                .filter(level -> !isBasementLevel(level))
+                .toList();
+        return aboveGroundLevels.isEmpty() ? project.levels() : aboveGroundLevels;
+    }
+
+    private boolean isBasementLevel(Level level) {
+        String normalizedName = level.name().trim().toLowerCase(Locale.GERMAN);
+        return normalizedName.contains("keller")
+                || normalizedName.startsWith("kg")
+                || normalizedName.contains("souterrain");
+    }
+
     private void drawGuides(GraphicsContext graphics) {
         if (!projectionService.isPlanView(activeView.get())) {
             return;
@@ -3666,6 +3680,7 @@ public final class CadWorkbench extends BorderPane {
         if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured() || !showTerrainInPlan.get()) {
             return;
         }
+        List<PlanPoint> outerOutline = terrainGeometryService.outerOutline(project.terrain());
         graphics.setStroke(TERRAIN_EDGE_COLOR);
         graphics.setFill(TERRAIN_LABEL_COLOR);
         graphics.setLineWidth(2.0);
@@ -3680,6 +3695,15 @@ public final class CadWorkbench extends BorderPane {
                     toScreenProjectedY(next.position(), 0.0));
             graphics.fillOval(x - 4.0, y - 4.0, 8.0, 8.0);
             graphics.fillText(vertex.elevationAboveLowestFloor().format(LengthUnit.METER, 2), x + 7.0, y - 7.0);
+            if (index < outerOutline.size()) {
+                PlanPoint labelPoint = new PlanPoint(
+                        (vertex.position().xMillimeters() + outerOutline.get(index).xMillimeters()) / 2.0,
+                        (vertex.position().yMillimeters() + outerOutline.get(index).yMillimeters()) / 2.0
+                );
+                graphics.fillText(Integer.toString(index + 1),
+                        toScreenProjectedX(labelPoint, 0.0),
+                        toScreenProjectedY(labelPoint, 0.0));
+            }
         }
     }
 

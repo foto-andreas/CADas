@@ -232,6 +232,38 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
+    void führtBodenbelagInLFormMitDurchgehendemRasterÜberTeilrechteckeFort() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = new Room(
+                UUID.randomUUID(),
+                "Flur",
+                List.of(
+                        new PlanPoint(0, 0),
+                        new PlanPoint(3_000, 0),
+                        new PlanPoint(3_000, 1_000),
+                        new PlanPoint(1_000, 1_000),
+                        new PlanPoint(1_000, 3_000),
+                        new PlanPoint(0, 3_000)
+                ),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER),
+                null
+        );
+        project.primaryLevel().addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        stack.addLayer(layer("Vario", Length.ofMillimeters(1_000), Length.ofMillimeters(600)));
+        project.primaryLevel().addSurfaceLayerStack(stack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        MaterialSummary material = report.materials().getFirst();
+        assertEquals(5.0, material.coveredAreaSquareMeters(), 0.001);
+        assertEquals(9, material.requiredPieces());
+        assertEquals(2, material.cutCount());
+    }
+
+    @Test
     void verwendetReststueckeFuerWeitereZuschnitte() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Room room = Room.rectangular(
