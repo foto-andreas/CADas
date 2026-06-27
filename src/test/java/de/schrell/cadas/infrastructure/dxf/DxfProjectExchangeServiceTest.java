@@ -442,6 +442,37 @@ class DxfProjectExchangeServiceTest {
     }
 
     @Test
+    void importiertKirepBadUndFlurMitEigenenBodenstapeln() throws Exception {
+        ProjectModel project = exchangeService.importProject(Path.of("KIREP.cadas"), "KIREP");
+        var dachgeschoss = project.levels().stream()
+                .filter(level -> level.name().equals("Dachgeschoss"))
+                .findFirst()
+                .orElseThrow();
+        Room flur = dachgeschoss.rooms().stream()
+                .filter(room -> room.name().equals("Flur"))
+                .findFirst()
+                .orElseThrow();
+        Room bad = dachgeschoss.rooms().stream()
+                .filter(room -> room.name().equals("Bad"))
+                .findFirst()
+                .orElseThrow();
+
+        var flurStack = dachgeschoss.surfaceLayerStacks().stream()
+                .filter(stack -> stack.surfaceType() == SurfaceType.FLOOR)
+                .filter(stack -> stack.targetKey().equals(flur.id().toString()))
+                .findFirst()
+                .orElseThrow();
+        var badStack = dachgeschoss.surfaceLayerStacks().stream()
+                .filter(stack -> stack.surfaceType() == SurfaceType.FLOOR)
+                .filter(stack -> stack.targetKey().equals(bad.id().toString()))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("Dämmplatte 120 x 60 cm", flurStack.layers().getFirst().name());
+        assertEquals("Dämmplatte 120 x 60 cm", badStack.layers().getFirst().name());
+    }
+
+    @Test
     void exportiertMetrischeHeaderUndProjektnamenFuerSpaeterenUiImport() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Importname", "Erdgeschoss");
         Wall wall = Wall.create(

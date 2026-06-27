@@ -11,8 +11,11 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +62,47 @@ class WallDimensionServiceTest {
         assertTrue(dimensions.exteriorDimension().isEmpty());
     }
 
+    @Test
+    void ignoriertNahezuParalleleAnschlusswandBeimAussenmass() {
+        Level level = new Level("Erdgeschoss");
+        Wall selectedWall = wall(0, 0, 4_000, 0, 200);
+        level.addWall(selectedWall);
+        level.addWall(wall(4_000, 0, 6_000, -2, 200));
+        level.addRoom(Room.rectangular(
+                "Raum",
+                new PlanPoint(0, -3_000),
+                new PlanPoint(4_000, 0),
+                Length.of(2.6, LengthUnit.METER),
+                Length.zero(),
+                Length.zero()
+        ));
+
+        WallDimensionService.WallDimensions dimensions = service.dimensions(level, selectedWall);
+
+        WallDimensionService.SideDimension exteriorDimension = dimensions.exteriorDimension().orElseThrow();
+        assertEquals(1.0, exteriorDimension.sideSign());
+        assertEquals(4_000.0, exteriorDimension.length().toMillimeters(), 0.001);
+        assertSegmentOnLine(exteriorDimension.dimensionSegment(), 0.0, 100.0, 4_000.0, 100.0);
+    }
+
+    @Test
+    void begrenztKirepAussenmasseBeiFastParallelenDachgeschosswaenden() throws Exception {
+        Level level = new DxfProjectExchangeService()
+                .importProject(Path.of("KIREP.cadas"), "KIREP")
+                .levels().stream()
+                .filter(candidate -> candidate.name().equals("Dachgeschoss"))
+                .findFirst()
+                .orElseThrow();
+        Wall firstWall = findWall(level, "c202572d-e23d-40c5-a999-9cba1c1086c2");
+        Wall secondWall = findWall(level, "11d23ce0-c53d-47dd-8e86-86dde854dd7b");
+
+        double firstExteriorLength = service.dimensions(level, firstWall).exteriorDimension().orElseThrow().length().toMillimeters();
+        double secondExteriorLength = service.dimensions(level, secondWall).exteriorDimension().orElseThrow().length().toMillimeters();
+
+        assertTrue(firstExteriorLength > 4_000.0 && firstExteriorLength < 6_000.0);
+        assertTrue(secondExteriorLength > 1_500.0 && secondExteriorLength < 3_000.0);
+    }
+
     private List<Wall> addRectangle(Level level, double width, double height, double thickness) {
         List<Wall> walls = List.of(
                 wall(0, 0, width, 0, thickness),
@@ -83,6 +127,13 @@ class WallDimensionServiceTest {
         level.replaceRooms(roomService.synchronize(level, new AutoRoomGenerationService.RoomDefaults(
                 "Raum", Length.of(2.6, LengthUnit.METER), Length.zero(), Length.zero(), null
         )));
+    }
+
+    private Wall findWall(Level level, String wallId) {
+        return level.walls().stream()
+                .filter(candidate -> candidate.id().equals(UUID.fromString(wallId)))
+                .findFirst()
+                .orElseThrow();
     }
 
     private void assertSegmentOnLine(PlanSegment segment, double expectedStartX, double expectedStartY, double expectedEndX, double expectedEndY) {

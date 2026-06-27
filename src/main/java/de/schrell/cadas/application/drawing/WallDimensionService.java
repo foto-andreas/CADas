@@ -100,6 +100,10 @@ public final class WallDimensionService {
             if (connected.id().equals(wall.id()) || !touches(connected, axisEndpoint)) {
                 continue;
             }
+            // Fast kollineare Anschlusswände erzeugen numerisch instabile Fernschnitte.
+            if (isParallel(wall.axis(), connected.axis())) {
+                continue;
+            }
             for (int connectedSide : new int[]{-1, 1}) {
                 PlanSegment candidate = shiftedSegment(connected.axis(), connected.thickness().toMillimeters() / 2.0, connectedSide);
                 Optional<PlanPoint> intersection = lineIntersection(extendedLine.start(), extendedLine.end(), candidate.start(), candidate.end());
