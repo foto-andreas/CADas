@@ -63,6 +63,11 @@ class SurfaceMaterialListServiceTest {
     @Test
     void erzeugtHeizplanMitSvgInDerMaterialliste() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(2_000, 0)),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(2_600)
+        ));
         Room room = Room.rectangular(
                 "Bad",
                 new PlanPoint(0, 0),
@@ -122,8 +127,9 @@ class SurfaceMaterialListServiceTest {
         assertEquals(900.0, report.rooms().getFirst().heatingElementWatts(), 0.001);
         assertEquals(1_005.3, report.rooms().getFirst().totalHeatOutputWatts(), 0.1);
         assertTrue(report.heatingPlans().getFirst().svg().contains("<svg"));
+        assertTrue(report.heatingPlans().getFirst().svg().contains("id=\"waende\""));
         assertTrue(report.heatingPlans().getFirst().svg().contains("id=\"sperrflaechen\""));
-        assertTrue(report.heatingPlans().getFirst().svg().contains("800.000,500.000 1200.000,500.000"));
+        assertTrue(report.heatingPlans().getFirst().svg().contains("fill=\"#f8dcd8\""));
         assertTrue(report.heatingPlans().getFirst().svg().contains("V1"));
         assertTrue(report.toMarkdown().contains("## Flächenheizungen"));
         assertTrue(report.toMarkdown().contains("## Heizelemente"));

@@ -11,6 +11,7 @@ import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
+import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.Staircase;
 
@@ -189,6 +190,29 @@ public final class HydronicHeatingLayoutService {
         Objects.requireNonNull(floorOpenings, "floorOpenings darf nicht null sein.");
         Objects.requireNonNull(heatingExclusionAreas, "heatingExclusionAreas darf nicht null sein.");
         return HydronicHeatingLayoutSvgRenderer.render(
+                null,
+                room,
+                heating,
+                floorOpenings,
+                heatingExclusionAreas,
+                layoutBestEffort(heating).circuits()
+        );
+    }
+
+    public String toSvg(
+            Level level,
+            Room room,
+            HydronicHeating heating,
+            List<FloorOpening> floorOpenings,
+            List<HeatingExclusionArea> heatingExclusionAreas
+    ) {
+        Objects.requireNonNull(level, "level darf nicht null sein.");
+        Objects.requireNonNull(room, "room darf nicht null sein.");
+        Objects.requireNonNull(heating, "heating darf nicht null sein.");
+        Objects.requireNonNull(floorOpenings, "floorOpenings darf nicht null sein.");
+        Objects.requireNonNull(heatingExclusionAreas, "heatingExclusionAreas darf nicht null sein.");
+        return HydronicHeatingLayoutSvgRenderer.render(
+                level,
                 room,
                 heating,
                 floorOpenings,

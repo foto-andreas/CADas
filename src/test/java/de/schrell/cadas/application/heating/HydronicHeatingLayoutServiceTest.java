@@ -245,13 +245,14 @@ class HydronicHeatingLayoutServiceTest {
 
         String svg = service.toSvg(room, heating);
 
-        assertTrue(svg.contains("viewBox=\"-200.000 -200.000 6400.000 4400.000\""));
+        assertTrue(svg.contains("viewBox=\"0.000 0.000 6400.000 4400.000\""));
         assertTrue(svg.contains("id=\"variotherm-rinnen\""));
         assertTrue(svg.contains("r=\"44.200\""));
         assertTrue(svg.contains("class=\"vorlauf\""));
         assertTrue(svg.contains("class=\"ruecklauf\""));
         assertFalse(svg.contains("connector-vorlauf"));
         assertFalse(svg.contains("connector-ruecklauf"));
+        assertFalse(svg.contains("id=\"waende\""));
         assertTrue(svg.contains("V1"));
         assertTrue(svg.contains("R1"));
     }

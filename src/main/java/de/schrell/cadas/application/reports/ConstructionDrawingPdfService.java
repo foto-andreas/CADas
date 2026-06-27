@@ -10,6 +10,7 @@ import de.schrell.cadas.application.drawing.WallDimensionService;
 import de.schrell.cadas.application.heating.RoomHeatingOutputService;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
+import de.schrell.cadas.application.view.WallPlanOutlineService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
@@ -68,6 +69,7 @@ public final class ConstructionDrawingPdfService {
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
+    private final WallPlanOutlineService wallPlanOutlineService = new WallPlanOutlineService();
 
     public void export(ProjectModel project, Path targetFile) throws IOException {
         export(project, targetFile, ConstructionDrawingOptions.defaults());
@@ -116,9 +118,7 @@ public final class ConstructionDrawingPdfService {
                 canvas.text(viewport.x(extension.minX()) + 5, viewport.y(extension.minY()) - 12, 7.5f, extension.type().toString());
             }
             for (Wall wall : level.walls()) {
-                float width = (float) Math.max(1.1, wall.thickness().toMillimeters() * viewport.factor());
-                canvas.line(viewport.x(wall.axis().start().xMillimeters()), viewport.y(wall.axis().start().yMillimeters()),
-                        viewport.x(wall.axis().end().xMillimeters()), viewport.y(wall.axis().end().yMillimeters()), width, Color.DARK_GRAY);
+                drawWall(canvas, viewport, wall, new Color(145, 145, 140), Color.DARK_GRAY, 0.85f);
             }
             for (Door door : level.doors()) {
                 Wall wall = level.findWall(door.wallId());
@@ -164,11 +164,7 @@ public final class ConstructionDrawingPdfService {
                 drawHeatingExclusionArea(canvas, viewport, area);
             }
             for (Wall wall : level.walls()) {
-                canvas.line(
-                        viewport.x(wall.axis().start().xMillimeters()), viewport.y(wall.axis().start().yMillimeters()),
-                        viewport.x(wall.axis().end().xMillimeters()), viewport.y(wall.axis().end().yMillimeters()),
-                        0.8f, new Color(120, 120, 120)
-                );
+                drawWall(canvas, viewport, wall, new Color(222, 222, 217), new Color(120, 120, 120), 0.7f);
             }
             Color zoneColor = surfacePosition == HeatingSurfacePosition.FLOOR
                     ? new Color(180, 45, 38)
@@ -267,11 +263,7 @@ public final class ConstructionDrawingPdfService {
                 drawPolygon(canvas, viewport, room.outline(), new Color(247, 247, 244), 0.35f);
             }
             for (Wall wall : level.walls()) {
-                canvas.line(
-                        viewport.x(wall.axis().start().xMillimeters()), viewport.y(wall.axis().start().yMillimeters()),
-                        viewport.x(wall.axis().end().xMillimeters()), viewport.y(wall.axis().end().yMillimeters()),
-                        0.8f, new Color(120, 120, 120)
-                );
+                drawWall(canvas, viewport, wall, new Color(222, 222, 217), new Color(120, 120, 120), 0.7f);
             }
             for (HeatingElementEntry entry : entries) {
                 drawHeatingElement(canvas, viewport, entry);
@@ -524,6 +516,17 @@ public final class ConstructionDrawingPdfService {
     }
 
     private void drawPolygon(PageCanvas canvas, Viewport viewport, List<PlanPoint> points, Color fill, float width) throws IOException {
+        drawPolygon(canvas, viewport, points, fill, Color.GRAY, width);
+    }
+
+    private void drawPolygon(
+            PageCanvas canvas,
+            Viewport viewport,
+            List<PlanPoint> points,
+            Color fill,
+            Color stroke,
+            float width
+    ) throws IOException {
         if (points.isEmpty()) {
             return;
         }
@@ -532,7 +535,11 @@ public final class ConstructionDrawingPdfService {
             coordinates[index * 2] = (float) viewport.x(points.get(index).xMillimeters());
             coordinates[index * 2 + 1] = (float) viewport.y(points.get(index).yMillimeters());
         }
-        canvas.polygon(coordinates, width, Color.GRAY, fill);
+        canvas.polygon(coordinates, width, stroke, fill);
+    }
+
+    private void drawWall(PageCanvas canvas, Viewport viewport, Wall wall, Color fill, Color stroke, float width) throws IOException {
+        drawPolygon(canvas, viewport, wallPlanOutlineService.outline(wall), fill, stroke, width);
     }
 
     private void drawOpening(PageCanvas canvas, Viewport viewport, Wall wall, double offset, double width, Color color) throws IOException {
@@ -666,8 +673,7 @@ public final class ConstructionDrawingPdfService {
     }
 
     private Viewport heatingViewport(Level level, List<HydronicHeating> heatings) {
-        List<PlanPoint> points = new ArrayList<>();
-        level.rooms().forEach(room -> points.addAll(room.outline()));
+        List<PlanPoint> points = new ArrayList<>(levelPlanPoints(level));
         heatings.forEach(heating -> {
             points.add(heating.supplyPoint());
             points.add(heating.returnPoint());
@@ -842,17 +848,7 @@ public final class ConstructionDrawingPdfService {
     }
 
     private Bounds levelBounds(Level level) {
-        List<PlanPoint> points = new ArrayList<>();
-        level.walls().forEach(wall -> {
-            points.add(wall.axis().start());
-            points.add(wall.axis().end());
-        });
-        level.rooms().forEach(room -> points.addAll(room.outline()));
-        level.staircases().forEach(stair -> {
-            points.add(stair.firstCorner());
-            points.add(stair.oppositeCorner());
-        });
-        level.floorExtensions().forEach(extension -> points.addAll(extension.outline()));
+        List<PlanPoint> points = new ArrayList<>(levelPlanPoints(level));
         if (points.isEmpty()) {
             return new Bounds(0, 0, 10_000, 7_000);
         }
@@ -862,6 +858,18 @@ public final class ConstructionDrawingPdfService {
                 points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(10_000),
                 points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(7_000)
         );
+    }
+
+    private List<PlanPoint> levelPlanPoints(Level level) {
+        List<PlanPoint> points = new ArrayList<>();
+        level.walls().forEach(wall -> points.addAll(wallPlanOutlineService.outline(wall)));
+        level.rooms().forEach(room -> points.addAll(room.outline()));
+        level.staircases().forEach(stair -> {
+            points.add(stair.firstCorner());
+            points.add(stair.oppositeCorner());
+        });
+        level.floorExtensions().forEach(extension -> points.addAll(extension.outline()));
+        return points;
     }
 
     private Bounds lineBounds(List<SpatialLine> lines) {
