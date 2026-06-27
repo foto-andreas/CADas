@@ -1484,7 +1484,7 @@ class CadWorkbenchTest {
     }
 
     @Test
-    void belagsauswahlZeigtBeiNurWandAussenwandUndInnenwandAn() throws Exception {
+    void belagsauswahlBevorzugtBeiNurWandInnenwandVorAussenwand() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -1502,8 +1502,8 @@ class CadWorkbenchTest {
         });
 
         WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
-        Assertions.assertEquals("WALL_EXTERIOR", snapshot.surfaceType());
-        Assertions.assertEquals("WALL_EXTERIOR,WALL_INTERIOR", snapshot.surfaceTypeOptions());
+        Assertions.assertEquals("WALL_INTERIOR", snapshot.surfaceType());
+        Assertions.assertEquals("WALL_INTERIOR,WALL_EXTERIOR", snapshot.surfaceTypeOptions());
     }
 
     @Test
@@ -1961,7 +1961,7 @@ class CadWorkbenchTest {
         String markdown = Files.readString(normalisierterPfad);
         Assertions.assertTrue(markdown.contains("# Materialliste Beläge"));
         Assertions.assertTrue(markdown.contains("Fliese"));
-        Assertions.assertTrue(markdown.contains("Komplexität pro Raum"));
+        Assertions.assertTrue(markdown.contains("Komplexität pro Raum und Fläche"));
         Assertions.assertTrue(markdown.contains("Schnitte"));
         Assertions.assertFalse(Files.exists(exportPfad));
     }

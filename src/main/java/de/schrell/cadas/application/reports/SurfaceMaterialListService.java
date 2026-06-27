@@ -63,8 +63,11 @@ public final class SurfaceMaterialListService {
         Map<String, RoomAccumulator> rooms = new LinkedHashMap<>();
         for (MaterialSummary material : materialSummaries) {
             for (MaterialRoomEntry entry : material.roomEntries()) {
-                String roomKey = entry.levelName() + "\u0000" + entry.roomName();
-                rooms.computeIfAbsent(roomKey, ignored -> new RoomAccumulator(entry.levelName(), entry.roomName()))
+                String roomKey = entry.levelName() + "\u0000" + entry.roomName() + "\u0000" + entry.surfaceDescription();
+                rooms.computeIfAbsent(
+                                roomKey,
+                                ignored -> new RoomAccumulator(entry.levelName(), entry.roomName(), entry.surfaceDescription())
+                        )
                         .add(entry);
             }
         }
@@ -280,24 +283,90 @@ public final class SurfaceMaterialListService {
             List<SurfaceCoverage> coverages
     ) {
         if (sides.positiveSide()) {
-            coverages.add(wallSideCoverage(level, stack, wall, roomName, 1.0));
+            coverages.addAll(wallSideCoverages(level, stack, wall, roomName, 1.0));
         }
         if (sides.negativeSide()) {
-            coverages.add(wallSideCoverage(level, stack, wall, roomName, -1.0));
+            coverages.addAll(wallSideCoverages(level, stack, wall, roomName, -1.0));
         }
     }
 
-    private SurfaceCoverage wallSideCoverage(Level level, SurfaceLayerStack stack, Wall wall, String roomName, double sideSign) {
-        List<SurfaceRectangle> rectangles = wallSurfaceOpeningService.visibleRectangles(level, wall, sideSign).stream()
+    private List<SurfaceCoverage> wallSideCoverages(Level level, SurfaceLayerStack stack, Wall wall, String roomName, double sideSign) {
+        List<de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(level, wall, sideSign);
+        List<SurfaceRectangle> rectangles = visibleRectangles.stream()
                 .map(rectangle -> new SurfaceRectangle(0.0, 0.0, rectangle.widthMillimeters(), rectangle.heightMillimeters()))
                 .toList();
         String sideLabel = sideSign > 0.0 ? "+" : "-";
-        return new SurfaceCoverage(
-                level.name(),
-                roomName,
-                stack.surfaceType() + " Wand " + shortId(wall.id().toString()) + " Seite " + sideLabel,
-                rectangles
-        );
+        String baseDescription = stack.surfaceType() + " Wand " + shortId(wall.id().toString()) + " Seite " + sideLabel;
+        if (!wall.hasVariableTopHeight()) {
+            return List.of(new SurfaceCoverage(level.name(), roomName, baseDescription, rectangles));
+        }
+        List<SurfaceRectangle> sockelRectangles = new ArrayList<>();
+        List<SurfaceRectangle> slopeRectangles = new ArrayList<>();
+        for (de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle rectangle : visibleRectangles) {
+            splitVariableWallRectangle(wall, rectangle, sockelRectangles, slopeRectangles);
+        }
+        List<SurfaceCoverage> coverages = new ArrayList<>();
+        if (!sockelRectangles.isEmpty()) {
+            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription + " Sockel", List.copyOf(sockelRectangles)));
+        }
+        if (!slopeRectangles.isEmpty()) {
+            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription + " Schräge", List.copyOf(slopeRectangles)));
+        }
+        if (coverages.isEmpty()) {
+            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription, rectangles));
+        }
+        return List.copyOf(coverages);
+    }
+
+    private void splitVariableWallRectangle(
+            Wall wall,
+            de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle rectangle,
+            List<SurfaceRectangle> sockelRectangles,
+            List<SurfaceRectangle> slopeRectangles
+    ) {
+        List<Double> cuts = wallSegmentCuts(wall, rectangle.startMillimeters(), rectangle.endMillimeters());
+        for (int index = 0; index < cuts.size() - 1; index++) {
+            double start = cuts.get(index);
+            double end = cuts.get(index + 1);
+            double width = end - start;
+            if (width <= EPSILON) {
+                continue;
+            }
+            double lowerHeight = rectangle.lowerHeightMillimeters();
+            double upperHeight = rectangle.upperHeightMillimeters();
+            double startTop = clippedWallHeight(wall, start, lowerHeight, upperHeight);
+            double endTop = clippedWallHeight(wall, end, lowerHeight, upperHeight);
+            double minimumTop = Math.min(startTop, endTop);
+            if (minimumTop > lowerHeight + EPSILON) {
+                sockelRectangles.add(new SurfaceRectangle(0.0, 0.0, width, minimumTop - lowerHeight));
+            }
+            double slopeHeight = Math.abs(endTop - startTop) / 2.0;
+            if (slopeHeight > EPSILON) {
+                slopeRectangles.add(new SurfaceRectangle(0.0, 0.0, width, slopeHeight));
+            }
+        }
+    }
+
+    private List<Double> wallSegmentCuts(Wall wall, double start, double end) {
+        List<Double> cuts = new ArrayList<>();
+        addDistinctCut(cuts, start);
+        wall.resolvedProfile().stream()
+                .mapToDouble(point -> point.offset().toMillimeters())
+                .filter(offset -> offset > start + EPSILON && offset < end - EPSILON)
+                .forEach(offset -> addDistinctCut(cuts, offset));
+        addDistinctCut(cuts, end);
+        cuts.sort(Double::compareTo);
+        return List.copyOf(cuts);
+    }
+
+    private void addDistinctCut(List<Double> cuts, double value) {
+        if (cuts.stream().noneMatch(existing -> Math.abs(existing - value) <= EPSILON)) {
+            cuts.add(value);
+        }
+    }
+
+    private double clippedWallHeight(Wall wall, double offset, double lowerHeight, double upperHeight) {
+        return Math.max(lowerHeight, Math.min(upperHeight, wall.heightAt(offset)));
     }
 
     private List<OrthogonalPolygonDecompositionService.CellRectangle> roomRectangles(Room room) {
@@ -832,15 +901,17 @@ public final class SurfaceMaterialListService {
 
         private final String levelName;
         private final String roomName;
+        private final String surfaceDescription;
         private int requiredPieceCount;
         private int placedPieceCount;
         private int cutCount;
         private double coveredAreaSquareMeters;
         private double cutPenaltySum;
 
-        private RoomAccumulator(String levelName, String roomName) {
+        private RoomAccumulator(String levelName, String roomName, String surfaceDescription) {
             this.levelName = levelName;
             this.roomName = roomName;
+            this.surfaceDescription = surfaceDescription;
         }
 
         private void add(MaterialRoomEntry entry) {
@@ -855,6 +926,7 @@ public final class SurfaceMaterialListService {
             return new RoomComplexitySummary(
                     levelName,
                     roomName,
+                    surfaceDescription,
                     coveredAreaSquareMeters,
                     requiredPieceCount,
                     cutCount,
@@ -1079,12 +1151,12 @@ public final class SurfaceMaterialListService {
         }
 
         private void appendRoomComplexities(StringBuilder markdown) {
-            markdown.append("## Komplexität pro Raum\n\n");
-            markdown.append("| Raum | Belegte Fläche | Stückzahl | Schnitte | Komplexität |\n");
+            markdown.append("## Komplexität pro Raum und Fläche\n\n");
+            markdown.append("| Raum/Fläche | Belegte Fläche | Stückzahl | Schnitte | Komplexität |\n");
             markdown.append("|---|---:|---:|---:|---:|\n");
             for (RoomComplexitySummary room : roomComplexities) {
                 markdown.append("| ")
-                        .append(markdownCell(room.levelName() + " / " + room.roomName()))
+                        .append(markdownCell(room.levelName() + " / " + room.roomName() + " / " + room.surfaceDescription()))
                         .append(" | ")
                         .append(decimal(room.coveredAreaSquareMeters(), 2)).append(" m²")
                         .append(" | ")
@@ -1168,6 +1240,7 @@ public final class SurfaceMaterialListService {
     public record RoomComplexitySummary(
             String levelName,
             String roomName,
+            String surfaceDescription,
             double coveredAreaSquareMeters,
             int requiredPieces,
             int cutCount,

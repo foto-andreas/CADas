@@ -493,7 +493,9 @@ Die Liste enthält:
 * Materialfläche auf Basis ganzer Platten oder Fliesen
 * Vollstücke, Zuschnitte und notwendige Schnittanzahl
 * genutzte und verbleibende Reststücke
-* eine Komplexität je Raum
+* eine Komplexität je Raum und Fläche
+
+Bei Wandbelägen mit polygonaler Oberkante trennt CADas Sockel und Schräge in Materialdetails und Raum-/Flächenübersicht. Wählst du nur eine Wand aus, ist bei gleichzeitig möglicher Innen- und Außenfläche standardmäßig die Innenwand vorausgewählt.
 
 Die Komplexität steigt bei vielen Schnitten und kurzen Kanten. Lange Schnittkanten werden günstiger bewertet; eine Kante in voller Materiallänge ist am besten. Unterschiedliche Kantenlängen des Materials werden dabei getrennt gegen Breite und Höhe der Vollplatte bewertet.
 

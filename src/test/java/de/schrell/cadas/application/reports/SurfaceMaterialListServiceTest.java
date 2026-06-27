@@ -28,9 +28,11 @@ import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
+import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -163,7 +165,7 @@ class SurfaceMaterialListServiceTest {
         assertEquals(1.0, material.requiredMaterialAreaSquareMeters(), 0.001);
         assertEquals(0, material.cutCount());
         assertEquals(0.0, report.roomComplexities().getFirst().complexityScore(), 0.001);
-        assertTrue(report.toMarkdown().contains("Komplexität pro Raum"));
+        assertTrue(report.toMarkdown().contains("Komplexität pro Raum und Fläche"));
     }
 
     @Test
@@ -403,6 +405,49 @@ class SurfaceMaterialListServiceTest {
         assertTrue(material.cutCount() > 0);
         assertTrue(material.roomEntries().getFirst().surfaceDescription().contains("Innenwand"));
         assertTrue(report.toMarkdown().contains("Reststücke"));
+    }
+
+    @Test
+    void trenntSockelUndSchraegeEinerInnenwandInMaterialUndRaumliste() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
+        Wall wall = new Wall(
+                UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.ofMillimeters(2000),
+                Length.ofMillimeters(1000),
+                Length.ofMillimeters(2000),
+                List.of(
+                        new WallProfilePoint(Length.zero(), Length.ofMillimeters(1000)),
+                        new WallProfilePoint(Length.ofMillimeters(4000), Length.ofMillimeters(2000))
+                )
+        );
+        Room room = Room.rectangular(
+                "Studio",
+                new PlanPoint(0, 100),
+                new PlanPoint(4000, 2100),
+                Length.ofMillimeters(2400),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addWall(wall);
+        project.primaryLevel().addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.WALL_INTERIOR, WallSurfaceTargetKey.interior(wall.id(), room.id()));
+        stack.addLayer(layer("Lehmputz", Length.of(100, LengthUnit.CENTIMETER), Length.of(100, LengthUnit.CENTIMETER)));
+        project.primaryLevel().addSurfaceLayerStack(stack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        MaterialSummary material = report.materials().getFirst();
+        assertEquals(6.0, material.coveredAreaSquareMeters(), 0.001);
+        assertTrue(material.roomEntries().stream().anyMatch(entry ->
+                entry.surfaceDescription().contains("Sockel") && Math.abs(entry.coveredAreaSquareMeters() - 4.0) < 0.001));
+        assertTrue(material.roomEntries().stream().anyMatch(entry ->
+                entry.surfaceDescription().contains("Schräge") && Math.abs(entry.coveredAreaSquareMeters() - 2.0) < 0.001));
+        assertTrue(report.roomComplexities().stream().anyMatch(entry -> entry.surfaceDescription().contains("Sockel")));
+        assertTrue(report.roomComplexities().stream().anyMatch(entry -> entry.surfaceDescription().contains("Schräge")));
+        assertTrue(report.toMarkdown().contains("Sockel"));
+        assertTrue(report.toMarkdown().contains("Schräge"));
     }
 
     private ProjectModel projektMitZweiZuschnittRaeumen(SurfaceCutRestriction cutRestriction) {

@@ -1953,7 +1953,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(roomObjectBaseElevationField, "Legt die vertikale Lage der Objektbasis relativ zum Boden der aktiven Etage fest. Positive Werte heben das Objekt an, negative Werte versenken es.");
         applyTooltip(roomObjectBaseElevationUnit, "Bestimmt die Einheit für die positive oder negative Basishöhe des Objekts.");
         applyTooltip(roomObjectAngleField, "Legt den frei einstellbaren Drehwinkel eines neuen oder ausgewählten Objekts in Grad fest.");
-        applyTooltip(surfaceTypeSelector, "Zeigt nur die Belagstypen an, die zur aktuellen Auswahl passen. Raum allein erlaubt Boden oder Decke, Raum plus Wand erlaubt Innenwand, Wand allein erlaubt Außenwand.");
+        applyTooltip(surfaceTypeSelector, "Zeigt nur die Belagstypen an, die zur aktuellen Auswahl passen. Raum allein erlaubt Boden oder Decke, Raum plus Wand erlaubt Innenwand, Wand allein erlaubt Innenwand oder Außenwand; Innenwand ist dabei vorausgewählt.");
         applyTooltip(surfacePresetSelector, "Wählt einen Beispielbelag oder eine DWG-Referenz aus und übernimmt deren Standardwerte in die Ebenenfelder.");
         applyTooltip(surfaceLayerList, "Zeigt die Ebenen der aktuell ausgewählten Fläche in ihrer Stapelreihenfolge an.");
         applyTooltip(surfaceLayerNameField, "Legt den Namen der Ebene fest, etwa Fliese, Rigips, Dämmplatte oder eine DWG-Referenz.");
@@ -7270,7 +7270,7 @@ public final class CadWorkbench extends BorderPane {
             boolean hasExteriorSide = walls.stream().anyMatch(wall -> wallSurfaceSideService.hasExteriorSide(activeLevel.get(), wall));
             boolean hasInteriorSide = walls.stream().anyMatch(wall -> !interiorWallTargetKeys(List.of(wall)).isEmpty());
             if (hasExteriorSide && hasInteriorSide) {
-                return List.of(SurfaceType.WALL_EXTERIOR, SurfaceType.WALL_INTERIOR);
+                return List.of(SurfaceType.WALL_INTERIOR, SurfaceType.WALL_EXTERIOR);
             }
             if (hasInteriorSide) {
                 return List.of(SurfaceType.WALL_INTERIOR);
