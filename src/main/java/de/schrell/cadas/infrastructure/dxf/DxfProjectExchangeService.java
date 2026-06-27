@@ -88,6 +88,13 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 roof.overhang().toMillimeters(),
                 roof.gutterEnabled()
         )));
+        if (project.terrain().configured()) {
+            appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
+                    Locale.US,
+                    "TERRAIN_SETTINGS|%.3f",
+                    project.terrain().displayWidth().toMillimeters()
+            ));
+        }
         project.terrain().vertices().forEach(vertex -> appendMetadataText(dxf, context, vertex.position(), String.format(
                 Locale.US,
                 "TERRAIN|%.3f|%.3f|%.3f",
@@ -120,6 +127,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         String importedProjectName = projectName;
         Roof importedRoof = null;
         List<TerrainVertex> importedTerrainVertices = new ArrayList<>();
+        Length importedTerrainWidth = Terrain.defaultDisplayWidth();
         boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadata);
         boolean objectRotationDegrees = DxfMetadataCodec.usesObjectRotationDegrees(metadata);
         for (String entry : metadata) {
@@ -131,6 +139,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 switch (parts[0]) {
                     case "PROJECT" -> importedProjectName = stripDxfExtension(DxfMetadataCodec.decode(parts[1], encodedFields));
                     case "LEVEL" -> levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
+                    case "TERRAIN_SETTINGS" -> importedTerrainWidth = Length.ofMillimeters(parseDouble(parts[1]));
                     case "TERRAIN" -> importedTerrainVertices.add(new TerrainVertex(
                             new PlanPoint(parseDouble(parts[1]), parseDouble(parts[2])),
                             Length.ofMillimeters(parseDouble(parts[3]))
@@ -309,7 +318,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 RoomObjectMountingMode.fromStoredValue(parts.length >= 17 ? parts[16] : null, Boolean.parseBoolean(parts[13])),
                                 Boolean.parseBoolean(parts[14]),
                                 DxfMetadataCodec.decode(parts[15], encodedFields),
-                                Length.ofMillimeters(parts.length >= 18 ? parseDouble(parts[17]) : 0.0)
+                                Length.ofMillimeters(parts.length >= 18 ? parseDouble(parts[17]) : 0.0),
+                                parts.length >= 19 ? parseDouble(parts[18]) : 0.0
                         ));
                     }
                     default -> {
@@ -336,7 +346,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             project.defineRoof(importedRoof);
         }
         if (importedTerrainVertices.size() >= 3) {
-            project.defineTerrain(new Terrain(importedTerrainVertices));
+            project.defineTerrain(new Terrain(importedTerrainVertices, importedTerrainWidth));
         }
         return project;
     }
@@ -600,7 +610,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f",
+                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f|%.3f",
                     DxfMetadataCodec.encode(level.name()),
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
@@ -617,7 +627,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     roomObject.visible(),
                     DxfMetadataCodec.encode(roomObject.source()),
                     roomObject.mountingMode().name(),
-                    roomObject.baseElevation().toMillimeters()
+                    roomObject.baseElevation().toMillimeters(),
+                    roomObject.heatOutputWatts()
             ));
         }
     }

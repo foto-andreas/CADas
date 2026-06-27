@@ -7,6 +7,7 @@ import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
 import de.schrell.cadas.application.drawing.TextBlockingBox;
 import de.schrell.cadas.application.drawing.WallDimensionPlacementService;
 import de.schrell.cadas.application.drawing.WallDimensionService;
+import de.schrell.cadas.application.heating.RoomHeatingOutputService;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -21,6 +22,7 @@ import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
@@ -65,6 +67,7 @@ public final class ConstructionDrawingPdfService {
     private final DimensionLabelPlacementService dimensionLabelPlacementService = new DimensionLabelPlacementService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
+    private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
 
     public void export(ProjectModel project, Path targetFile) throws IOException {
         export(project, targetFile, ConstructionDrawingOptions.defaults());
@@ -85,6 +88,9 @@ public final class ConstructionDrawingPdfService {
                     if (level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == surfacePosition)) {
                         addHeatingPage(document, project, level, surfacePosition);
                     }
+                }
+                if (!heatingElementEntries(level).isEmpty()) {
+                    addHeatingElementsPage(document, project, level);
                 }
             }
             addSpatialViewsPage(document, project, true);
@@ -247,6 +253,68 @@ public final class ConstructionDrawingPdfService {
         double y = viewport.y(point.yMillimeters());
         canvas.rectangle(x - 5.0, y - 5.0, 10.0, 10.0, 0.8f, color, Color.WHITE);
         canvas.text(x - 2.2, y - 2.3, 6.0f, label);
+    }
+
+    private void addHeatingElementsPage(
+            PDDocument document,
+            ProjectModel project,
+            Level level
+    ) throws IOException {
+        List<HeatingElementEntry> entries = heatingElementEntries(level);
+        Viewport viewport = planViewport(level, ConstructionDrawingOptions.defaults());
+        try (PageCanvas canvas = addPage(document, project.name(), "Heizelemente – " + level.name(), "M 1:" + viewport.scale())) {
+            for (Room room : level.rooms()) {
+                drawPolygon(canvas, viewport, room.outline(), new Color(247, 247, 244), 0.35f);
+            }
+            for (Wall wall : level.walls()) {
+                canvas.line(
+                        viewport.x(wall.axis().start().xMillimeters()), viewport.y(wall.axis().start().yMillimeters()),
+                        viewport.x(wall.axis().end().xMillimeters()), viewport.y(wall.axis().end().yMillimeters()),
+                        0.8f, new Color(120, 120, 120)
+                );
+            }
+            for (HeatingElementEntry entry : entries) {
+                drawHeatingElement(canvas, viewport, entry);
+            }
+        }
+    }
+
+    private void drawHeatingElement(PageCanvas canvas, Viewport viewport, HeatingElementEntry entry) throws IOException {
+        RoomObject roomObject = entry.roomObject();
+        canvas.rectangle(
+                viewport.x(roomObject.minXMillimeters()),
+                viewport.y(roomObject.maxYMillimeters()),
+                roomObject.footprintWidthMillimeters() * viewport.factor(),
+                roomObject.footprintDepthMillimeters() * viewport.factor(),
+                0.8f,
+                new Color(182, 82, 36),
+                new Color(255, 245, 236)
+        );
+        canvas.text(
+                viewport.x(roomObject.center().xMillimeters()) + 5.0,
+                viewport.y(roomObject.center().yMillimeters()) - 5.0,
+                6.5f,
+                String.format(
+                        Locale.GERMAN,
+                        "%s | %s | %.0f W",
+                        entry.room().name(),
+                        roomObject.name(),
+                        roomObject.heatOutputWatts()
+                )
+        );
+    }
+
+    private List<HeatingElementEntry> heatingElementEntries(Level level) {
+        List<HeatingElementEntry> entries = new ArrayList<>();
+        for (Room room : level.rooms()) {
+            for (RoomHeatingOutputService.HeatingElementSummary summary : roomHeatingOutputService.heatingElements(level, room)) {
+                level.roomObjects().stream()
+                        .filter(roomObject -> roomObject.id().toString().equals(summary.objectId()))
+                        .findFirst()
+                        .ifPresent(roomObject -> entries.add(new HeatingElementEntry(room, roomObject)));
+            }
+        }
+        return List.copyOf(entries);
     }
 
     private PlanPoint polygonCenter(List<PlanPoint> points) {
@@ -876,6 +944,9 @@ public final class ConstructionDrawingPdfService {
     }
 
     private record ScreenPoint(double x, double y) {
+    }
+
+    private record HeatingElementEntry(Room room, RoomObject roomObject) {
     }
 
     private record SpatialLine(double x1, double y1, double x2, double y2, boolean top, boolean terrain) {

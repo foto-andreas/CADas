@@ -14,7 +14,8 @@ public record RoomObjectPreset(
         Length depth,
         Length height,
         RoomObjectMountingMode mountingMode,
-        String source
+        String source,
+        double heatOutputWatts
 ) {
 
     public RoomObjectPreset(
@@ -28,7 +29,21 @@ public record RoomObjectPreset(
             boolean cutsFloorCovering,
             String source
     ) {
-        this(id, name, type, shape, width, depth, height, RoomObjectMountingMode.fromCutsFloorCovering(cutsFloorCovering), source);
+        this(id, name, type, shape, width, depth, height, RoomObjectMountingMode.fromCutsFloorCovering(cutsFloorCovering), source, 0.0);
+    }
+
+    public RoomObjectPreset(
+            String id,
+            String name,
+            RoomObjectType type,
+            RoomObjectShape shape,
+            Length width,
+            Length depth,
+            Length height,
+            RoomObjectMountingMode mountingMode,
+            String source
+    ) {
+        this(id, name, type, shape, width, depth, height, mountingMode, source, 0.0);
     }
 
     public boolean cutsFloorCovering() {

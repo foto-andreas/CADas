@@ -96,21 +96,41 @@ class SurfaceMaterialListServiceTest {
                 new PlanPoint(800, 500),
                 new PlanPoint(1_200, 900)
         ));
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "konvektor",
+                "Konvektor",
+                RoomObjectType.CUBOID,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(1_500, 750),
+                Length.of(120, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ).withHeatOutputWatts(900.0));
 
         SurfaceMaterialReport report = service.create(project);
 
         assertEquals(1, report.heatingPlans().size());
+        assertEquals(1, report.heatingElements().size());
         assertEquals("FBH 1", report.heatingPlans().getFirst().zoneName());
         assertEquals("Schnecke", report.heatingPlans().getFirst().layoutPattern());
         assertEquals(45.0, report.heatingPlans().getFirst().heatOutputWattsPerSquareMeter(), 0.001);
         assertEquals(105.3, report.heatingPlans().getFirst().heatOutputWatts(), 0.1);
+        assertEquals(900.0, report.heatingElements().getFirst().heatOutputWatts(), 0.001);
+        assertEquals(105.3, report.rooms().getFirst().surfaceHeatingWatts(), 0.1);
+        assertEquals(900.0, report.rooms().getFirst().heatingElementWatts(), 0.001);
+        assertEquals(1_005.3, report.rooms().getFirst().totalHeatOutputWatts(), 0.1);
         assertTrue(report.heatingPlans().getFirst().svg().contains("<svg"));
         assertTrue(report.heatingPlans().getFirst().svg().contains("id=\"sperrflaechen\""));
         assertTrue(report.heatingPlans().getFirst().svg().contains("800.000,500.000 1200.000,500.000"));
         assertTrue(report.heatingPlans().getFirst().svg().contains("V1"));
         assertTrue(report.toMarkdown().contains("## Flächenheizungen"));
+        assertTrue(report.toMarkdown().contains("## Heizelemente"));
         assertTrue(report.toMarkdown().contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
         assertTrue(report.toMarkdown().contains("105 W"));
+        assertTrue(report.toMarkdown().contains("Konvektor"));
+        assertTrue(report.toMarkdown().contains("1005 W"));
     }
 
     @Test

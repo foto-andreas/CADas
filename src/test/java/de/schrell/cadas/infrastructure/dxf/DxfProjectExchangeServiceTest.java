@@ -370,13 +370,13 @@ class DxfProjectExchangeServiceTest {
                 22.5,
                 RoomObjectMountingMode.WALL_MOUNTED,
                 "Spiegel.dwg#Block"
-        ).withBaseElevation(Length.of(-15, LengthUnit.CENTIMETER)));
+        ).withBaseElevation(Length.of(-15, LengthUnit.CENTIMETER)).withHeatOutputWatts(420.0));
         project.defineTerrain(new Terrain(java.util.List.of(
                 new TerrainVertex(new PlanPoint(0, 0), Length.ofMillimeters(-100)),
                 new TerrainVertex(new PlanPoint(5000, 0), Length.ofMillimeters(200)),
                 new TerrainVertex(new PlanPoint(5000, 4000), Length.ofMillimeters(600)),
                 new TerrainVertex(new PlanPoint(0, 4000), Length.ofMillimeters(300))
-        )));
+        ), Length.ofMillimeters(1250)));
 
         var og = project.createLevel("Obergeschoss");
         og.addRoom(Room.rectangular(
@@ -426,8 +426,10 @@ class DxfProjectExchangeServiceTest {
         assertFalse(importedEg.roomObjects().getFirst().cutsFloorCovering());
         assertEquals(22.5, importedEg.roomObjects().getFirst().rotationDegrees(), 0.001);
         assertEquals(-150.0, importedEg.roomObjects().getFirst().baseElevation().toMillimeters(), 0.001);
+        assertEquals(420.0, importedEg.roomObjects().getFirst().heatOutputWatts(), 0.001);
         assertEquals(4, imported.terrain().vertices().size());
         assertEquals(600.0, imported.terrain().vertices().get(2).elevationAboveLowestFloor().toMillimeters(), 0.001);
+        assertEquals(1250.0, imported.terrain().displayWidth().toMillimeters(), 0.001);
         assertEquals(egRoom.id(), importedEg.rooms().getFirst().id(), "Raum-UUID muss im Rundlauf erhalten bleiben");
 
         var importedOg = imported.levels().get(1);

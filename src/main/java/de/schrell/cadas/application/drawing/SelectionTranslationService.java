@@ -154,7 +154,8 @@ public final class SelectionTranslationService {
                 roomObject.mountingMode(),
                 roomObject.visible(),
                 roomObject.source(),
-                roomObject.baseElevation()
+                roomObject.baseElevation(),
+                roomObject.heatOutputWatts()
         );
     }
 

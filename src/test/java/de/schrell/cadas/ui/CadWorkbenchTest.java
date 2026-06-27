@@ -114,6 +114,7 @@ class CadWorkbenchTest {
             Assertions.assertEquals(entry.getValue(), aufFxThread(() -> workbench.automationFieldValue(entry.getKey())), entry.getKey());
         }
         Assertions.assertEquals("0", aufFxThread(() -> workbench.automationFieldValue("roomObjectAngle")));
+        Assertions.assertEquals("0", aufFxThread(() -> workbench.automationFieldValue("roomObjectHeatOutput")));
     }
 
     @Test
@@ -1204,6 +1205,7 @@ class CadWorkbenchTest {
             instanz.automationSetField("roomObjectWidth", "120");
             instanz.automationSetField("roomObjectDepth", "80");
             instanz.automationSetField("roomObjectHeight", "240");
+            instanz.automationSetField("roomObjectHeatOutput", "850");
             instanz.automationSetField("roomObjectBaseElevation", "-15");
             instanz.automationSetField("roomObjectAngle", "37,5");
             instanz.automationCanvasClick(900, 600, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
@@ -1214,11 +1216,13 @@ class CadWorkbenchTest {
         Assertions.assertEquals(1200.0, placed.width().toMillimeters(), 0.001);
         Assertions.assertEquals(800.0, placed.depth().toMillimeters(), 0.001);
         Assertions.assertEquals(2400.0, placed.height().toMillimeters(), 0.001);
+        Assertions.assertEquals(850.0, placed.heatOutputWatts(), 0.001);
         Assertions.assertEquals(-150.0, placed.baseElevation().toMillimeters(), 0.001);
         Assertions.assertEquals(37.5, placed.rotationDegrees(), 0.001);
 
         aufFxThread(() -> {
             workbench.automationSetField("roomObjectWidth", "150");
+            workbench.automationSetField("roomObjectHeatOutput", "1200");
             workbench.automationSetField("roomObjectAngle", "-15");
             workbench.automationSetField("roomObjectBaseElevation", "25");
             workbench.automationInvoke("applySelectionProperties", null);
@@ -1227,6 +1231,7 @@ class CadWorkbenchTest {
 
         RoomObject edited = aufFxThread(() -> workbench.automationRoomObject(0));
         Assertions.assertEquals(1500.0, edited.width().toMillimeters(), 0.001);
+        Assertions.assertEquals(1200.0, edited.heatOutputWatts(), 0.001);
         Assertions.assertEquals(345.0, edited.rotationDegrees(), 0.001);
         Assertions.assertEquals(250.0, edited.baseElevation().toMillimeters(), 0.001);
     }
@@ -1778,7 +1783,7 @@ class CadWorkbenchTest {
     }
 
     @Test
-    void rasterIstDauerhaftSichtbarUndNichtAbschaltbar() throws Exception {
+    void rasterUndGeländeSindInDerAnsichtSchaltbar() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
             new Scene(instanz, 1200, 800);
@@ -1791,7 +1796,7 @@ class CadWorkbenchTest {
             VBox topArea = (VBox) workbench.getTop();
             MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
             ToolBar settingsBar = (ToolBar) topArea.getChildren().get(1);
-            Assertions.assertFalse(settingsBar.getItems().stream()
+            Assertions.assertTrue(settingsBar.getItems().stream()
                     .filter(CheckBox.class::isInstance)
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
@@ -1801,13 +1806,21 @@ class CadWorkbenchTest {
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
                     .anyMatch("Raster-Snap"::equals));
+            Assertions.assertTrue(settingsBar.getItems().stream()
+                    .filter(CheckBox.class::isInstance)
+                    .map(CheckBox.class::cast)
+                    .map(CheckBox::getText)
+                    .anyMatch("Gelände 2D"::equals));
             Menu optionenMenu = menuBar.getMenus().stream()
                     .filter(menu -> "Optionen".equals(menu.getText()))
                     .findFirst()
                     .orElseThrow();
-            Assertions.assertFalse(optionenMenu.getItems().stream()
+            Assertions.assertTrue(optionenMenu.getItems().stream()
                     .map(MenuItem::getText)
                     .anyMatch("Raster anzeigen"::equals));
+            Assertions.assertTrue(optionenMenu.getItems().stream()
+                    .map(MenuItem::getText)
+                    .anyMatch("Gelände in 2D anzeigen"::equals));
             return null;
         });
     }

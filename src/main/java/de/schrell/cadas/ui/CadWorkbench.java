@@ -20,6 +20,7 @@ import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
+import de.schrell.cadas.application.heating.RoomHeatingOutputService;
 import de.schrell.cadas.application.drawing.OpeningPlacementService;
 import de.schrell.cadas.application.drawing.OrthogonalCorrectionService;
 import de.schrell.cadas.application.drawing.QuarterTurnRotationService;
@@ -66,6 +67,7 @@ import de.schrell.cadas.application.roof.RoofWindowPlacementService;
 import de.schrell.cadas.application.stairs.StairUnderbuildService;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
 import de.schrell.cadas.application.terrain.TerrainCornerService;
+import de.schrell.cadas.application.terrain.TerrainGeometryService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.application.view.WallSurfaceOpeningService;
@@ -244,13 +246,20 @@ public final class CadWorkbench extends BorderPane {
     private static final double DIMENSION_PARALLEL_TEXT_AWAY_DISTANCE = 14.0;
     private static final double DIMENSION_TEXT_PADDING = 6.0;
     private static final double DIMENSION_LINE_BLOCKING_PADDING = 4.0;
+    private static final Color CANVAS_BACKGROUND = Color.web("#fcfaf5");
+    private static final Color TERRAIN_FILL_COLOR = Color.color(0.65, 0.49, 0.27, 0.16);
+    private static final Color TERRAIN_EDGE_COLOR = Color.web("#8a6337");
+    private static final Color TERRAIN_LABEL_COLOR = Color.web("#6f4e2c");
+    private static final Color TERRAIN_ELEVATION_COLOR = Color.web("#a67c46");
 
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     private final TerrainCornerService terrainCornerService = new TerrainCornerService();
+    private final TerrainGeometryService terrainGeometryService = new TerrainGeometryService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
+    private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
     private final Map<UUID, HydronicHeatingLayoutService.PlanningResult> heatingLayoutCache = new HashMap<>();
     private final Set<UUID> heatingZonesPendingRoutingRegeneration = new HashSet<>();
     private final Set<UUID> heatingLayoutsDirty = new HashSet<>();
@@ -305,12 +314,14 @@ public final class CadWorkbench extends BorderPane {
     private final ObjectProperty<ViewOrientation> activeView = new SimpleObjectProperty<>(ViewOrientation.TOP);
     private final ObjectProperty<WorkspaceMode> activeWorkspaceMode = new SimpleObjectProperty<>(WorkspaceMode.TWO_D);
     private final BooleanProperty snapToGrid = new SimpleBooleanProperty(true);
+    private final BooleanProperty showGrid = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToEndpoints = new SimpleBooleanProperty(true);
     private final BooleanProperty showCompass = new SimpleBooleanProperty(true);
     private final BooleanProperty showDimensions = new SimpleBooleanProperty(true);
     private final ObjectProperty<DimensionTextStyle> dimensionTextStyle = new SimpleObjectProperty<>(DimensionTextStyle.LENGTH_ONLY);
     private final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
     private final BooleanProperty showRoomObjects = new SimpleBooleanProperty(true);
+    private final BooleanProperty showTerrainInPlan = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuideDistances = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToGuides = new SimpleBooleanProperty(true);
@@ -370,6 +381,7 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> roomObjectDepthUnit = new ComboBox<>();
     private final TextField roomObjectHeightField = new TextField("200");
     private final ComboBox<LengthUnit> roomObjectHeightUnit = new ComboBox<>();
+    private final TextField roomObjectHeatOutputField = new TextField("0");
     private final TextField roomObjectBaseElevationField = new TextField("0");
     private final ComboBox<LengthUnit> roomObjectBaseElevationUnit = new ComboBox<>();
     private final TextField roomObjectAngleField = new TextField("0");
@@ -630,11 +642,13 @@ public final class CadWorkbench extends BorderPane {
         applyFormTooltips();
 
         registerRenderListener(snapToGrid);
+        registerRenderListener(showGrid);
         registerRenderListener(snapToEndpoints);
         registerRenderListener(showCompass);
         registerRenderListener(showDimensions);
         registerRenderListener(dimensionTextStyle);
         registerRenderListener(showAreaVolume);
+        registerRenderListener(showTerrainInPlan);
         registerRenderListener(showGuides);
         registerRenderListener(showGuideDistances);
         registerRenderListener(snapToGuides);
@@ -713,6 +727,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private ToolBar buildSettingsBar() {
+        CheckBox gridBox = new CheckBox("Raster");
+        gridBox.selectedProperty().bindBidirectional(showGrid);
+        applyTooltip(gridBox, "Blendet das sichtbare Raster der 2D-Zeichenfläche ein oder aus, ohne den Raster-Snap zu verändern.");
+
         CheckBox snapRasterBox = new CheckBox("Raster-Snap");
         snapRasterBox.selectedProperty().bindBidirectional(snapToGrid);
         applyTooltip(snapRasterBox, "Aktiviert das magnetische Einrasten auf das konfigurierte Raster.");
@@ -751,6 +769,10 @@ public final class CadWorkbench extends BorderPane {
         CheckBox objectsBox = new CheckBox("Objekte");
         objectsBox.selectedProperty().bindBidirectional(showRoomObjects);
         applyTooltip(objectsBox, "Blendet platzierte Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.");
+
+        CheckBox terrainPlanBox = new CheckBox("Gelände 2D");
+        terrainPlanBox.selectedProperty().bindBidirectional(showTerrainInPlan);
+        applyTooltip(terrainPlanBox, "Blendet das Gelände in der 2D-Ansicht als Band außerhalb des Gebäudes ein oder aus. Seitenansichten und 3D bleiben davon unberührt.");
 
         Button addLevelButton = createActionButton(
                 "Etage hinzufügen",
@@ -807,6 +829,7 @@ public final class CadWorkbench extends BorderPane {
                 deleteSelectionButton,
                 clearSelectionButton,
                 new Separator(Orientation.VERTICAL),
+                gridBox,
                 snapRasterBox,
                 snapPointsBox,
                 guideDistancesBox,
@@ -815,7 +838,8 @@ public final class CadWorkbench extends BorderPane {
                 new Separator(Orientation.VERTICAL),
                 dimensionsBox,
                 dimensionTextPartsBox,
-                objectsBox
+                objectsBox,
+                terrainPlanBox
         );
     }
 
@@ -947,6 +971,7 @@ public final class CadWorkbench extends BorderPane {
         roomObjectWidthField.setPrefColumnCount(6);
         roomObjectDepthField.setPrefColumnCount(6);
         roomObjectHeightField.setPrefColumnCount(6);
+        roomObjectHeatOutputField.setPrefColumnCount(6);
         roomObjectAngleField.setPrefColumnCount(6);
         dwgBlockNameField.setPrefColumnCount(14);
     }
@@ -1021,6 +1046,10 @@ public final class CadWorkbench extends BorderPane {
         }
         List<TextField> elevationFields = new ArrayList<>();
         VBox rows = new VBox(8.0);
+        TextField widthField = new TextField(formatValue(synchronizedTerrain.displayWidth(), LengthUnit.CENTIMETER, LENGTH_INPUT_DECIMALS));
+        widthField.setPrefColumnCount(8);
+        applyTooltip(widthField, "Legt fest, wie breit das Gelände in Draufsicht und 3D außerhalb des Gebäudes dargestellt wird. Der Wert wird in Zentimetern gespeichert.");
+        rows.getChildren().add(new HBox(10.0, new Label("Darstellungsbreite"), widthField, new Label("cm")));
         for (int index = 0; index < synchronizedTerrain.vertices().size(); index++) {
             TerrainVertex vertex = synchronizedTerrain.vertices().get(index);
             TextField field = new TextField(formatValue(vertex.elevationAboveLowestFloor(), LengthUnit.CENTIMETER, LENGTH_INPUT_DECIMALS));
@@ -1057,8 +1086,10 @@ public final class CadWorkbench extends BorderPane {
                     .orElse(vertex.elevationAboveLowestFloor());
             updatedVertices.add(new TerrainVertex(vertex.position(), elevation));
         }
+        Length displayWidth = parseLength(widthField, LengthUnit.CENTIMETER)
+                .orElse(synchronizedTerrain.displayWidth());
         rememberStateForUndo();
-        project.defineTerrain(new Terrain(updatedVertices));
+        project.defineTerrain(new Terrain(updatedVertices, displayWidth));
         markThreeDDirty();
         render();
     }
@@ -1131,6 +1162,7 @@ public final class CadWorkbench extends BorderPane {
 
         Menu optionenMenu = new Menu("Optionen");
         optionenMenu.getItems().addAll(
+                checkMenuItem("Raster anzeigen", showGrid),
                 checkMenuItem("Auf Raster einrasten", snapToGrid),
                 checkMenuItem("Auf Punkte einrasten", snapToEndpoints),
                 checkMenuItem("Hilfslinien anzeigen", showGuides),
@@ -1140,6 +1172,7 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("ISO-Bemaßung anzeigen", showDimensions),
                 checkMenuItem("Erweiterte Maßtexte anzeigen", dimensionTextStyle, DimensionTextStyle.FULL, DimensionTextStyle.LENGTH_ONLY),
                 checkMenuItem("Objekte anzeigen", showRoomObjects),
+                checkMenuItem("Gelände in 2D anzeigen", showTerrainInPlan),
                 checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
                 checkMenuItem("Nordpfeil anzeigen", showCompass)
         );
@@ -1256,6 +1289,7 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Breite", roomObjectWidthField, roomObjectWidthUnit),
                         propertyRow("Tiefe", roomObjectDepthField, roomObjectDepthUnit),
                         propertyRow("Höhe", roomObjectHeightField, roomObjectHeightUnit),
+                        propertyRow("Wärmeleistung", roomObjectHeatOutputField),
                         propertyRow("Basishöhe", roomObjectBaseElevationField, roomObjectBaseElevationUnit),
                         propertyRow("Winkel", roomObjectAngleField)
                 ),
@@ -1915,6 +1949,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(roomObjectDepthUnit, "Bestimmt die Einheit für die Objekttiefe.");
         applyTooltip(roomObjectHeightField, "Legt die Höhe eines neuen oder ausgewählten Objekts fest.");
         applyTooltip(roomObjectHeightUnit, "Bestimmt die Einheit für die Objekthöhe.");
+        applyTooltip(roomObjectHeatOutputField, "Legt die Wärmeleistung eines neuen oder ausgewählten Objekts in Watt fest. Positive Werte führen das Objekt in Raumwärmesummen, Materialliste und PDF als Heizelement.");
         applyTooltip(roomObjectBaseElevationField, "Legt die vertikale Lage der Objektbasis relativ zum Boden der aktiven Etage fest. Positive Werte heben das Objekt an, negative Werte versenken es.");
         applyTooltip(roomObjectBaseElevationUnit, "Bestimmt die Einheit für die positive oder negative Basishöhe des Objekts.");
         applyTooltip(roomObjectAngleField, "Legt den frei einstellbaren Drehwinkel eines neuen oder ausgewählten Objekts in Grad fest.");
@@ -2662,7 +2697,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void render() {
         GraphicsContext graphics = drawingCanvas.getGraphicsContext2D();
-        graphics.setFill(Color.web("#fcfaf5"));
+        graphics.setFill(CANVAS_BACKGROUND);
         graphics.fillRect(0, 0, drawingCanvas.getWidth(), drawingCanvas.getHeight());
 
         drawTerrainPlanArea(graphics);
@@ -2754,7 +2789,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawGrid(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!projectionService.isPlanView(activeView.get()) || !showGrid.get()) {
             return;
         }
         double spacingMillimeters = currentGrid().spacing().toMillimeters();
@@ -3566,7 +3601,7 @@ public final class CadWorkbench extends BorderPane {
         if (profile.size() < 2) {
             return;
         }
-        graphics.setStroke(Color.web("#a67c46"));
+        graphics.setStroke(TERRAIN_ELEVATION_COLOR);
         graphics.setLineWidth(2.4);
         Map.Entry<Long, Double> previous = null;
         for (Map.Entry<Long, Double> current : profile.entrySet()) {
@@ -3583,25 +3618,37 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawTerrainPlanArea(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured()) {
+        if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured() || !showTerrainInPlan.get()) {
             return;
         }
-        double[] xPoints = project.terrain().vertices().stream()
+        List<PlanPoint> outerOutline = terrainGeometryService.outerOutline(project.terrain());
+        if (outerOutline.size() < 3) {
+            return;
+        }
+        double[] outerXPoints = outerOutline.stream()
+                .mapToDouble(point -> toScreenProjectedX(point, 0.0))
+                .toArray();
+        double[] outerYPoints = outerOutline.stream()
+                .mapToDouble(point -> toScreenProjectedY(point, 0.0))
+                .toArray();
+        double[] innerXPoints = project.terrain().vertices().stream()
                 .mapToDouble(vertex -> toScreenProjectedX(vertex.position(), 0.0))
                 .toArray();
-        double[] yPoints = project.terrain().vertices().stream()
+        double[] innerYPoints = project.terrain().vertices().stream()
                 .mapToDouble(vertex -> toScreenProjectedY(vertex.position(), 0.0))
                 .toArray();
-        graphics.setFill(Color.color(0.65, 0.49, 0.27, 0.16));
-        graphics.fillPolygon(xPoints, yPoints, xPoints.length);
+        graphics.setFill(TERRAIN_FILL_COLOR);
+        graphics.fillPolygon(outerXPoints, outerYPoints, outerXPoints.length);
+        graphics.setFill(CANVAS_BACKGROUND);
+        graphics.fillPolygon(innerXPoints, innerYPoints, innerXPoints.length);
     }
 
     private void drawTerrainPlanMarkers(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured()) {
+        if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured() || !showTerrainInPlan.get()) {
             return;
         }
-        graphics.setStroke(Color.web("#8a6337"));
-        graphics.setFill(Color.web("#6f4e2c"));
+        graphics.setStroke(TERRAIN_EDGE_COLOR);
+        graphics.setFill(TERRAIN_LABEL_COLOR);
         graphics.setLineWidth(2.0);
         List<TerrainVertex> vertices = project.terrain().vertices();
         for (int index = 0; index < vertices.size(); index++) {
@@ -4825,6 +4872,19 @@ public final class CadWorkbench extends BorderPane {
         return positiveLength(roomObjectHeightField, roomObjectHeightUnit, preset.height());
     }
 
+    private double currentRoomObjectHeatOutputWatts(double fallback) {
+        String text = roomObjectHeatOutputField.getText();
+        if (text == null || text.isBlank()) {
+            return fallback;
+        }
+        try {
+            double value = Double.parseDouble(text.replace(',', '.'));
+            return Double.isFinite(value) && value >= 0.0 ? value : fallback;
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
     private Length currentRoomObjectBaseElevation() {
         return parseLength(roomObjectBaseElevationField, roomObjectBaseElevationUnit.getValue()).orElse(Length.zero());
     }
@@ -5170,7 +5230,9 @@ public final class CadWorkbench extends BorderPane {
                 currentRoomObjectAngleDegrees(),
                 preset.mountingMode(),
                 preset.source()
-        ).withBaseElevation(currentRoomObjectBaseElevation());
+        )
+                .withBaseElevation(currentRoomObjectBaseElevation())
+                .withHeatOutputWatts(currentRoomObjectHeatOutputWatts(preset.heatOutputWatts()));
         activeLevel.get().addRoomObject(roomObject);
         selectSingle(new SelectionKey(RenderableKind.ROOM_OBJECT, activeLevel.get().name(), roomObject.id().toString()));
         markThreeDDirty();
@@ -6304,6 +6366,7 @@ public final class CadWorkbench extends BorderPane {
         setLengthInput(roomObjectWidthField, roomObjectWidthUnit, preset.width(), LengthUnit.CENTIMETER);
         setLengthInput(roomObjectDepthField, roomObjectDepthUnit, preset.depth(), LengthUnit.CENTIMETER);
         setLengthInput(roomObjectHeightField, roomObjectHeightUnit, preset.height(), LengthUnit.CENTIMETER);
+        roomObjectHeatOutputField.setText(formatNonNegativeDouble(preset.heatOutputWatts(), 1));
         setLengthInput(roomObjectBaseElevationField, roomObjectBaseElevationUnit, Length.zero(), LengthUnit.CENTIMETER);
         roomObjectAngleField.setText("0");
     }
@@ -6355,8 +6418,15 @@ public final class CadWorkbench extends BorderPane {
             updateActionButtons();
             return;
         }
+        RoomHeatingOutputService.RoomHeatTotals roomHeatTotals = roomHeatingOutputService.totals(activeLevel.get(), room);
         if (heating == null) {
-            heatingSummaryLabel.setText("Für " + heatingSurfacePositionSelector.getValue() + " ist noch keine Heizung angelegt.");
+            heatingSummaryLabel.setText(String.format(
+                    Locale.GERMAN,
+                    "Für %s ist noch keine Heizung angelegt. Heizelemente %.0f W · Raum gesamt %.0f W",
+                    heatingSurfacePositionSelector.getValue(),
+                    roomHeatTotals.heatingElementWatts(),
+                    roomHeatTotals.totalHeatOutputWatts()
+            ));
             heatingZoneList.getItems().clear();
             syncHeatingZoneSettingsInputs(null);
             syncHeatingRoutingCommandArea(null);
@@ -6402,8 +6472,16 @@ public final class CadWorkbench extends BorderPane {
         String warning = CadWorkbenchHeatingSupport.heatingWarning(layoutResult.validationReport(), maximumExceeded);
         heatingSummaryLabel.setText(String.format(
                 Locale.GERMAN,
-                "%s · Raumvorgabe %s · %d Heizkreis(e) · %.2f m² · %.1f m HKL · %.0f W%s",
-                heating.surfacePosition(), heating.layoutPattern(), circuits.size(), totalArea, totalLength / 1_000.0, totalHeatOutput, warning
+                "%s · Raumvorgabe %s · %d Heizkreis(e) · %.2f m² · %.1f m HKL · %.0f W FBH/DH · %.0f W Heizelemente · %.0f W Raum gesamt%s",
+                heating.surfacePosition(),
+                heating.layoutPattern(),
+                circuits.size(),
+                totalArea,
+                totalLength / 1_000.0,
+                totalHeatOutput,
+                roomHeatTotals.heatingElementWatts(),
+                roomHeatTotals.totalHeatOutputWatts(),
+                warning
         ));
         updateActionButtons();
     }
@@ -8120,6 +8198,7 @@ public final class CadWorkbench extends BorderPane {
                         syncLengthInput(roomObjectWidthField, roomObjectWidthUnit, roomObject.width(), LengthUnit.CENTIMETER);
                         syncLengthInput(roomObjectDepthField, roomObjectDepthUnit, roomObject.depth(), LengthUnit.CENTIMETER);
                         syncLengthInput(roomObjectHeightField, roomObjectHeightUnit, roomObject.height(), LengthUnit.CENTIMETER);
+                        roomObjectHeatOutputField.setText(formatNonNegativeDouble(roomObject.heatOutputWatts(), 1));
                         syncLengthInput(roomObjectBaseElevationField, roomObjectBaseElevationUnit, roomObject.baseElevation(), LengthUnit.CENTIMETER);
                         roomObjectAngleField.setText(String.format(Locale.GERMAN, "%.2f", roomObject.rotationDegrees()));
                     });
@@ -8208,7 +8287,8 @@ public final class CadWorkbench extends BorderPane {
                             roomObject.mountingMode(),
                             roomObject.visible(),
                             roomObject.source(),
-                            currentRoomObjectBaseElevation()
+                            currentRoomObjectBaseElevation(),
+                            currentRoomObjectHeatOutputWatts(roomObject.heatOutputWatts())
                     )
                             : roomObject)
                     .toList());
@@ -8283,6 +8363,11 @@ public final class CadWorkbench extends BorderPane {
         return length.format(unit, decimals)
                 .replace(" " + unit.symbol(), "")
                 .replace('.', ',');
+    }
+
+    private String formatNonNegativeDouble(double value, int decimals) {
+        String formatted = String.format(Locale.GERMAN, "%." + decimals + "f", value);
+        return formatted.replaceAll(",0+$", "").replaceAll("(,\\d*?)0+$", "$1");
     }
 
     private void setLengthInput(TextField field, ComboBox<LengthUnit> unitSelector, Length length, LengthUnit unit) {
@@ -9355,6 +9440,7 @@ public final class CadWorkbench extends BorderPane {
             case "roomObjectWidth" -> roomObjectWidthField;
             case "roomObjectDepth" -> roomObjectDepthField;
             case "roomObjectHeight" -> roomObjectHeightField;
+            case "roomObjectHeatOutput" -> roomObjectHeatOutputField;
             case "roomObjectBaseElevation" -> roomObjectBaseElevationField;
             case "roomObjectAngle" -> roomObjectAngleField;
             case "floorExtensionThickness" -> floorExtensionThicknessField;

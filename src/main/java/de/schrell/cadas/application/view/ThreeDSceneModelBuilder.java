@@ -17,6 +17,7 @@ import de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceIn
 import de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle;
 import de.schrell.cadas.application.view.WallSurfacePlanGeometryService.WallSurfacePlanPolygon;
 import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService;
+import de.schrell.cadas.application.terrain.TerrainGeometryService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Door;
@@ -60,8 +61,8 @@ public final class ThreeDSceneModelBuilder {
     private static final int MIN_SLOPE_SEGMENTS = 24;
     private static final double JOINT_HEIGHT = 2.5;
     private static final double JOINT_SURFACE_OFFSET = 2.0;
-    private static final double TERRAIN_MARGIN = 2_000.0;
     private final OrthogonalPolygonDecompositionService decompositionService = new OrthogonalPolygonDecompositionService();
+    private final TerrainGeometryService terrainGeometryService = new TerrainGeometryService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
@@ -131,8 +132,6 @@ public final class ThreeDSceneModelBuilder {
         if (vertices.size() < 3) {
             return;
         }
-        double centerX = vertices.stream().mapToDouble(vertex -> vertex.position().xMillimeters()).average().orElse(0.0);
-        double centerZ = vertices.stream().mapToDouble(vertex -> vertex.position().yMillimeters()).average().orElse(0.0);
         double minimumElevation = vertices.stream().mapToDouble(vertex -> vertex.elevationAboveLowestFloor().toMillimeters()).min().orElse(0.0);
         double maximumElevation = vertices.stream().mapToDouble(vertex -> vertex.elevationAboveLowestFloor().toMillimeters()).max().orElse(0.0);
         List<MeshPoint> inner = vertices.stream()
@@ -142,11 +141,21 @@ public final class ThreeDSceneModelBuilder {
                         vertex.position().yMillimeters()
                 ))
                 .toList();
-        List<MeshPoint> outer = inner.stream().map(point -> expandTerrainPoint(point, centerX, centerZ)).toList();
-        List<Float> trianglePoints = new ArrayList<>();
-        for (int index = 1; index + 1 < inner.size(); index++) {
-            appendTriangle(trianglePoints, inner.getFirst(), inner.get(index), inner.get(index + 1));
+        List<PlanPoint> outerOutline = terrainGeometryService.outerOutline(project.terrain());
+        if (outerOutline.size() != inner.size()) {
+            return;
         }
+        List<MeshPoint> outer = new ArrayList<>();
+        for (int index = 0; index < outerOutline.size(); index++) {
+            TerrainVertex vertex = vertices.get(index);
+            PlanPoint point = outerOutline.get(index);
+            outer.add(new MeshPoint(
+                    point.xMillimeters(),
+                    vertex.elevationAboveLowestFloor().toMillimeters() - minimumElevation,
+                    point.yMillimeters()
+            ));
+        }
+        List<Float> trianglePoints = new ArrayList<>();
         for (int index = 0; index < inner.size(); index++) {
             int next = (index + 1) % inner.size();
             appendTriangle(trianglePoints, inner.get(index), outer.get(index), outer.get(next));
@@ -167,14 +176,6 @@ public final class ThreeDSceneModelBuilder {
                 "terrain",
                 1.0
         ));
-    }
-
-    private MeshPoint expandTerrainPoint(MeshPoint point, double centerX, double centerZ) {
-        double deltaX = point.x() - centerX;
-        double deltaZ = point.z() - centerZ;
-        double distance = Math.max(1.0, Math.hypot(deltaX, deltaZ));
-        double factor = (distance + TERRAIN_MARGIN) / distance;
-        return new MeshPoint(centerX + deltaX * factor, point.y(), centerZ + deltaZ * factor);
     }
 
     private void appendTriangle(List<Float> target, MeshPoint first, MeshPoint second, MeshPoint third) {

@@ -293,7 +293,7 @@ class DxfLevelExchangeServiceTest {
                 37.5,
                 RoomObjectMountingMode.CUTS_FLOOR_COVERING,
                 "Standard"
-        ).withBaseElevation(Length.of(25, LengthUnit.CENTIMETER)));
+        ).withBaseElevation(Length.of(25, LengthUnit.CENTIMETER)).withHeatOutputWatts(650.0));
 
         Path file = tempDir.resolve("oberflaechen.dxf");
         exchangeService.exportLevel(level, file);
@@ -327,6 +327,7 @@ class DxfLevelExchangeServiceTest {
         assertEquals(RoomObjectMountingMode.CUTS_FLOOR_COVERING, imported.roomObjects().getFirst().mountingMode());
         assertEquals(37.5, imported.roomObjects().getFirst().rotationDegrees(), 0.001);
         assertEquals(250.0, imported.roomObjects().getFirst().baseElevation().toMillimeters(), 0.001);
+        assertEquals(650.0, imported.roomObjects().getFirst().heatOutputWatts(), 0.001);
     }
 
     @Test

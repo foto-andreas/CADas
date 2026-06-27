@@ -27,16 +27,21 @@ class RoomObjectTest {
     @Test
     void weistUngültigeObjektmaßeZurück() {
         assertThrows(IllegalArgumentException.class, () -> roomObject(0.0, Length.zero(), Length.ofMillimeters(500)));
+        assertThrows(IllegalArgumentException.class, () -> roomObject(0.0, Length.ofMillimeters(1000), Length.ofMillimeters(500))
+                .withHeatOutputWatts(-1.0));
     }
 
     @Test
     void erhältPositiveUndNegativeBasishöhenBeiÄnderungen() {
         RoomObject roomObject = roomObject(15.0, Length.ofMillimeters(1000), Length.ofMillimeters(500))
-                .withBaseElevation(Length.ofMillimeters(-250));
+                .withBaseElevation(Length.ofMillimeters(-250))
+                .withHeatOutputWatts(850.0);
 
         assertEquals(-250.0, roomObject.baseElevation().toMillimeters(), 0.001);
+        assertEquals(850.0, roomObject.heatOutputWatts(), 0.001);
         assertEquals(-250.0, roomObject.withRotationDegrees(30).baseElevation().toMillimeters(), 0.001);
         assertEquals(-250.0, roomObject.withVisibility(false).baseElevation().toMillimeters(), 0.001);
+        assertEquals(850.0, roomObject.withBaseElevation(Length.zero()).heatOutputWatts(), 0.001);
     }
 
     private RoomObject roomObject(double rotationDegrees, Length width, Length depth) {

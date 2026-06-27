@@ -242,7 +242,7 @@ class ThreeDSceneModelBuilderTest {
         assertEquals("terrain", terrain.materialKey());
         assertEquals(-200.0, terrain.baseY(), 0.001);
         assertEquals(500.0, terrain.height(), 0.001);
-        assertEquals(10, terrain.faceCount());
+        assertEquals(8, terrain.faceCount());
     }
 
     @Test

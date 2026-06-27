@@ -17,7 +17,7 @@ class TerrainCornerServiceTest {
     private final TerrainCornerService service = new TerrainCornerService();
 
     @Test
-    void leitetÄußereEckenAlsKonvexeHülleAbUndErhältHöhen() {
+    void leitetÄußereEckenAusWandkörpernAbUndErhältHöhen() {
         Level level = new Level("Keller");
         addWall(level, 0, 0, 4000, 0);
         addWall(level, 4000, 0, 4000, 3000);
@@ -35,6 +35,22 @@ class TerrainCornerServiceTest {
 
         assertEquals(4, synchronizedTerrain.vertices().size());
         assertEquals(350.0, synchronizedTerrain.vertices().getFirst().elevationAboveLowestFloor().toMillimeters(), 0.001);
+    }
+
+    @Test
+    void erhältKonkaveGebäudeeckenBeiLForm() {
+        Level level = new Level("Erdgeschoss");
+        addWall(level, 0, 0, 3000, 0);
+        addWall(level, 3000, 0, 3000, 1000);
+        addWall(level, 3000, 1000, 1000, 1000);
+        addWall(level, 1000, 1000, 1000, 3000);
+        addWall(level, 1000, 3000, 0, 3000);
+        addWall(level, 0, 3000, 0, 0);
+
+        Terrain synchronizedTerrain = service.synchronize(level, Terrain.empty());
+
+        assertEquals(6, synchronizedTerrain.vertices().size());
+        assertEquals(new PlanPoint(1087.5, 1087.5), synchronizedTerrain.vertices().get(3).position());
     }
 
     private void addWall(Level level, double x1, double y1, double x2, double y2) {
