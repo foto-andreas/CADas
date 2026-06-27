@@ -1762,7 +1762,7 @@ public final class CadWorkbench extends BorderPane {
             if (!Objects.equals(Optional.ofNullable(newValue).orElse(""), normalizedDisplayText)) {
                 replaceTextPreservingCaretAndScroll(heatingRoutingCommandArea, normalizedDisplayText);
             }
-            if (Optional.ofNullable(normalizedDisplayText).orElse("").trim().isBlank()) {
+            if (normalizedDisplayText.trim().isBlank()) {
                 return;
             }
             runGuardedAction("Heizkreis-Routing übernehmen", this::applySelectedHeatingZoneRouting);
@@ -3489,10 +3489,6 @@ public final class CadWorkbench extends BorderPane {
         render();
     }
 
-    private void recomputeHeatingLayoutsNow() {
-        runHeatingLayoutRecalculation();
-    }
-
     private void recomputeHeatingLayoutNow(UUID heatingId) {
         heatingLayoutsDirty.remove(heatingId);
         activeLevel.get().hydronicHeatings().stream()
@@ -3592,35 +3588,6 @@ public final class CadWorkbench extends BorderPane {
         graphics.setStroke(Color.web("#ffffff"));
         graphics.setLineWidth(selected ? 1.6 : 1.0);
         graphics.strokeOval(x - radius, y - radius, radius * 2.0, radius * 2.0);
-        graphics.restore();
-    }
-
-    private void drawHeatingManifold(GraphicsContext graphics, HydronicHeating heating) {
-        double centerX = (heating.supplyPoint().xMillimeters() + heating.returnPoint().xMillimeters()) / 2.0;
-        double centerY = (heating.supplyPoint().yMillimeters() + heating.returnPoint().yMillimeters()) / 2.0;
-        double minX = centerX - heating.manifoldFreeAreaWidth().toMillimeters() / 2.0;
-        double minY = centerY - heating.manifoldFreeAreaDepth().toMillimeters() / 2.0;
-        boolean selected = selectedSelections.contains(new SelectionKey(RenderableKind.HEATING_MANIFOLD, activeLevel.get().name(), heating.id().toString()));
-        graphics.save();
-        graphics.setFill(Color.color(0.75, 0.78, 0.74, selected ? 0.22 : 0.12));
-        graphics.setStroke(selected ? Color.web("#f2a900") : Color.web("#6b746b"));
-        graphics.setLineWidth(selected ? 2.2 : 1.0);
-        graphics.setLineDashes(6.0, 4.0);
-        graphics.fillRect(
-                toScreenProjectedX(new PlanPoint(minX, minY), 0.0),
-                toScreenProjectedY(new PlanPoint(minX, minY), 0.0),
-                heating.manifoldFreeAreaWidth().toMillimeters() * scale(),
-                heating.manifoldFreeAreaDepth().toMillimeters() * scale()
-        );
-        graphics.strokeRect(
-                toScreenProjectedX(new PlanPoint(minX, minY), 0.0),
-                toScreenProjectedY(new PlanPoint(minX, minY), 0.0),
-                heating.manifoldFreeAreaWidth().toMillimeters() * scale(),
-                heating.manifoldFreeAreaDepth().toMillimeters() * scale()
-        );
-        graphics.setLineDashes();
-        drawHeatingConnectionMarker(graphics, heating.supplyPoint(), "HKV V", Color.web("#1f62d0"));
-        drawHeatingConnectionMarker(graphics, heating.returnPoint(), "HKV R", Color.web("#d33b32"));
         graphics.restore();
     }
 
@@ -6625,10 +6592,6 @@ public final class CadWorkbench extends BorderPane {
         textArea.setScrollTop(scrollTop);
     }
 
-    private String normalizeRoutingEditorText(String text) {
-        return normalizeRoutingEditorText(text, activeHeatingZoneForRoutingInput().orElse(null));
-    }
-
     private String normalizeRoutingEditorText(String text, HeatingZone zone) {
         return HeatingRoutingLanguage.stripWhitespaceAndNormalizeAliases(text, usesMirroredRoutingAliases(zone));
     }
@@ -6812,12 +6775,6 @@ public final class CadWorkbench extends BorderPane {
             throw new IllegalArgumentException(label + " darf nicht negativ sein.");
         }
         return length;
-    }
-
-    private double requiredCoordinate(TextField field, ComboBox<LengthUnit> unitSelector, String label) {
-        return parseLength(field, unitSelector.getValue())
-                .map(Length::toMillimeters)
-                .orElseThrow(() -> new IllegalArgumentException(label + " ist keine gültige Koordinate."));
     }
 
     private record HydronicManifoldDefaults(PlanPoint supplyPoint, PlanPoint returnPoint) {
@@ -8384,41 +8341,6 @@ public final class CadWorkbench extends BorderPane {
         threeDViewport.activateInteriorView(project, activeLevel.get(), room.orElseThrow(), contextMenuWorldPoint);
         activeWorkspaceMode.set(WorkspaceMode.INTERIOR);
         draftLabel.setText("Innenansicht am gewählten Raumstandort geöffnet.");
-    }
-
-    private void setHydronicManifoldFromContextLocation() {
-        Room room = contextMenuRoom().orElseThrow(() -> new IllegalStateException("Kein Raum im Kontextmenü ausgewählt."));
-        if (contextMenuWorldPoint == null) {
-            throw new IllegalStateException("Kein Standort im Kontextmenü vorhanden.");
-        }
-        PlanPoint supplyPoint = contextMenuWorldPoint;
-        PlanPoint returnPoint = new PlanPoint(
-                contextMenuWorldPoint.xMillimeters() + DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS,
-                contextMenuWorldPoint.yMillimeters()
-        );
-        setLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(supplyPoint.xMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(supplyPoint.yMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(returnPoint.xMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(returnPoint.yMillimeters()), LengthUnit.CENTIMETER);
-
-        HydronicHeating existing = activeLevel.get().findHydronicHeating(
-                room.id(),
-                Optional.ofNullable(heatingSurfacePositionSelector.getValue()).orElse(HeatingSurfacePosition.FLOOR)
-        );
-        if (existing == null) {
-            draftLabel.setText("HKV-Position gesetzt. Heizkreise können jetzt mit diesem Vor- und Rücklauf geplant werden.");
-            return;
-        }
-        HydronicHeating updated = withHydronicManifold(existing, supplyPoint, returnPoint);
-        rememberStateForUndo();
-        activeLevel.get().replaceHydronicHeating(updated);
-        refreshHeatingSection();
-        draftLabel.setText("HKV-Position gesetzt.");
-        render();
-    }
-
-    private HydronicHeating withHydronicManifold(HydronicHeating heating, PlanPoint supplyPoint, PlanPoint returnPoint) {
-        return heating.withManifold(supplyPoint, returnPoint);
     }
 
     private void renameContextRoom() {

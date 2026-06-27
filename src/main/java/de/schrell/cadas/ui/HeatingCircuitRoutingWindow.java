@@ -8,6 +8,8 @@ import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.QuarterA
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingPoint;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingResult;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.Turn;
+import de.schrell.cadas.application.heating.HeatingCircuitFieldBounds;
+import de.schrell.cadas.application.heating.HeatingCircuitFieldBounds.Bounds;
 import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 
 import java.io.IOException;
@@ -521,52 +523,6 @@ final class HeatingCircuitRoutingWindow {
         }
     }
 
-    private void paintNextVarioEdge() {
-        try {
-            VarioPaintState paintState = currentVarioPaintState();
-            rememberUndoState();
-            redoStack.clear();
-            String step = paintState.nextStep();
-            commands.append(step);
-            protocol.append(step);
-            routingVariant = RoutingVariant.VARIO;
-            rotationQuarterTurns = 0;
-            updateProtocolArea();
-            redraw();
-            statusLabel.setText("Vario-Seite gemalt.");
-            Platform.runLater(protocolArea::requestFocus);
-        } catch (IllegalArgumentException exception) {
-            statusLabel.setText(exception.getMessage());
-        }
-    }
-
-    private void removeLastVarioEdge() {
-        try {
-            VarioPaintState paintState = currentVarioPaintState();
-            String step = paintState.lastStep();
-            if (step.isEmpty()) {
-                statusLabel.setText("Keine gemalte Vario-Seite zum Entfernen vorhanden.");
-                Platform.runLater(protocolArea::requestFocus);
-                return;
-            }
-            rememberUndoState();
-            redoStack.clear();
-            commands.delete(commands.length() - step.length(), commands.length());
-            if (protocol.toString().endsWith(step)) {
-                protocol.delete(protocol.length() - step.length(), protocol.length());
-            } else {
-                protocol.setLength(0);
-                protocol.append(commands);
-            }
-            updateProtocolArea();
-            redraw();
-            statusLabel.setText("Vario-Seite entfernt.");
-            Platform.runLater(protocolArea::requestFocus);
-        } catch (IllegalArgumentException exception) {
-            statusLabel.setText(exception.getMessage());
-        }
-    }
-
     private VarioPaintState currentVarioPaintState() {
         AreaSize size = parseAreaSize();
         double spacingMillimeters = parsePositiveCentimeters(spacingField.getText(), "Der Verlegeabstand") * 10.0;
@@ -967,7 +923,7 @@ final class HeatingCircuitRoutingWindow {
         for (int index = 0; index < rotationQuarterTurns; index++) {
             result = result.rotatedClockwise();
         }
-        return alignVerticallyToGrid(result, size, spacingMillimeters);
+        return result;
     }
 
     private void drawField(GraphicsContext gc, AreaSize size, double spacingMillimeters, ViewTransform transform) {
@@ -1045,38 +1001,8 @@ final class HeatingCircuitRoutingWindow {
         return points;
     }
 
-    private RoutingResult alignVerticallyToGrid(RoutingResult result, AreaSize size, double spacingMillimeters) {
-        if (result.supplyPath().primitives().isEmpty() && result.returnPath().primitives().isEmpty()) {
-            return result;
-        }
-        Bounds bounds = routeBounds(result);
-        double offset = verticalAlignmentScore(bounds, size.heightMillimeters())
-                <= verticalAlignmentScore(bounds, size.heightMillimeters())
-                ? 0
-                : 0;
-        return result.translatedBy(0.0, offset);
-    }
-
-    private double verticalAlignmentScore(Bounds bounds, double heightMillimeters) {
-        double bottom = -heightMillimeters / 2.0;
-        double top = heightMillimeters / 2.0;
-        double shiftedMinY = bounds.minY() ;
-        double shiftedMaxY = bounds.maxY();
-        double overflow = Math.max(0.0, bottom - shiftedMinY) + Math.max(0.0, shiftedMaxY - top);
-        double edgeDistance = Math.min(Math.abs(shiftedMinY - bottom), Math.abs(top - shiftedMaxY));
-        return overflow * 1_000.0 + edgeDistance;
-    }
-
     Bounds routeBounds(RoutingResult result) {
-        return new Bounds(0.0, 0.0, 0.0, 0.0)
-                .include(result.supplyPath(), result.fieldSupplyPrimitiveCount())
-                .include(result.returnPath(), result.fieldReturnPrimitiveCount());
-    }
-
-    Bounds routeBounds(RoutingResult result, int includedPrimitiveCount) {
-        return new Bounds(0.0, 0.0, 0.0, 0.0)
-                .include(result.supplyPath(), includedPrimitiveCount)
-                .include(result.returnPath(), includedPrimitiveCount);
+        return HeatingCircuitFieldBounds.fieldBounds(result);
     }
 
     private void drawStartPoint(GraphicsContext gc, RoutingPoint startPoint, ViewTransform transform) {
@@ -1094,10 +1020,10 @@ final class HeatingCircuitRoutingWindow {
     }
 
     private ViewTransform transformFor(AreaSize size, RoutingResult result) {
-        Bounds bounds = new Bounds(
+        Bounds bounds = Bounds.rectangle(
                 -size.widthMillimeters() / 2.0,
-                size.widthMillimeters() / 2.0,
                 -size.heightMillimeters() / 2.0,
+                size.widthMillimeters() / 2.0,
                 size.heightMillimeters() / 2.0
         );
         bounds = bounds.include(result.supplyPath(), result.fieldSupplyPrimitiveCount());
@@ -1210,87 +1136,6 @@ final class HeatingCircuitRoutingWindow {
                     viewportWidth / 2.0 + (xMillimeters - centerX) * scale,
                     viewportHeight / 2.0 - (yMillimeters - centerY) * scale
             );
-        }
-    }
-
-    record Bounds(double minX, double maxX, double minY, double maxY) {
-
-        Bounds include(PipePath path) {
-            return include(path, path.primitives().size());
-        }
-
-        Bounds include(PipePath path, int includedPrimitiveCount) {
-            Bounds result = include(path.startPoint());
-            int primitiveCount = Math.max(0, Math.min(includedPrimitiveCount, path.primitives().size()));
-            for (int index = 0; index < primitiveCount; index++) {
-                PipePrimitive primitive = path.primitives().get(index);
-                result = result.include(primitive.startPoint()).include(primitive.endPoint());
-                if (primitive instanceof QuarterArc arc) {
-                    result = result.include(arc);
-                }
-            }
-            return result;
-        }
-
-        Bounds include(QuarterArc arc) {
-            Bounds result = include(arc.startPoint()).include(arc.endPoint());
-            double startAngle = Math.atan2(
-                    arc.startPoint().yMillimeters() - arc.centerPoint().yMillimeters(),
-                    arc.startPoint().xMillimeters() - arc.centerPoint().xMillimeters()
-            );
-            double endAngle = Math.atan2(
-                    arc.endPoint().yMillimeters() - arc.centerPoint().yMillimeters(),
-                    arc.endPoint().xMillimeters() - arc.centerPoint().xMillimeters()
-            );
-            if (startAngle < 0.0) {
-                startAngle += Math.PI * 2.0;
-            }
-            if (endAngle < 0.0) {
-                endAngle += Math.PI * 2.0;
-            }
-            for (double candidateAngle : new double[]{0.0, Math.PI / 2.0, Math.PI, Math.PI * 1.5}) {
-                if (angleLiesOnArc(startAngle, endAngle, candidateAngle, arc.turn())) {
-                    result = result.include(new RoutingPoint(
-                            arc.centerPoint().xMillimeters() + Math.cos(candidateAngle) * arc.radiusMillimeters(),
-                            arc.centerPoint().yMillimeters() + Math.sin(candidateAngle) * arc.radiusMillimeters()
-                    ));
-                }
-            }
-            return result;
-        }
-
-        Bounds include(RoutingPoint point) {
-            return new Bounds(
-                    Math.min(minX, point.xMillimeters()),
-                    Math.max(maxX, point.xMillimeters()),
-                    Math.min(minY, point.yMillimeters()),
-                    Math.max(maxY, point.yMillimeters())
-            );
-        }
-
-        private boolean angleLiesOnArc(double startAngle, double endAngle, double candidateAngle, Turn turn) {
-            double fullTurn = Math.PI * 2.0;
-            double adjustedCandidate = candidateAngle;
-            if (turn == Turn.RIGHT) {
-                double adjustedEnd = endAngle > startAngle ? endAngle - fullTurn : endAngle;
-                if (adjustedCandidate > startAngle) {
-                    adjustedCandidate -= fullTurn;
-                }
-                return adjustedCandidate <= startAngle + 0.000_001 && adjustedCandidate >= adjustedEnd - 0.000_001;
-            }
-            double adjustedEnd = endAngle < startAngle ? endAngle + fullTurn : endAngle;
-            if (adjustedCandidate < startAngle) {
-                adjustedCandidate += fullTurn;
-            }
-            return adjustedCandidate >= startAngle - 0.000_001 && adjustedCandidate <= adjustedEnd + 0.000_001;
-        }
-
-        double width() {
-            return maxX - minX;
-        }
-
-        double height() {
-            return maxY - minY;
         }
     }
 }

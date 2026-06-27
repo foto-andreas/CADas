@@ -4,7 +4,6 @@ import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.FloorOpening;
-import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
@@ -329,12 +328,6 @@ public final class HydronicHeatingLayoutService {
             computationCache.put(heating, computed);
         }
         return computed;
-    }
-
-    private GeometryScope fieldScopeFor(HydronicHeating heating) {
-        return new GeometryScope(heating.zones().stream()
-                .map(HeatingZone::outline)
-                .toList());
     }
 
     private List<HeatingZone> initialZones(
@@ -1300,93 +1293,6 @@ public final class HydronicHeatingLayoutService {
                 && point.yMillimeters() < bounds.maxY() - EPSILON;
     }
 
-    private ManifoldPair manifoldPair(HydronicHeating heating, int index) {
-        PlanPoint supply = heating.supplyPoint();
-        PlanPoint ret = heating.returnPoint();
-        double dx = ret.xMillimeters() - supply.xMillimeters();
-        double dy = ret.yMillimeters() - supply.yMillimeters();
-        double length = Math.hypot(dx, dy);
-        double axisX;
-        double axisY;
-        if (length <= EPSILON) {
-            axisX = 1.0;
-            axisY = 0.0;
-        } else {
-            axisX = dx / length;
-            axisY = dy / length;
-        }
-        double offset = index * Math.max(MANIFOLD_PAIR_PITCH_MILLIMETERS, heating.pipeSpacing().toMillimeters());
-        return new ManifoldPair(
-                new PlanPoint(supply.xMillimeters() + axisX * offset, supply.yMillimeters() + axisY * offset),
-                new PlanPoint(ret.xMillimeters() + axisX * offset, ret.yMillimeters() + axisY * offset)
-        );
-    }
-
-    private List<ValidationIssue> validateGeometry(
-            GeometryScope scope,
-            List<CircuitLayout> circuits,
-            HydronicHeating heating
-    ) {
-        List<ValidationIssue> errors = new ArrayList<>();
-        Map<GridEdge, PipeSegment> used = new HashMap<>();
-        double pitch = heating.pipeSpacing().toMillimeters();
-        for (CircuitLayout circuit : circuits) {
-            validateContinuity(circuit, errors);
-            for (PipeSegment segment : circuit.segments()) {
-                if (!scope.containsSegment(segment.start(), segment.end())
-                        && !segmentTouchesManifold(segment, circuit)) {
-                    errors.add(new ValidationIssue(
-                            ValidationErrorType.PIPE_OUTSIDE_ROOM,
-                            "Rohrsegment liegt außerhalb des Raums: " + format(segment.start()) + " -> " + format(segment.end())
-                    ));
-                }
-            }
-            for (PipeSegment segment : circuit.segments()) {
-                if (segment.role() != PipeRole.SUPPLY && segment.role() != PipeRole.RETURN) {
-                    continue;
-                }
-                for (GridEdge edge : edgesOf(List.of(segment.start(), segment.end()), pitch)) {
-                    PipeSegment previous = used.putIfAbsent(edge, segment);
-                    if (previous != null) {
-                        errors.add(new ValidationIssue(
-                                ValidationErrorType.DUPLICATE_GRID_EDGE,
-                                "Rasterrinne mehrfach belegt: " + edge
-                                        + " vorher " + previous.role() + " " + format(previous.start()) + " -> " + format(previous.end())
-                                        + " aktuell " + segment.role() + " " + format(segment.start()) + " -> " + format(segment.end())
-                        ));
-                    }
-                }
-            }
-        }
-        validateIntersections(circuits, errors);
-        return errors;
-    }
-
-    private boolean segmentTouchesManifold(PipeSegment segment, CircuitLayout circuit) {
-        return samePoint(segment.start(), circuit.supplyPort())
-                || samePoint(segment.end(), circuit.supplyPort())
-                || samePoint(segment.start(), circuit.returnPort())
-                || samePoint(segment.end(), circuit.returnPort());
-    }
-
-    private void validateContinuity(CircuitLayout circuit, List<ValidationIssue> errors) {
-        if (circuit.supplyConnectorPath().isEmpty() && circuit.returnConnectorPath().isEmpty()) {
-            return;
-        }
-        if (circuit.supplyConnectorPath().isEmpty() || circuit.returnConnectorPath().isEmpty()) {
-            errors.add(new ValidationIssue(ValidationErrorType.CONNECTOR_NOT_CONNECTED, "Vorlauf und Rücklauf sind uneinheitlich angebunden."));
-            return;
-        }
-        if (!samePoint(circuit.supplyConnectorPath().getFirst(), circuit.supplyPort())
-                || !samePoint(circuit.supplyConnectorPath().getLast(), circuit.fieldSupplyPath().getFirst())) {
-            errors.add(new ValidationIssue(ValidationErrorType.CONNECTOR_NOT_CONNECTED, "Vorlauf ist nicht durchgehend angebunden."));
-        }
-        if (!samePoint(circuit.returnConnectorPath().getFirst(), circuit.fieldReturnPath().getLast())
-                || !samePoint(circuit.returnConnectorPath().getLast(), circuit.returnPort())) {
-            errors.add(new ValidationIssue(ValidationErrorType.CONNECTOR_NOT_CONNECTED, "Rücklauf ist nicht durchgehend angebunden."));
-        }
-    }
-
     private void validateIntersections(List<CircuitLayout> circuits, List<ValidationIssue> errors) {
         List<IndexedSegment> segments = new ArrayList<>();
         for (int circuitIndex = 0; circuitIndex < circuits.size(); circuitIndex++) {
@@ -1961,14 +1867,6 @@ public final class HydronicHeatingLayoutService {
             }
         }
         return true;
-    }
-
-    private List<PlanPoint> concatenate(List<PlanPoint> first, List<PlanPoint> second, List<PlanPoint> third) {
-        List<PlanPoint> result = new ArrayList<>();
-        first.forEach(point -> appendDistinct(result, point));
-        second.forEach(point -> appendDistinct(result, point));
-        third.forEach(point -> appendDistinct(result, point));
-        return List.copyOf(result);
     }
 
     private PlanPoint centroid(List<PlanPoint> polygon) {

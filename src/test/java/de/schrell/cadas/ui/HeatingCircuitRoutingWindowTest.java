@@ -3,6 +3,7 @@ package de.schrell.cadas.ui;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingPoint;
 import de.schrell.cadas.application.heating.HeatingCircuitCommandRouter.RoutingResult;
+import de.schrell.cadas.application.heating.HeatingCircuitFieldBounds.Bounds;
 import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -228,8 +229,8 @@ class HeatingCircuitRoutingWindowTest {
         RoutingResult separated = router.route(2_000.0, 3_000.0, 100.0, "=+-");
 
         aufFxThread(() -> {
-            HeatingCircuitRoutingWindow.Bounds iiBounds = window.routeBounds(ii);
-            HeatingCircuitRoutingWindow.Bounds separatedBounds = window.routeBounds(separated);
+            Bounds iiBounds = window.routeBounds(ii);
+            Bounds separatedBounds = window.routeBounds(separated);
 
             Assertions.assertEquals(0.0, iiBounds.minX(), 0.001);
             Assertions.assertEquals(0.0, iiBounds.maxX(), 0.001);
