@@ -1,6 +1,9 @@
 package de.schrell.cadas.application.heating;
 
-import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
+import de.schrell.cadas.application.heating.HydronicHeatingGridRoutingSupport.GeometryScope;
+import de.schrell.cadas.application.heating.HydronicHeatingGridRoutingSupport.GridEdge;
+import de.schrell.cadas.application.heating.HydronicHeatingGridRoutingSupport.GridGraph;
+import de.schrell.cadas.application.heating.HydronicHeatingGridRoutingSupport.GridPoint;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.FloorOpening;
@@ -10,12 +13,9 @@ import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.Staircase;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,7 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
 
@@ -188,70 +187,13 @@ public final class HydronicHeatingLayoutService {
         Objects.requireNonNull(heating, "heating darf nicht null sein.");
         Objects.requireNonNull(floorOpenings, "floorOpenings darf nicht null sein.");
         Objects.requireNonNull(heatingExclusionAreas, "heatingExclusionAreas darf nicht null sein.");
-        List<CircuitLayout> circuits = layoutBestEffort(heating).circuits();
-        List<PlanPoint> svgPoints = new ArrayList<>(room.outline());
-        heating.zones().forEach(zone -> svgPoints.addAll(zone.outline()));
-        circuits.forEach(circuit -> svgPoints.addAll(circuit.pipePath()));
-        Bounds bounds = bounds(svgPoints);
-        double padding = Math.max(heating.pipeSpacing().toMillimeters(), 100.0);
-        double minX = bounds.minX() - padding;
-        double minY = bounds.minY() - padding;
-        double width = bounds.width() + padding * 2.0;
-        double height = bounds.height() + padding * 2.0;
-        StringBuilder svg = new StringBuilder();
-        svg.append(String.format(Locale.US,
-                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"%.3f %.3f %.3f %.3f\">\n",
-                minX, minY, width, height));
-        svg.append("<g id=\"raum\" fill=\"none\" stroke=\"#202020\" stroke-width=\"10\">\n");
-        svg.append("<polygon points=\"").append(pointsAttribute(room.outline())).append("\"/>\n</g>\n");
-        svg.append("<g id=\"sperrflaechen\" fill=\"#f8dcd8\" stroke=\"#aa2d23\" stroke-width=\"5\">\n");
-        for (FloorOpening opening : floorOpenings) {
-            if (!opening.roomId().equals(room.id())) {
-                continue;
-            }
-            if (opening.shape() == de.schrell.cadas.domain.model.FloorOpeningShape.CIRCLE) {
-                svg.append(String.format(Locale.US,
-                        "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"%.3f\"/>\n",
-                        opening.center().xMillimeters(), opening.center().yMillimeters(),
-                        opening.width().toMillimeters() / 2.0));
-            } else {
-                svg.append("<polygon points=\"").append(pointsAttribute(rectangle(
-                        opening.minXMillimeters(), opening.minYMillimeters(),
-                        opening.maxXMillimeters(), opening.maxYMillimeters()
-                ))).append("\"/>\n");
-            }
-        }
-        for (HeatingExclusionArea area : heatingExclusionAreas) {
-            if (!area.roomId().equals(room.id())) {
-                continue;
-            }
-            svg.append("<polygon points=\"").append(pointsAttribute(rectangle(
-                    area.minXMillimeters(), area.minYMillimeters(),
-                    area.maxXMillimeters(), area.maxYMillimeters()
-            ))).append("\"/>\n");
-        }
-        svg.append("</g>\n");
-        svg.append("<g id=\"variotherm-rinnen\" fill=\"none\" stroke=\"#9aa6ad\" stroke-width=\"2\">\n");
-        appendVariothermGrooves(svg, room);
-        svg.append("</g>\n");
-        svg.append("<g id=\"heizbereiche\" fill=\"rgba(255,255,255,0.1)\" stroke=\"#315f8f\" stroke-width=\"5\" stroke-dasharray=\"35 20\">\n");
-        for (HeatingZone zone : heating.zones()) {
-            svg.append("<polygon points=\"").append(pointsAttribute(zone.outline())).append("\"/>\n");
-        }
-        svg.append("</g>\n");
-        svg.append(String.format(Locale.US,
-                "<g id=\"heizrohre\" fill=\"none\" stroke-width=\"%.3f\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n",
-                heating.pipeDiameter().toMillimeters()));
-        int circuitIndex = 0;
-        for (CircuitLayout circuit : circuits) {
-            svg.append(pathElement("vorlauf", circuit.fieldSupplyPath().reversed(), "#d33b32", false));
-            svg.append(pathElement("ruecklauf", circuit.fieldReturnPath(), "#1f62d0", true));
-            svg.append(portCircle(circuit.supplyPort(), "#d33b32", "V" + (circuitIndex + 1)));
-            svg.append(portCircle(circuit.returnPort(), "#1f62d0", "R" + (circuitIndex + 1)));
-            circuitIndex++;
-        }
-        svg.append("</g>\n</svg>\n");
-        return svg.toString();
+        return HydronicHeatingLayoutSvgRenderer.render(
+                room,
+                heating,
+                floorOpenings,
+                heatingExclusionAreas,
+                layoutBestEffort(heating).circuits()
+        );
     }
 
     public void validateZones(Room room, HydronicHeating heating) {
@@ -1123,22 +1065,16 @@ public final class HydronicHeatingLayoutService {
             PlanPoint start,
             PlanPoint goal,
             Set<GridEdge> blocked,
-            double pitch,
-            boolean allowDirect,
-            PlanPoint perimeterReference
+            double pitch
     ) {
         if (samePoint(start, goal)) {
             return List.of(start);
         }
-        if (!allowDirect && !blocked.isEmpty()) {
-            List<PlanPoint> perimeter = perimeterConnector(start, goal, scope, fieldScope, blocked, pitch, perimeterReference);
+        if (!blocked.isEmpty()) {
+            List<PlanPoint> perimeter = perimeterConnector(start, goal, scope, fieldScope, blocked, pitch);
             if (!perimeter.isEmpty()) {
                 return perimeter;
             }
-        }
-        List<PlanPoint> direct = allowDirect ? directConnector(start, goal, scope) : List.of();
-        if (!direct.isEmpty() && pathAvoidsBlocked(direct, blocked, pitch) && pathAvoidsInternalVoids(direct, fieldScope)) {
-            return direct;
         }
         Set<GridPoint> forbiddenNodes = graph.blockedNodes(blocked, null, null);
         forbiddenNodes.removeIf(candidate -> samePoint(candidate.toPlanPoint(pitch), start)
@@ -1150,7 +1086,7 @@ public final class HydronicHeatingLayoutService {
         }
         List<GridPoint> gridPath = graph.shortestPath(startGrid.orElseThrow(), goalGrid.orElseThrow(), blocked, true);
         if (gridPath.isEmpty()) {
-            List<PlanPoint> perimeter = perimeterConnector(start, goal, scope, fieldScope, blocked, pitch, perimeterReference);
+            List<PlanPoint> perimeter = perimeterConnector(start, goal, scope, fieldScope, blocked, pitch);
             if (!perimeter.isEmpty()) {
                 return perimeter;
             }
@@ -1178,11 +1114,10 @@ public final class HydronicHeatingLayoutService {
             GeometryScope scope,
             GeometryScope fieldScope,
             Set<GridEdge> blocked,
-            double pitch,
-            PlanPoint reference
+            double pitch
     ) {
-        Bounds bounds = scope.bounds();
-        PlanPoint sideReference = reference == null ? centroid(List.of(start, goal, new PlanPoint(start.xMillimeters(), goal.yMillimeters()))) : reference;
+        var bounds = scope.bounds();
+        PlanPoint sideReference = centroid(List.of(start, goal, new PlanPoint(start.xMillimeters(), goal.yMillimeters())));
         record Candidate(List<PlanPoint> path, double sideDistance) {
         }
         List<Candidate> candidates = new ArrayList<>();
@@ -1222,21 +1157,6 @@ public final class HydronicHeatingLayoutService {
         return true;
     }
 
-    private List<PlanPoint> directConnector(PlanPoint start, PlanPoint goal, GeometryScope scope) {
-        if (axisAligned(start, goal) && scope.containsSegment(start, goal)) {
-            return simplifyPath(List.of(start, goal));
-        }
-        PlanPoint firstCorner = new PlanPoint(start.xMillimeters(), goal.yMillimeters());
-        if (scope.containsSegment(start, firstCorner) && scope.containsSegment(firstCorner, goal)) {
-            return simplifyPath(List.of(start, firstCorner, goal));
-        }
-        PlanPoint secondCorner = new PlanPoint(goal.xMillimeters(), start.yMillimeters());
-        if (scope.containsSegment(start, secondCorner) && scope.containsSegment(secondCorner, goal)) {
-            return simplifyPath(List.of(start, secondCorner, goal));
-        }
-        return List.of();
-    }
-
     private boolean edgesDisjoint(List<PlanPoint> path, Set<GridEdge> blocked, double pitch) {
         for (GridEdge edge : edgesOf(path, pitch)) {
             if (blocked.contains(edge)) {
@@ -1268,7 +1188,7 @@ public final class HydronicHeatingLayoutService {
     }
 
     private boolean pathAvoidsInternalVoids(List<PlanPoint> path, GeometryScope fieldScope) {
-        Bounds bounds = fieldScope.bounds();
+        var bounds = fieldScope.bounds();
         for (int index = 1; index < path.size(); index++) {
             PlanPoint start = path.get(index - 1);
             PlanPoint end = path.get(index);
@@ -1278,81 +1198,16 @@ public final class HydronicHeatingLayoutService {
                         start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
                         start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
                 );
-                if (insideBounds(bounds, point) && !fieldScope.contains(point)) {
+                if (point.xMillimeters() > bounds.minX() + EPSILON
+                        && point.xMillimeters() < bounds.maxX() - EPSILON
+                        && point.yMillimeters() > bounds.minY() + EPSILON
+                        && point.yMillimeters() < bounds.maxY() - EPSILON
+                        && !fieldScope.contains(point)) {
                     return false;
                 }
             }
         }
         return true;
-    }
-
-    private boolean insideBounds(Bounds bounds, PlanPoint point) {
-        return point.xMillimeters() > bounds.minX() + EPSILON
-                && point.xMillimeters() < bounds.maxX() - EPSILON
-                && point.yMillimeters() > bounds.minY() + EPSILON
-                && point.yMillimeters() < bounds.maxY() - EPSILON;
-    }
-
-    private void validateIntersections(List<CircuitLayout> circuits, List<ValidationIssue> errors) {
-        List<IndexedSegment> segments = new ArrayList<>();
-        for (int circuitIndex = 0; circuitIndex < circuits.size(); circuitIndex++) {
-            List<PipeSegment> pipeSegments = circuits.get(circuitIndex).segments();
-            for (int segmentIndex = 0; segmentIndex < pipeSegments.size(); segmentIndex++) {
-                segments.add(new IndexedSegment(circuitIndex, segmentIndex, pipeSegments.get(segmentIndex)));
-            }
-        }
-        for (int firstIndex = 0; firstIndex < segments.size(); firstIndex++) {
-            IndexedSegment first = segments.get(firstIndex);
-            for (int secondIndex = firstIndex + 1; secondIndex < segments.size(); secondIndex++) {
-                IndexedSegment second = segments.get(secondIndex);
-                if (allowedTouch(first, second)) {
-                    continue;
-                }
-                if (segmentsIntersect(first.segment().start(), first.segment().end(), second.segment().start(), second.segment().end())) {
-                    errors.add(new ValidationIssue(
-                            ValidationErrorType.GEOMETRIC_INTERSECTION,
-                            "Rohrsegmente schneiden sich geometrisch: "
-                                    + first.segment().role() + " " + format(first.segment().start()) + " -> " + format(first.segment().end())
-                                    + " / "
-                                    + second.segment().role() + " " + format(second.segment().start()) + " -> " + format(second.segment().end())
-                    ));
-                    return;
-                }
-            }
-        }
-    }
-
-    private boolean allowedTouch(IndexedSegment first, IndexedSegment second) {
-        if (isConnector(first.segment()) && isConnector(second.segment())) {
-            return true;
-        }
-        if (first.circuitIndex() == second.circuitIndex() && Math.abs(first.segmentIndex() - second.segmentIndex()) <= 1) {
-            return true;
-        }
-        if (first.circuitIndex() == second.circuitIndex()
-                && touchesAtOwnPathPoint(first.segment(), second.segment())) {
-            return true;
-        }
-        return sharedEndpoint(first.segment(), second.segment())
-                && first.circuitIndex() == second.circuitIndex();
-    }
-
-    private boolean isConnector(PipeSegment segment) {
-        return segment.role() == PipeRole.SUPPLY_CONNECTOR || segment.role() == PipeRole.RETURN_CONNECTOR;
-    }
-
-    private boolean touchesAtOwnPathPoint(PipeSegment first, PipeSegment second) {
-        return pointOnSegment(first.start(), second.start(), second.end())
-                || pointOnSegment(first.end(), second.start(), second.end())
-                || pointOnSegment(second.start(), first.start(), first.end())
-                || pointOnSegment(second.end(), first.start(), first.end());
-    }
-
-    private boolean sharedEndpoint(PipeSegment first, PipeSegment second) {
-        return samePoint(first.start(), second.start())
-                || samePoint(first.start(), second.end())
-                || samePoint(first.end(), second.start())
-                || samePoint(first.end(), second.end());
     }
 
     private boolean segmentsIntersect(PlanPoint a, PlanPoint b, PlanPoint c, PlanPoint d) {
@@ -1490,7 +1345,7 @@ public final class HydronicHeatingLayoutService {
         }
         GeometryScope scope = new GeometryScope(List.of(polygon));
         GridGraph graph = GridGraph.create(scope, pitch);
-        List<PlanPoint> connector = routePath(graph, scope, scope, previous, target, edgesOf(path, pitch), pitch, false, null);
+        List<PlanPoint> connector = routePath(graph, scope, scope, previous, target, edgesOf(path, pitch), pitch);
         connector.stream().skip(1).forEach(point -> appendDistinct(path, point));
     }
 
@@ -1509,7 +1364,7 @@ public final class HydronicHeatingLayoutService {
         }
         PlanPoint previous = supplyPath.getLast();
         PlanPoint target = returnPath.getFirst();
-        List<List<PlanPoint>> candidates = connectionCandidates(previous, target, polygon, pitch, true);
+        List<List<PlanPoint>> candidates = connectionCandidates(previous, target, polygon, pitch);
         if (candidates.isEmpty()) {
             appendConnected(supplyPath, target, polygon, pitch);
             return;
@@ -1565,8 +1420,7 @@ public final class HydronicHeatingLayoutService {
             PlanPoint previous,
             PlanPoint target,
             List<PlanPoint> polygon,
-            double pitch,
-            boolean includeDetours
+            double pitch
     ) {
         List<List<PlanPoint>> candidates = new ArrayList<>();
         if (axisAligned(previous, target) && segmentInside(previous, target, polygon)) {
@@ -1576,7 +1430,7 @@ public final class HydronicHeatingLayoutService {
         addConnectionCandidate(candidates, previous, firstCorner, target, polygon);
         PlanPoint secondCorner = new PlanPoint(target.xMillimeters(), previous.yMillimeters());
         addConnectionCandidate(candidates, previous, secondCorner, target, polygon);
-        if (includeDetours && axisAligned(previous, target)) {
+        if (axisAligned(previous, target)) {
             addDetourCandidates(candidates, previous, target, polygon, pitch);
         }
         return List.copyOf(candidates);
@@ -1635,7 +1489,7 @@ public final class HydronicHeatingLayoutService {
     }
 
     private List<PlanPoint> simplifyPolygon(List<PlanPoint> points) {
-        List<PlanPoint> distinct = simplifyPath(points);
+        List<PlanPoint> distinct = new ArrayList<>(simplifyPath(points));
         boolean changed = true;
         while (changed && distinct.size() >= 3) {
             changed = false;
@@ -1701,7 +1555,7 @@ public final class HydronicHeatingLayoutService {
             length += segmentLength;
         }
         List<PlanPoint> first = new ArrayList<>(path.subList(0, Math.min(path.size(), splitIndex + 1)));
-        List<PlanPoint> second = new ArrayList<>(path.subList(Math.max(0, splitIndex), path.size()));
+        List<PlanPoint> second = new ArrayList<>(path.subList(splitIndex, path.size()));
         return new SplitPath(List.copyOf(first), List.copyOf(second));
     }
 
@@ -1739,7 +1593,7 @@ public final class HydronicHeatingLayoutService {
     private List<PipeSegment> segments(UUID zoneId, FieldPattern pattern) {
         List<PipeSegment> segments = new ArrayList<>();
         addSupplyAndBridgeSegments(segments, zoneId, pattern);
-        addSegments(segments, zoneId, pattern.returnPath(), PipeRole.RETURN);
+        addReturnSegments(segments, zoneId, pattern.returnPath());
         return List.copyOf(segments);
     }
 
@@ -1754,9 +1608,9 @@ public final class HydronicHeatingLayoutService {
         }
     }
 
-    private void addSegments(List<PipeSegment> segments, UUID zoneId, List<PlanPoint> path, PipeRole role) {
+    private void addReturnSegments(List<PipeSegment> segments, UUID zoneId, List<PlanPoint> path) {
         for (int index = 1; index < path.size(); index++) {
-            segments.add(new PipeSegment(zoneId, role, path.get(index - 1), path.get(index)));
+            segments.add(new PipeSegment(zoneId, PipeRole.RETURN, path.get(index - 1), path.get(index)));
         }
     }
 
@@ -1916,63 +1770,6 @@ public final class HydronicHeatingLayoutService {
         return Math.round(coordinate / pitch) * pitch;
     }
 
-    private String pointsAttribute(List<PlanPoint> points) {
-        StringBuilder attribute = new StringBuilder();
-        for (PlanPoint point : points) {
-            if (!attribute.isEmpty()) {
-                attribute.append(' ');
-            }
-            attribute.append(String.format(Locale.US, "%.3f,%.3f", point.xMillimeters(), point.yMillimeters()));
-        }
-        return attribute.toString();
-    }
-
-    private void appendVariothermGrooves(StringBuilder svg, Room room) {
-        Bounds bounds = bounds(room.outline());
-        double pitch = SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS;
-        double radius = (pitch - SurfaceCoveringPresetService.VARIOTHERM_PIPE_DIAMETER_MILLIMETERS) / 2.0;
-        for (double x = snapUp(bounds.minX(), pitch); x <= bounds.maxX() + EPSILON; x += pitch) {
-            for (double y = snapUp(bounds.minY(), pitch); y <= bounds.maxY() + EPSILON; y += pitch) {
-                PlanPoint center = new PlanPoint(x, y);
-                if (containsPoint(room.outline(), center)) {
-                    svg.append(String.format(Locale.US,
-                            "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"%.3f\"/>\n",
-                            x, y, radius));
-                }
-            }
-        }
-    }
-
-    private String pathElement(String cssClass, List<PlanPoint> path, String color, boolean dashed) {
-        if (path.size() < 2) {
-            return "";
-        }
-        return String.format(Locale.US,
-                "<path class=\"%s\" d=\"%s\" stroke=\"%s\"%s/>\n",
-                cssClass,
-                svgPath(path),
-                color,
-                dashed ? " stroke-dasharray=\"60 35\"" : "");
-    }
-
-    private String svgPath(List<PlanPoint> path) {
-        StringBuilder d = new StringBuilder();
-        for (int index = 0; index < path.size(); index++) {
-            PlanPoint point = path.get(index);
-            d.append(index == 0 ? "M " : " L ");
-            d.append(String.format(Locale.US, "%.3f %.3f", point.xMillimeters(), point.yMillimeters()));
-        }
-        return d.toString();
-    }
-
-    private String portCircle(PlanPoint point, String color, String label) {
-        return String.format(Locale.US,
-                "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"38\" fill=\"#fff\" stroke=\"%s\" stroke-width=\"8\"/>"
-                        + "<text x=\"%.3f\" y=\"%.3f\" fill=\"%s\">%s</text>\n",
-                point.xMillimeters(), point.yMillimeters(), color,
-                point.xMillimeters(), point.yMillimeters() + 30.0, color, label);
-    }
-
     private String format(PlanPoint point) {
         return String.format(Locale.GERMAN, "(%.1f; %.1f)", point.xMillimeters(), point.yMillimeters());
     }
@@ -2045,9 +1842,6 @@ public final class HydronicHeatingLayoutService {
     private record LayoutComputation(List<CircuitLayout> circuits, ValidationReport report, Set<UUID> unroutableZoneIds) {
     }
 
-    private record IndexedSegment(int circuitIndex, int segmentIndex, PipeSegment segment) {
-    }
-
     private record SharedBoundary(
             int firstIndex,
             int secondIndex,
@@ -2056,218 +1850,6 @@ public final class HydronicHeatingLayoutService {
             double start,
             double end
     ) {
-    }
-
-    private record GridPoint(int ix, int iy) {
-        private PlanPoint toPlanPoint(double pitch) {
-            return new PlanPoint(ix * pitch, iy * pitch);
-        }
-    }
-
-    private record GridEdge(GridPoint a, GridPoint b) {
-        private GridEdge {
-            if (compare(b, a) < 0) {
-                GridPoint swap = a;
-                a = b;
-                b = swap;
-            }
-        }
-
-        private static int compare(GridPoint first, GridPoint second) {
-            int x = Integer.compare(first.ix(), second.ix());
-            return x != 0 ? x : Integer.compare(first.iy(), second.iy());
-        }
-    }
-
-    private static final class GridGraph {
-
-        private final double pitch;
-        private final Set<GridPoint> nodes;
-        private final Map<GridPoint, List<GridPoint>> adjacency;
-
-        private GridGraph(double pitch, Set<GridPoint> nodes, Map<GridPoint, List<GridPoint>> adjacency) {
-            this.pitch = pitch;
-            this.nodes = nodes;
-            this.adjacency = adjacency;
-        }
-
-        private static GridGraph create(GeometryScope scope, double pitch) {
-            Bounds bounds = scope.bounds();
-            int minX = (int) Math.floor(bounds.minX() / pitch) - 1;
-            int maxX = (int) Math.ceil(bounds.maxX() / pitch) + 1;
-            int minY = (int) Math.floor(bounds.minY() / pitch) - 1;
-            int maxY = (int) Math.ceil(bounds.maxY() / pitch) + 1;
-            Set<GridPoint> nodes = new LinkedHashSet<>();
-            for (int ix = minX; ix <= maxX; ix++) {
-                for (int iy = minY; iy <= maxY; iy++) {
-                    GridPoint point = new GridPoint(ix, iy);
-                    if (scope.contains(point.toPlanPoint(pitch))) {
-                        nodes.add(point);
-                    }
-                }
-            }
-            Map<GridPoint, List<GridPoint>> adjacency = new HashMap<>();
-            for (GridPoint node : nodes) {
-                List<GridPoint> neighbors = new ArrayList<>();
-                for (int[] delta : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-                    GridPoint neighbor = new GridPoint(node.ix() + delta[0], node.iy() + delta[1]);
-                    if (nodes.contains(neighbor) && scope.containsSegment(node.toPlanPoint(pitch), neighbor.toPlanPoint(pitch))) {
-                        neighbors.add(neighbor);
-                    }
-                }
-                adjacency.put(node, neighbors);
-            }
-            return new GridGraph(pitch, nodes, adjacency);
-        }
-
-        private Optional<GridPoint> nearest(PlanPoint point, GeometryScope scope, Set<GridPoint> forbiddenNodes) {
-            GridPoint exact = new GridPoint(
-                    (int) Math.round(point.xMillimeters() / pitch),
-                    (int) Math.round(point.yMillimeters() / pitch)
-            );
-            if (nodes.contains(exact) && !forbiddenNodes.contains(exact) && scope.containsSegment(point, exact.toPlanPoint(pitch))) {
-                return Optional.of(exact);
-            }
-            return nodes.stream()
-                    .filter(candidate -> !forbiddenNodes.contains(candidate))
-                    .filter(candidate -> scope.containsSegment(point, candidate.toPlanPoint(pitch)))
-                    .min(Comparator.comparingDouble(candidate -> candidate.toPlanPoint(pitch).distanceTo(point).toMillimeters()));
-        }
-
-        private List<GridPoint> shortestPath(GridPoint start, GridPoint goal, Set<GridEdge> blockedEdges, boolean blockTouchedNodes) {
-            if (!nodes.contains(start) || !nodes.contains(goal)) {
-                return List.of();
-            }
-            Set<GridPoint> blockedNodes = blockTouchedNodes ? blockedNodes(blockedEdges, start, goal) : Set.of();
-            PriorityQueue<SearchNode> open = new PriorityQueue<>(Comparator.comparingDouble(SearchNode::score));
-            Map<GridPoint, Double> distance = new HashMap<>();
-            Map<GridPoint, GridPoint> previous = new HashMap<>();
-            open.add(new SearchNode(start, heuristic(start, goal)));
-            distance.put(start, 0.0);
-            while (!open.isEmpty()) {
-                GridPoint current = open.poll().point();
-                if (current.equals(goal)) {
-                    return compress(reconstruct(previous, current));
-                }
-                for (GridPoint neighbor : adjacency.getOrDefault(current, List.of())) {
-                    GridEdge edge = new GridEdge(current, neighbor);
-                    if (blockedEdges.contains(edge) || blockedNodes.contains(neighbor)) {
-                        continue;
-                    }
-                    double turnPenalty = turnPenalty(previous.get(current), current, neighbor);
-                    double candidateDistance = distance.get(current) + 1.0 + turnPenalty;
-                    if (candidateDistance + EPSILON < distance.getOrDefault(neighbor, Double.POSITIVE_INFINITY)) {
-                        distance.put(neighbor, candidateDistance);
-                        previous.put(neighbor, current);
-                        open.add(new SearchNode(neighbor, candidateDistance + heuristic(neighbor, goal)));
-                    }
-                }
-            }
-            return List.of();
-        }
-
-        private Set<GridPoint> blockedNodes(Set<GridEdge> blockedEdges, GridPoint start, GridPoint goal) {
-            Set<GridPoint> blockedNodes = new HashSet<>();
-            for (GridEdge edge : blockedEdges) {
-                blockedNodes.add(edge.a());
-                blockedNodes.add(edge.b());
-            }
-            if (start != null) {
-                blockedNodes.remove(start);
-            }
-            if (goal != null) {
-                blockedNodes.remove(goal);
-            }
-            return blockedNodes;
-        }
-
-        private static List<GridPoint> reconstruct(Map<GridPoint, GridPoint> previous, GridPoint current) {
-            ArrayDeque<GridPoint> points = new ArrayDeque<>();
-            points.addFirst(current);
-            while (previous.containsKey(current)) {
-                current = previous.get(current);
-                points.addFirst(current);
-            }
-            return List.copyOf(points);
-        }
-
-        private static List<GridPoint> compress(List<GridPoint> points) {
-            if (points.size() < 3) {
-                return points;
-            }
-            List<GridPoint> compressed = new ArrayList<>();
-            compressed.add(points.getFirst());
-            for (int index = 1; index + 1 < points.size(); index++) {
-                GridPoint previous = compressed.getLast();
-                GridPoint current = points.get(index);
-                GridPoint next = points.get(index + 1);
-                int dx1 = Integer.compare(current.ix() - previous.ix(), 0);
-                int dy1 = Integer.compare(current.iy() - previous.iy(), 0);
-                int dx2 = Integer.compare(next.ix() - current.ix(), 0);
-                int dy2 = Integer.compare(next.iy() - current.iy(), 0);
-                if (dx1 != dx2 || dy1 != dy2) {
-                    compressed.add(current);
-                }
-            }
-            compressed.add(points.getLast());
-            return List.copyOf(compressed);
-        }
-
-        private double heuristic(GridPoint first, GridPoint second) {
-            return Math.abs(first.ix() - second.ix()) + Math.abs(first.iy() - second.iy());
-        }
-
-        private double turnPenalty(GridPoint previous, GridPoint current, GridPoint next) {
-            if (previous == null) {
-                return 0.0;
-            }
-            int dx1 = Integer.compare(current.ix() - previous.ix(), 0);
-            int dy1 = Integer.compare(current.iy() - previous.iy(), 0);
-            int dx2 = Integer.compare(next.ix() - current.ix(), 0);
-            int dy2 = Integer.compare(next.iy() - current.iy(), 0);
-            return dx1 == dx2 && dy1 == dy2 ? 0.0 : 0.18;
-        }
-
-        private record SearchNode(GridPoint point, double score) {
-        }
-    }
-
-    private final class GeometryScope {
-
-        private final List<List<PlanPoint>> polygons;
-        private final Bounds bounds;
-
-        private GeometryScope(List<List<PlanPoint>> polygons) {
-            this.polygons = polygons.stream().map(List::copyOf).toList();
-            this.bounds = new Bounds(
-                    polygons.stream().flatMap(List::stream).mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0),
-                    polygons.stream().flatMap(List::stream).mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0),
-                    polygons.stream().flatMap(List::stream).mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0),
-                    polygons.stream().flatMap(List::stream).mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0)
-            );
-        }
-
-        private Bounds bounds() {
-            return bounds;
-        }
-
-        private boolean contains(PlanPoint point) {
-            return polygons.stream().anyMatch(polygon -> containsPoint(polygon, point));
-        }
-
-        private boolean containsSegment(PlanPoint start, PlanPoint end) {
-            for (int step = 0; step <= 32; step++) {
-                double ratio = step / 32.0;
-                PlanPoint point = new PlanPoint(
-                        start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
-                        start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
-                );
-                if (!contains(point)) {
-                    return false;
-                }
-            }
-            return true;
-        }
     }
 
     public enum PipeRole {
