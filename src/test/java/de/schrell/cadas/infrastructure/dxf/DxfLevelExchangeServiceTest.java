@@ -25,6 +25,7 @@ import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -346,7 +347,9 @@ class DxfLevelExchangeServiceTest {
                 37.5,
                 RoomObjectMountingMode.CUTS_FLOOR_COVERING,
                 "Standard"
-        ).withBaseElevation(Length.of(25, LengthUnit.CENTIMETER)).withHeatOutputWatts(650.0));
+        ).withBaseElevation(Length.of(25, LengthUnit.CENTIMETER))
+                .withHeatingType(RoomObjectHeatingType.CEILING_HEATING)
+                .withHeatOutputWatts(650.0));
 
         Path file = tempDir.resolve("oberflaechen.dxf");
         exchangeService.exportLevel(level, file);
@@ -380,6 +383,7 @@ class DxfLevelExchangeServiceTest {
         assertEquals(RoomObjectMountingMode.CUTS_FLOOR_COVERING, imported.roomObjects().getFirst().mountingMode());
         assertEquals(37.5, imported.roomObjects().getFirst().rotationDegrees(), 0.001);
         assertEquals(250.0, imported.roomObjects().getFirst().baseElevation().toMillimeters(), 0.001);
+        assertEquals(RoomObjectHeatingType.CEILING_HEATING, imported.roomObjects().getFirst().heatingType());
         assertEquals(650.0, imported.roomObjects().getFirst().heatOutputWatts(), 0.001);
     }
 

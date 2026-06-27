@@ -39,6 +39,7 @@ import java.awt.Color;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -97,8 +98,29 @@ public final class ConstructionDrawingPdfService {
             }
             addSpatialViewsPage(document, project, true);
             addSpatialViewsPage(document, project, false);
-            document.save(targetFile.toFile());
+            saveAtomically(document, targetFile.toAbsolutePath().normalize());
         }
+    }
+
+    private void saveAtomically(PDDocument document, Path targetFile) throws IOException {
+        Path parent = targetFile.getParent();
+        Path tempFile = Files.createTempFile(parent, tempFilePrefix(targetFile), ".pdf.tmp");
+        try {
+            document.save(tempFile.toFile());
+            try {
+                Files.move(tempFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException exception) {
+                Files.move(tempFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    private String tempFilePrefix(Path targetFile) {
+        String fileName = targetFile.getFileName().toString().replaceAll("[^A-Za-z0-9._-]", "_");
+        String prefix = fileName.length() < 3 ? "pdf_" + fileName : fileName;
+        return prefix.length() < 3 ? "pdf" : prefix;
     }
 
     private void addPlanPage(PDDocument document, ProjectModel project, Level level, ConstructionDrawingOptions options) throws IOException {
@@ -288,9 +310,10 @@ public final class ConstructionDrawingPdfService {
                 6.5f,
                 String.format(
                         Locale.GERMAN,
-                        "%s | %s | %.0f W",
+                        "%s | %s | %s | %.0f W",
                         entry.room().name(),
                         roomObject.name(),
+                        roomObject.heatingType(),
                         roomObject.heatOutputWatts()
                 )
         );

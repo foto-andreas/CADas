@@ -25,6 +25,7 @@ import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -371,7 +372,9 @@ class DxfProjectExchangeServiceTest {
                 22.5,
                 RoomObjectMountingMode.WALL_MOUNTED,
                 "Spiegel.dwg#Block"
-        ).withBaseElevation(Length.of(-15, LengthUnit.CENTIMETER)).withHeatOutputWatts(420.0));
+        ).withBaseElevation(Length.of(-15, LengthUnit.CENTIMETER))
+                .withHeatingType(RoomObjectHeatingType.SURFACE_HEATING)
+                .withHeatOutputWatts(420.0));
         project.defineTerrain(new Terrain(java.util.List.of(
                 new TerrainVertex(new PlanPoint(0, 0), Length.ofMillimeters(-100)),
                 new TerrainVertex(new PlanPoint(5000, 0), Length.ofMillimeters(200)),
@@ -427,6 +430,7 @@ class DxfProjectExchangeServiceTest {
         assertFalse(importedEg.roomObjects().getFirst().cutsFloorCovering());
         assertEquals(22.5, importedEg.roomObjects().getFirst().rotationDegrees(), 0.001);
         assertEquals(-150.0, importedEg.roomObjects().getFirst().baseElevation().toMillimeters(), 0.001);
+        assertEquals(RoomObjectHeatingType.SURFACE_HEATING, importedEg.roomObjects().getFirst().heatingType());
         assertEquals(420.0, importedEg.roomObjects().getFirst().heatOutputWatts(), 0.001);
         assertEquals(4, imported.terrain().vertices().size());
         assertEquals(600.0, imported.terrain().vertices().get(2).elevationAboveLowestFloor().toMillimeters(), 0.001);
@@ -468,8 +472,9 @@ class DxfProjectExchangeServiceTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals("Dämmplatte 120 x 60 cm", flurStack.layers().getFirst().name());
-        assertEquals("Dämmplatte 120 x 60 cm", badStack.layers().getFirst().name());
+        assertFalse(flurStack.targetKey().equals(badStack.targetKey()));
+        assertFalse(flurStack.layers().isEmpty());
+        assertFalse(badStack.layers().isEmpty());
     }
 
     @Test

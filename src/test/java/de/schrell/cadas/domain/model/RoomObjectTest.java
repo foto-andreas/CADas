@@ -44,6 +44,15 @@ class RoomObjectTest {
         assertEquals(850.0, roomObject.withBaseElevation(Length.zero()).heatOutputWatts(), 0.001);
     }
 
+    @Test
+    void ordnetBestandswärmeleistungStandardmäßigAlsHeizelementEin() {
+        RoomObject roomObject = roomObject(0.0, Length.ofMillimeters(1000), Length.ofMillimeters(500))
+                .withHeatOutputWatts(850.0);
+
+        assertEquals(RoomObjectHeatingType.HEATING_ELEMENT, roomObject.heatingType());
+        assertEquals(RoomObjectHeatingType.FLOOR_HEATING, roomObject.withHeatingType(RoomObjectHeatingType.FLOOR_HEATING).heatingType());
+    }
+
     private RoomObject roomObject(double rotationDegrees, Length width, Length depth) {
         return new RoomObject(
                 UUID.randomUUID(),

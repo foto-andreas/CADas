@@ -19,6 +19,7 @@ import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.StairType;
@@ -136,7 +137,7 @@ class ConstructionDrawingPdfServiceTest {
                 Length.of(60, LengthUnit.CENTIMETER),
                 false,
                 ""
-        ).withHeatOutputWatts(900.0));
+        ).withHeatingType(RoomObjectHeatingType.HEATING_ELEMENT).withHeatOutputWatts(900.0));
         Path target = tempDir.resolve("heizelemente.pdf");
 
         new ConstructionDrawingPdfService().export(project, target);
@@ -146,8 +147,24 @@ class ConstructionDrawingPdfServiceTest {
             String text = new PDFTextStripper().getText(document);
             assertTrue(text.contains("Heizelemente - Erdgeschoss"));
             assertTrue(text.contains("Konvektor"));
+            assertTrue(text.contains("Heizelement"));
             assertTrue(text.contains("900 W"));
         }
+    }
+
+    @Test
+    void exportiertOhneDirektesÜberschreibenBereitsGeöffneterPdfDateien() throws Exception {
+        ProjectModel project = sampleProject();
+        Path target = tempDir.resolve("bauzeichnung.pdf");
+        ConstructionDrawingPdfService service = new ConstructionDrawingPdfService();
+        service.export(project, target);
+
+        try (var existing = Loader.loadPDF(target.toFile())) {
+            service.export(project, target);
+            assertEquals(3, existing.getNumberOfPages());
+        }
+
+        assertTrue(Files.size(target) > 2_000);
     }
 
     @Test

@@ -433,11 +433,11 @@ Wähle im Werkzeug `Bearbeiten` genau einen Raum. Der Bereich `Flächenheizung` 
 5. Wähle einen Heizkreis in der Liste. Name, Verlegeart, Vorlauf-/Rücklauf-Invertierung, Mittelschlange, Heizleistung, Polygon-Eckpunkte und `Routing` liegen direkt in der Eigenschaftenleiste. `=` und `-` verlängern Vorlauf und Rücklauf, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt. `+` markiert die Grenze zwischen Heizfeld und Zulauf. Bei genau einer aktiven Spiegelung akzeptiert das Routing-Textfeld zusätzlich `(` und `)` als `L` und `R` sowie `8` und `9` als `l` und `r`. Ältere gespeicherte `I/i` werden beim Laden automatisch in `=` und `-` überführt. Polygon-Eckpunkte werden als `X; Y` in Zentimetern erfasst; dadurch sind auch L- und U-förmige Bereiche möglich.
 6. Der rote Punkt bleibt immer am tatsächlichen Startpunkt des Heizkreis-Routings. Raster, Hilfslinien und ähnliche Fanghilfen orientieren sich am roten Punkt oder an der äußeren Rohrkante, nie am ursprünglichen Rechteck. Das Rechteck dient nur als Größenrahmen und wird nach dem Routing an der äußeren Rohrkante des Heizfelds nachgeführt. Segmente hinter `+` zählen zur Rohrlänge, aber nicht zur Rechteckgröße, Fläche oder Heizleistung; bei Meander zählt dafür die äußerste Kante des Halbkreises.
 7. Die HKV-Anschlüsse dienen als freie Vorlauf-/Rücklauf-Marker. Direkte Verbindungsleitungen zwischen HKV und Heizkreis werden nicht mehr erzeugt.
-8. Raumobjekte können zusätzlich eine `Wärmeleistung` in Watt tragen. Solche Objekte erscheinen in der Heizungszusammenfassung des Raums als `Heizelemente`; CADas summiert `FBH/DH`, `Heizelemente` und die gesamte Raumwärmeleistung getrennt.
+8. Raumobjekte können zusätzlich eine `Wärmeleistung` in Watt tragen. Über `Heizart` ordnest du die Leistung als `Keine Heizung`, `Heizelement`, `FBH`, `DH` oder `Flächenheizung` zu. CADas summiert diese Anteile getrennt pro Raum.
 
 Das separate Heizkreis-Router-Testfenster verwendet dieselbe Sprache. Mit `Einfach gespiegelt` gelten dort ebenfalls die Alias-Tasten `(`, `)`, `8` und `9`; Texteingaben werden sofort gerendert.
 
-Die 2D-Ansicht zeichnet Heizbereiche als Umriss, Vorläufe blau und Rückläufe rot. Die Leitungen liegen ausschließlich in der Heizfläche. `V` und `R` markieren Vorlauf und Rücklauf am HKV. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen, Verlegeart und berechneter Rohrlänge. Raumobjekte mit Wärmeleistung erscheinen zusätzlich als `Heizelemente` auf eigenen Heizungsseiten. Die Materialliste enthält zusätzlich je Raum eine maßstäbliche SVG-Zeichnung der geplanten Flächenheizung sowie getrennte Summen für `FBH/DH`, `Heizelemente` und `Gesamtwärme`. Allgemeine Hindernisse werden noch nicht automatisch ausgespart; Treppenbereiche werden beim automatischen Vorschlag berücksichtigt.
+Die 2D-Ansicht zeichnet Heizbereiche als Umriss, Vorläufe blau und Rückläufe rot. Die Leitungen liegen ausschließlich in der Heizfläche. `V` und `R` markieren Vorlauf und Rücklauf am HKV. Beim PDF-Export erhält jede beheizte Etage getrennte Seiten für Fußboden und Decke mit Bereichsnamen, Verlegeart und berechneter Rohrlänge. Raumobjekte mit Wärmeleistung erscheinen zusätzlich auf eigenen Heizungsseiten. Die Materialliste enthält zusätzlich je Raum eine maßstäbliche SVG-Zeichnung der geplanten Flächenheizung sowie getrennte Summen für `FBH`, `DH`, `Flächenheizung`, `Heizelemente` und `Gesamtwärme`. Allgemeine Hindernisse werden noch nicht automatisch ausgespart; Treppenbereiche werden beim automatischen Vorschlag berücksichtigt.
 
 ### Ebenen auf Flächen
 
@@ -482,8 +482,8 @@ Eigene Beläge werden unter `~/.config/CADas/Belag` gespeichert und beim Start a
 
 Zusätzlich zu Belägen enthält die Liste jetzt:
 
-* Raumwärmesummen aus `FBH/DH`, `Heizelementen` und `Gesamtwärme`
-* einzelne `Heizelemente` aus Raumobjekten mit Wärmeleistung
+* Raumwärmesummen je Etage und Raum aus `FBH`, `DH`, `Flächenheizung`, `Heizelementen` und `Gesamtwärme`
+* einzelne beheizte Raumobjekte mit `Heizart` und Wärmeleistung
 * je Heizkreis die zugehörigen Raum-Summen
 
 Die Liste enthält:
@@ -513,7 +513,7 @@ Mit dem Werkzeug `Objekt` platzierst du einfache Einrichtungs- und Sanitärobjek
 * Das Objekt wird mittig an der Klickposition platziert und kann im Werkzeug `Bearbeiten` ausgewählt, verschoben, gedreht, skaliert oder gelöscht werden.
 * Geänderte Maße und Winkel werden mit `Werte auf Auswahl anwenden` auf das ausgewählte Objekt übernommen.
 * Über die Anzeigeoption `Objekte` blendest du alle Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.
-* Über das Feld `Wärmeleistung` in den Objekt-Eigenschaften führst du Heizkörper, Konvektoren oder ähnliche Heizelemente in Watt. Positive Werte werden in Raumwärmesummen, Materialliste und PDF-Export berücksichtigt.
+* Über die Felder `Wärmeleistung` und `Heizart` in den Objekt-Eigenschaften führst du Heizkörper, Konvektoren oder flächige Heizobjekte in Watt. Positive Werte werden je nach Heizart in Raumwärmesummen, Materialliste und PDF-Export berücksichtigt.
 
 Aktuell enthaltene Standardobjekte:
 

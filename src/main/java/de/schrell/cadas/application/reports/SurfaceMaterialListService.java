@@ -116,6 +116,9 @@ public final class SurfaceMaterialListService {
                             heating.maximumPipeLength().toMillimeters() / 1_000.0,
                             zone.heatOutputWattsPerSquareMeter(),
                             zone.heatOutputWatts(),
+                            roomHeatTotals.floorHeatingWatts(),
+                            roomHeatTotals.ceilingHeatingWatts(),
+                            roomHeatTotals.additionalSurfaceHeatingWatts(),
                             roomHeatTotals.surfaceHeatingWatts(),
                             roomHeatTotals.heatingElementWatts(),
                             roomHeatTotals.totalHeatOutputWatts(),
@@ -137,6 +140,7 @@ public final class SurfaceMaterialListService {
                                 room.name(),
                                 element.objectName(),
                                 element.objectType(),
+                                element.heatingType().toString(),
                                 element.heatOutputWatts()
                         )
                 ));
@@ -157,6 +161,9 @@ public final class SurfaceMaterialListService {
                 surfaceLayerEffectService.effectiveAreaSquareMeters(level, room),
                 surfaceLayerEffectService.effectiveVolumeCubicMeters(level, room),
                 residentialAreaService.residentialAreaSquareMeters(level, room),
+                roomHeatTotals.floorHeatingWatts(),
+                roomHeatTotals.ceilingHeatingWatts(),
+                roomHeatTotals.additionalSurfaceHeatingWatts(),
                 roomHeatTotals.surfaceHeatingWatts(),
                 roomHeatTotals.heatingElementWatts(),
                 roomHeatTotals.totalHeatOutputWatts()
@@ -966,34 +973,48 @@ public final class SurfaceMaterialListService {
                 markdown.append("Keine Räume vorhanden.\n\n");
                 return;
             }
-            markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Mietfläche | Volumen | FBH/DH | Heizelemente | Gesamtwärme |\n");
-            markdown.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
-            for (RoomSummary room : rooms) {
-                markdown.append("| ")
-                        .append(markdownCell(room.levelName() + " / " + room.roomName()))
-                        .append(" | ")
-                        .append(decimal(room.widthMillimeters() / 1000.0, 2)).append(" × ")
-                        .append(decimal(room.depthMillimeters() / 1000.0, 2)).append(" m")
-                        .append(" | ")
-                        .append(decimal(room.minimumHeightMillimeters() / 1000.0, 2));
-                if (Math.abs(room.maximumHeightMillimeters() - room.minimumHeightMillimeters()) > EPSILON) {
-                    markdown.append("–").append(decimal(room.maximumHeightMillimeters() / 1000.0, 2));
-                }
-                markdown.append(" m | ")
-                        .append(decimal(room.areaSquareMeters(), 2)).append(" m²")
-                        .append(" | ")
-                        .append(decimal(room.residentialAreaSquareMeters(), 2)).append(" m²")
-                        .append(" | ")
-                        .append(decimal(room.volumeCubicMeters(), 2)).append(" m³")
-                        .append(" | ")
-                        .append(decimal(room.surfaceHeatingWatts(), 0)).append(" W")
-                        .append(" | ")
-                        .append(decimal(room.heatingElementWatts(), 0)).append(" W")
-                        .append(" | ")
-                        .append(decimal(room.totalHeatOutputWatts(), 0)).append(" W")
-                        .append(" |\n");
-            }
-            markdown.append("\nDie Mietfläche gewichtet lichte Höhen ab 2 m vollständig, zwischen 1 m und 2 m zur Hälfte und unter 1 m nicht. Sichtbare Boden- und Deckenbeläge reduzieren die lichte Höhe.\n\n");
+            rooms.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            RoomSummary::levelName,
+                            LinkedHashMap::new,
+                            java.util.stream.Collectors.toList()
+                    ))
+                    .forEach((levelName, levelRooms) -> {
+                        markdown.append("### ").append(levelName).append("\n\n");
+                        markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Mietfläche | Volumen | FBH | DH | Flächenheizung | Heizelemente | Gesamtwärme |\n");
+                        markdown.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+                        for (RoomSummary room : levelRooms) {
+                            markdown.append("| ")
+                                    .append(markdownCell(room.roomName()))
+                                    .append(" | ")
+                                    .append(decimal(room.widthMillimeters() / 1000.0, 2)).append(" × ")
+                                    .append(decimal(room.depthMillimeters() / 1000.0, 2)).append(" m")
+                                    .append(" | ")
+                                    .append(decimal(room.minimumHeightMillimeters() / 1000.0, 2));
+                            if (Math.abs(room.maximumHeightMillimeters() - room.minimumHeightMillimeters()) > EPSILON) {
+                                markdown.append("–").append(decimal(room.maximumHeightMillimeters() / 1000.0, 2));
+                            }
+                            markdown.append(" m | ")
+                                    .append(decimal(room.areaSquareMeters(), 2)).append(" m²")
+                                    .append(" | ")
+                                    .append(decimal(room.residentialAreaSquareMeters(), 2)).append(" m²")
+                                    .append(" | ")
+                                    .append(decimal(room.volumeCubicMeters(), 2)).append(" m³")
+                                    .append(" | ")
+                                    .append(decimal(room.floorHeatingWatts(), 0)).append(" W")
+                                    .append(" | ")
+                                    .append(decimal(room.ceilingHeatingWatts(), 0)).append(" W")
+                                    .append(" | ")
+                                    .append(decimal(room.additionalSurfaceHeatingWatts(), 0)).append(" W")
+                                    .append(" | ")
+                                    .append(decimal(room.heatingElementWatts(), 0)).append(" W")
+                                    .append(" | ")
+                                    .append(decimal(room.totalHeatOutputWatts(), 0)).append(" W")
+                                    .append(" |\n");
+                        }
+                        markdown.append('\n');
+                    });
+            markdown.append("Die Mietfläche gewichtet lichte Höhen ab 2 m vollständig, zwischen 1 m und 2 m zur Hälfte und unter 1 m nicht. Sichtbare Boden- und Deckenbeläge reduzieren die lichte Höhe.\n\n");
         }
 
         private void appendHeatingPlans(StringBuilder markdown) {
@@ -1002,8 +1023,8 @@ public final class SurfaceMaterialListService {
                 markdown.append("Keine Flächenheizungen vorhanden.\n\n");
                 return;
             }
-            markdown.append("| Raum | Fläche | Verlegung | Heizkreis | Heizfläche | HKL | Maximum | W/m² | Leistung | Raum FBH/DH | Heizelemente | Raum gesamt |\n");
-            markdown.append("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+            markdown.append("| Raum | Fläche | Verlegung | Heizkreis | Heizfläche | HKL | Maximum | W/m² | Leistung | Raum FBH | Raum DH | Raum Fläche | Heizelemente | Raum gesamt |\n");
+            markdown.append("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
             for (HeatingPlanSummary plan : heatingPlans) {
                 markdown.append("| ")
                         .append(markdownCell(plan.levelName() + " / " + plan.roomName()))
@@ -1024,7 +1045,11 @@ public final class SurfaceMaterialListService {
                         .append(" | ")
                         .append(decimal(plan.heatOutputWatts(), 0)).append(" W")
                         .append(" | ")
-                        .append(decimal(plan.roomSurfaceHeatOutputWatts(), 0)).append(" W")
+                        .append(decimal(plan.roomFloorHeatOutputWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(decimal(plan.roomCeilingHeatOutputWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(decimal(plan.roomAdditionalSurfaceHeatOutputWatts(), 0)).append(" W")
                         .append(" | ")
                         .append(decimal(plan.roomHeatingElementWatts(), 0)).append(" W")
                         .append(" | ")
@@ -1055,8 +1080,8 @@ public final class SurfaceMaterialListService {
                 markdown.append("Keine Heizelemente vorhanden.\n\n");
                 return;
             }
-            markdown.append("| Raum | Objekt | Typ | Leistung |\n");
-            markdown.append("|---|---|---|---:|\n");
+            markdown.append("| Raum | Objekt | Typ | Heizart | Leistung |\n");
+            markdown.append("|---|---|---|---|---:|\n");
             for (HeatingElementSummary element : heatingElements) {
                 markdown.append("| ")
                         .append(markdownCell(element.levelName() + " / " + element.roomName()))
@@ -1064,6 +1089,8 @@ public final class SurfaceMaterialListService {
                         .append(markdownCell(element.objectName()))
                         .append(" | ")
                         .append(markdownCell(element.objectType()))
+                        .append(" | ")
+                        .append(markdownCell(element.heatingType()))
                         .append(" | ")
                         .append(decimal(element.heatOutputWatts(), 0)).append(" W")
                         .append(" |\n");
@@ -1198,6 +1225,9 @@ public final class SurfaceMaterialListService {
             double maximumPipeLengthMeters,
             double heatOutputWattsPerSquareMeter,
             double heatOutputWatts,
+            double roomFloorHeatOutputWatts,
+            double roomCeilingHeatOutputWatts,
+            double roomAdditionalSurfaceHeatOutputWatts,
             double roomSurfaceHeatOutputWatts,
             double roomHeatingElementWatts,
             double roomTotalHeatOutputWatts,
@@ -1210,6 +1240,7 @@ public final class SurfaceMaterialListService {
             String roomName,
             String objectName,
             String objectType,
+            String heatingType,
             double heatOutputWatts
     ) {
     }
@@ -1258,6 +1289,9 @@ public final class SurfaceMaterialListService {
             double areaSquareMeters,
             double volumeCubicMeters,
             double residentialAreaSquareMeters,
+            double floorHeatingWatts,
+            double ceilingHeatingWatts,
+            double additionalSurfaceHeatingWatts,
             double surfaceHeatingWatts,
             double heatingElementWatts,
             double totalHeatOutputWatts

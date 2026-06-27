@@ -155,6 +155,7 @@ public final class SelectionTranslationService {
                 roomObject.visible(),
                 roomObject.source(),
                 roomObject.baseElevation(),
+                roomObject.heatingType(),
                 roomObject.heatOutputWatts()
         );
     }

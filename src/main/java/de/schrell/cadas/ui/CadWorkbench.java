@@ -98,6 +98,7 @@ import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -194,6 +195,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.print.PrinterJob;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.ImagePattern;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
@@ -382,6 +384,7 @@ public final class CadWorkbench extends BorderPane {
     private final TextField roomObjectHeightField = new TextField("200");
     private final ComboBox<LengthUnit> roomObjectHeightUnit = new ComboBox<>();
     private final TextField roomObjectHeatOutputField = new TextField("0");
+    private final ComboBox<RoomObjectHeatingType> roomObjectHeatingTypeSelector = new ComboBox<>();
     private final TextField roomObjectBaseElevationField = new TextField("0");
     private final ComboBox<LengthUnit> roomObjectBaseElevationUnit = new ComboBox<>();
     private final TextField roomObjectAngleField = new TextField("0");
@@ -555,6 +558,8 @@ public final class CadWorkbench extends BorderPane {
     private EdgeResizeService.EdgeHandle activeEdgeHandle;
     private List<Wall> edgeResizeBaseWalls = List.of();
     private List<Door> edgeResizeBaseDoors = List.of();
+    private ImagePattern variothermGroovePattern;
+    private double variothermGroovePatternPitchPixels = -1.0;
     private List<WindowElement> edgeResizeBaseWindows = List.of();
     private List<Staircase> edgeResizeBaseStaircases = List.of();
     private List<FloorOpening> edgeResizeBaseFloorOpenings = List.of();
@@ -972,6 +977,7 @@ public final class CadWorkbench extends BorderPane {
         roomObjectDepthField.setPrefColumnCount(6);
         roomObjectHeightField.setPrefColumnCount(6);
         roomObjectHeatOutputField.setPrefColumnCount(6);
+        roomObjectHeatingTypeSelector.setPrefWidth(170);
         roomObjectAngleField.setPrefColumnCount(6);
         dwgBlockNameField.setPrefColumnCount(14);
     }
@@ -1037,6 +1043,9 @@ public final class CadWorkbench extends BorderPane {
 
     private void editTerrainElevations() {
         Terrain synchronizedTerrain = terrainCornerService.synchronize(project.primaryLevel(), project.terrain());
+        if (!synchronizedTerrain.configured() && project.terrain().configured()) {
+            synchronizedTerrain = project.terrain();
+        }
         if (!synchronizedTerrain.configured()) {
             draftLabel.setText("Geländehöhen benötigen mindestens drei äußere Gebäudeecken.");
             return;
@@ -1290,6 +1299,7 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Tiefe", roomObjectDepthField, roomObjectDepthUnit),
                         propertyRow("Höhe", roomObjectHeightField, roomObjectHeightUnit),
                         propertyRow("Wärmeleistung", roomObjectHeatOutputField),
+                        propertyRow("Heizart", roomObjectHeatingTypeSelector),
                         propertyRow("Basishöhe", roomObjectBaseElevationField, roomObjectBaseElevationUnit),
                         propertyRow("Winkel", roomObjectAngleField)
                 ),
@@ -1725,6 +1735,8 @@ public final class CadWorkbench extends BorderPane {
         availableWindowPresets.setAll(partLibrary.windowPresets());
         availableStairPresets.setAll(partLibrary.stairPresets());
         availableRoomObjectPresets.setAll(roomObjectPresetService.presets());
+        roomObjectHeatingTypeSelector.getItems().setAll(RoomObjectHeatingType.values());
+        roomObjectHeatingTypeSelector.setValue(RoomObjectHeatingType.NONE);
         doorPresetSelector.setItems(availableDoorPresets);
         windowPresetSelector.setItems(availableWindowPresets);
         stairPresetSelector.setItems(availableStairPresets);
@@ -1949,7 +1961,8 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(roomObjectDepthUnit, "Bestimmt die Einheit für die Objekttiefe.");
         applyTooltip(roomObjectHeightField, "Legt die Höhe eines neuen oder ausgewählten Objekts fest.");
         applyTooltip(roomObjectHeightUnit, "Bestimmt die Einheit für die Objekthöhe.");
-        applyTooltip(roomObjectHeatOutputField, "Legt die Wärmeleistung eines neuen oder ausgewählten Objekts in Watt fest. Positive Werte führen das Objekt in Raumwärmesummen, Materialliste und PDF als Heizelement.");
+        applyTooltip(roomObjectHeatOutputField, "Legt die Wärmeleistung eines neuen oder ausgewählten Objekts in Watt fest. Der Wert wird je nach Heizart den Summen für FBH, DH, sonstige Flächenheizung oder Heizelemente zugeordnet.");
+        applyTooltip(roomObjectHeatingTypeSelector, "Legt fest, ob die Wärmeleistung dieses Objekts als keine Heizung, Heizelement, FBH, DH oder sonstige Flächenheizung geführt wird. Diese Zuordnung steuert Raumwärmesummen, Materialliste und PDF.");
         applyTooltip(roomObjectBaseElevationField, "Legt die vertikale Lage der Objektbasis relativ zum Boden der aktiven Etage fest. Positive Werte heben das Objekt an, negative Werte versenken es.");
         applyTooltip(roomObjectBaseElevationUnit, "Bestimmt die Einheit für die positive oder negative Basishöhe des Objekts.");
         applyTooltip(roomObjectAngleField, "Legt den frei einstellbaren Drehwinkel eines neuen oder ausgewählten Objekts in Grad fest.");
@@ -3751,19 +3764,33 @@ public final class CadWorkbench extends BorderPane {
     private void drawVariothermPanelGrooves(GraphicsContext graphics, double tileX, double tileY, double tileWidth, double tileHeight) {
         double pitch = SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS;
         double radius = Math.max(1.0, (pitch - SurfaceCoveringPresetService.VARIOTHERM_PIPE_DIAMETER_MILLIMETERS) / 2.0);
-        graphics.setStroke(Color.color(0.18, 0.36, 0.44, 0.48));
-        graphics.setLineWidth(Math.max(0.45, 1.2 * scale()));
-        for (double x = tileX; x <= tileX + tileWidth + 0.001; x += pitch) {
-            for (double y = tileY; y <= tileY + tileHeight + 0.001; y += pitch) {
-                double screenRadius = radius * scale();
-                graphics.strokeOval(
-                        toScreenX(x - radius),
-                        toScreenY(y - radius),
-                        screenRadius * 2.0,
-                        screenRadius * 2.0
-                );
-            }
+        double pitchPixels = pitch * scale();
+        double radiusPixels = radius * scale();
+        graphics.save();
+        graphics.setFill(variothermGroovePattern(pitchPixels, radiusPixels));
+        graphics.fillRect(toScreenX(tileX), toScreenY(tileY + tileHeight), tileWidth * scale(), tileHeight * scale());
+        graphics.restore();
+    }
+
+    private ImagePattern variothermGroovePattern(double pitchPixels, double radiusPixels) {
+        if (variothermGroovePattern != null && Math.abs(variothermGroovePatternPitchPixels - pitchPixels) <= 0.01) {
+            return variothermGroovePattern;
         }
+        double canvasSize = Math.max(2.0, pitchPixels);
+        Canvas patternCanvas = new Canvas(canvasSize, canvasSize);
+        GraphicsContext patternGraphics = patternCanvas.getGraphicsContext2D();
+        patternGraphics.setStroke(Color.color(0.18, 0.36, 0.44, 0.48));
+        patternGraphics.setLineWidth(Math.max(0.45, 1.2 * scale()));
+        patternGraphics.strokeOval(
+                (canvasSize - radiusPixels * 2.0) / 2.0,
+                (canvasSize - radiusPixels * 2.0) / 2.0,
+                radiusPixels * 2.0,
+                radiusPixels * 2.0
+        );
+        WritableImage patternImage = patternCanvas.snapshot(null, null);
+        variothermGroovePattern = new ImagePattern(patternImage, 0.0, 0.0, canvasSize, canvasSize, false);
+        variothermGroovePatternPitchPixels = pitchPixels;
+        return variothermGroovePattern;
     }
 
     private List<TextBlockingBox> drawRoomLabel(GraphicsContext graphics, Room room, PlanPoint center) {
@@ -4885,6 +4912,10 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
+    private RoomObjectHeatingType currentRoomObjectHeatingType(RoomObjectHeatingType fallback) {
+        return Optional.ofNullable(roomObjectHeatingTypeSelector.getValue()).orElse(fallback);
+    }
+
     private Length currentRoomObjectBaseElevation() {
         return parseLength(roomObjectBaseElevationField, roomObjectBaseElevationUnit.getValue()).orElse(Length.zero());
     }
@@ -5232,6 +5263,7 @@ public final class CadWorkbench extends BorderPane {
                 preset.source()
         )
                 .withBaseElevation(currentRoomObjectBaseElevation())
+                .withHeatingType(currentRoomObjectHeatingType(RoomObjectHeatingType.NONE))
                 .withHeatOutputWatts(currentRoomObjectHeatOutputWatts(preset.heatOutputWatts()));
         activeLevel.get().addRoomObject(roomObject);
         selectSingle(new SelectionKey(RenderableKind.ROOM_OBJECT, activeLevel.get().name(), roomObject.id().toString()));
@@ -6367,6 +6399,9 @@ public final class CadWorkbench extends BorderPane {
         setLengthInput(roomObjectDepthField, roomObjectDepthUnit, preset.depth(), LengthUnit.CENTIMETER);
         setLengthInput(roomObjectHeightField, roomObjectHeightUnit, preset.height(), LengthUnit.CENTIMETER);
         roomObjectHeatOutputField.setText(formatNonNegativeDouble(preset.heatOutputWatts(), 1));
+        roomObjectHeatingTypeSelector.setValue(preset.heatOutputWatts() > 0.0
+                ? RoomObjectHeatingType.HEATING_ELEMENT
+                : RoomObjectHeatingType.NONE);
         setLengthInput(roomObjectBaseElevationField, roomObjectBaseElevationUnit, Length.zero(), LengthUnit.CENTIMETER);
         roomObjectAngleField.setText("0");
     }
@@ -6422,8 +6457,11 @@ public final class CadWorkbench extends BorderPane {
         if (heating == null) {
             heatingSummaryLabel.setText(String.format(
                     Locale.GERMAN,
-                    "Für %s ist noch keine Heizung angelegt. Heizelemente %.0f W · Raum gesamt %.0f W",
+                    "Für %s ist noch keine Heizung angelegt. FBH %.0f W · DH %.0f W · Fläche %.0f W · Heizelemente %.0f W · Raum gesamt %.0f W",
                     heatingSurfacePositionSelector.getValue(),
+                    roomHeatTotals.floorHeatingWatts(),
+                    roomHeatTotals.ceilingHeatingWatts(),
+                    roomHeatTotals.additionalSurfaceHeatingWatts(),
                     roomHeatTotals.heatingElementWatts(),
                     roomHeatTotals.totalHeatOutputWatts()
             ));
@@ -6472,13 +6510,15 @@ public final class CadWorkbench extends BorderPane {
         String warning = CadWorkbenchHeatingSupport.heatingWarning(layoutResult.validationReport(), maximumExceeded);
         heatingSummaryLabel.setText(String.format(
                 Locale.GERMAN,
-                "%s · Raumvorgabe %s · %d Heizkreis(e) · %.2f m² · %.1f m HKL · %.0f W FBH/DH · %.0f W Heizelemente · %.0f W Raum gesamt%s",
+                "%s · Raumvorgabe %s · %d Heizkreis(e) · %.2f m² · %.1f m HKL · %.0f W FBH · %.0f W DH · %.0f W Fläche · %.0f W Heizelemente · %.0f W Raum gesamt%s",
                 heating.surfacePosition(),
                 heating.layoutPattern(),
                 circuits.size(),
                 totalArea,
                 totalLength / 1_000.0,
-                totalHeatOutput,
+                roomHeatTotals.floorHeatingWatts(),
+                roomHeatTotals.ceilingHeatingWatts(),
+                roomHeatTotals.additionalSurfaceHeatingWatts(),
                 roomHeatTotals.heatingElementWatts(),
                 roomHeatTotals.totalHeatOutputWatts(),
                 warning
@@ -8199,6 +8239,7 @@ public final class CadWorkbench extends BorderPane {
                         syncLengthInput(roomObjectDepthField, roomObjectDepthUnit, roomObject.depth(), LengthUnit.CENTIMETER);
                         syncLengthInput(roomObjectHeightField, roomObjectHeightUnit, roomObject.height(), LengthUnit.CENTIMETER);
                         roomObjectHeatOutputField.setText(formatNonNegativeDouble(roomObject.heatOutputWatts(), 1));
+                        roomObjectHeatingTypeSelector.setValue(roomObject.heatingType());
                         syncLengthInput(roomObjectBaseElevationField, roomObjectBaseElevationUnit, roomObject.baseElevation(), LengthUnit.CENTIMETER);
                         roomObjectAngleField.setText(String.format(Locale.GERMAN, "%.2f", roomObject.rotationDegrees()));
                     });
@@ -8288,6 +8329,7 @@ public final class CadWorkbench extends BorderPane {
                             roomObject.visible(),
                             roomObject.source(),
                             currentRoomObjectBaseElevation(),
+                            currentRoomObjectHeatingType(roomObject.heatingType()),
                             currentRoomObjectHeatOutputWatts(roomObject.heatOutputWatts())
                     )
                             : roomObject)
@@ -9033,6 +9075,12 @@ public final class CadWorkbench extends BorderPane {
     }
 
     public void automationSetField(String fieldName, String value) {
+        if ("roomObjectHeatingType".equals(fieldName)) {
+            roomObjectHeatingTypeSelector.setValue(RoomObjectHeatingType.fromUserInput(value));
+            updatePropertySectionVisibility();
+            render();
+            return;
+        }
         textFieldByName(fieldName).setText(value);
         updatePropertySectionVisibility();
         render();
@@ -9228,6 +9276,7 @@ public final class CadWorkbench extends BorderPane {
             case "toggleSurfaceLayerVisibility" -> toggleSurfaceLayerVisibility();
             case "addSurfaceLayer" -> addSurfaceLayer();
             case "updateSurfaceLayer" -> updateSurfaceLayer();
+            case "editTerrainElevations" -> editTerrainElevations();
             case "rotateSelectedComponentsClockwise", "rotateSelectedStairsClockwise" -> rotateSelectedComponentsClockwise();
             case "rotateSelectedComponentsCounterClockwise", "rotateSelectedStairsCounterClockwise" -> rotateSelectedComponentsCounterClockwise();
             case "mirrorSelectedHeatingZonesHorizontally" -> mirrorSelectedHeatingZones(true);

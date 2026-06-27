@@ -28,6 +28,7 @@ final class HydronicHeatingLayoutSvgRenderer {
     private static final String WALL_STROKE = "#6b655d";
     private static final String ROOM_FILL = "#fffdf9";
     private static final String ROOM_STROKE = "#202020";
+    private static final String VARIOTHERM_PATTERN_ID = "variotherm-rinne";
     private static final WallSurfaceSideService WALL_SURFACE_SIDE_SERVICE = new WallSurfaceSideService();
     private static final WallPlanOutlineService WALL_PLAN_OUTLINE_SERVICE = new WallPlanOutlineService();
 
@@ -62,6 +63,7 @@ final class HydronicHeatingLayoutSvgRenderer {
         svg.append(String.format(Locale.US,
                 "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0.000 0.000 %.3f %.3f\">\n",
                 width, height));
+        appendVariothermPatternDefinition(svg);
         if (!roomWalls.isEmpty()) {
             svg.append("<g id=\"waende\" fill=\"").append(WALL_FILL).append("\" stroke=\"").append(WALL_STROKE)
                     .append("\" stroke-width=\"8\">\n");
@@ -76,7 +78,7 @@ final class HydronicHeatingLayoutSvgRenderer {
         appendOpenings(svg, room, floorOpenings, transform);
         appendExclusionAreas(svg, room, heatingExclusionAreas, transform);
         svg.append("</g>\n");
-        svg.append("<g id=\"variotherm-rinnen\" fill=\"none\" stroke=\"#9aa6ad\" stroke-width=\"2\">\n");
+        svg.append("<g id=\"variotherm-rinnen\" fill=\"url(#").append(VARIOTHERM_PATTERN_ID).append(")\" stroke=\"none\">\n");
         appendVariothermGrooves(svg, room, transform);
         svg.append("</g>\n");
         svg.append("<g id=\"heizbereiche\" fill=\"rgba(255,255,255,0.1)\" stroke=\"#315f8f\" stroke-width=\"5\" stroke-dasharray=\"35 20\">\n");
@@ -135,20 +137,25 @@ final class HydronicHeatingLayoutSvgRenderer {
         }
     }
 
-    private static void appendVariothermGrooves(StringBuilder svg, Room room, CoordinateTransform transform) {
-        Bounds bounds = bounds(room.outline());
+    private static void appendVariothermPatternDefinition(StringBuilder svg) {
         double pitch = SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS;
         double radius = (pitch - SurfaceCoveringPresetService.VARIOTHERM_PIPE_DIAMETER_MILLIMETERS) / 2.0;
-        for (double x = snapUp(bounds.minX(), pitch); x <= bounds.maxX() + EPSILON; x += pitch) {
-            for (double y = snapUp(bounds.minY(), pitch); y <= bounds.maxY() + EPSILON; y += pitch) {
-                PlanPoint center = new PlanPoint(x, y);
-                if (PlanPolygonSupport.containsPoint(room.outline(), center, EPSILON)) {
-                    svg.append(String.format(Locale.US,
-                            "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"%.3f\"/>\n",
-                            transform.x(x), transform.y(y), radius));
-                }
-            }
-        }
+        svg.append(String.format(Locale.US,
+                "<defs><pattern id=\"%s\" patternUnits=\"userSpaceOnUse\" x=\"0.000\" y=\"0.000\" width=\"%.3f\" height=\"%.3f\">",
+                VARIOTHERM_PATTERN_ID,
+                pitch,
+                pitch
+        ));
+        svg.append(String.format(Locale.US,
+                "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"%.3f\" fill=\"none\" stroke=\"#9aa6ad\" stroke-width=\"2\"/></pattern></defs>\n",
+                pitch / 2.0,
+                pitch / 2.0,
+                radius
+        ));
+    }
+
+    private static void appendVariothermGrooves(StringBuilder svg, Room room, CoordinateTransform transform) {
+        svg.append("<polygon points=\"").append(pointsAttribute(room.outline(), transform)).append("\"/>\n");
     }
 
     private static String pointsAttribute(List<PlanPoint> points, CoordinateTransform transform) {

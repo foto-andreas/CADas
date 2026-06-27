@@ -10,6 +10,7 @@ import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -25,7 +26,7 @@ class RoomHeatingOutputServiceTest {
     private final RoomHeatingOutputService service = new RoomHeatingOutputService();
 
     @Test
-    void summiertHeizkreiseUndHeizelementeProRaum() {
+    void summiertHeizkreiseObjektheizartenUndHeizelementeProRaum() {
         Level level = new Level("Erdgeschoss");
         Room room = Room.rectangular(
                 "Wohnen",
@@ -70,14 +71,54 @@ class RoomHeatingOutputServiceTest {
                 true,
                 "",
                 Length.zero(),
+                RoomObjectHeatingType.HEATING_ELEMENT,
                 900.0
+        ));
+        level.addRoomObject(new RoomObject(
+                UUID.randomUUID(),
+                "fbh-panel",
+                "FBH-Panel",
+                RoomObjectType.CUBOID,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(1_000, 1_500),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.of(5, LengthUnit.CENTIMETER),
+                0.0,
+                RoomObjectMountingMode.STANDS_ON_COVERING,
+                true,
+                "",
+                Length.zero(),
+                RoomObjectHeatingType.FLOOR_HEATING,
+                250.0
+        ));
+        level.addRoomObject(new RoomObject(
+                UUID.randomUUID(),
+                "wand-panel",
+                "Wandheizung",
+                RoomObjectType.CUBOID,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(3_200, 1_500),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.of(200, LengthUnit.CENTIMETER),
+                0.0,
+                RoomObjectMountingMode.WALL_MOUNTED,
+                true,
+                "",
+                Length.zero(),
+                RoomObjectHeatingType.SURFACE_HEATING,
+                180.0
         ));
 
         RoomHeatingOutputService.RoomHeatTotals totals = service.totals(level, room);
 
-        assertEquals(117.0, totals.surfaceHeatingWatts(), 0.2);
+        assertEquals(367.0, totals.floorHeatingWatts(), 0.2);
+        assertEquals(0.0, totals.ceilingHeatingWatts(), 0.001);
+        assertEquals(180.0, totals.additionalSurfaceHeatingWatts(), 0.001);
+        assertEquals(547.0, totals.surfaceHeatingWatts(), 0.2);
         assertEquals(900.0, totals.heatingElementWatts(), 0.001);
-        assertEquals(1_017.0, totals.totalHeatOutputWatts(), 0.2);
-        assertEquals(1, service.heatingElements(level, room).size());
+        assertEquals(1_447.0, totals.totalHeatOutputWatts(), 0.2);
+        assertEquals(3, service.heatingElements(level, room).size());
     }
 }

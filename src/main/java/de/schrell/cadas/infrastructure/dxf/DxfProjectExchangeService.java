@@ -22,6 +22,7 @@ import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -321,6 +322,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                 Boolean.parseBoolean(parts[14]),
                                 DxfMetadataCodec.decode(parts[15], encodedFields),
                                 Length.ofMillimeters(parts.length >= 18 ? parseDouble(parts[17]) : 0.0),
+                                RoomObjectHeatingType.fromStoredValue(parts.length >= 20 ? parts[19] : null, parts.length >= 19 ? parseDouble(parts[18]) : 0.0),
                                 parts.length >= 19 ? parseDouble(parts[18]) : 0.0
                         ));
                     }
@@ -613,7 +615,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f|%.3f",
+                    "OBJ|%s|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f|%.3f|%s",
                     DxfMetadataCodec.encode(level.name()),
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
@@ -631,7 +633,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     DxfMetadataCodec.encode(roomObject.source()),
                     roomObject.mountingMode().name(),
                     roomObject.baseElevation().toMillimeters(),
-                    roomObject.heatOutputWatts()
+                    roomObject.heatOutputWatts(),
+                    roomObject.heatingType().name()
             ));
         }
     }

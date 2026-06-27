@@ -15,10 +15,13 @@ import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
+import de.schrell.cadas.domain.model.Terrain;
+import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
@@ -1206,6 +1209,7 @@ class CadWorkbenchTest {
             instanz.automationSetField("roomObjectDepth", "80");
             instanz.automationSetField("roomObjectHeight", "240");
             instanz.automationSetField("roomObjectHeatOutput", "850");
+            instanz.automationSetField("roomObjectHeatingType", "DH");
             instanz.automationSetField("roomObjectBaseElevation", "-15");
             instanz.automationSetField("roomObjectAngle", "37,5");
             instanz.automationCanvasClick(900, 600, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
@@ -1217,12 +1221,14 @@ class CadWorkbenchTest {
         Assertions.assertEquals(800.0, placed.depth().toMillimeters(), 0.001);
         Assertions.assertEquals(2400.0, placed.height().toMillimeters(), 0.001);
         Assertions.assertEquals(850.0, placed.heatOutputWatts(), 0.001);
+        Assertions.assertEquals(RoomObjectHeatingType.CEILING_HEATING, placed.heatingType());
         Assertions.assertEquals(-150.0, placed.baseElevation().toMillimeters(), 0.001);
         Assertions.assertEquals(37.5, placed.rotationDegrees(), 0.001);
 
         aufFxThread(() -> {
             workbench.automationSetField("roomObjectWidth", "150");
             workbench.automationSetField("roomObjectHeatOutput", "1200");
+            workbench.automationSetField("roomObjectHeatingType", "Flächenheizung");
             workbench.automationSetField("roomObjectAngle", "-15");
             workbench.automationSetField("roomObjectBaseElevation", "25");
             workbench.automationInvoke("applySelectionProperties", null);
@@ -1232,6 +1238,7 @@ class CadWorkbenchTest {
         RoomObject edited = aufFxThread(() -> workbench.automationRoomObject(0));
         Assertions.assertEquals(1500.0, edited.width().toMillimeters(), 0.001);
         Assertions.assertEquals(1200.0, edited.heatOutputWatts(), 0.001);
+        Assertions.assertEquals(RoomObjectHeatingType.SURFACE_HEATING, edited.heatingType());
         Assertions.assertEquals(345.0, edited.rotationDegrees(), 0.001);
         Assertions.assertEquals(250.0, edited.baseElevation().toMillimeters(), 0.001);
     }
@@ -1823,6 +1830,38 @@ class CadWorkbenchTest {
                     .anyMatch("Gelände in 2D anzeigen"::equals));
             return null;
         });
+    }
+
+    @Test
+    void geländeBearbeitenFälltNachDateiladenAufGespeichertesGeländeZurück() throws Exception {
+        Path projektDatei = Files.createTempFile("cadas-gelaende-fallback", ".cadas");
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addWall(Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(3_000, 1_500)),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(2_600)
+        ));
+        project.defineTerrain(new Terrain(List.of(
+                new TerrainVertex(new PlanPoint(0, 0), Length.ofMillimeters(0)),
+                new TerrainVertex(new PlanPoint(4_000, 0), Length.ofMillimeters(200)),
+                new TerrainVertex(new PlanPoint(4_000, 3_000), Length.ofMillimeters(400)),
+                new TerrainVertex(new PlanPoint(0, 3_000), Length.ofMillimeters(100))
+        ), Length.ofMillimeters(1_800)));
+        new DxfProjectExchangeService().exportProject(project, projektDatei);
+
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetErrorDialogsEnabled(false);
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationInvoke("editTerrainElevations", null);
+            return instanz;
+        });
+
+        Assertions.assertFalse(aufFxThread(() -> workbench.automationSnapshot().statusText())
+                .contains("Geländehöhen benötigen mindestens drei äußere Gebäudeecken."));
     }
 
     @Test

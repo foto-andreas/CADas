@@ -20,6 +20,7 @@ import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -200,7 +201,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         for (RoomObject roomObject : level.roomObjects()) {
             appendMetadataText(dxf, context, roomObject.center(), String.format(
                     Locale.US,
-                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f|%.3f",
+                    "OBJ|%s|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f|%.3f|%s",
                     roomObject.id(),
                     DxfMetadataCodec.encode(roomObject.presetId()),
                     DxfMetadataCodec.encode(roomObject.name()),
@@ -217,7 +218,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     DxfMetadataCodec.encode(roomObject.source()),
                     roomObject.mountingMode().name(),
                     roomObject.baseElevation().toMillimeters(),
-                    roomObject.heatOutputWatts()
+                    roomObject.heatOutputWatts(),
+                    roomObject.heatingType().name()
             ));
         }
 
@@ -500,6 +502,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                             Boolean.parseBoolean(parts[13]),
                             DxfMetadataCodec.decode(parts[14], encodedFields),
                             Length.ofMillimeters(parts.length >= 17 ? parseDouble(parts[16]) : 0.0),
+                            RoomObjectHeatingType.fromStoredValue(parts.length >= 19 ? parts[18] : null, parts.length >= 18 ? parseDouble(parts[17]) : 0.0),
                             parts.length >= 18 ? parseDouble(parts[17]) : 0.0
                     ));
                     default -> {

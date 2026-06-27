@@ -21,6 +21,7 @@ public record RoomObject(
         boolean visible,
         String source,
         Length baseElevation,
+        RoomObjectHeatingType heatingType,
         double heatOutputWatts
 ) {
 
@@ -37,6 +38,7 @@ public record RoomObject(
         Objects.requireNonNull(mountingMode, "mountingMode darf nicht null sein.");
         Objects.requireNonNull(source, "source darf nicht null sein.");
         Objects.requireNonNull(baseElevation, "baseElevation darf nicht null sein.");
+        Objects.requireNonNull(heatingType, "heatingType darf nicht null sein.");
         if (width.toMillimeters() <= 0.0 || depth.toMillimeters() <= 0.0 || height.toMillimeters() <= 0.0) {
             throw new IllegalArgumentException("Objektmaße müssen größer als null sein.");
         }
@@ -62,9 +64,46 @@ public record RoomObject(
             double rotationDegrees,
             RoomObjectMountingMode mountingMode,
             boolean visible,
+            String source,
+            Length baseElevation,
+            double heatOutputWatts
+    ) {
+        this(
+                id,
+                presetId,
+                name,
+                type,
+                shape,
+                center,
+                width,
+                depth,
+                height,
+                rotationDegrees,
+                mountingMode,
+                visible,
+                source,
+                baseElevation,
+                RoomObjectHeatingType.defaultForLegacyHeatOutput(heatOutputWatts),
+                heatOutputWatts
+        );
+    }
+
+    public RoomObject(
+            UUID id,
+            String presetId,
+            String name,
+            RoomObjectType type,
+            RoomObjectShape shape,
+            PlanPoint center,
+            Length width,
+            Length depth,
+            Length height,
+            double rotationDegrees,
+            RoomObjectMountingMode mountingMode,
+            boolean visible,
             String source
     ) {
-        this(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, Length.zero(), 0.0);
+        this(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, Length.zero(), RoomObjectHeatingType.NONE, 0.0);
     }
 
     public RoomObject(
@@ -83,7 +122,7 @@ public record RoomObject(
             String source,
             Length baseElevation
     ) {
-        this(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, baseElevation, 0.0);
+        this(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, baseElevation, RoomObjectHeatingType.NONE, 0.0);
     }
 
     public RoomObject(
@@ -258,19 +297,26 @@ public record RoomObject(
     }
 
     public RoomObject withVisibility(boolean newVisibility) {
-        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, newVisibility, source, baseElevation, heatOutputWatts);
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, newVisibility, source, baseElevation, heatingType, heatOutputWatts);
     }
 
     public RoomObject withRotationDegrees(double newRotationDegrees) {
-        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, newRotationDegrees, mountingMode, visible, source, baseElevation, heatOutputWatts);
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, newRotationDegrees, mountingMode, visible, source, baseElevation, heatingType, heatOutputWatts);
     }
 
     public RoomObject withBaseElevation(Length newBaseElevation) {
-        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, newBaseElevation, heatOutputWatts);
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, newBaseElevation, heatingType, heatOutputWatts);
+    }
+
+    public RoomObject withHeatingType(RoomObjectHeatingType newHeatingType) {
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, baseElevation, Objects.requireNonNull(newHeatingType, "newHeatingType darf nicht null sein."), heatOutputWatts);
     }
 
     public RoomObject withHeatOutputWatts(double newHeatOutputWatts) {
-        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, baseElevation, newHeatOutputWatts);
+        RoomObjectHeatingType effectiveHeatingType = heatingType == RoomObjectHeatingType.NONE && newHeatOutputWatts > 0.0
+                ? RoomObjectHeatingType.HEATING_ELEMENT
+                : heatingType;
+        return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, visible, source, baseElevation, effectiveHeatingType, newHeatOutputWatts);
     }
 
     private static double normalizeDegrees(double degrees) {

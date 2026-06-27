@@ -59,6 +59,7 @@ class SurfaceMaterialListServiceTest {
         assertEquals(31.2, report.rooms().getFirst().volumeCubicMeters(), 0.001);
         assertEquals(12.0, report.rooms().getFirst().residentialAreaSquareMeters(), 0.001);
         assertTrue(report.toMarkdown().contains("Räume und Mietflächen nach WoFlV"));
+        assertTrue(report.toMarkdown().contains("### Erdgeschoss"));
         assertTrue(report.toMarkdown().contains("4,00 × 3,00 m"));
     }
 
@@ -135,6 +136,7 @@ class SurfaceMaterialListServiceTest {
         assertTrue(report.heatingPlans().getFirst().svg().contains("V1"));
         assertTrue(report.toMarkdown().contains("## Flächenheizungen"));
         assertTrue(report.toMarkdown().contains("## Heizelemente"));
+        assertTrue(report.toMarkdown().contains("| Raum | Objekt | Typ | Heizart | Leistung |"));
         assertTrue(report.toMarkdown().contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
         assertTrue(report.toMarkdown().contains("105 W"));
         assertTrue(report.toMarkdown().contains("Konvektor"));
