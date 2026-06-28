@@ -18,6 +18,7 @@ import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
+import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Terrain;
@@ -1552,6 +1553,67 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void ausgeblendeteObersteBodenebeneZeichnetWeiterDieGewählteSichtbareEbene() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3900, 2900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Decklage",
+                    Length.of(1.8, LengthUnit.CENTIMETER),
+                    Length.ofMillimeters(1_500),
+                    Length.ofMillimeters(1_000),
+                    SurfaceLayoutMode.NONE,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.ofMillimeters(120),
+                    ""
+            ).withVisibility(false));
+            stack.addLayer(SurfaceLayer.create(
+                    "Traglage",
+                    Length.of(1.8, LengthUnit.CENTIMETER),
+                    Length.ofMillimeters(1_000),
+                    Length.ofMillimeters(1_000),
+                    SurfaceLayoutMode.NONE,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.ofMillimeters(200),
+                    ""
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetViewport(1.0, 150.0, 120.0);
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSelectSurfaceLayer(1);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+
+        assertHervorgehobenerBelagImRaum(
+                image,
+                snapshot,
+                new PlanPoint(150, 150),
+                new PlanPoint(3_850, 2_850)
+        );
+    }
+
+    @Test
     void importierteInnenwandFliesenAktualisierenDie3dAnsichtMitFugen() throws Exception {
         Path projektDatei = erzeugeProjektMitInnenwandfliesenAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {
@@ -2092,6 +2154,29 @@ class CadWorkbenchTest {
             }
         }
         Assertions.assertTrue(darkOutlineFound, "Kein Pickkreis bei " + point + " gefunden.");
+    }
+
+    private void assertHervorgehobenerBelagImRaum(
+            WritableImage image,
+            WorkbenchAutomationSnapshot snapshot,
+            PlanPoint minPoint,
+            PlanPoint maxPoint
+    ) {
+        int minX = (int) Math.round(snapshot.offsetX() + minPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int maxX = (int) Math.round(snapshot.offsetX() + maxPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int minY = (int) Math.round(snapshot.offsetY() + minPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        int maxY = (int) Math.round(snapshot.offsetY() + maxPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        boolean highlightedJointFound = false;
+        for (int x = Math.max(0, minX); x <= Math.min((int) image.getWidth() - 1, maxX); x++) {
+            for (int y = Math.max(0, minY); y <= Math.min((int) image.getHeight() - 1, maxY); y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                highlightedJointFound |= color.getRed() > 0.65
+                        && color.getGreen() > 0.15
+                        && color.getGreen() < 0.45
+                        && color.getBlue() < 0.18;
+            }
+        }
+        Assertions.assertTrue(highlightedJointFound, "Kein hervorgehobener Belag im Raumbereich gefunden.");
     }
 
     private Path erzeugeProjektMitInnenwandfliesenAlsDxf() throws Exception {

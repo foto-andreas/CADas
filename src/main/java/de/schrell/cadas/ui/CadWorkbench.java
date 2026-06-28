@@ -3825,8 +3825,8 @@ public final class CadWorkbench extends BorderPane {
         if (stack == null || stack.layers().isEmpty()) {
             return;
         }
-        SurfaceLayer layer = stack.layers().getFirst();
-        if (!layer.visible()) {
+        SurfaceLayer baseLayer = firstVisibleSurfaceLayer(stack).orElse(null);
+        if (baseLayer == null) {
             return;
         }
         SurfaceLayer highlightedLayer = stack.layers().stream()
@@ -3834,10 +3834,17 @@ public final class CadWorkbench extends BorderPane {
                 .filter(candidate -> isSelectedSurfaceLayer(stack, candidate))
                 .findFirst()
                 .orElse(null);
-        drawRoomTileLayer(graphics, room, layer, false);
-        if (highlightedLayer != null) {
+        boolean baseLayerSelected = highlightedLayer != null && highlightedLayer.id().equals(baseLayer.id());
+        drawRoomTileLayer(graphics, room, baseLayer, baseLayerSelected);
+        if (highlightedLayer != null && !baseLayerSelected) {
             drawRoomTileLayer(graphics, room, highlightedLayer, true);
         }
+    }
+
+    private Optional<SurfaceLayer> firstVisibleSurfaceLayer(SurfaceLayerStack stack) {
+        return stack.layers().stream()
+                .filter(this::isVisibleSurfaceLayer)
+                .findFirst();
     }
 
     private void drawRoomTileLayer(GraphicsContext graphics, Room room, SurfaceLayer layer, boolean highlighted) {
@@ -6929,9 +6936,14 @@ public final class CadWorkbench extends BorderPane {
             updateActionButtons();
             return;
         }
+        int previousSelection = surfaceLayerList.getSelectionModel().getSelectedIndex();
         surfaceLayerList.getItems().setAll(stack.get().layers().stream().map(this::describeSurfaceLayer).toList());
-        if (!surfaceLayerList.getItems().isEmpty() && surfaceLayerList.getSelectionModel().getSelectedIndex() < 0) {
+        if (surfaceLayerList.getItems().isEmpty()) {
+            surfaceLayerList.getSelectionModel().clearSelection();
+        } else if (previousSelection < 0) {
             surfaceLayerList.getSelectionModel().selectFirst();
+        } else {
+            surfaceLayerList.getSelectionModel().select(Math.min(previousSelection, surfaceLayerList.getItems().size() - 1));
         }
         syncInputsFromSelectedSurfaceLayer();
         updateActionButtons();
