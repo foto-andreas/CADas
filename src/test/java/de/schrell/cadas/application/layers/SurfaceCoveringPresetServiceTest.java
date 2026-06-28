@@ -26,6 +26,8 @@ class SurfaceCoveringPresetServiceTest {
         assertEquals(18.0, preset.thickness().toMillimeters(), 0.001);
         assertEquals(600.0, preset.tileWidth().toMillimeters(), 0.001);
         assertEquals(1_000.0, preset.tileHeight().toMillimeters(), 0.001);
+        assertEquals(200.0, preset.offset().toMillimeters(), 0.001);
+        assertEquals(100.0, preset.minimumOffset().toMillimeters(), 0.001);
         assertEquals(SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE, preset.coveringSource());
     }
 

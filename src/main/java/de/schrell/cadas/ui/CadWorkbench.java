@@ -107,6 +107,7 @@ import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
 import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
@@ -3888,15 +3889,14 @@ public final class CadWorkbench extends BorderPane {
         if (stack == null || stack.layers().isEmpty()) {
             return;
         }
-        SurfaceLayer baseLayer = firstVisibleSurfaceLayer(stack).orElse(null);
-        if (baseLayer == null) {
-            return;
-        }
         SurfaceLayer highlightedLayer = stack.layers().stream()
-                .filter(this::isVisibleSurfaceLayer)
                 .filter(candidate -> isSelectedSurfaceLayer(stack, candidate))
                 .findFirst()
                 .orElse(null);
+        SurfaceLayer baseLayer = firstVisibleSurfaceLayer(stack).orElse(highlightedLayer);
+        if (baseLayer == null) {
+            return;
+        }
         boolean baseLayerSelected = highlightedLayer != null && highlightedLayer.id().equals(baseLayer.id());
         drawRoomTileLayer(graphics, room, baseLayer, baseLayerSelected);
         if (highlightedLayer != null && !baseLayerSelected) {
@@ -3952,7 +3952,7 @@ public final class CadWorkbench extends BorderPane {
                     && SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource())
                     && scale() * SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS
                     >= VARIOTHERM_DETAIL_MIN_SCREEN_SPACING) {
-                drawVariothermPanelGrooves(graphics, tx, ty, tw, th);
+                drawVariothermPanelGrooves(graphics, layer, tx, ty, tw, th);
             }
         }
         if (highlighted) {
@@ -3970,17 +3970,61 @@ public final class CadWorkbench extends BorderPane {
         graphics.restore();
     }
 
-    private void drawVariothermPanelGrooves(GraphicsContext graphics, double tileX, double tileY, double tileWidth, double tileHeight) {
+    private void drawVariothermPanelGrooves(GraphicsContext graphics, SurfaceLayer layer, double tileX, double tileY, double tileWidth, double tileHeight) {
         double pitch = SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS;
         double radius = Math.max(1.0, (pitch - SurfaceCoveringPresetService.VARIOTHERM_PIPE_DIAMETER_MILLIMETERS) / 2.0);
         double pitchPixels = pitch * scale();
         double radiusPixels = radius * scale();
+        double patternOriginX = variothermPatternOrigin(
+                tileX,
+                tileWidth,
+                layer.effectiveTileWidth().toMillimeters(),
+                pitch,
+                startsAtMaximumX(layer.layoutAnchor())
+        );
+        double patternOriginY = variothermPatternOrigin(
+                tileY,
+                tileHeight,
+                layer.effectiveTileHeight().toMillimeters(),
+                pitch,
+                startsAtMaximumY(layer.layoutAnchor())
+        );
         double screenX = toScreenX(tileX);
         double screenY = toScreenY(tileY);
         graphics.save();
-        graphics.setFill(variothermGroovePattern(screenX, screenY, pitchPixels, radiusPixels));
+        graphics.setFill(variothermGroovePattern(toScreenX(patternOriginX), toScreenY(patternOriginY), pitchPixels, radiusPixels));
         graphics.fillRect(screenX, screenY, tileWidth * scale(), tileHeight * scale());
         graphics.restore();
+    }
+
+    private double variothermPatternOrigin(
+            double tileStart,
+            double visibleTileSize,
+            double fullTileSize,
+            double pitch,
+            boolean startsAtMaximumSide
+    ) {
+        if (!startsAtMaximumSide || visibleTileSize >= fullTileSize - 0.001) {
+            return tileStart;
+        }
+        double trimmedAtStart = modulo(fullTileSize - visibleTileSize, pitch);
+        return tileStart - trimmedAtStart;
+    }
+
+    private boolean startsAtMaximumX(SurfaceLayoutAnchor anchor) {
+        return anchor == SurfaceLayoutAnchor.MAX_X_MIN_Y || anchor == SurfaceLayoutAnchor.MAX_X_MAX_Y;
+    }
+
+    private boolean startsAtMaximumY(SurfaceLayoutAnchor anchor) {
+        return anchor == SurfaceLayoutAnchor.MAX_X_MAX_Y || anchor == SurfaceLayoutAnchor.MIN_X_MAX_Y;
+    }
+
+    private double modulo(double value, double modulus) {
+        if (Math.abs(modulus) <= 0.001) {
+            return 0.0;
+        }
+        double result = value % modulus;
+        return result < 0.0 ? result + modulus : result;
     }
 
     private ImagePattern variothermGroovePattern(double tileScreenX, double tileScreenY, double pitchPixels, double radiusPixels) {

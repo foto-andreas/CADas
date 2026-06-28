@@ -19,7 +19,10 @@ import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
+import de.schrell.cadas.domain.model.SurfaceCutRestriction;
+import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
+import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Terrain;
@@ -1649,6 +1652,67 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void gewaehlteAusgeblendeteBodenebeneBleibtTrotzSichtbarerDecklageHervorgehoben() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3900, 2900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Traglage",
+                    Length.of(1.8, LengthUnit.CENTIMETER),
+                    Length.ofMillimeters(1_000),
+                    Length.ofMillimeters(1_000),
+                    SurfaceLayoutMode.NONE,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.ofMillimeters(200),
+                    ""
+            ).withVisibility(false));
+            stack.addLayer(SurfaceLayer.create(
+                    "Decklage",
+                    Length.of(1.8, LengthUnit.CENTIMETER),
+                    Length.ofMillimeters(1_500),
+                    Length.ofMillimeters(1_000),
+                    SurfaceLayoutMode.NONE,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.ofMillimeters(120),
+                    ""
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetViewport(1.0, 150.0, 120.0);
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSelectSurfaceLayer(0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+
+        assertHervorgehobenerBelagImRaum(
+                image,
+                snapshot,
+                new PlanPoint(150, 150),
+                new PlanPoint(3_850, 2_850)
+        );
+    }
+
+    @Test
     void variothermKreiseLassenSichGlobalAusblenden() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -1706,6 +1770,61 @@ class CadWorkbenchTest {
 
         Assertions.assertTrue(sichtbareKreisPixel > 120, "Variotherm-Kreise wurden nicht sichtbar gezeichnet.");
         Assertions.assertTrue(ausgeblendeteKreisPixel < sichtbareKreisPixel / 5, "Variotherm-Kreise bleiben trotz globalem Abschalten sichtbar.");
+    }
+
+    @Test
+    void variothermAussenschnittZeigtVolleKreiseAufDerInnenseite() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(950, 1_100),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Variotherm",
+                    Length.of(18, LengthUnit.MILLIMETER),
+                    Length.of(60, LengthUnit.CENTIMETER),
+                    Length.of(100, LengthUnit.CENTIMETER),
+                    SurfaceLayoutMode.FIXED,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.zero(),
+                    SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
+                    SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE
+            ).withLayoutOrientation(SurfaceLayoutRotation.DEGREES_0, SurfaceLayoutDirection.RIGHT_TO_LEFT));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetViewport(3.0, 30.0, 30.0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+        int aussenkante = countVariothermCirclePixels(
+                image,
+                snapshot,
+                new PlanPoint(110, 180),
+                new PlanPoint(145, 1_020)
+        );
+        int innenbereich = countVariothermCirclePixels(
+                image,
+                snapshot,
+                new PlanPoint(190, 180),
+                new PlanPoint(320, 1_020)
+        );
+
+        Assertions.assertTrue(innenbereich > 80, "Im inneren Bereich des Außenschnitts fehlen die vollen Variotherm-Kreise.");
+        Assertions.assertTrue(aussenkante * 3 < innenbereich, "An der äußeren Schnittkante werden weiterhin zu viele volle Variotherm-Kreise gezeichnet.");
     }
 
     @Test
