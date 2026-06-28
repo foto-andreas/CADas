@@ -282,7 +282,7 @@ public final class CadWorkbench extends BorderPane {
     private final GuideSnapService guideSnapService = new GuideSnapService();
     private final WallSnapService wallSnapService = new WallSnapService();
     private final SelectionQueryService selectionQueryService = new SelectionQueryService();
-    private final ExchangeFileNameService exchangeFileNameService = new ExchangeFileNameService();
+    final ExchangeFileNameService exchangeFileNameService = new ExchangeFileNameService();
     private final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     private final WallEditingService wallEditingService = new WallEditingService();
     private final WallDimensionService wallDimensionService = new WallDimensionService();
@@ -312,16 +312,17 @@ public final class CadWorkbench extends BorderPane {
     private final TwoDZoomRange twoDZoomRange = new TwoDZoomRange();
     private final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     private final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
-    private final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
-    private final ConstructionDrawingPdfService constructionDrawingPdfService = new ConstructionDrawingPdfService();
-    private final HelpContentService helpContentService = new HelpContentService();
-    private final MarkdownNavigationService markdownNavigationService = new MarkdownNavigationService();
-    private final MarkdownHtmlRenderer markdownHtmlRenderer = new MarkdownHtmlRenderer();
+    final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
+    final ConstructionDrawingPdfService constructionDrawingPdfService = new ConstructionDrawingPdfService();
+    final HelpContentService helpContentService = new HelpContentService();
+    final MarkdownNavigationService markdownNavigationService = new MarkdownNavigationService();
+    final MarkdownHtmlRenderer markdownHtmlRenderer = new MarkdownHtmlRenderer();
     private final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     private final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
     private final DwgLibraryAnalyzer dwgLibraryAnalyzer = new DwgLibraryAnalyzer();
+    private final CadWorkbenchDocumentSupport documentSupport = new CadWorkbenchDocumentSupport(this);
     private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
-    private final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
+    final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
 
     private final ObjectProperty<Level> activeLevel = new SimpleObjectProperty<>(project.primaryLevel());
     private final ObjectProperty<ViewOrientation> activeView = new SimpleObjectProperty<>(ViewOrientation.TOP);
@@ -330,9 +331,9 @@ public final class CadWorkbench extends BorderPane {
     private final BooleanProperty showGrid = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToEndpoints = new SimpleBooleanProperty(true);
     private final BooleanProperty showCompass = new SimpleBooleanProperty(true);
-    private final BooleanProperty showDimensions = new SimpleBooleanProperty(true);
+    final BooleanProperty showDimensions = new SimpleBooleanProperty(true);
     private final ObjectProperty<DimensionTextStyle> dimensionTextStyle = new SimpleObjectProperty<>(DimensionTextStyle.LENGTH_ONLY);
-    private final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
+    final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
     private final BooleanProperty showRoomObjects = new SimpleBooleanProperty(true);
     private final BooleanProperty showTerrainInPlan = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
@@ -521,7 +522,7 @@ public final class CadWorkbench extends BorderPane {
 
     private final Label zoomLabel = new Label();
     private final Label cursorLabel = new Label();
-    private final Label draftLabel = new Label();
+    final Label draftLabel = new Label();
     private final Label viewLabel = new Label();
 
     private final ObservableList<GuideLine> guideLines = FXCollections.observableArrayList();
@@ -582,7 +583,7 @@ public final class CadWorkbench extends BorderPane {
     private boolean spacePressed;
     // Steuert alle blockierenden UI-Dialoge (Fehler-, Bestätigungs-, Erfolgs- und Eingabedialoge).
     // Wird durch die Automatisierung deaktiviert, damit Tests nicht an Dialogen hängen bleiben.
-    private boolean interactiveDialogsEnabled = true;
+    boolean interactiveDialogsEnabled = true;
     private boolean applicationExitRequested;
     private boolean applicationExitConfirmed;
     private Boolean automatedUnsavedChangesExitDecision;
@@ -1691,7 +1692,7 @@ public final class CadWorkbench extends BorderPane {
         showErrorDialog(title, header, content, throwable);
     }
 
-    private void showOperationException(String title, Throwable throwable) {
+    void showOperationException(String title, Throwable throwable) {
         String content = UiErrorDialogs.userMessage(throwable);
         draftLabel.setText(title + ": " + content);
         showErrorDialog(title, title, content, throwable);
@@ -1706,7 +1707,7 @@ public final class CadWorkbench extends BorderPane {
         UiErrorDialogs.show(lastErrorDialog, currentWindow(), interactiveDialogsEnabled);
     }
 
-    private Window currentWindow() {
+    Window currentWindow() {
         return getScene() != null ? getScene().getWindow() : null;
     }
 
@@ -3088,7 +3089,7 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
-    private DimensionLabelOptions currentDimensionLabelOptions() {
+    DimensionLabelOptions currentDimensionLabelOptions() {
         return new DimensionLabelOptions(dimensionTextStyle.get());
     }
 
@@ -5123,7 +5124,7 @@ public final class CadWorkbench extends BorderPane {
         };
     }
 
-    private void applyTooltip(javafx.scene.Node node, String text) {
+    void applyTooltip(javafx.scene.Node node, String text) {
         Tooltip tooltip = new Tooltip(text);
         tooltip.setWrapText(true);
         tooltip.setMaxWidth(320);
@@ -5802,175 +5803,51 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void showSurfaceMaterialReportWindow() {
-        String markdown = surfaceMaterialListService.create(project).toMarkdown();
-        WebView reportView = new WebView();
-        reportView.getEngine().loadContent(markdownHtmlRenderer.renderDocument(markdown));
-        VBox.setVgrow(reportView, Priority.ALWAYS);
-        Button exportButton = new Button("Markdown exportieren");
-        exportButton.setOnAction(event -> exportSurfaceMaterialReportMarkdown());
-        applyTooltip(exportButton, "Exportiert genau diese Materialliste als Markdown-Datei.");
-        Button printButton = new Button("Drucken");
-        printButton.setOnAction(event -> printSurfaceMaterialReport(reportView));
-        applyTooltip(printButton, "Druckt die gerenderte Materialliste so, wie sie in diesem Fenster angezeigt wird.");
-        HBox actions = new HBox(8.0, printButton, exportButton);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-        VBox container = new VBox(10.0, reportView, actions);
-        container.setPadding(new Insets(12));
-        Stage stage = new Stage();
-        stage.setTitle("Räume und Materialien");
-        Window owner = getScene() != null ? getScene().getWindow() : null;
-        if (owner != null) {
-            stage.initOwner(owner);
-        }
-        stage.setScene(new Scene(container, 920, 680));
-        stage.show();
+        documentSupport.showSurfaceMaterialReportWindow();
     }
 
     private void exportConstructionDrawingPdf() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Maßstabgerechte Bauzeichnung als PDF speichern");
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
-        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName + "_Bauzeichnung.pdf");
-        Window owner = getScene() != null ? getScene().getWindow() : null;
-        java.io.File file = fileChooser.showSaveDialog(owner);
-        if (file == null) {
-            return;
-        }
-        try {
-            Path target = exchangeFileNameService.ensureSingleExtension(file.toPath(), ".pdf");
-            ConstructionDrawingOptions options = new ConstructionDrawingOptions(
-                    currentDimensionLabelOptions(),
-                    showDimensions.get(),
-                    showAreaVolume.get()
-            );
-            constructionDrawingPdfService.export(project, target, options);
-            draftLabel.setText("Bauzeichnungs-PDF exportiert: " + target.getFileName());
-        } catch (Exception exception) {
-            showOperationException("PDF-Export fehlgeschlagen", exception);
-        }
+        documentSupport.exportConstructionDrawingPdf();
     }
 
     private void showHelpWindow() {
-        showMarkdownWindow(helpContentService.createMarkdown(), "CADas-Benutzerdokumentation", "Benutzerdokumentation", "Druckt die vollständige Benutzerdokumentation. Im Druckdialog kann auch ein PDF-Drucker gewählt werden.");
+        documentSupport.showHelpWindow();
     }
 
     private void showKeymapWindow() {
-        showMarkdownWindow(helpContentService.createKeymapMarkdown(), "CADas-Keymap und Mausbedienung", "Keymap und Mausbedienung", "Druckt die Tastaturkürzel und Mausbedienung. Im Druckdialog kann auch ein PDF-Drucker gewählt werden.");
+        documentSupport.showKeymapWindow();
     }
 
     private void showThirdPartyLicensesWindow() {
-        showMarkdownWindow(helpContentService.createThirdPartyLicensesMarkdown(), "CADas-Drittanbieter-Lizenzen", "Drittanbieter-Lizenzen", "Druckt die automatisch erzeugte Liste aller Drittanbieter-Lizenzen.");
+        documentSupport.showThirdPartyLicensesWindow();
     }
 
     public void showAboutDialog() {
-        if (!interactiveDialogsEnabled) {
-            return;
-        }
-        AboutInformation information = AboutInformation.current();
-        Alert alert = new Alert(Alert.AlertType.INFORMATION, information.detailText(), ButtonType.OK);
-        alert.setTitle("Über CADas");
-        alert.setHeaderText(information.applicationName());
-        Window owner = currentWindow();
-        if (owner != null) {
-            alert.initOwner(owner);
-        }
-        alert.showAndWait();
+        documentSupport.showAboutDialog();
     }
 
     private void showMarkdownWindow(String markdown, String windowTitle, String documentName, String printTooltip) {
-        WebView view = new WebView();
-        view.getEngine().loadContent(markdownHtmlRenderer.renderDocument(markdown));
-        VBox.setVgrow(view, Priority.ALWAYS);
-        ComboBox<HelpSection> sectionSelector = new ComboBox<>();
-        sectionSelector.getItems().setAll(markdownNavigationService.sections(markdown));
-        sectionSelector.setPromptText("Inhaltsverzeichnis");
-        sectionSelector.setPrefWidth(300);
-        sectionSelector.setOnAction(event -> Optional.ofNullable(sectionSelector.getValue())
-                .ifPresent(section -> view.getEngine().executeScript(
-                        "document.getElementById('" + section.anchor() + "').scrollIntoView({behavior:'smooth',block:'start'});"
-                )));
-        applyTooltip(sectionSelector, "Listet alle Kapitel und Unterkapitel auf und springt direkt zum gewählten Abschnitt der Dokumentation.");
-        TextField searchField = new TextField();
-        searchField.setPromptText("Dokumentation durchsuchen");
-        searchField.setPrefWidth(260);
-        applyTooltip(searchField, "Sucht im vollständigen Text der geöffneten Dokumentation. Mit Eingabe oder Weiter wird der nächste Treffer markiert.");
-        Button previousButton = new Button("Zurück");
-        previousButton.setOnAction(event -> findInWebView(view, searchField.getText(), true));
-        applyTooltip(previousButton, "Springt rückwärts zum vorherigen Treffer des eingegebenen Suchbegriffs.");
-        Button nextButton = new Button("Weiter");
-        nextButton.setOnAction(event -> findInWebView(view, searchField.getText(), false));
-        applyTooltip(nextButton, "Springt vorwärts zum nächsten Treffer des eingegebenen Suchbegriffs.");
-        searchField.setOnAction(event -> findInWebView(view, searchField.getText(), false));
-        HBox navigation = new HBox(8.0, sectionSelector, searchField, previousButton, nextButton);
-        navigation.setAlignment(Pos.CENTER_LEFT);
-        Button printButton = new Button("Drucken");
-        printButton.setOnAction(event -> printWebView(view, documentName));
-        applyTooltip(printButton, printTooltip);
-        HBox actions = new HBox(8.0, printButton);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-        VBox container = new VBox(10.0, navigation, view, actions);
-        container.setPadding(new Insets(12));
-        Stage stage = new Stage();
-        stage.setTitle(windowTitle);
-        Window owner = getScene() != null ? getScene().getWindow() : null;
-        if (owner != null) {
-            stage.initOwner(owner);
-        }
-        stage.setScene(new Scene(container, 960, 760));
-        stage.show();
+        documentSupport.showMarkdownWindow(markdown, windowTitle, documentName, printTooltip);
     }
 
     private void findInWebView(WebView view, String searchText, boolean backwards) {
-        if (searchText == null || searchText.isBlank()) {
-            return;
-        }
-        String escaped = searchText.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
-        view.getEngine().executeScript("window.find('" + escaped + "',false," + backwards + ",true,false,true,false);");
+        documentSupport.findInWebView(view, searchText, backwards);
     }
 
     private void printSurfaceMaterialReport(WebView reportView) {
-        printWebView(reportView, "Materialliste");
+        documentSupport.printSurfaceMaterialReport(reportView);
     }
 
     private void printWebView(WebView reportView, String documentName) {
-        PrinterJob printerJob = PrinterJob.createPrinterJob();
-        if (printerJob == null) {
-            draftLabel.setText("Kein Drucker verfügbar.");
-            return;
-        }
-        Window owner = getScene() != null ? getScene().getWindow() : null;
-        if (interactiveDialogsEnabled && !printerJob.showPrintDialog(owner)) {
-            draftLabel.setText("Druck abgebrochen.");
-            return;
-        }
-        reportView.getEngine().print(printerJob);
-        printerJob.endJob();
-        draftLabel.setText(documentName + " an Drucker übergeben.");
+        documentSupport.printWebView(reportView, documentName);
     }
 
     private void exportSurfaceMaterialReportMarkdown() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Materialliste als Markdown speichern");
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Markdown-Dateien", "*.md"));
-        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName + "_Räume_und_Material");
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        java.io.File file = fileChooser.showSaveDialog(window);
-        if (file == null) {
-            return;
-        }
-        exportSurfaceMaterialReportMarkdown(file.toPath());
+        documentSupport.exportSurfaceMaterialReportMarkdown();
     }
 
     private void exportSurfaceMaterialReportMarkdown(Path targetFile) {
-        try {
-            Path exportPath = exchangeFileNameService.ensureSingleExtension(targetFile, ".md");
-            Files.writeString(exportPath, surfaceMaterialListService.create(project).toMarkdown());
-            draftLabel.setText("Materialliste exportiert: " + exportPath.getFileName());
-        } catch (Exception exception) {
-            showOperationException("Materiallisten-Export fehlgeschlagen", exception);
-        }
+        documentSupport.exportSurfaceMaterialReportMarkdown(targetFile);
     }
 
     private void importLevel() {
