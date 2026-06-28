@@ -140,6 +140,7 @@ import java.util.Optional;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 
@@ -9197,56 +9198,24 @@ public final class CadWorkbench extends BorderPane {
 
     public void automationSelect(String kindName, int index, boolean toggle) {
         SelectionKey selectionKey = switch (kindName.trim().toUpperCase(Locale.ROOT)) {
-            case "WALL" -> activeLevel.get().walls().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(wall -> new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("Wandindex `" + index + "` ist ungültig."));
-            case "ROOM", "ROOM_VOLUME" -> activeLevel.get().rooms().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(room -> new SelectionKey(RenderableKind.ROOM_VOLUME, activeLevel.get().name(), room.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("Raumindex `" + index + "` ist ungültig."));
-            case "DOOR" -> activeLevel.get().doors().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(door -> new SelectionKey(RenderableKind.DOOR, activeLevel.get().name(), door.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("Türindex `" + index + "` ist ungültig."));
-            case "WINDOW" -> activeLevel.get().windows().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(window -> new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("Fensterindex `" + index + "` ist ungültig."));
-            case "STAIR" -> activeLevel.get().staircases().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(stair -> new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), stair.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("Treppenindex `" + index + "` ist ungültig."));
-            case "OBJECT", "ROOM_OBJECT" -> activeLevel.get().roomObjects().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(roomObject -> new SelectionKey(RenderableKind.ROOM_OBJECT, activeLevel.get().name(), roomObject.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("Objektindex `" + index + "` ist ungültig."));
-            case "FLOOR_EXTENSION", "BALCONY", "GALLERY" -> activeLevel.get().floorExtensions().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(extension -> new SelectionKey(RenderableKind.FLOOR_EXTENSION, activeLevel.get().name(), extension.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("Balkon-/Emporenindex `" + index + "` ist ungültig."));
-            case "FLOOR_OPENING" -> activeLevel.get().floorOpenings().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(opening -> new SelectionKey(RenderableKind.FLOOR_OPENING, activeLevel.get().name(), opening.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("Bodenöffnungsindex `" + index + "` ist ungültig."));
-            case "HEATING_EXCLUSION", "HEATING_EXCLUSION_AREA" -> activeLevel.get().heatingExclusionAreas().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(area -> new SelectionKey(RenderableKind.HEATING_EXCLUSION, activeLevel.get().name(), area.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("FBH-Sperrflächenindex `" + index + "` ist ungültig."));
-            case "HEATING_MANIFOLD", "HKV" -> activeLevel.get().hydronicHeatings().stream()
-                    .skip(index)
-                    .findFirst()
-                    .map(heating -> new SelectionKey(RenderableKind.HEATING_MANIFOLD, activeLevel.get().name(), heating.id().toString()))
-                    .orElseThrow(() -> new IllegalArgumentException("HKV-Index `" + index + "` ist ungültig."));
+            case "WALL" -> selectionKeyByIndex(activeLevel.get().walls(), index, RenderableKind.WALL, Wall::id, "Wandindex");
+            case "ROOM", "ROOM_VOLUME" -> selectionKeyByIndex(activeLevel.get().rooms(), index, RenderableKind.ROOM_VOLUME, Room::id, "Raumindex");
+            case "DOOR" -> selectionKeyByIndex(activeLevel.get().doors(), index, RenderableKind.DOOR, Door::id, "Türindex");
+            case "WINDOW" -> selectionKeyByIndex(activeLevel.get().windows(), index, RenderableKind.WINDOW, WindowElement::id, "Fensterindex");
+            case "STAIR" -> selectionKeyByIndex(activeLevel.get().staircases(), index, RenderableKind.STAIR, Staircase::id, "Treppenindex");
+            case "OBJECT", "ROOM_OBJECT" -> selectionKeyByIndex(activeLevel.get().roomObjects(), index, RenderableKind.ROOM_OBJECT, RoomObject::id, "Objektindex");
+            case "FLOOR_EXTENSION", "BALCONY", "GALLERY" -> selectionKeyByIndex(
+                    activeLevel.get().floorExtensions(), index, RenderableKind.FLOOR_EXTENSION, FloorExtension::id, "Balkon-/Emporenindex"
+            );
+            case "FLOOR_OPENING" -> selectionKeyByIndex(
+                    activeLevel.get().floorOpenings(), index, RenderableKind.FLOOR_OPENING, FloorOpening::id, "Bodenöffnungsindex"
+            );
+            case "HEATING_EXCLUSION", "HEATING_EXCLUSION_AREA" -> selectionKeyByIndex(
+                    activeLevel.get().heatingExclusionAreas(), index, RenderableKind.HEATING_EXCLUSION, HeatingExclusionArea::id, "FBH-Sperrflächenindex"
+            );
+            case "HEATING_MANIFOLD", "HKV" -> selectionKeyByIndex(
+                    activeLevel.get().hydronicHeatings(), index, RenderableKind.HEATING_MANIFOLD, HydronicHeating::id, "HKV-Index"
+            );
             default -> throw new IllegalArgumentException("Bauteilart `" + kindName + "` wird von der Automatisierung nicht unterstützt.");
         };
         updateSelection(selectionKey, toggle);
@@ -9476,116 +9445,69 @@ public final class CadWorkbench extends BorderPane {
             case "exportSurfaceMaterialReportMarkdown" -> exportSurfaceMaterialReportMarkdown(requirePath(path, actionName));
             case "importPartLibrary" -> importPartLibrary(requirePath(path, actionName));
             case "exportWorkbenchSnapshot" -> exportWorkbenchSnapshot(requirePath(path, actionName));
-            case "exportThreeDSnapshot" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.exportSnapshot(requirePath(path, actionName));
-            }
-            case "exportSubSceneSnapshot" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.exportSubSceneSnapshot(requirePath(path, actionName));
-            }
-            case "threeDOrbitLeft" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationOrbit(-15.0, 0.0);
-            }
-            case "threeDOrbitRight" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationOrbit(15.0, 0.0);
-            }
-            case "threeDOrbitUp" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationOrbit(0.0, 8.0);
-            }
-            case "threeDOrbitDown" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationOrbit(0.0, -8.0);
-            }
-            case "threeDPanRight" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationPan(90.0, 0.0);
-            }
-            case "threeDPanLeft" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationPan(-90.0, 0.0);
-            }
-            case "threeDPanUp" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationPan(0.0, -60.0);
-            }
-            case "threeDPanDown" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationPan(0.0, 60.0);
-            }
-            case "threeDZoomIn" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationZoom(0.92);
-            }
-            case "threeDZoomOut" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationZoom(1.08);
-            }
-            case "threeDFit" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.automationFitToScene();
-            }
-            case "threeDReset" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
-                threeDViewport.resetToDefaultView();
-            }
-            case "threeDViewportReset" -> {
-                refreshThreeDIfNeeded();
-                threeDViewport.resetToDefaultView();
-            }
+            case "exportThreeDSnapshot" -> runPreparedThreeDAction(false, () -> threeDViewport.exportSnapshot(requirePath(path, actionName)));
+            case "exportSubSceneSnapshot" -> runPreparedThreeDAction(false, () -> threeDViewport.exportSubSceneSnapshot(requirePath(path, actionName)));
+            case "threeDOrbitLeft" -> runPreparedThreeDAction(false, () -> threeDViewport.automationOrbit(-15.0, 0.0));
+            case "threeDOrbitRight" -> runPreparedThreeDAction(false, () -> threeDViewport.automationOrbit(15.0, 0.0));
+            case "threeDOrbitUp" -> runPreparedThreeDAction(false, () -> threeDViewport.automationOrbit(0.0, 8.0));
+            case "threeDOrbitDown" -> runPreparedThreeDAction(false, () -> threeDViewport.automationOrbit(0.0, -8.0));
+            case "threeDPanRight" -> runPreparedThreeDAction(false, () -> threeDViewport.automationPan(90.0, 0.0));
+            case "threeDPanLeft" -> runPreparedThreeDAction(false, () -> threeDViewport.automationPan(-90.0, 0.0));
+            case "threeDPanUp" -> runPreparedThreeDAction(false, () -> threeDViewport.automationPan(0.0, -60.0));
+            case "threeDPanDown" -> runPreparedThreeDAction(false, () -> threeDViewport.automationPan(0.0, 60.0));
+            case "threeDZoomIn" -> runPreparedThreeDAction(false, () -> threeDViewport.automationZoom(0.92));
+            case "threeDZoomOut" -> runPreparedThreeDAction(false, () -> threeDViewport.automationZoom(1.08));
+            case "threeDFit" -> runPreparedThreeDAction(true, threeDViewport::automationFitToScene);
+            case "threeDReset" -> runPreparedThreeDAction(true, threeDViewport::resetToDefaultView);
+            case "threeDViewportReset" -> runPreparedThreeDViewportAction(threeDViewport::resetToDefaultView);
             case "diagnose3D" -> {
-                activateThreeDWorkspaceForSnapshot();
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
+                runPreparedThreeDAction(false, () -> {
+                });
                 result = automationSnapshot();
                 // Diagnose wird in die cameraStatus-Info-Zeile geschrieben, damit sie
                 // vom Automation-Snapshot zurückgegeben werden kann, ohne neue Felder anzulegen.
                 String diagnose = threeDViewport.diagnoseRenderState();
                 draftLabel.setText("DIAGNOSE: " + diagnose);
             }
-            case "setProjection3D" -> {
-                activeWorkspaceMode.set(WorkspaceMode.THREE_D);
-                updateWorkspaceMode();
-                refreshThreeDIfNeeded();
+            case "setProjection3D" -> runPreparedThreeDAction(true, () -> {
                 String mode = path != null ? path.toString() : "ORTHOGRAPHIC";
                 threeDViewport.setProjectionMode(de.schrell.cadas.application.view.ProjectionMode.valueOf(mode));
-            }
+            });
             case "exit" -> requestApplicationExit();
             case "clearProject" -> clearProjectWithoutDialog();
             default -> throw new IllegalArgumentException("Automatisierungsaktion `" + actionName + "` ist unbekannt.");
         }
         return result;
+    }
+
+    private <T> SelectionKey selectionKeyByIndex(
+            List<T> elements,
+            int index,
+            RenderableKind kind,
+            Function<T, UUID> idExtractor,
+            String errorLabel
+    ) {
+        return elements.stream()
+                .skip(index)
+                .findFirst()
+                .map(element -> new SelectionKey(kind, activeLevel.get().name(), idExtractor.apply(element).toString()))
+                .orElseThrow(() -> new IllegalArgumentException(errorLabel + " `" + index + "` ist ungültig."));
+    }
+
+    private void runPreparedThreeDAction(boolean forceThreeDWorkspace, Runnable action) {
+        if (forceThreeDWorkspace) {
+            activeWorkspaceMode.set(WorkspaceMode.THREE_D);
+        } else {
+            activateThreeDWorkspaceForSnapshot();
+        }
+        updateWorkspaceMode();
+        refreshThreeDIfNeeded();
+        action.run();
+    }
+
+    private void runPreparedThreeDViewportAction(Runnable action) {
+        refreshThreeDIfNeeded();
+        action.run();
     }
 
     private void activateThreeDWorkspaceForSnapshot() {
