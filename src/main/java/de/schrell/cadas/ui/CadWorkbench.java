@@ -1272,6 +1272,7 @@ public final class CadWorkbench extends BorderPane {
         Menu berichteMenu = new Menu("Berichte");
         berichteMenu.getItems().addAll(
                 menuItem("Räume und Materialien anzeigen", this::showSurfaceMaterialReportWindow, null),
+                menuItem("Räume und Materialien als PDF exportieren", this::exportSurfaceMaterialReportPdf, null),
                 menuItem("Räume und Materialien als MD exportieren", this::exportSurfaceMaterialReportMarkdown, null)
         );
 
@@ -5930,6 +5931,14 @@ public final class CadWorkbench extends BorderPane {
         documentSupport.exportSurfaceMaterialReportMarkdown(targetFile);
     }
 
+    private void exportSurfaceMaterialReportPdf() {
+        documentSupport.exportSurfaceMaterialReportPdf();
+    }
+
+    private void exportSurfaceMaterialReportPdf(Path targetFile) {
+        documentSupport.exportSurfaceMaterialReportPdf(targetFile);
+    }
+
     private void importLevel() {
         FileChooser fileChooser = createCadasFileChooser();
         Window window = getScene() != null ? getScene().getWindow() : null;
@@ -9555,6 +9564,7 @@ public final class CadWorkbench extends BorderPane {
             case "exportLevelDxf" -> exportCurrentLevel(requirePath(path, actionName));
             case "importLevelDxf" -> importLevel(requirePath(path, actionName));
             case "exportSurfaceMaterialReportMarkdown" -> exportSurfaceMaterialReportMarkdown(requirePath(path, actionName));
+            case "exportSurfaceMaterialReportPdf" -> exportSurfaceMaterialReportPdf(requirePath(path, actionName));
             case "importPartLibrary" -> importPartLibrary(requirePath(path, actionName));
             case "exportWorkbenchSnapshot" -> exportWorkbenchSnapshot(requirePath(path, actionName));
             case "exportThreeDSnapshot" -> runPreparedThreeDAction(false, () -> threeDViewport.exportSnapshot(requirePath(path, actionName)));

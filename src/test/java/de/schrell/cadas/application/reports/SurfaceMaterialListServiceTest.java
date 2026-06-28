@@ -1,6 +1,7 @@
 package de.schrell.cadas.application.reports;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.application.layers.WallSurfaceTargetKey;
@@ -64,7 +65,7 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
-    void erzeugtHeizplanMitSvgInDerMaterialliste() {
+    void blendetHeizplanSvgNurImExportEin() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         project.primaryLevel().addWall(Wall.create(
                 new PlanSegment(new PlanPoint(0, 0), new PlanPoint(2_000, 0)),
@@ -134,13 +135,21 @@ class SurfaceMaterialListServiceTest {
         assertTrue(report.heatingPlans().getFirst().svg().contains("id=\"sperrflaechen\""));
         assertTrue(report.heatingPlans().getFirst().svg().contains("fill=\"#f8dcd8\""));
         assertTrue(report.heatingPlans().getFirst().svg().contains("V1"));
-        assertTrue(report.toMarkdown().contains("## Flächenheizungen"));
-        assertTrue(report.toMarkdown().contains("## Heizelemente"));
-        assertTrue(report.toMarkdown().contains("| Raum | Objekt | Typ | Heizart | Leistung |"));
-        assertTrue(report.toMarkdown().contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
-        assertTrue(report.toMarkdown().contains("105 W"));
-        assertTrue(report.toMarkdown().contains("Konvektor"));
-        assertTrue(report.toMarkdown().contains("1005 W"));
+        String exportMarkdown = report.toMarkdown();
+        String displayMarkdown = report.toDisplayMarkdown();
+        assertTrue(exportMarkdown.contains("## Flächenheizungen"));
+        assertTrue(exportMarkdown.contains("## Heizelemente"));
+        assertTrue(exportMarkdown.contains("| Raum | Objekt | Typ | Heizart | Leistung |"));
+        assertTrue(exportMarkdown.contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
+        assertTrue(exportMarkdown.contains("105 W"));
+        assertTrue(exportMarkdown.contains("Konvektor"));
+        assertTrue(exportMarkdown.contains("1005 W"));
+        assertTrue(exportMarkdown.contains("<svg"));
+        assertTrue(displayMarkdown.contains("## Flächenheizungen"));
+        assertTrue(displayMarkdown.contains("105 W"));
+        assertTrue(displayMarkdown.contains("1005 W"));
+        assertFalse(displayMarkdown.contains("<svg"));
+        assertFalse(displayMarkdown.contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
     }
 
     @Test

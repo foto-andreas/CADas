@@ -3,6 +3,8 @@ package de.schrell.cadas.ui;
 import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
+import de.schrell.cadas.application.reports.SurfaceMaterialListService.SurfaceMaterialReport;
+import de.schrell.cadas.application.reports.SurfaceMaterialReportPdfService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -29,23 +31,28 @@ import javafx.stage.Window;
 final class CadWorkbenchDocumentSupport {
 
     private final CadWorkbench owner;
+    private final SurfaceMaterialReportPdfService surfaceMaterialReportPdfService = new SurfaceMaterialReportPdfService();
 
     CadWorkbenchDocumentSupport(CadWorkbench owner) {
         this.owner = owner;
     }
 
     void showSurfaceMaterialReportWindow() {
-        String markdown = owner.surfaceMaterialListService.create(owner.project).toMarkdown();
+        SurfaceMaterialReport report = owner.surfaceMaterialListService.create(owner.project);
+        String markdown = report.toDisplayMarkdown();
         WebView reportView = new WebView();
         reportView.getEngine().loadContent(owner.markdownHtmlRenderer.renderDocument(markdown));
         VBox.setVgrow(reportView, Priority.ALWAYS);
         Button exportButton = new Button("Markdown exportieren");
-        exportButton.setOnAction(event -> exportSurfaceMaterialReportMarkdown());
+        exportButton.setOnAction(event -> exportSurfaceMaterialReportMarkdown(report));
         owner.applyTooltip(exportButton, "Exportiert genau diese Materialliste als Markdown-Datei.");
+        Button exportPdfButton = new Button("PDF exportieren");
+        exportPdfButton.setOnAction(event -> exportSurfaceMaterialReportPdf(report));
+        owner.applyTooltip(exportPdfButton, "Exportiert genau diese Materialliste als PDF-Datei ohne eingebettete SVG-Vorschauen.");
         Button printButton = new Button("Drucken");
         printButton.setOnAction(event -> printSurfaceMaterialReport(reportView));
         owner.applyTooltip(printButton, "Druckt die gerenderte Materialliste so, wie sie in diesem Fenster angezeigt wird.");
-        HBox actions = new HBox(8.0, printButton, exportButton);
+        HBox actions = new HBox(8.0, printButton, exportPdfButton, exportButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
         VBox container = new VBox(10.0, reportView, actions);
         container.setPadding(new Insets(12));
@@ -197,6 +204,10 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportMarkdown() {
+        exportSurfaceMaterialReportMarkdown(owner.surfaceMaterialListService.create(owner.project));
+    }
+
+    void exportSurfaceMaterialReportMarkdown(SurfaceMaterialReport report) {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Materialliste als Markdown speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Markdown-Dateien", "*.md"));
@@ -206,16 +217,51 @@ final class CadWorkbenchDocumentSupport {
         if (file == null) {
             return;
         }
-        exportSurfaceMaterialReportMarkdown(file.toPath());
+        exportSurfaceMaterialReportMarkdown(report, file.toPath());
     }
 
     void exportSurfaceMaterialReportMarkdown(Path targetFile) {
+        exportSurfaceMaterialReportMarkdown(owner.surfaceMaterialListService.create(owner.project), targetFile);
+    }
+
+    void exportSurfaceMaterialReportMarkdown(SurfaceMaterialReport report, Path targetFile) {
         try {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".md");
-            Files.writeString(exportPath, owner.surfaceMaterialListService.create(owner.project).toMarkdown());
+            Files.writeString(exportPath, report.toMarkdown());
             owner.draftLabel.setText("Materialliste exportiert: " + exportPath.getFileName());
         } catch (Exception exception) {
             owner.showOperationException("Materiallisten-Export fehlgeschlagen", exception);
+        }
+    }
+
+    void exportSurfaceMaterialReportPdf() {
+        exportSurfaceMaterialReportPdf(owner.surfaceMaterialListService.create(owner.project));
+    }
+
+    void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Materialliste als PDF speichern");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
+        String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
+        fileChooser.setInitialFileName(projectName + "_Räume_und_Material.pdf");
+        java.io.File file = fileChooser.showSaveDialog(owner.currentWindow());
+        if (file == null) {
+            return;
+        }
+        exportSurfaceMaterialReportPdf(report, file.toPath());
+    }
+
+    void exportSurfaceMaterialReportPdf(Path targetFile) {
+        exportSurfaceMaterialReportPdf(owner.surfaceMaterialListService.create(owner.project), targetFile);
+    }
+
+    void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile) {
+        try {
+            Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
+            surfaceMaterialReportPdfService.export(report, exportPath);
+            owner.draftLabel.setText("Materialliste als PDF exportiert: " + exportPath.getFileName());
+        } catch (Exception exception) {
+            owner.showOperationException("Materiallisten-PDF-Export fehlgeschlagen", exception);
         }
     }
 }

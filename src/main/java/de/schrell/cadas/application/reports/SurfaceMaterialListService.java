@@ -1071,10 +1071,18 @@ public final class SurfaceMaterialListService {
     ) {
 
         public String toMarkdown() {
+            return toMarkdown(true);
+        }
+
+        public String toDisplayMarkdown() {
+            return toMarkdown(false);
+        }
+
+        private String toMarkdown(boolean includeHeatingPlanSvg) {
             StringBuilder markdown = new StringBuilder();
             markdown.append("# Materialliste Beläge – ").append(projectName).append("\n\n");
             appendRooms(markdown);
-            appendHeatingPlans(markdown);
+            appendHeatingPlans(markdown, includeHeatingPlanSvg);
             appendHeatingElements(markdown);
             if (materials.isEmpty()) {
                 markdown.append("## Beläge\n\nKeine sichtbaren Beläge vorhanden.\n");
@@ -1136,7 +1144,7 @@ public final class SurfaceMaterialListService {
             markdown.append("Die Mietfläche gewichtet lichte Höhen ab 2 m vollständig, zwischen 1 m und 2 m zur Hälfte und unter 1 m nicht. Sichtbare Boden- und Deckenbeläge reduzieren die lichte Höhe.\n\n");
         }
 
-        private void appendHeatingPlans(StringBuilder markdown) {
+        private void appendHeatingPlans(StringBuilder markdown, boolean includeSvg) {
             markdown.append("## Flächenheizungen\n\n");
             if (heatingPlans.isEmpty()) {
                 markdown.append("Keine Flächenheizungen vorhanden.\n\n");
@@ -1176,6 +1184,9 @@ public final class SurfaceMaterialListService {
                         .append(" |\n");
             }
             markdown.append('\n');
+            if (!includeSvg) {
+                return;
+            }
             heatingPlans.stream()
                     .collect(java.util.stream.Collectors.groupingBy(
                             plan -> plan.levelName() + "\u0000" + plan.roomName() + "\u0000" + plan.surfacePosition(),
