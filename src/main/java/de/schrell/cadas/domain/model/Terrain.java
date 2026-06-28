@@ -15,9 +15,6 @@ public record Terrain(List<TerrainVertex> vertices, Length displayWidth) {
         Objects.requireNonNull(vertices, "vertices darf nicht null sein.");
         Objects.requireNonNull(displayWidth, "displayWidth darf nicht null sein.");
         vertices = List.copyOf(vertices);
-        if (!vertices.isEmpty() && vertices.size() < 3) {
-            throw new IllegalArgumentException("Ein Gelände braucht mindestens drei äußere Ecken.");
-        }
         if (displayWidth.toMillimeters() <= 0.0) {
             throw new IllegalArgumentException("Die Geländebreite muss größer als 0 sein.");
         }

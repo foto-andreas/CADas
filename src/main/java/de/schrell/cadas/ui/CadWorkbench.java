@@ -18,8 +18,6 @@ import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.history.UndoRedoStack;
 import de.schrell.cadas.application.help.HelpContentService;
 import de.schrell.cadas.application.help.MarkdownNavigationService;
-import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
-import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.application.heating.RoomHeatingOutputService;
@@ -62,7 +60,6 @@ import de.schrell.cadas.application.parts.StandardPartLibrary;
 import de.schrell.cadas.application.parts.StandardPartLibraryService;
 import de.schrell.cadas.application.parts.WindowPreset;
 import de.schrell.cadas.application.reports.MarkdownHtmlRenderer;
-import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
 import de.schrell.cadas.application.reports.ConstructionDrawingPdfService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService;
 import de.schrell.cadas.application.roof.RoofSlopeWallService;
@@ -70,6 +67,7 @@ import de.schrell.cadas.application.roof.RoofWindowPlacementService;
 import de.schrell.cadas.application.stairs.StairUnderbuildService;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
 import de.schrell.cadas.application.terrain.TerrainContourService;
+import de.schrell.cadas.application.terrain.TerrainEditService;
 import de.schrell.cadas.application.terrain.TerrainGeometryService;
 import de.schrell.cadas.application.terrain.TerrainProfileService;
 import de.schrell.cadas.application.view.RenderableKind;
@@ -111,8 +109,6 @@ import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
-import de.schrell.cadas.domain.model.Terrain;
-import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
@@ -128,7 +124,6 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -141,7 +136,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 
 import javafx.application.Platform;
@@ -192,14 +186,11 @@ import javafx.scene.input.PickResult;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.Node;
 import javafx.scene.Cursor;
-import javafx.scene.Scene;
-import javafx.print.PrinterJob;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.ImagePattern;
 import javafx.scene.text.Font;
@@ -259,12 +250,12 @@ public final class CadWorkbench extends BorderPane {
     private static final Color TERRAIN_EDGE_COLOR = Color.web("#8a6337");
     private static final Color TERRAIN_LABEL_COLOR = Color.web("#6f4e2c");
     private static final Color TERRAIN_ELEVATION_COLOR = Color.web("#a67c46");
-    private static final double TERRAIN_SAMPLE_CAPTURE_TOLERANCE_MILLIMETERS = 180.0;
 
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     private final TerrainContourService terrainContourService = new TerrainContourService();
+    private final TerrainEditService terrainEditService = new TerrainEditService();
     private final TerrainGeometryService terrainGeometryService = new TerrainGeometryService();
     private final TerrainProfileService terrainProfileService = new TerrainProfileService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
@@ -1077,23 +1068,55 @@ public final class CadWorkbench extends BorderPane {
             draftLabel.setText("Für das Gelände wird zuerst eine geschlossene Außenkontur benötigt.");
             return true;
         }
-        Optional<TerrainProfileService.ProjectedTerrainPoint> projection = terrainProfileService.projectToBand(
-                screenToWorld(event.getX(), event.getY()),
-                contour
+        PlanPoint clickPoint = screenToWorld(event.getX(), event.getY());
+        Optional<TerrainProfileService.ProjectedTerrainPoint> existingSample = terrainEditService.existingSampleNear(
+                project.terrain(),
+                contour,
+                clickPoint,
+                TerrainEditService.EXISTING_POINT_SELECTION_TOLERANCE_MILLIMETERS
         );
+        Optional<TerrainProfileService.ProjectedTerrainPoint> projection = existingSample.isPresent()
+                ? existingSample
+                : terrainEditService.resolveEditTarget(project.terrain(), contour, clickPoint);
         if (projection.isEmpty()) {
             return false;
         }
-        editTerrainPoint(projection.orElseThrow(), contour);
+        if (existingSample.isPresent()) {
+            editExistingTerrainPoint(projection.orElseThrow(), existingSample.orElseThrow(), contour);
+        } else {
+            editTerrainPoint(projection.orElseThrow(), contour);
+        }
         return true;
     }
 
-    private void editTerrainPoint(TerrainProfileService.ProjectedTerrainPoint projection, List<PlanPoint> contour) {
+    private void editTerrainPoint(
+            TerrainProfileService.ProjectedTerrainPoint projection,
+            List<PlanPoint> contour
+    ) {
+        editTerrainPointDialog(projection, null, contour);
+    }
+
+    private void editExistingTerrainPoint(
+            TerrainProfileService.ProjectedTerrainPoint projection,
+            TerrainProfileService.ProjectedTerrainPoint existingSample,
+            List<PlanPoint> contour
+    ) {
+        editTerrainPointDialog(projection, existingSample, contour);
+    }
+
+    private void editTerrainPointDialog(
+            TerrainProfileService.ProjectedTerrainPoint projection,
+            TerrainProfileService.ProjectedTerrainPoint existingSample,
+            List<PlanPoint> contour
+    ) {
         if (!interactiveDialogsEnabled) {
             return;
         }
+        Length currentElevation = existingSample == null
+                ? terrainEditService.currentElevation(project.terrain(), contour, projection)
+                : existingSample.elevation();
         TextField elevationField = new TextField(formatValue(
-                currentTerrainElevation(projection, contour),
+                currentElevation,
                 LengthUnit.CENTIMETER,
                 LENGTH_INPUT_DECIMALS
         ));
@@ -1107,56 +1130,38 @@ public final class CadWorkbench extends BorderPane {
         dialog.setTitle("Geländepunkt bearbeiten");
         dialog.setHeaderText("Höhe über dem Boden der untersten Etage");
         dialog.getDialogPane().setContent(row);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        ButtonType deleteButtonType = new ButtonType("Löschen", ButtonBar.ButtonData.LEFT);
+        dialog.getDialogPane().getButtonTypes().addAll(deleteButtonType, ButtonType.OK, ButtonType.CANCEL);
         Window owner = currentWindow();
         if (owner != null) {
             dialog.initOwner(owner);
         }
+        javafx.scene.Node deleteButton = dialog.getDialogPane().lookupButton(deleteButtonType);
+        deleteButton.setDisable(existingSample == null);
+        applyTooltip(deleteButton, existingSample != null
+                ? "Entfernt den gewählten gespeicherten Geländepunkt und interpoliert das Gelände aus den übrigen Punkten neu."
+                : "Ist nur verfügbar, wenn ein bereits gespeicherter Geländepunkt ausgewählt wurde.");
         applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Übernimmt die Geländehöhe an diesem Bandpunkt und aktualisiert 2D, Seitenansichten, 3D und PDF.");
         applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Verwirft die Eingabe und belässt das Gelände unverändert.");
-        if (dialog.showAndWait().filter(ButtonType.OK::equals).isEmpty()) {
+        Optional<ButtonType> decision = dialog.showAndWait();
+        if (decision.isEmpty() || ButtonType.CANCEL.equals(decision.orElseThrow())) {
             return;
         }
-        Length elevation = parseLength(elevationField, LengthUnit.CENTIMETER)
-                .orElse(currentTerrainElevation(projection, contour));
         rememberStateForUndo();
-        project.defineTerrain(updatedTerrainWithPoint(projection, elevation, contour));
+        if (deleteButtonType.equals(decision.orElseThrow())) {
+            project.defineTerrain(terrainEditService.deletePoint(project.terrain(), contour, existingSample));
+            draftLabel.setText("Geländepunkt entfernt.");
+        } else {
+            Length elevation = parseLength(elevationField, LengthUnit.CENTIMETER).orElse(currentElevation);
+            if (existingSample == null) {
+                project.defineTerrain(terrainEditService.upsertPoint(project.terrain(), contour, projection, elevation));
+            } else {
+                project.defineTerrain(terrainEditService.replacePoint(project.terrain(), contour, projection, existingSample, elevation));
+            }
+            draftLabel.setText("Geländepunkt aktualisiert.");
+        }
         markThreeDDirty();
         render();
-    }
-
-    private Length currentTerrainElevation(TerrainProfileService.ProjectedTerrainPoint projection, List<PlanPoint> contour) {
-        return matchingTerrainSample(projection, contour)
-                .map(TerrainProfileService.ProjectedTerrainPoint::elevation)
-                .orElse(Length.ofMillimeters(
-                        terrainProfileService.interpolatedElevationMillimeters(project.terrain(), contour, projection.contourDistance())
-                ));
-    }
-
-    private Optional<TerrainProfileService.ProjectedTerrainPoint> matchingTerrainSample(
-            TerrainProfileService.ProjectedTerrainPoint projection,
-            List<PlanPoint> contour
-    ) {
-        return terrainProfileService.projectedSamples(project.terrain(), contour).stream()
-                .filter(sample -> Math.abs(sample.contourDistance() - projection.contourDistance()) <= TERRAIN_SAMPLE_CAPTURE_TOLERANCE_MILLIMETERS)
-                .min(Comparator.comparingDouble(sample -> Math.abs(sample.contourDistance() - projection.contourDistance())));
-    }
-
-    private Terrain updatedTerrainWithPoint(
-            TerrainProfileService.ProjectedTerrainPoint projection,
-            Length elevation,
-            List<PlanPoint> contour
-    ) {
-        List<TerrainVertex> updatedVertices = new ArrayList<>(project.terrain().vertices());
-        matchingTerrainSample(projection, contour)
-                .ifPresent(sample -> updatedVertices.removeIf(vertex -> vertex.position().equals(sample.contourPoint())));
-        updatedVertices.add(new TerrainVertex(projection.contourPoint(), elevation));
-        List<TerrainVertex> sortedVertices = updatedVertices.stream()
-                .sorted(Comparator.comparingDouble(vertex -> terrainProfileService.projectToContour(vertex.position(), contour)
-                        .map(TerrainProfileService.ProjectedTerrainPoint::contourDistance)
-                        .orElse(Double.MAX_VALUE)))
-                .toList();
-        return new Terrain(sortedVertices, Terrain.defaultDisplayWidth());
     }
 
     private MenuBar buildMenuBar() {
