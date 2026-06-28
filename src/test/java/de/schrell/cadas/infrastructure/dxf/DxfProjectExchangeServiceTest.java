@@ -37,6 +37,7 @@ import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Terrain;
@@ -362,7 +363,12 @@ class DxfProjectExchangeServiceTest {
                 Length.of(1, LengthUnit.MILLIMETER),
                 SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
                 "Holz"
-        ).withLayoutRotatedQuarterTurn(true));
+        ).withLayoutRotatedQuarterTurn(true).withFreeMargins(new SurfaceLayoutMargins(
+                Length.of(12, LengthUnit.MILLIMETER),
+                Length.of(18, LengthUnit.MILLIMETER),
+                Length.of(24, LengthUnit.MILLIMETER),
+                Length.of(30, LengthUnit.MILLIMETER)
+        )));
         project.primaryLevel().addSurfaceLayerStack(egFloor);
         project.primaryLevel().addRoomObject(RoomObject.create(
                 "dwg-spiegel",
@@ -431,6 +437,10 @@ class DxfProjectExchangeServiceTest {
         assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().layoutAnchor());
         assertEquals(25.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().startRowTrim().toMillimeters(), 0.001);
         assertEquals(475.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().startRowWidth().toMillimeters(), 0.001);
+        assertEquals(12.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().freeMargins().left().toMillimeters(), 0.001);
+        assertEquals(18.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().freeMargins().right().toMillimeters(), 0.001);
+        assertEquals(24.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().freeMargins().top().toMillimeters(), 0.001);
+        assertEquals(30.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().freeMargins().bottom().toMillimeters(), 0.001);
         assertEquals(1, importedEg.roomObjects().size());
         assertEquals("DWG-Spiegel", importedEg.roomObjects().getFirst().name());
         assertEquals(RoomObjectMountingMode.WALL_MOUNTED, importedEg.roomObjects().getFirst().mountingMode());

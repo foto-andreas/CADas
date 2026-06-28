@@ -35,11 +35,20 @@ public final class TileLayoutService {
         double minimumEdgeWidth = request.minimumEdgeWidth().toMillimeters();
         double minimumStartEndMargin = request.minimumStartEndMargin().toMillimeters();
         double layoutOffset = request.layoutOffset().toMillimeters();
-        double rowStartTrim = startTrim(request, surfaceHeight, tileHeight, minimumStartEndMargin);
+        double leftMargin = request.freeMargins().left().toMillimeters();
+        double rightMargin = request.freeMargins().right().toMillimeters();
+        double topMargin = request.freeMargins().top().toMillimeters();
+        double bottomMargin = request.freeMargins().bottom().toMillimeters();
+        double availableWidth = Math.max(0.0, surfaceWidth - leftMargin - rightMargin);
+        double availableHeight = Math.max(0.0, surfaceHeight - bottomMargin - topMargin);
+        if (availableWidth <= 0.001 || availableHeight <= 0.001 || tileWidth <= 0.001 || tileHeight <= 0.001) {
+            return List.of();
+        }
+        double rowStartTrim = startTrim(request, availableHeight, tileHeight, minimumStartEndMargin);
 
         int row = 0;
         List<TilePlacement> localPlacements = new ArrayList<>();
-        for (double y = -rowStartTrim; y < surfaceHeight - 0.001; y += tileHeight, row++) {
+        for (double y = -rowStartTrim; y < availableHeight - 0.001; y += tileHeight, row++) {
             double rowOffset = switch (request.layoutMode()) {
                 case NONE -> 0.0;
                 case FIXED -> boundedOffset(
@@ -50,22 +59,22 @@ public final class TileLayoutService {
                         tileWidth, minimumOffset, minimumEdgeWidth);
             };
             double clippedY = Math.max(0.0, y);
-            double remainingHeight = Math.min(tileHeight - Math.max(0.0, -y), surfaceHeight - clippedY);
+            double remainingHeight = Math.min(tileHeight - Math.max(0.0, -y), availableHeight - clippedY);
             if (remainingHeight <= 0.0) {
                 continue;
             }
             int column = 0;
-            for (double x = -rowOffset; x < surfaceWidth - 0.001; x += tileWidth, column++) {
+            for (double x = -rowOffset; x < availableWidth - 0.001; x += tileWidth, column++) {
                 double clippedX = Math.max(0.0, x);
-                double remainingWidth = Math.min(tileWidth - Math.max(0.0, -x), surfaceWidth - clippedX);
+                double remainingWidth = Math.min(tileWidth - Math.max(0.0, -x), availableWidth - clippedX);
                 if (remainingWidth <= 0.0 || remainingHeight <= 0.0) {
                     continue;
                 }
                 localPlacements.add(new TilePlacement(
                         column,
                         row,
-                        Length.ofMillimeters(clippedX),
-                        Length.ofMillimeters(clippedY),
+                        Length.ofMillimeters(clippedX + leftMargin),
+                        Length.ofMillimeters(clippedY + bottomMargin),
                         Length.ofMillimeters(remainingWidth),
                         Length.ofMillimeters(remainingHeight)
                 ));
@@ -76,7 +85,7 @@ public final class TileLayoutService {
             placements.addAll(localPlacements);
         } else {
             for (TilePlacement placement : localPlacements) {
-                placements.add(transformPlacement(placement, surfaceWidth, surfaceHeight, layoutAnchor));
+                placements.add(transformPlacement(placement, leftMargin, bottomMargin, availableWidth, availableHeight, layoutAnchor));
             }
         }
         List<TilePlacement> result = List.copyOf(placements);
@@ -86,27 +95,29 @@ public final class TileLayoutService {
 
     private TilePlacement transformPlacement(
             TilePlacement placement,
-            double surfaceWidth,
-            double surfaceHeight,
+            double leftMargin,
+            double bottomMargin,
+            double availableWidth,
+            double availableHeight,
             SurfaceLayoutAnchor layoutAnchor
     ) {
-        double localX = placement.xOffset().toMillimeters();
-        double localY = placement.yOffset().toMillimeters();
+        double localX = placement.xOffset().toMillimeters() - leftMargin;
+        double localY = placement.yOffset().toMillimeters() - bottomMargin;
         double width = placement.width().toMillimeters();
         double height = placement.height().toMillimeters();
         double transformedX = switch (layoutAnchor) {
             case AUTO, MIN_X_MIN_Y, MIN_X_MAX_Y -> localX;
-            case MAX_X_MIN_Y, MAX_X_MAX_Y -> surfaceWidth - localX - width;
+            case MAX_X_MIN_Y, MAX_X_MAX_Y -> availableWidth - localX - width;
         };
         double transformedY = switch (layoutAnchor) {
             case AUTO, MIN_X_MIN_Y, MAX_X_MIN_Y -> localY;
-            case MAX_X_MAX_Y, MIN_X_MAX_Y -> surfaceHeight - localY - height;
+            case MAX_X_MAX_Y, MIN_X_MAX_Y -> availableHeight - localY - height;
         };
         return new TilePlacement(
                 placement.column(),
                 placement.row(),
-                Length.ofMillimeters(transformedX),
-                Length.ofMillimeters(transformedY),
+                Length.ofMillimeters(transformedX + leftMargin),
+                Length.ofMillimeters(transformedY + bottomMargin),
                 Length.ofMillimeters(width),
                 Length.ofMillimeters(height)
         );

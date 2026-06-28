@@ -34,6 +34,7 @@ import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
@@ -304,7 +305,12 @@ class DxfLevelExchangeServiceTest {
                 Length.of(2, LengthUnit.MILLIMETER),
                 SurfaceCutRestriction.OUTER_CUTS_ROTATABLE,
                 "Kacheln"
-        ).withLayoutRotatedQuarterTurn(true));
+        ).withLayoutRotatedQuarterTurn(true).withFreeMargins(new SurfaceLayoutMargins(
+                Length.of(15, LengthUnit.MILLIMETER),
+                Length.of(25, LengthUnit.MILLIMETER),
+                Length.of(35, LengthUnit.MILLIMETER),
+                Length.of(45, LengthUnit.MILLIMETER)
+        )));
         floorStack.addLayer(new SurfaceLayer(
                 java.util.UUID.randomUUID(),
                 "Daemmung",
@@ -372,6 +378,10 @@ class DxfLevelExchangeServiceTest {
         assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, importedFloor.layers().getFirst().layoutAnchor());
         assertEquals(40.0, importedFloor.layers().getFirst().startRowTrim().toMillimeters(), 0.001);
         assertEquals(260.0, importedFloor.layers().getFirst().startRowWidth().toMillimeters(), 0.001);
+        assertEquals(15.0, importedFloor.layers().getFirst().freeMargins().left().toMillimeters(), 0.001);
+        assertEquals(25.0, importedFloor.layers().getFirst().freeMargins().right().toMillimeters(), 0.001);
+        assertEquals(35.0, importedFloor.layers().getFirst().freeMargins().top().toMillimeters(), 0.001);
+        assertEquals(45.0, importedFloor.layers().getFirst().freeMargins().bottom().toMillimeters(), 0.001);
         assertTrue(importedFloor.layers().getFirst().visible());
         assertEquals("Daemmung", importedFloor.layers().get(1).name());
         assertEquals(SurfaceLayoutMode.FIXED, importedFloor.layers().get(1).layoutMode());

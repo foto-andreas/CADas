@@ -1077,7 +1077,8 @@ public final class ThreeDSceneModelBuilder {
                 layer.layoutOffset(),
                 layer.minimumOffset(),
                 layer.minimumEdgeWidth(),
-                layer.minimumStartEndMargin()
+                layer.minimumStartEndMargin(),
+                layer.freeMargins()
         );
         List<TilePlacement> tiles = tileLayoutService.fillSurface(request);
         var horizontalKeys = new java.util.HashSet<String>();

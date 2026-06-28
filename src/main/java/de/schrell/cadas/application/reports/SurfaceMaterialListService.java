@@ -429,9 +429,14 @@ public final class SurfaceMaterialListService {
                 Double.toString(layer.minimumOffset().toMillimeters()),
                 Double.toString(layer.minimumEdgeWidth().toMillimeters()),
                 Double.toString(layer.minimumStartEndMargin().toMillimeters()),
+                Double.toString(layer.freeMargins().left().toMillimeters()),
+                Double.toString(layer.freeMargins().right().toMillimeters()),
+                Double.toString(layer.freeMargins().top().toMillimeters()),
+                Double.toString(layer.freeMargins().bottom().toMillimeters()),
                 Double.toString(layer.jointWidth().toMillimeters()),
                 layer.cutRestriction().name(),
-                Boolean.toString(layer.layoutRotatedQuarterTurn()),
+                layer.layoutRotation().name(),
+                layer.layoutDirection().name(),
                 layer.coveringSource()
         );
     }
@@ -660,7 +665,8 @@ public final class SurfaceMaterialListService {
                     layer.layoutOffset(),
                     layer.minimumOffset(),
                     layer.minimumEdgeWidth(),
-                    layer.minimumStartEndMargin()
+                    layer.minimumStartEndMargin(),
+                    layer.freeMargins()
             ));
             for (TilePlacement placement : placements) {
                 addPlacementDimensions(placement.width().toMillimeters(), placement.height().toMillimeters(), tileWidth, tileHeight);
@@ -998,11 +1004,20 @@ public final class SurfaceMaterialListService {
                     + ", Format " + length(layer.tileWidth(), LengthUnit.CENTIMETER, 1)
                     + " x " + length(layer.tileHeight(), LengthUnit.CENTIMETER, 1)
                     + ", Verlegung " + layer.layoutMode()
-                    + (layer.layoutRotatedQuarterTurn() ? " um 90° gedreht" : "")
+                    + ", Drehung " + layer.layoutRotation().label()
+                    + ", Richtung " + layer.layoutDirection().label()
                     + ", Versatz " + length(layer.layoutOffset(), LengthUnit.CENTIMETER, 1)
                     + ", Mindestversatz " + length(layer.minimumOffset(), LengthUnit.CENTIMETER, 1)
                     + ", Mindestrand " + length(layer.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1)
                     + ", Anfang/Ende " + length(layer.minimumStartEndMargin(), LengthUnit.CENTIMETER, 1)
+                    + ", Freiränder L/R/O/U "
+                    + length(layer.freeMargins().left(), LengthUnit.CENTIMETER, 1)
+                    + "/"
+                    + length(layer.freeMargins().right(), LengthUnit.CENTIMETER, 1)
+                    + "/"
+                    + length(layer.freeMargins().top(), LengthUnit.CENTIMETER, 1)
+                    + "/"
+                    + length(layer.freeMargins().bottom(), LengthUnit.CENTIMETER, 1)
                     + ", Fuge " + length(layer.jointWidth(), LengthUnit.MILLIMETER, 1)
                     + ", Schnittbeschränkung " + layer.cutRestriction().label();
         }

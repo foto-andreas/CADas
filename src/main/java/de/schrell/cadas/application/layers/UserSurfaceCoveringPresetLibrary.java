@@ -86,7 +86,12 @@ public final class UserSurfaceCoveringPresetLibrary {
         properties.setProperty("minimumOffsetMm", Double.toString(savedPreset.minimumOffset().toMillimeters()));
         properties.setProperty("minimumEdgeWidthMm", Double.toString(savedPreset.minimumEdgeWidth().toMillimeters()));
         properties.setProperty("minimumStartEndMarginMm", Double.toString(savedPreset.minimumStartEndMargin().toMillimeters()));
+        properties.setProperty("freeMarginLeftMm", Double.toString(savedPreset.freeMargins().left().toMillimeters()));
+        properties.setProperty("freeMarginRightMm", Double.toString(savedPreset.freeMargins().right().toMillimeters()));
+        properties.setProperty("freeMarginTopMm", Double.toString(savedPreset.freeMargins().top().toMillimeters()));
+        properties.setProperty("freeMarginBottomMm", Double.toString(savedPreset.freeMargins().bottom().toMillimeters()));
         properties.setProperty("layoutAnchor", savedPreset.layoutAnchor().name());
+        properties.setProperty("layoutRotatedQuarterTurn", Boolean.toString(savedPreset.layoutRotatedQuarterTurn()));
         properties.setProperty("startRowTrimMm", Double.toString(savedPreset.startRowTrim().toMillimeters()));
         properties.setProperty("startRowWidthMm", Double.toString(savedPreset.startRowWidth().toMillimeters()));
         properties.setProperty("jointWidthMm", Double.toString(savedPreset.jointWidth().toMillimeters()));
@@ -139,7 +144,14 @@ public final class UserSurfaceCoveringPresetLibrary {
                 length(properties, "minimumOffsetMm"),
                 length(properties, "minimumEdgeWidthMm"),
                 length(properties, "minimumStartEndMarginMm"),
+                new de.schrell.cadas.domain.model.SurfaceLayoutMargins(
+                        length(properties, "freeMarginLeftMm"),
+                        length(properties, "freeMarginRightMm"),
+                        length(properties, "freeMarginTopMm"),
+                        length(properties, "freeMarginBottomMm")
+                ),
                 SurfaceLayoutAnchor.valueOf(properties.getProperty("layoutAnchor", SurfaceLayoutAnchor.AUTO.name())),
+                Boolean.parseBoolean(properties.getProperty("layoutRotatedQuarterTurn", "false")),
                 length(properties, "startRowTrimMm"),
                 length(properties, "startRowWidthMm"),
                 length(properties, "jointWidthMm"),
@@ -166,7 +178,9 @@ public final class UserSurfaceCoveringPresetLibrary {
                 preset.minimumOffset(),
                 preset.minimumEdgeWidth(),
                 preset.minimumStartEndMargin(),
+                preset.freeMargins(),
                 preset.layoutAnchor(),
+                preset.layoutRotatedQuarterTurn(),
                 preset.startRowTrim(),
                 preset.startRowWidth(),
                 preset.jointWidth(),

@@ -26,14 +26,18 @@ public final class SurfaceRectangleTileLayoutService {
         if (rectangles.isEmpty()) {
             return List.of();
         }
+        List<CellRectangle> effectiveRectangles = applyFreeMargins(rectangles, layer.freeMargins());
+        if (effectiveRectangles.isEmpty()) {
+            return List.of();
+        }
         double tileWidth = layer.effectiveTileWidth().toMillimeters();
         double tileHeight = layer.effectiveTileHeight().toMillimeters();
         if (tileWidth <= EPSILON || tileHeight <= EPSILON) {
             return List.of();
         }
-        SurfaceBounds bounds = bounds(rectangles);
-        AnchorPair anchors = bestAnchors(rectangles, layer, bounds);
-        return clipTilesToRectangles(rectangles, layer, bounds, anchors.anchorX(), anchors.anchorY());
+        SurfaceBounds bounds = bounds(effectiveRectangles);
+        AnchorPair anchors = bestAnchors(effectiveRectangles, layer, bounds);
+        return clipTilesToRectangles(effectiveRectangles, layer, bounds, anchors.anchorX(), anchors.anchorY());
     }
 
     private AnchorPair bestAnchors(List<CellRectangle> rectangles, SurfaceLayer layer, SurfaceBounds bounds) {
@@ -66,8 +70,9 @@ public final class SurfaceRectangleTileLayoutService {
         candidates.add(bounds.minX());
         int firstRow = firstRelevantRow(bounds, anchorY, layer.effectiveTileHeight().toMillimeters());
         int lastRow = lastRelevantRow(bounds, anchorY, layer.effectiveTileHeight().toMillimeters());
+        int firstVisibleRow = firstVisibleLayoutRow(bounds, anchorY, layer.effectiveTileHeight().toMillimeters());
         for (int row = firstRow; row <= lastRow; row++) {
-            double rowOffset = rowOffset(layer, row);
+            double rowOffset = rowOffset(layer, row, firstVisibleRow);
             for (CellRectangle rectangle : rectangles) {
                 candidates.add(rectangle.minX() + rowOffset);
                 candidates.add(rectangle.maxX() - tileWidth + rowOffset);
@@ -134,6 +139,7 @@ public final class SurfaceRectangleTileLayoutService {
         double penalty = 0.0;
         int firstRow = firstRelevantRow(bounds, anchorY, tileHeight);
         int lastRow = lastRelevantRow(bounds, anchorY, tileHeight);
+        int firstVisibleRow = firstVisibleLayoutRow(bounds, anchorY, tileHeight);
         for (CellRectangle rectangle : rectangles) {
             if (rectangle.width() + EPSILON < tileWidth) {
                 continue;
@@ -145,7 +151,7 @@ public final class SurfaceRectangleTileLayoutService {
                 if (rowEnd <= rectangle.minY() + EPSILON || rowStart >= rectangle.maxY() - EPSILON) {
                     continue;
                 }
-                double boundaryX = anchorX - rowOffset(layer, row);
+                double boundaryX = anchorX - rowOffset(layer, row, firstVisibleRow);
                 bestDistance = Math.min(bestDistance, boundaryDistance(rectangle.minX(), boundaryX, tileWidth));
             }
             if (bestDistance < Double.POSITIVE_INFINITY) {
@@ -181,6 +187,7 @@ public final class SurfaceRectangleTileLayoutService {
         List<PlacedSurfaceTile> tiles = new ArrayList<>();
         int firstRow = firstRelevantRow(bounds, anchorY, tileHeight);
         int lastRow = lastRelevantRow(bounds, anchorY, tileHeight);
+        int firstVisibleRow = firstVisibleLayoutRow(bounds, anchorY, tileHeight);
         for (int row = firstRow; row <= lastRow; row++) {
             double y = anchorY + row * tileHeight;
             double clippedY = Math.max(bounds.minY(), y);
@@ -188,7 +195,7 @@ public final class SurfaceRectangleTileLayoutService {
             if (remainingHeight <= EPSILON) {
                 continue;
             }
-            double rowOffset = rowOffset(layer, row);
+            double rowOffset = rowOffset(layer, row, firstVisibleRow);
             int firstColumn = firstRelevantColumn(bounds, anchorX, rowOffset, tileWidth);
             int lastColumn = lastRelevantColumn(bounds, anchorX, rowOffset, tileWidth);
             for (int column = firstColumn; column <= lastColumn; column++) {
@@ -299,6 +306,10 @@ public final class SurfaceRectangleTileLayoutService {
         return (int) Math.ceil((bounds.maxY() - anchorY) / tileHeight) + 1;
     }
 
+    private int firstVisibleLayoutRow(SurfaceBounds bounds, double anchorY, double tileHeight) {
+        return (int) Math.floor((bounds.minY() - anchorY + EPSILON) / tileHeight);
+    }
+
     private int firstRelevantColumn(SurfaceBounds bounds, double anchorX, double rowOffset, double tileWidth) {
         return (int) Math.floor((bounds.minX() - (anchorX - rowOffset)) / tileWidth) - 1;
     }
@@ -307,14 +318,15 @@ public final class SurfaceRectangleTileLayoutService {
         return (int) Math.ceil((bounds.maxX() - (anchorX - rowOffset)) / tileWidth) + 1;
     }
 
-    private double rowOffset(SurfaceLayer layer, int row) {
+    private double rowOffset(SurfaceLayer layer, int row, int firstVisibleRow) {
         double tileWidth = layer.effectiveTileWidth().toMillimeters();
         double minimumOffset = layer.minimumOffset().toMillimeters();
         double minimumEdgeWidth = layer.minimumEdgeWidth().toMillimeters();
+        int relativeRow = row - firstVisibleRow;
         double requestedOffset = switch (layer.layoutMode()) {
             case NONE -> 0.0;
-            case FIXED -> modulo(row * layer.layoutOffset().toMillimeters(), tileWidth);
-            case AUTOMATIC -> row % 2 == 0 ? 0.0 : tileWidth / 2.0;
+            case FIXED -> modulo(relativeRow * layer.layoutOffset().toMillimeters(), tileWidth);
+            case AUTOMATIC -> relativeRow % 2 == 0 ? 0.0 : tileWidth / 2.0;
         };
         return boundedOffset(requestedOffset, tileWidth, minimumOffset, minimumEdgeWidth);
     }
@@ -369,6 +381,36 @@ public final class SurfaceRectangleTileLayoutService {
         double minY = rectangles.stream().mapToDouble(CellRectangle::minY).min().orElse(0.0);
         double maxY = rectangles.stream().mapToDouble(CellRectangle::maxY).max().orElse(0.0);
         return new SurfaceBounds(minX, maxX, minY, maxY);
+    }
+
+    private List<CellRectangle> applyFreeMargins(List<CellRectangle> rectangles, de.schrell.cadas.domain.model.SurfaceLayoutMargins freeMargins) {
+        if (freeMargins.left().toMillimeters() <= EPSILON
+                && freeMargins.right().toMillimeters() <= EPSILON
+                && freeMargins.top().toMillimeters() <= EPSILON
+                && freeMargins.bottom().toMillimeters() <= EPSILON) {
+            return rectangles;
+        }
+        SurfaceBounds originalBounds = bounds(rectangles);
+        List<CellRectangle> shrunkRectangles = new ArrayList<>();
+        for (CellRectangle rectangle : rectangles) {
+            double minX = sameValue(rectangle.minX(), originalBounds.minX())
+                    ? rectangle.minX() + freeMargins.left().toMillimeters()
+                    : rectangle.minX();
+            double maxX = sameValue(rectangle.maxX(), originalBounds.maxX())
+                    ? rectangle.maxX() - freeMargins.right().toMillimeters()
+                    : rectangle.maxX();
+            double minY = sameValue(rectangle.minY(), originalBounds.minY())
+                    ? rectangle.minY() + freeMargins.bottom().toMillimeters()
+                    : rectangle.minY();
+            double maxY = sameValue(rectangle.maxY(), originalBounds.maxY())
+                    ? rectangle.maxY() - freeMargins.top().toMillimeters()
+                    : rectangle.maxY();
+            if (maxX - minX <= EPSILON || maxY - minY <= EPSILON) {
+                continue;
+            }
+            shrunkRectangles.add(new CellRectangle(minX, maxX, minY, maxY));
+        }
+        return List.copyOf(shrunkRectangles);
     }
 
     public record PlacedSurfaceTile(

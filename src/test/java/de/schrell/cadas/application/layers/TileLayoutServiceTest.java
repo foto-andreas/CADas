@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
+import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
 import java.util.List;
@@ -250,5 +251,34 @@ class TileLayoutServiceTest {
                         && tile.yOffset().toMillimeters() == 0.0
                         && tile.width().toMillimeters() == 50.0
                         && tile.height().toMillimeters() == 50.0));
+    }
+
+    @Test
+    void lässtKonfigurierteFreiränderAnAllenSeitenLeer() {
+        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+                Length.ofMillimeters(2_400),
+                Length.ofMillimeters(1_800),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(600),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                new SurfaceLayoutMargins(
+                        Length.ofMillimeters(120),
+                        Length.ofMillimeters(180),
+                        Length.ofMillimeters(90),
+                        Length.ofMillimeters(150)
+                )
+        ));
+
+        assertFalse(placements.isEmpty());
+        assertTrue(placements.stream().allMatch(tile -> tile.xOffset().toMillimeters() >= 120.0 - 0.01));
+        assertTrue(placements.stream().allMatch(tile -> tile.yOffset().toMillimeters() >= 150.0 - 0.01));
+        assertTrue(placements.stream().allMatch(tile ->
+                tile.xOffset().toMillimeters() + tile.width().toMillimeters() <= 2_220.0 + 0.01));
+        assertTrue(placements.stream().allMatch(tile ->
+                tile.yOffset().toMillimeters() + tile.height().toMillimeters() <= 1_710.0 + 0.01));
     }
 }

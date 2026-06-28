@@ -107,7 +107,10 @@ import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
+import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
+import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
@@ -446,7 +449,8 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> surfaceTileWidthUnit = new ComboBox<>();
     private final TextField surfaceTileHeightField = new TextField("30");
     private final ComboBox<LengthUnit> surfaceTileHeightUnit = new ComboBox<>();
-    private final CheckBox surfaceRotateLayoutCheckBox = new CheckBox("Verlegerichtung um 90° drehen");
+    private final ComboBox<SurfaceLayoutRotation> surfaceLayoutRotationSelector = new ComboBox<>();
+    private final ComboBox<SurfaceLayoutDirection> surfaceLayoutDirectionSelector = new ComboBox<>();
     private final ComboBox<SurfaceLayoutMode> surfaceLayoutModeSelector = new ComboBox<>();
     private final TextField surfaceLayoutOffsetField = new TextField("0");
     private final ComboBox<LengthUnit> surfaceLayoutOffsetUnit = new ComboBox<>();
@@ -456,6 +460,14 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> surfaceMinimumEdgeWidthUnit = new ComboBox<>();
     private final TextField surfaceMinimumStartEndMarginField = new TextField("8");
     private final ComboBox<LengthUnit> surfaceMinimumStartEndMarginUnit = new ComboBox<>();
+    private final TextField surfaceFreeMarginLeftField = new TextField("0");
+    private final ComboBox<LengthUnit> surfaceFreeMarginLeftUnit = new ComboBox<>();
+    private final TextField surfaceFreeMarginRightField = new TextField("0");
+    private final ComboBox<LengthUnit> surfaceFreeMarginRightUnit = new ComboBox<>();
+    private final TextField surfaceFreeMarginTopField = new TextField("0");
+    private final ComboBox<LengthUnit> surfaceFreeMarginTopUnit = new ComboBox<>();
+    private final TextField surfaceFreeMarginBottomField = new TextField("0");
+    private final ComboBox<LengthUnit> surfaceFreeMarginBottomUnit = new ComboBox<>();
     private final TextField surfaceJointWidthField = new TextField("0,2");
     private final ComboBox<LengthUnit> surfaceJointWidthUnit = new ComboBox<>();
     private final ComboBox<SurfaceCutRestriction> surfaceCutRestrictionSelector = new ComboBox<>();
@@ -1383,12 +1395,17 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Dicke", surfaceLayerThicknessField, surfaceLayerThicknessUnit),
                         propertyRow("Modulbreite", surfaceTileWidthField, surfaceTileWidthUnit),
                         propertyRow("Modulhöhe", surfaceTileHeightField, surfaceTileHeightUnit),
-                        surfaceRotateLayoutCheckBox,
+                        propertyRow("Drehung", surfaceLayoutRotationSelector),
+                        propertyRow("Verlegerichtung", surfaceLayoutDirectionSelector),
                         propertyRow("Versatzmodus", surfaceLayoutModeSelector),
                         propertyRow("Versatz", surfaceLayoutOffsetField, surfaceLayoutOffsetUnit),
                         propertyRow("Mindestversatz", surfaceMinimumOffsetField, surfaceMinimumOffsetUnit),
                         propertyRow("Mindestrand links/rechts", surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit),
                         propertyRow("Mindestbreite Anfang/Ende", surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit),
+                        propertyRow("Freirand links", surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit),
+                        propertyRow("Freirand rechts", surfaceFreeMarginRightField, surfaceFreeMarginRightUnit),
+                        propertyRow("Freirand oben", surfaceFreeMarginTopField, surfaceFreeMarginTopUnit),
+                        propertyRow("Freirand unten", surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit),
                         propertyRow("Fugenbreite", surfaceJointWidthField, surfaceJointWidthUnit),
                         propertyRow("Schnittbeschränkung", surfaceCutRestrictionSelector),
                         propertyRow("DWG-Block", dwgBlockNameField),
@@ -1774,6 +1791,10 @@ public final class CadWorkbench extends BorderPane {
         initializeUnitSelector(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceFreeMarginRightField, surfaceFreeMarginRightUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceFreeMarginTopField, surfaceFreeMarginTopUnit, LengthUnit.CENTIMETER);
+        initializeUnitSelector(surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit, LengthUnit.CENTIMETER);
         initializeUnitSelector(surfaceJointWidthField, surfaceJointWidthUnit, LengthUnit.CENTIMETER);
     }
 
@@ -1823,6 +1844,10 @@ public final class CadWorkbench extends BorderPane {
         if (!availableSurfacePresets.isEmpty()) {
             surfacePresetSelector.setValue(availableSurfacePresets.getFirst());
         }
+        surfaceLayoutRotationSelector.getItems().setAll(SurfaceLayoutRotation.values());
+        surfaceLayoutRotationSelector.setValue(SurfaceLayoutRotation.DEGREES_0);
+        surfaceLayoutDirectionSelector.getItems().setAll(SurfaceLayoutDirection.values());
+        surfaceLayoutDirectionSelector.setValue(SurfaceLayoutDirection.LEFT_TO_RIGHT);
         surfaceLayoutModeSelector.getItems().setAll(SurfaceLayoutMode.values());
         surfaceLayoutModeSelector.setValue(SurfaceLayoutMode.AUTOMATIC);
         surfaceCutRestrictionSelector.getItems().setAll(SurfaceCutRestriction.values());
@@ -2037,7 +2062,8 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(surfaceTileWidthUnit, "Bestimmt die Einheit für die Breite der Fliese oder Platte.");
         applyTooltip(surfaceTileHeightField, "Legt die Höhe beziehungsweise Länge einer Fliese oder Platte für die Belegungsbasis fest.");
         applyTooltip(surfaceTileHeightUnit, "Bestimmt die Einheit für die Höhe oder Länge des Belags.");
-        applyTooltip(surfaceRotateLayoutCheckBox, "Dreht die Verlegerichtung dieses Belags um 90 Grad. Die gespeicherten Modulmaße bleiben gleich, für Belegung, Darstellung und Materialberechnung werden Breite und Höhe vertauscht.");
+        applyTooltip(surfaceLayoutRotationSelector, "Legt die absolute Verlegedrehung fest. 0° und 180° behalten Breite und Höhe bei, 90° und 270° tauschen Modulbreite und Modulhöhe für Belegung, Darstellung und Materialberechnung.");
+        applyTooltip(surfaceLayoutDirectionSelector, "Legt fest, ob die Verlegung innerhalb jeder Reihe von links nach rechts oder von rechts nach links startet. Daraus wird die passende Startecke automatisch abgeleitet.");
         applyTooltip(surfaceLayoutModeSelector, "Bestimmt, ob ohne Versatz, mit automatischem Versatz oder mit festem Reihenversatz belegt wird.");
         applyTooltip(surfaceLayoutOffsetField, "Legt bei festem Versatz den horizontalen Reihenversatz fest.");
         applyTooltip(surfaceLayoutOffsetUnit, "Bestimmt die Einheit für den festen Reihenversatz.");
@@ -2047,6 +2073,14 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(surfaceMinimumEdgeWidthUnit, "Bestimmt die Einheit für die seitliche Mindestbreite an den Rändern.");
         applyTooltip(surfaceMinimumStartEndMarginField, "Legt die kleinste zulässige Breite der Anfangs- und Endreihe in Verlegerichtung fest. Wenn die Endreihe zu schmal würde, wird die Anfangsreihe entsprechend beschnitten, bleibt aber direkt an der Wand.");
         applyTooltip(surfaceMinimumStartEndMarginUnit, "Bestimmt die Einheit für die Mindestbreite der Anfangs- und Endreihe.");
+        applyTooltip(surfaceFreeMarginLeftField, "Lässt an der linken Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung beginnt erst hinter diesem Rand.");
+        applyTooltip(surfaceFreeMarginLeftUnit, "Bestimmt die Einheit für den freien linken Rand.");
+        applyTooltip(surfaceFreeMarginRightField, "Lässt an der rechten Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung endet vor diesem Rand.");
+        applyTooltip(surfaceFreeMarginRightUnit, "Bestimmt die Einheit für den freien rechten Rand.");
+        applyTooltip(surfaceFreeMarginTopField, "Lässt an der oberen Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung endet vor diesem Rand.");
+        applyTooltip(surfaceFreeMarginTopUnit, "Bestimmt die Einheit für den freien oberen Rand.");
+        applyTooltip(surfaceFreeMarginBottomField, "Lässt an der unteren Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung beginnt erst oberhalb dieses Randes.");
+        applyTooltip(surfaceFreeMarginBottomUnit, "Bestimmt die Einheit für den freien unteren Rand.");
         applyTooltip(surfaceJointWidthField, "Legt die Breite der Fugen zwischen den Fliesen oder Platten fest.");
         applyTooltip(surfaceJointWidthUnit, "Bestimmt die Einheit für die Fugenbreite.");
         applyTooltip(surfaceCutRestrictionSelector, "Legt fest, ob Zuschnitte beliebig frei verwendet werden dürfen, ob Schnittkanten nur an Außenkanten liegen dürfen oder ob zusätzlich die Verlegerichtung ohne Drehung eingehalten werden muss.");
@@ -3317,7 +3351,8 @@ public final class CadWorkbench extends BorderPane {
                 layer.layoutOffset(),
                 layer.minimumOffset(),
                 layer.minimumEdgeWidth(),
-                layer.minimumStartEndMargin()
+                layer.minimumStartEndMargin(),
+                layer.freeMargins()
         );
         graphics.setStroke(selected ? Color.color(0.78, 0.24, 0.08, 0.92) : Color.color(0.20, 0.15, 0.09, 0.72));
         graphics.setLineWidth(Math.max(selected ? 1.2 : 0.8, jointWidth * scale()));
@@ -3459,7 +3494,8 @@ public final class CadWorkbench extends BorderPane {
                 layer.layoutOffset(),
                 layer.minimumOffset(),
                 layer.minimumEdgeWidth(),
-                layer.minimumStartEndMargin()
+                layer.minimumStartEndMargin(),
+                layer.freeMargins()
         );
         graphics.setStroke(selected ? Color.color(0.78, 0.24, 0.08, 0.92) : Color.color(0.16, 0.12, 0.08, 0.78));
         graphics.setLineWidth(Math.max(selected ? 1.1 : 0.7, jointWidth * scale()));
@@ -6362,6 +6398,11 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceMinimumOffset(),
                 currentSurfaceMinimumEdgeWidth(),
                 currentSurfaceMinimumStartEndMargin(),
+                currentSurfaceFreeMargins(),
+                currentSurfaceLayoutAnchor(),
+                currentSurfaceLayoutRotatedQuarterTurn(),
+                Length.zero(),
+                Length.zero(),
                 currentSurfaceJointWidth(),
                 currentSurfaceCutRestriction(),
                 currentSurfaceCoveringSource()
@@ -6435,12 +6476,17 @@ public final class CadWorkbench extends BorderPane {
         setLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, preset.thickness(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, preset.tileWidth(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, preset.tileHeight(), LengthUnit.CENTIMETER);
-        surfaceRotateLayoutCheckBox.setSelected(false);
+        surfaceLayoutRotationSelector.setValue(preset.layoutRotation());
+        surfaceLayoutDirectionSelector.setValue(preset.layoutDirection());
         surfaceLayoutModeSelector.setValue(preset.layoutMode());
         setLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, preset.offset(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, preset.minimumOffset(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, preset.minimumEdgeWidth(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, preset.minimumStartEndMargin(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit, preset.freeMargins().left(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceFreeMarginRightField, surfaceFreeMarginRightUnit, preset.freeMargins().right(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceFreeMarginTopField, surfaceFreeMarginTopUnit, preset.freeMargins().top(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit, preset.freeMargins().bottom(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, preset.jointWidth(), LengthUnit.CENTIMETER);
         surfaceCutRestrictionSelector.setValue(preset.cutRestriction());
         dwgBlockNameField.setText(extractDwgBlockName(preset.coveringSource()).orElse(""));
@@ -6954,8 +7000,20 @@ public final class CadWorkbench extends BorderPane {
         int tileCount = estimatedTileCount(layer);
         String sourceLabel = formatCoveringSourceLabel(layer.coveringSource());
         String source = sourceLabel.isBlank() ? "" : " | Quelle: " + sourceLabel;
-        String direction = layer.layoutRotatedQuarterTurn() ? " | 90°" : "";
-        return layer.name() + " | " + layer.thickness().format(LengthUnit.MILLIMETER, 1) + " | " + visibility + direction + " | " + tileCount + " Elemente | " + layer.cutRestriction().label() + source;
+        return layer.name()
+                + " | "
+                + layer.thickness().format(LengthUnit.MILLIMETER, 1)
+                + " | "
+                + visibility
+                + " | "
+                + layer.layoutRotation().label()
+                + " | "
+                + layer.layoutDirection().label()
+                + " | "
+                + tileCount
+                + " Elemente | "
+                + layer.cutRestriction().label()
+                + source;
     }
 
     private int estimatedTileCount(SurfaceLayer layer) {
@@ -6972,7 +7030,8 @@ public final class CadWorkbench extends BorderPane {
                 layer.layoutOffset(),
                 layer.minimumOffset(),
                 layer.minimumEdgeWidth(),
-                layer.minimumStartEndMargin()
+                layer.minimumStartEndMargin(),
+                layer.freeMargins()
         );
         return tileLayoutService.fillSurface(request).size();
     }
@@ -6987,12 +7046,17 @@ public final class CadWorkbench extends BorderPane {
         syncLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, selectedLayer.thickness(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, selectedLayer.tileWidth(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, selectedLayer.tileHeight(), LengthUnit.CENTIMETER);
-        surfaceRotateLayoutCheckBox.setSelected(selectedLayer.layoutRotatedQuarterTurn());
+        surfaceLayoutRotationSelector.setValue(selectedLayer.layoutRotation());
+        surfaceLayoutDirectionSelector.setValue(selectedLayer.layoutDirection());
         surfaceLayoutModeSelector.setValue(selectedLayer.layoutMode());
         syncLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, selectedLayer.layoutOffset(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, selectedLayer.minimumOffset(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, selectedLayer.minimumEdgeWidth(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, selectedLayer.minimumStartEndMargin(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit, selectedLayer.freeMargins().left(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceFreeMarginRightField, surfaceFreeMarginRightUnit, selectedLayer.freeMargins().right(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceFreeMarginTopField, surfaceFreeMarginTopUnit, selectedLayer.freeMargins().top(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit, selectedLayer.freeMargins().bottom(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, selectedLayer.jointWidth(), LengthUnit.CENTIMETER);
         surfaceCutRestrictionSelector.setValue(selectedLayer.cutRestriction());
         surfaceLayerCoverageLabel.setText(describeSurfaceLayer(selectedLayer));
@@ -7043,6 +7107,10 @@ public final class CadWorkbench extends BorderPane {
                     currentSurfaceMinimumOffset(),
                     currentSurfaceMinimumEdgeWidth(),
                     currentSurfaceMinimumStartEndMargin(),
+                    currentSurfaceFreeMargins(),
+                    currentSurfaceLayoutAnchor(),
+                    Length.zero(),
+                    Length.zero(),
                     currentSurfaceJointWidth(),
                     currentSurfaceCutRestriction(),
                     currentSurfaceCoveringSource(),
@@ -7124,7 +7192,7 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceJointWidth(),
                 currentSurfaceCutRestriction(),
                 currentSurfaceCoveringSource()
-        ).withLayoutRotatedQuarterTurn(currentSurfaceLayoutRotatedQuarterTurn());
+        ).withFreeMargins(currentSurfaceFreeMargins()).withLayoutOrientation(currentSurfaceLayoutRotation(), currentSurfaceLayoutDirection());
     }
 
     private String currentSurfaceLayerName() {
@@ -7144,8 +7212,20 @@ public final class CadWorkbench extends BorderPane {
         return parseLength(surfaceTileHeightField, surfaceTileHeightUnit.getValue()).orElse(Length.of(30, LengthUnit.CENTIMETER));
     }
 
+    private SurfaceLayoutRotation currentSurfaceLayoutRotation() {
+        return Optional.ofNullable(surfaceLayoutRotationSelector.getValue()).orElse(SurfaceLayoutRotation.DEGREES_0);
+    }
+
+    private SurfaceLayoutDirection currentSurfaceLayoutDirection() {
+        return Optional.ofNullable(surfaceLayoutDirectionSelector.getValue()).orElse(SurfaceLayoutDirection.LEFT_TO_RIGHT);
+    }
+
     private boolean currentSurfaceLayoutRotatedQuarterTurn() {
-        return surfaceRotateLayoutCheckBox.isSelected();
+        return currentSurfaceLayoutRotation().rotatedQuarterTurn();
+    }
+
+    private de.schrell.cadas.domain.model.SurfaceLayoutAnchor currentSurfaceLayoutAnchor() {
+        return SurfaceLayer.anchorFor(currentSurfaceLayoutRotation(), currentSurfaceLayoutDirection());
     }
 
     private SurfaceLayoutMode currentSurfaceLayoutMode() {
@@ -7166,6 +7246,15 @@ public final class CadWorkbench extends BorderPane {
 
     private Length currentSurfaceMinimumStartEndMargin() {
         return parseLength(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit.getValue()).orElse(Length.zero());
+    }
+
+    private SurfaceLayoutMargins currentSurfaceFreeMargins() {
+        return new SurfaceLayoutMargins(
+                parseLength(surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit.getValue()).orElse(Length.zero()),
+                parseLength(surfaceFreeMarginRightField, surfaceFreeMarginRightUnit.getValue()).orElse(Length.zero()),
+                parseLength(surfaceFreeMarginTopField, surfaceFreeMarginTopUnit.getValue()).orElse(Length.zero()),
+                parseLength(surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit.getValue()).orElse(Length.zero())
+        );
     }
 
     private Length currentSurfaceJointWidth() {

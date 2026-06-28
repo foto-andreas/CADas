@@ -1,10 +1,12 @@
 package de.schrell.cadas.application.layers;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService.CellRectangle;
 import de.schrell.cadas.domain.geometry.Length;
+import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.SurfaceLayer;
@@ -109,5 +111,45 @@ class SurfaceRectangleTileLayoutServiceTest {
                         Math.abs(tile.x() + 80.0) < 0.01
                                 && Math.abs(tile.width() - 1_000.0) < 0.01),
                 "Der schmale Flurarm soll bei 90°-Verlegung mit einer vollen 1000-mm-Platte starten.");
+    }
+
+    @Test
+    void hältDenFixenVersatzInGedrehterKi1SchlafzimmerbelegungInJederZweitenReihe() throws Exception {
+        Level level = new DxfProjectExchangeService()
+                .importProject(Path.of("KI1.cadas"), "KI1")
+                .levels().stream()
+                .filter(candidate -> candidate.name().equals("Erdgeschoss"))
+                .findFirst()
+                .orElseThrow();
+        Room schlafzimmer = level.rooms().stream()
+                .filter(room -> room.name().equals("Schlafzimmer"))
+                .findFirst()
+                .orElseThrow();
+        SurfaceLayer layer = level.findSurfaceLayerStack(SurfaceType.FLOOR, schlafzimmer.id().toString()).layers().getFirst();
+
+        assertTrue(layer.layoutRotatedQuarterTurn());
+        assertEquals(SurfaceLayoutMode.FIXED, layer.layoutMode());
+        assertEquals(300.0, layer.layoutOffset().toMillimeters(), 0.001);
+
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = service.tilesForRectangles(
+                floorOpeningGeometryService.floorRectangles(level, schlafzimmer),
+                layer
+        );
+
+        double ersteReihe = ersteReihenbreite(tiles, 0);
+        double zweiteReihe = ersteReihenbreite(tiles, 1);
+        double dritteReihe = ersteReihenbreite(tiles, 2);
+        assertEquals(594.088, ersteReihe, 0.02);
+        assertEquals(414.088, zweiteReihe, 0.02);
+        assertEquals(594.088, dritteReihe, 0.02);
+    }
+
+    private double ersteReihenbreite(List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles, int row) {
+        return tiles.stream()
+                .filter(tile -> tile.row() == row)
+                .sorted(java.util.Comparator.comparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::x))
+                .findFirst()
+                .orElseThrow()
+                .width();
     }
 }

@@ -8,7 +8,10 @@ import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
+import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
+import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
+import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -37,7 +40,14 @@ class UserSurfaceCoveringPresetLibraryTest {
                 Length.of(7, LengthUnit.CENTIMETER),
                 Length.of(6, LengthUnit.CENTIMETER),
                 Length.of(12, LengthUnit.CENTIMETER),
+                new SurfaceLayoutMargins(
+                        Length.of(1, LengthUnit.CENTIMETER),
+                        Length.of(2, LengthUnit.CENTIMETER),
+                        Length.of(3, LengthUnit.CENTIMETER),
+                        Length.of(4, LengthUnit.CENTIMETER)
+                ),
                 SurfaceLayoutAnchor.MAX_X_MAX_Y,
+                true,
                 Length.of(4, LengthUnit.CENTIMETER),
                 Length.of(41, LengthUnit.CENTIMETER),
                 Length.of(3, LengthUnit.MILLIMETER),
@@ -60,7 +70,13 @@ class UserSurfaceCoveringPresetLibraryTest {
         assertEquals(Length.of(7, LengthUnit.CENTIMETER), loadedPreset.minimumOffset());
         assertEquals(Length.of(6, LengthUnit.CENTIMETER), loadedPreset.minimumEdgeWidth());
         assertEquals(Length.of(12, LengthUnit.CENTIMETER), loadedPreset.minimumStartEndMargin());
+        assertEquals(Length.of(1, LengthUnit.CENTIMETER), loadedPreset.freeMargins().left());
+        assertEquals(Length.of(2, LengthUnit.CENTIMETER), loadedPreset.freeMargins().right());
+        assertEquals(Length.of(3, LengthUnit.CENTIMETER), loadedPreset.freeMargins().top());
+        assertEquals(Length.of(4, LengthUnit.CENTIMETER), loadedPreset.freeMargins().bottom());
         assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, loadedPreset.layoutAnchor());
+        assertEquals(SurfaceLayoutRotation.DEGREES_270, loadedPreset.layoutRotation());
+        assertEquals(SurfaceLayoutDirection.RIGHT_TO_LEFT, loadedPreset.layoutDirection());
         assertEquals(Length.of(4, LengthUnit.CENTIMETER), loadedPreset.startRowTrim());
         assertEquals(Length.of(41, LengthUnit.CENTIMETER), loadedPreset.startRowWidth());
         assertEquals(Length.of(3, LengthUnit.MILLIMETER), loadedPreset.jointWidth());
