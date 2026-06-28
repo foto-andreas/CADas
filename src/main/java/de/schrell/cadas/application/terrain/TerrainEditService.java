@@ -77,7 +77,7 @@ public final class TerrainEditService {
             Length elevation
     ) {
         List<TerrainVertex> updatedVertices = new ArrayList<>(terrain.vertices());
-        updatedVertices.removeIf(vertex -> vertex.position().equals(existingSample.contourPoint()));
+        removeMatchingVertex(updatedVertices, contour, existingSample);
         updatedVertices.add(new TerrainVertex(target.contourPoint(), elevation));
         return terrainWithSortedVertices(terrain.displayWidth(), contour, updatedVertices);
     }
@@ -87,10 +87,25 @@ public final class TerrainEditService {
             List<PlanPoint> contour,
             TerrainProfileService.ProjectedTerrainPoint existingSample
     ) {
-        List<TerrainVertex> updatedVertices = terrain.vertices().stream()
-                .filter(vertex -> !vertex.position().equals(existingSample.contourPoint()))
-                .toList();
+        List<TerrainVertex> updatedVertices = new ArrayList<>(terrain.vertices());
+        removeMatchingVertex(updatedVertices, contour, existingSample);
         return terrainWithSortedVertices(terrain.displayWidth(), contour, updatedVertices);
+    }
+
+    private void removeMatchingVertex(
+            List<TerrainVertex> vertices,
+            List<PlanPoint> contour,
+            TerrainProfileService.ProjectedTerrainPoint existingSample
+    ) {
+        long contourKey = contourKey(existingSample.contourDistance());
+        vertices.removeIf(vertex -> vertex.position().equals(existingSample.contourPoint())
+                || terrainProfileService.projectToContour(vertex.position(), contour)
+                .map(projectedPoint -> contourKey(projectedPoint.contourDistance()) == contourKey)
+                .orElse(false));
+    }
+
+    private long contourKey(double contourDistance) {
+        return Math.round(contourDistance * 1000.0);
     }
 
     private Terrain terrainWithSortedVertices(

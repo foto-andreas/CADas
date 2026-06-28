@@ -87,6 +87,25 @@ class TerrainEditServiceTest {
         assertFalse(aktualisiert.vertices().stream().anyMatch(vertex -> vertex.position().equals(new PlanPoint(2000, 0))));
     }
 
+    @Test
+    void entferntAuchLeichtNebenDerKonturGespeichertenGeländepunkt() {
+        Terrain terrain = new Terrain(List.of(
+                new TerrainVertex(new PlanPoint(1000, 0), Length.ofMillimeters(100)),
+                new TerrainVertex(new PlanPoint(2000, -20), Length.ofMillimeters(200)),
+                new TerrainVertex(new PlanPoint(3000, 3000), Length.ofMillimeters(300))
+        ), Length.ofMillimeters(1800));
+        TerrainProfileService.ProjectedTerrainPoint vorhandenerPunkt = service.resolveEditTarget(
+                terrain,
+                CONTOUR,
+                new PlanPoint(2050, -190)
+        ).orElseThrow();
+
+        Terrain aktualisiert = service.deletePoint(terrain, CONTOUR, vorhandenerPunkt);
+
+        assertEquals(2, aktualisiert.vertices().size());
+        assertFalse(aktualisiert.vertices().stream().anyMatch(vertex -> vertex.position().equals(new PlanPoint(2000, -20))));
+    }
+
     private Terrain terrainMitStützpunkten() {
         return new Terrain(List.of(
                 new TerrainVertex(new PlanPoint(1000, 0), Length.ofMillimeters(100)),
