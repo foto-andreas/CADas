@@ -9569,109 +9569,38 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private TextField textFieldByName(String fieldName) {
-        return switch (fieldName) {
-            case "grid" -> gridField;
-            case "length" -> lengthField;
-            case "angle" -> angleField;
-            case "northAngle" -> northAngleField;
-            case "wallThickness" -> wallThicknessField;
-            case "wallHeight" -> wallHeightField;
-            case "endpointHeight" -> endpointHeightField;
-            case "surfaceLayerName" -> surfaceLayerNameField;
-            case "surfaceLayerThickness" -> surfaceLayerThicknessField;
-            case "surfaceTileWidth" -> surfaceTileWidthField;
-            case "surfaceTileHeight" -> surfaceTileHeightField;
-            case "surfaceLayoutOffset" -> surfaceLayoutOffsetField;
-            case "surfaceMinimumOffset" -> surfaceMinimumOffsetField;
-            case "surfaceMinimumEdgeWidth" -> surfaceMinimumEdgeWidthField;
-            case "surfaceMinimumStartEndMargin" -> surfaceMinimumStartEndMarginField;
-            case "surfaceJointWidth" -> surfaceJointWidthField;
-            case "roomName" -> roomNameField;
-            case "roomHeight" -> roomHeightField;
-            case "floorThickness" -> floorThicknessField;
-            case "ceilingThickness" -> ceilingThicknessField;
-            case "kneeWallHeight" -> kneeWallHeightField;
-            case "doorWidth" -> doorWidthField;
-            case "doorHeight" -> doorHeightField;
-            case "threshold" -> thresholdField;
-            case "windowWidth" -> windowWidthField;
-            case "windowHeight" -> windowHeightField;
-            case "sillHeight" -> sillHeightField;
-            case "stairHeight" -> stairHeightField;
-            case "stairSteps" -> stairStepsField;
-            case "stairStartLanding" -> stairStartLandingField;
-            case "stairEndLanding" -> stairEndLandingField;
-            case "stairLeftUnderbuild" -> stairLeftUnderbuildField;
-            case "stairRightUnderbuild" -> stairRightUnderbuildField;
-            case "stairUndersideThickness" -> stairUndersideThicknessField;
-            case "roomObjectName" -> roomObjectNameField;
-            case "roomObjectWidth" -> roomObjectWidthField;
-            case "roomObjectDepth" -> roomObjectDepthField;
-            case "roomObjectHeight" -> roomObjectHeightField;
-            case "roomObjectHeatOutput" -> roomObjectHeatOutputField;
-            case "roomObjectBaseElevation" -> roomObjectBaseElevationField;
-            case "roomObjectAngle" -> roomObjectAngleField;
-            case "floorExtensionThickness" -> floorExtensionThicknessField;
-            case "heatingPipeSpacing" -> heatingPipeSpacingField;
-            case "heatingPipeDiameter" -> heatingPipeDiameterField;
-            case "heatingMaximumPipeLength" -> heatingMaximumPipeLengthField;
-            case "heatingWallClearance" -> heatingWallClearanceField;
-            case "heatingSupplyX" -> heatingSupplyXField;
-            case "heatingSupplyY" -> heatingSupplyYField;
-            case "heatingReturnX" -> heatingReturnXField;
-            case "heatingReturnY" -> heatingReturnYField;
-            case "heatingZoneName" -> heatingZoneNameField;
-            case "heatingZoneHeatOutput" -> heatingZoneHeatOutputField;
-            default -> throw new IllegalArgumentException("Eingabefeld `" + fieldName + "` ist unbekannt.");
-        };
+        return uiMember(fieldName + "Field", TextField.class, "Eingabefeld");
     }
 
+    @SuppressWarnings("unchecked")
     private ComboBox<LengthUnit> unitSelectorByName(String fieldName) {
-        return switch (fieldName) {
-            case "grid" -> gridUnit;
-            case "length" -> lengthUnit;
-            case "wallThickness" -> wallThicknessUnit;
-            case "wallHeight" -> wallHeightUnit;
-            case "endpointHeight" -> endpointHeightUnit;
-            case "stairStartLanding" -> stairStartLandingUnit;
-            case "stairEndLanding" -> stairEndLandingUnit;
-            case "stairLeftUnderbuild" -> stairLeftUnderbuildUnit;
-            case "stairRightUnderbuild" -> stairRightUnderbuildUnit;
-            case "stairUndersideThickness" -> stairUndersideThicknessUnit;
-            case "roomObjectWidth" -> roomObjectWidthUnit;
-            case "roomObjectDepth" -> roomObjectDepthUnit;
-            case "roomObjectHeight" -> roomObjectHeightUnit;
-            case "roomObjectBaseElevation" -> roomObjectBaseElevationUnit;
-            case "floorExtensionThickness" -> floorExtensionThicknessUnit;
-            case "heatingPipeSpacing" -> heatingPipeSpacingUnit;
-            case "heatingPipeDiameter" -> heatingPipeDiameterUnit;
-            case "heatingMaximumPipeLength" -> heatingMaximumPipeLengthUnit;
-            case "heatingWallClearance" -> heatingWallClearanceUnit;
-            case "heatingSupplyX" -> heatingSupplyXUnit;
-            case "heatingSupplyY" -> heatingSupplyYUnit;
-            case "heatingReturnX" -> heatingReturnXUnit;
-            case "heatingReturnY" -> heatingReturnYUnit;
-            case "surfaceLayerThickness" -> surfaceLayerThicknessUnit;
-            case "surfaceTileWidth" -> surfaceTileWidthUnit;
-            case "surfaceTileHeight" -> surfaceTileHeightUnit;
-            case "surfaceLayoutOffset" -> surfaceLayoutOffsetUnit;
-            case "surfaceMinimumOffset" -> surfaceMinimumOffsetUnit;
-            case "surfaceMinimumEdgeWidth" -> surfaceMinimumEdgeWidthUnit;
-            case "surfaceMinimumStartEndMargin" -> surfaceMinimumStartEndMarginUnit;
-            case "surfaceJointWidth" -> surfaceJointWidthUnit;
-            case "roomHeight" -> roomHeightUnit;
-            case "floorThickness" -> floorThicknessUnit;
-            case "ceilingThickness" -> ceilingThicknessUnit;
-            case "kneeWallHeight" -> kneeWallHeightUnit;
-            case "doorWidth" -> doorWidthUnit;
-            case "doorHeight" -> doorHeightUnit;
-            case "threshold" -> thresholdUnit;
-            case "windowWidth" -> windowWidthUnit;
-            case "windowHeight" -> windowHeightUnit;
-            case "sillHeight" -> sillHeightUnit;
-            case "stairHeight" -> stairHeightUnit;
-            default -> throw new IllegalArgumentException("Einheitenselektor `" + fieldName + "` ist unbekannt.");
-        };
+        return (ComboBox<LengthUnit>) uiMember(fieldName + "Unit", ComboBox.class, "Einheitenselektor");
+    }
+
+    private <T> T uiMember(String memberName, Class<T> expectedType, String label) {
+        try {
+            Object value = findUiMemberField(memberName).get(this);
+            if (!expectedType.isInstance(value)) {
+                throw new IllegalArgumentException(label + " `" + memberName + "` hat einen unerwarteten Typ.");
+            }
+            return expectedType.cast(value);
+        } catch (NoSuchFieldException exception) {
+            throw new IllegalArgumentException(label + " `" + memberName.replaceAll("(Field|Unit)$", "") + "` ist unbekannt.", exception);
+        } catch (IllegalAccessException exception) {
+            throw new IllegalStateException(label + " `" + memberName + "` konnte nicht gelesen werden.", exception);
+        }
+    }
+
+    private java.lang.reflect.Field findUiMemberField(String memberName) throws NoSuchFieldException {
+        Class<?> currentType = getClass();
+        while (currentType != null) {
+            try {
+                return currentType.getDeclaredField(memberName);
+            } catch (NoSuchFieldException ignored) {
+                currentType = currentType.getSuperclass();
+            }
+        }
+        throw new NoSuchFieldException(memberName);
     }
 
     private void ensureCanvasReady() {
