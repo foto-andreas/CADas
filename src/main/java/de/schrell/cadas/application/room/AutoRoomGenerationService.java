@@ -27,6 +27,8 @@ public final class AutoRoomGenerationService {
     private static final double WALL_JOIN_TOLERANCE = 10.0;
     private static final double MAX_ORTHOGONAL_DEVIATION_RATIO = Math.tan(Math.toRadians(0.5));
     private static final double OUTER_MARGIN = 1_000.0;
+    private static final double SMALL_SEGMENT_MAX_MILLIMETERS = 150.0;
+    private static final double RELEVANT_HEIGHT_DELTA_MILLIMETERS = 200.0;
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
 
     public List<Room> synchronize(Level level, RoomDefaults defaults) {
@@ -603,7 +605,51 @@ public final class AutoRoomGenerationService {
                 heights.add(Length.ofMillimeters(sum / count));
             }
         }
-        return List.copyOf(heights);
+        return normalizeThinWallEndHeights(outline, heights);
+    }
+
+    private List<Length> normalizeThinWallEndHeights(List<PlanPoint> outline, List<Length> heights) {
+        if (outline.size() < 3 || heights.size() != outline.size()) {
+            return List.copyOf(heights);
+        }
+        List<Length> normalizedHeights = new ArrayList<>(heights);
+        PlanPoint center = polygonCenter(outline);
+        for (int index = 0; index < outline.size(); index++) {
+            int nextIndex = (index + 1) % outline.size();
+            int previousIndex = (index - 1 + outline.size()) % outline.size();
+            int afterNextIndex = (nextIndex + 1) % outline.size();
+            double segmentLength = outline.get(index).distanceTo(outline.get(nextIndex)).toMillimeters();
+            if (segmentLength > SMALL_SEGMENT_MAX_MILLIMETERS) {
+                continue;
+            }
+            double firstHeight = normalizedHeights.get(index).toMillimeters();
+            double secondHeight = normalizedHeights.get(nextIndex).toMillimeters();
+            if (Math.abs(firstHeight - secondHeight) > EPSILON) {
+                continue;
+            }
+            double adjacentHeight = Math.max(
+                    normalizedHeights.get(previousIndex).toMillimeters(),
+                    normalizedHeights.get(afterNextIndex).toMillimeters()
+            );
+            if (adjacentHeight - firstHeight < RELEVANT_HEIGHT_DELTA_MILLIMETERS) {
+                continue;
+            }
+            boolean firstCloserToCenter = outline.get(index).distanceTo(center).toMillimeters()
+                    <= outline.get(nextIndex).distanceTo(center).toMillimeters();
+            normalizedHeights.set(index, Length.ofMillimeters(firstCloserToCenter ? firstHeight : adjacentHeight));
+            normalizedHeights.set(nextIndex, Length.ofMillimeters(firstCloserToCenter ? adjacentHeight : secondHeight));
+        }
+        return List.copyOf(normalizedHeights);
+    }
+
+    private PlanPoint polygonCenter(List<PlanPoint> outline) {
+        double sumX = 0.0;
+        double sumY = 0.0;
+        for (PlanPoint point : outline) {
+            sumX += point.xMillimeters();
+            sumY += point.yMillimeters();
+        }
+        return new PlanPoint(sumX / outline.size(), sumY / outline.size());
     }
 
     private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {

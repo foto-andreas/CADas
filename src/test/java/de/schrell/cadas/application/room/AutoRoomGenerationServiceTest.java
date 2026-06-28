@@ -176,6 +176,29 @@ class AutoRoomGenerationServiceTest {
     }
 
     @Test
+    void senktImKi2FlurNurEineTreppennaheMiniEckeAb() throws Exception {
+        Level level = new DxfProjectExchangeService()
+                .importProject(java.nio.file.Path.of("KI2.cadas"), "KI2")
+                .levels().stream()
+                .filter(candidate -> candidate.name().equals("Erdgeschoss"))
+                .findFirst()
+                .orElseThrow();
+
+        Room flur = service.synchronize(level, defaults()).stream()
+                .filter(room -> room.name().equals("Flur"))
+                .findFirst()
+                .orElseThrow();
+
+        long lowCorners = flur.ceilingVertexHeights().stream()
+                .filter(height -> height.toMillimeters() < 600.0)
+                .count();
+
+        assertEquals(1, lowCorners);
+        assertEquals(550.0, flur.minimumCeilingHeightMillimeters(), 0.001);
+        assertEquals(2550.0, flur.maximumCeilingHeightMillimeters(), 0.001);
+    }
+
+    @Test
     void passtRaumkonturBeiVerschobenerEckeMitSchraegenWaendenAn() {
         Level level = new Level("Erdgeschoss");
         addLoop(level, List.of(
