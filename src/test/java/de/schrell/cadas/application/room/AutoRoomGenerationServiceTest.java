@@ -176,7 +176,7 @@ class AutoRoomGenerationServiceTest {
     }
 
     @Test
-    void senktImKi2FlurNurEineTreppennaheMiniEckeAb() throws Exception {
+    void ignoriertImKi2FlurTreppenunterbauBeiDerDeckenhöhe() throws Exception {
         Level level = new DxfProjectExchangeService()
                 .importProject(java.nio.file.Path.of("KI2.cadas"), "KI2")
                 .levels().stream()
@@ -193,8 +193,8 @@ class AutoRoomGenerationServiceTest {
                 .filter(height -> height.toMillimeters() < 600.0)
                 .count();
 
-        assertEquals(1, lowCorners);
-        assertEquals(550.0, flur.minimumCeilingHeightMillimeters(), 0.001);
+        assertEquals(0, lowCorners);
+        assertEquals(2550.0, flur.minimumCeilingHeightMillimeters(), 0.001);
         assertEquals(2550.0, flur.maximumCeilingHeightMillimeters(), 0.001);
     }
 
