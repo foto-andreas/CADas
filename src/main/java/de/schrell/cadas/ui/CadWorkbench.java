@@ -241,6 +241,7 @@ public final class CadWorkbench extends BorderPane {
     private static final Length DEFAULT_WINDOW_SILL = Length.of(90, LengthUnit.CENTIMETER);
     private static final Length DEFAULT_STAIR_HEIGHT = Length.of(2.80, LengthUnit.METER);
     private static final Length SNAP_TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
+    private static final double POINTER_SELECTION_TOLERANCE_PIXELS = 8.0;
     private static final double DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS = 50.0;
     private static final double VARIOTHERM_DETAIL_MIN_SCREEN_SPACING = 28.0;
     private static final int LENGTH_INPUT_DECIMALS = 3;
@@ -2052,7 +2053,7 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(autoRouteHeatingZoneOnResizeCheckBox, "Legt fest, ob ein Heizkreis nach dem Ziehen seines Rechtecks automatisch neu geroutet wird. Ausgeschaltet bleiben die vorhandenen Routing-Befehle erhalten.");
         applyTooltip(heatingSummaryLabel, "Zeigt Fläche, Verlegeart, Anzahl der Heizkreise, gesamte HKL und die aufsummierte Heizleistung der gewählten Flächenheizung.");
         applyTooltip(roomObjectPresetSelector, "Wählt ein Objekt zum Platzieren aus und übernimmt dessen Standardmaße. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
-        applyTooltip(roomObjectNameField, "Legt die sichtbare Bezeichnung eines neuen oder ausgewählten Objekts fest. Bei Quadern wird sie im Grundriss angezeigt.");
+        applyTooltip(roomObjectNameField, "Legt die sichtbare Bezeichnung eines neuen oder ausgewählten Objekts fest. Die Bezeichnung wird in der 2D-Draufsicht direkt am Objekt angezeigt.");
         applyTooltip(roomObjectWidthField, "Legt die Breite eines neuen oder ausgewählten Objekts fest.");
         applyTooltip(roomObjectWidthUnit, "Bestimmt die Einheit für die Objektbreite.");
         applyTooltip(roomObjectDepthField, "Legt die Tiefe eines neuen oder ausgewählten Objekts fest.");
@@ -2221,7 +2222,7 @@ public final class CadWorkbench extends BorderPane {
             }
             // Für die Selektion wird der reine Klickpunkt verwendet, nicht das gerasterte Ergebnis.
             PlanPoint editPoint = rawEditPoint;
-            selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, SNAP_TOLERANCE).orElse(null);
+            selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, pointerSelectionTolerance()).orElse(null);
             selectionDragAnchor = null;
             selectionDragBaseWalls = List.of();
             selectionDragBaseStaircases = List.of();
@@ -2306,7 +2307,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private SelectionKey editSelectionAt(PlanPoint editPoint, boolean cycleSelection) {
-        List<SelectionKey> candidates = selectionQueryService.findSelections(activeLevel.get(), editPoint, SNAP_TOLERANCE);
+        List<SelectionKey> candidates = selectionQueryService.findSelections(activeLevel.get(), editPoint, pointerSelectionTolerance());
         if (candidates.isEmpty()) {
             return null;
         }
@@ -2325,7 +2326,7 @@ public final class CadWorkbench extends BorderPane {
                 endpointSelection.startWallIds().stream(),
                 endpointSelection.endWallIds().stream()
         ).map(UUID::toString).collect(java.util.stream.Collectors.toSet());
-        Optional<SelectionKey> hitWall = selectionQueryService.findSelections(activeLevel.get(), editPoint, SNAP_TOLERANCE).stream()
+        Optional<SelectionKey> hitWall = selectionQueryService.findSelections(activeLevel.get(), editPoint, pointerSelectionTolerance()).stream()
                 .filter(selection -> selection.kind() == RenderableKind.WALL)
                 .filter(selection -> endpointWallIds.contains(selection.elementId()))
                 .findFirst();
@@ -2673,7 +2674,7 @@ public final class CadWorkbench extends BorderPane {
 
     private SelectionKey contextSelectionAt(MouseEvent event) {
         PlanPoint editPoint = screenToWorld(event.getX(), event.getY());
-        return selectionQueryService.findSelection(activeLevel.get(), editPoint, SNAP_TOLERANCE).orElse(null);
+        return selectionQueryService.findSelection(activeLevel.get(), editPoint, pointerSelectionTolerance()).orElse(null);
     }
 
     private void updateModifierState(KeyEvent event) {
@@ -4412,7 +4413,7 @@ public final class CadWorkbench extends BorderPane {
             }
         }
         graphics.restore();
-        if (roomObject.type() == RoomObjectType.CUBOID && !roomObject.name().isBlank()) {
+        if (!roomObject.name().isBlank()) {
             graphics.save();
             graphics.setFill(Color.web("#183f37"));
             graphics.setFont(Font.font("Menlo", 11));
@@ -5030,6 +5031,13 @@ public final class CadWorkbench extends BorderPane {
 
     private Grid currentGrid() {
         return new Grid(parseLength(gridField, gridUnit.getValue()).orElse(DEFAULT_GRID));
+    }
+
+    private Length pointerSelectionTolerance() {
+        return Length.ofMillimeters(Math.min(
+                SNAP_TOLERANCE.toMillimeters(),
+                POINTER_SELECTION_TOLERANCE_PIXELS / Math.max(scale(), 0.0001)
+        ));
     }
 
     private Length currentWallThickness() {
@@ -9207,7 +9215,7 @@ public final class CadWorkbench extends BorderPane {
         contextMenuSelection = selectionQueryService.findSelection(
                 activeLevel.get(),
                 contextMenuWorldPoint,
-                SNAP_TOLERANCE
+                pointerSelectionTolerance()
         ).orElse(null);
         if (contextMenuSelection != null) {
             selectSingle(contextMenuSelection);

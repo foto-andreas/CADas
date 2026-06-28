@@ -296,6 +296,17 @@ public record RoomObject(
         return center.yMillimeters() + footprintDepthMillimeters() / 2.0;
     }
 
+    public boolean contains(PlanPoint point) {
+        Objects.requireNonNull(point, "point darf nicht null sein.");
+        LocalPoint localPoint = toLocalPoint(point);
+        return switch (shape) {
+            case RECTANGLE -> containsRectangle(localPoint);
+            case CIRCLE, OVAL -> containsOval(localPoint);
+            case HALF_ROUND -> containsHalfRound(localPoint);
+            case QUARTER_CIRCLE -> containsQuarterCircle(localPoint);
+        };
+    }
+
     public RoomObject withVisibility(boolean newVisibility) {
         return new RoomObject(id, presetId, name, type, shape, center, width, depth, height, rotationDegrees, mountingMode, newVisibility, source, baseElevation, heatingType, heatOutputWatts);
     }
@@ -322,5 +333,58 @@ public record RoomObject(
     private static double normalizeDegrees(double degrees) {
         double normalized = degrees % 360.0;
         return normalized < 0.0 ? normalized + 360.0 : normalized;
+    }
+
+    private LocalPoint toLocalPoint(PlanPoint point) {
+        double deltaX = point.xMillimeters() - center.xMillimeters();
+        double deltaY = point.yMillimeters() - center.yMillimeters();
+        double radians = Math.toRadians(rotationDegrees);
+        double cos = Math.cos(radians);
+        double sin = Math.sin(radians);
+        return new LocalPoint(
+                deltaX * cos - deltaY * sin,
+                deltaX * sin + deltaY * cos
+        );
+    }
+
+    private boolean containsRectangle(LocalPoint point) {
+        return Math.abs(point.xMillimeters()) <= width.toMillimeters() / 2.0
+                && Math.abs(point.yMillimeters()) <= depth.toMillimeters() / 2.0;
+    }
+
+    private boolean containsOval(LocalPoint point) {
+        double halfWidth = width.toMillimeters() / 2.0;
+        double halfDepth = depth.toMillimeters() / 2.0;
+        double normalizedX = point.xMillimeters() / halfWidth;
+        double normalizedY = point.yMillimeters() / halfDepth;
+        return normalizedX * normalizedX + normalizedY * normalizedY <= 1.0;
+    }
+
+    private boolean containsHalfRound(LocalPoint point) {
+        double halfWidth = width.toMillimeters() / 2.0;
+        double halfDepth = depth.toMillimeters() / 2.0;
+        if (point.yMillimeters() >= 0.0) {
+            return Math.abs(point.xMillimeters()) <= halfWidth && point.yMillimeters() <= halfDepth;
+        }
+        double normalizedX = point.xMillimeters() / halfWidth;
+        double normalizedY = point.yMillimeters() / halfDepth;
+        return normalizedX * normalizedX + normalizedY * normalizedY <= 1.0;
+    }
+
+    private boolean containsQuarterCircle(LocalPoint point) {
+        double halfWidth = width.toMillimeters() / 2.0;
+        double halfDepth = depth.toMillimeters() / 2.0;
+        if (point.xMillimeters() < -halfWidth
+                || point.xMillimeters() > halfWidth
+                || point.yMillimeters() < -halfDepth
+                || point.yMillimeters() > halfDepth) {
+            return false;
+        }
+        double normalizedX = (point.xMillimeters() + halfWidth) / width.toMillimeters();
+        double normalizedY = (point.yMillimeters() - halfDepth) / depth.toMillimeters();
+        return normalizedX * normalizedX + normalizedY * normalizedY <= 1.0;
+    }
+
+    private record LocalPoint(double xMillimeters, double yMillimeters) {
     }
 }

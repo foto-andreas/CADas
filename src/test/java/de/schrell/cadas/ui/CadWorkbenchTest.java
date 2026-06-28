@@ -1313,6 +1313,33 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void rundesObjektZeigtSeineBezeichnungInDerDraufsicht() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSelectRoomObjectPreset("table-round");
+            instanz.automationSetField("roomObjectName", "Esstisch");
+            instanz.automationSetTool("OBJECT");
+            instanz.automationCanvasClick(600, 450, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            return instanz;
+        });
+
+        RoomObject placed = aufFxThread(() -> workbench.automationRoomObject(0));
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+        int centerX = (int) Math.round(snapshot.offsetX() + placed.center().xMillimeters() * 0.1 * snapshot.zoom());
+        int centerY = (int) Math.round(snapshot.offsetY() + placed.center().yMillimeters() * 0.1 * snapshot.zoom());
+
+        int darkPixels = countDarkPixels(image, centerX - 45, centerY - 16, centerX + 45, centerY + 16);
+        Assertions.assertTrue(
+                darkPixels > 3,
+                "Die Objektbezeichnung wurde in der 2D-Ansicht nicht sichtbar gezeichnet. Dunkle Pixel: " + darkPixels
+        );
+    }
+
+    @Test
     void innenansichtOhneRaumBleibtImAktivenArbeitsbereichUndMeldetDenGrund() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -2410,6 +2437,19 @@ class CadWorkbenchTest {
                 if (color.getBlue() > color.getRed() + 0.04
                         && color.getGreen() > color.getRed() + 0.02
                         && color.getBlue() > 0.32) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private int countDarkPixels(WritableImage image, int minX, int minY, int maxX, int maxY) {
+        int count = 0;
+        for (int x = Math.max(0, minX); x <= Math.min((int) image.getWidth() - 1, maxX); x++) {
+            for (int y = Math.max(0, minY); y <= Math.min((int) image.getHeight() - 1, maxY); y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                if (color.getRed() < 0.20 && color.getGreen() < 0.32 && color.getBlue() < 0.30) {
                     count++;
                 }
             }

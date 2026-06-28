@@ -89,10 +89,7 @@ public final class SelectionQueryService {
     private List<SelectionKey> findRoomObjectSelections(Level level, PlanPoint point) {
         return level.roomObjects().stream()
                 .filter(RoomObject::visible)
-                .filter(roomObject -> point.xMillimeters() >= roomObject.minXMillimeters()
-                        && point.xMillimeters() <= roomObject.maxXMillimeters()
-                        && point.yMillimeters() >= roomObject.minYMillimeters()
-                        && point.yMillimeters() <= roomObject.maxYMillimeters())
+                .filter(roomObject -> roomObject.contains(point))
                 .map(roomObject -> new SelectionKey(RenderableKind.ROOM_OBJECT, level.name(), roomObject.id().toString()))
                 .toList();
     }

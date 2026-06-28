@@ -20,12 +20,16 @@ import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectShape;
+import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -210,6 +214,54 @@ class SelectionQueryServiceTest {
         assertEquals(2, selections.size());
         assertEquals(horizontalWall.id().toString(), selections.getFirst().elementId());
         assertEquals(verticalWall.id().toString(), selections.get(1).elementId());
+    }
+
+    @Test
+    void trifftRundesRaumobjektNichtNurUeberSeineBoundingBox() {
+        Level level = new Level("Erdgeschoss");
+        RoomObject table = RoomObject.create(
+                "table-round",
+                "Rundtisch",
+                RoomObjectType.TABLE,
+                RoomObjectShape.CIRCLE,
+                new PlanPoint(1_500, 1_500),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(1.0, LengthUnit.METER),
+                Length.of(75, LengthUnit.CENTIMETER),
+                false,
+                ""
+        );
+        level.addRoomObject(table);
+
+        List<SelectionKey> selections = selectionQueryService.findSelections(level, new PlanPoint(1_980, 1_980), Length.ofMillimeters(10));
+
+        assertTrue(selections.stream().noneMatch(selection -> selection.kind() == RenderableKind.ROOM_OBJECT));
+    }
+
+    @Test
+    void trifftGedrehtesRaumobjektInnerhalbSeinerKontur() {
+        Level level = new Level("Erdgeschoss");
+        RoomObject cabinet = new RoomObject(
+                UUID.randomUUID(),
+                "cabinet",
+                "Schrank",
+                RoomObjectType.CABINET,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(1_500, 1_500),
+                Length.ofMillimeters(1_000),
+                Length.ofMillimeters(400),
+                Length.ofMillimeters(2_000),
+                45.0,
+                true,
+                true,
+                ""
+        );
+        level.addRoomObject(cabinet);
+
+        SelectionKey selection = selectionQueryService.findSelection(level, new PlanPoint(1_640, 1_640), Length.ofMillimeters(10)).orElseThrow();
+
+        assertEquals(RenderableKind.ROOM_OBJECT, selection.kind());
+        assertEquals(cabinet.id().toString(), selection.elementId());
     }
 
     @Test
