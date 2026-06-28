@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 public final class SurfaceMaterialListService {
 
@@ -301,7 +302,12 @@ public final class SurfaceMaterialListService {
     }
 
     private List<SurfaceCoverage> wallSideCoverages(Level level, SurfaceLayerStack stack, Wall wall, String roomName, double sideSign) {
-        List<de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(level, wall, sideSign);
+        UUID roomId = stack.surfaceType() == SurfaceType.WALL_INTERIOR
+                ? WallSurfaceTargetKey.roomId(stack.targetKey()).orElse(null)
+                : null;
+        List<de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle> visibleRectangles = roomId == null
+                ? wallSurfaceOpeningService.visibleRectangles(level, wall, sideSign)
+                : wallSurfaceOpeningService.visibleRectangles(level, wall, sideSign, roomId);
         List<SurfaceRectangle> rectangles = visibleRectangles.stream()
                 .map(rectangle -> new SurfaceRectangle(0.0, 0.0, rectangle.widthMillimeters(), rectangle.heightMillimeters()))
                 .toList();

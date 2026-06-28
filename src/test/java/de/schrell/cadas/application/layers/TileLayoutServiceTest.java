@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
 import java.util.List;
@@ -189,5 +190,65 @@ class TileLayoutServiceTest {
         assertEquals(250.0, ersteReihenHoehe, 0.01);
         assertEquals(100.0, letzteReihenHoehe, 0.01);
         assertEquals(ersteReihenHoehe, zweiteReihenStart, 0.01);
+    }
+
+    @Test
+    void expliziteStartreihenbreiteHatVorrangVorAutomatischemMindestRand() {
+        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+                Length.ofMillimeters(3000),
+                Length.ofMillimeters(650),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(300),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.ofMillimeters(100),
+                SurfaceLayoutAnchor.AUTO,
+                Length.zero(),
+                Length.ofMillimeters(200)
+        ));
+
+        double ersteReihenHoehe = placements.stream()
+                .filter(tile -> tile.row() == 0)
+                .mapToDouble(tile -> tile.height().toMillimeters())
+                .max()
+                .orElseThrow();
+        double zweiteReihenStart = placements.stream()
+                .filter(tile -> tile.row() == 1)
+                .mapToDouble(tile -> tile.yOffset().toMillimeters())
+                .min()
+                .orElseThrow();
+        assertEquals(200.0, ersteReihenHoehe, 0.01);
+        assertEquals(200.0, zweiteReihenStart, 0.01);
+    }
+
+    @Test
+    void verankertDasRasterAnDerMaximalenXUndYSeite() {
+        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+                Length.ofMillimeters(650),
+                Length.ofMillimeters(650),
+                Length.ofMillimeters(300),
+                Length.ofMillimeters(300),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                SurfaceLayoutAnchor.MAX_X_MAX_Y,
+                Length.zero(),
+                Length.zero()
+        ));
+
+        assertTrue(placements.stream().anyMatch(tile ->
+                tile.xOffset().toMillimeters() == 350.0
+                        && tile.yOffset().toMillimeters() == 350.0
+                        && tile.width().toMillimeters() == 300.0
+                        && tile.height().toMillimeters() == 300.0));
+        assertTrue(placements.stream().anyMatch(tile ->
+                tile.xOffset().toMillimeters() == 0.0
+                        && tile.yOffset().toMillimeters() == 0.0
+                        && tile.width().toMillimeters() == 50.0
+                        && tile.height().toMillimeters() == 50.0));
     }
 }

@@ -16,13 +16,13 @@ public final class TerrainGeometryService {
     private static final double EPSILON = 0.001;
 
     public List<PlanPoint> outerOutline(Terrain terrain) {
-        List<PlanPoint> innerOutline = terrain.vertices().stream()
-                .map(vertex -> vertex.position())
-                .toList();
+        return outerOutline(terrain.vertices().stream().map(vertex -> vertex.position()).toList(), terrain.displayWidth().toMillimeters());
+    }
+
+    public List<PlanPoint> outerOutline(List<PlanPoint> innerOutline, double offset) {
         if (innerOutline.size() < 3) {
             return List.of();
         }
-        double offset = terrain.displayWidth().toMillimeters();
         double signedArea = signedArea(innerOutline);
         if (Math.abs(signedArea) < EPSILON || offset <= EPSILON) {
             return innerOutline;

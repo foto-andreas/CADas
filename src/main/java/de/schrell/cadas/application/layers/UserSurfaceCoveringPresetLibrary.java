@@ -2,6 +2,7 @@ package de.schrell.cadas.application.layers;
 
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
 import java.io.IOException;
@@ -85,6 +86,9 @@ public final class UserSurfaceCoveringPresetLibrary {
         properties.setProperty("minimumOffsetMm", Double.toString(savedPreset.minimumOffset().toMillimeters()));
         properties.setProperty("minimumEdgeWidthMm", Double.toString(savedPreset.minimumEdgeWidth().toMillimeters()));
         properties.setProperty("minimumStartEndMarginMm", Double.toString(savedPreset.minimumStartEndMargin().toMillimeters()));
+        properties.setProperty("layoutAnchor", savedPreset.layoutAnchor().name());
+        properties.setProperty("startRowTrimMm", Double.toString(savedPreset.startRowTrim().toMillimeters()));
+        properties.setProperty("startRowWidthMm", Double.toString(savedPreset.startRowWidth().toMillimeters()));
         properties.setProperty("jointWidthMm", Double.toString(savedPreset.jointWidth().toMillimeters()));
         properties.setProperty("cutRestriction", savedPreset.cutRestriction().name());
         properties.setProperty("coveringSource", savedPreset.coveringSource());
@@ -135,6 +139,9 @@ public final class UserSurfaceCoveringPresetLibrary {
                 length(properties, "minimumOffsetMm"),
                 length(properties, "minimumEdgeWidthMm"),
                 length(properties, "minimumStartEndMarginMm"),
+                SurfaceLayoutAnchor.valueOf(properties.getProperty("layoutAnchor", SurfaceLayoutAnchor.AUTO.name())),
+                length(properties, "startRowTrimMm"),
+                length(properties, "startRowWidthMm"),
                 length(properties, "jointWidthMm"),
                 SurfaceCutRestriction.fromStoredValue(properties.getProperty("cutRestriction")),
                 path.toAbsolutePath().normalize().toString()
@@ -159,6 +166,9 @@ public final class UserSurfaceCoveringPresetLibrary {
                 preset.minimumOffset(),
                 preset.minimumEdgeWidth(),
                 preset.minimumStartEndMargin(),
+                preset.layoutAnchor(),
+                preset.startRowTrim(),
+                preset.startRowWidth(),
                 preset.jointWidth(),
                 preset.cutRestriction(),
                 target.toAbsolutePath().normalize().toString()

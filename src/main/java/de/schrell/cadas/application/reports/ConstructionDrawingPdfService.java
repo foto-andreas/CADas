@@ -10,6 +10,8 @@ import de.schrell.cadas.application.drawing.WallDimensionService;
 import de.schrell.cadas.application.heating.RoomHeatingOutputService;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
+import de.schrell.cadas.application.terrain.TerrainContourService;
+import de.schrell.cadas.application.terrain.TerrainProfileService;
 import de.schrell.cadas.application.view.WallPlanOutlineService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
@@ -71,6 +73,8 @@ public final class ConstructionDrawingPdfService {
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
     private final WallPlanOutlineService wallPlanOutlineService = new WallPlanOutlineService();
+    private final TerrainContourService terrainContourService = new TerrainContourService();
+    private final TerrainProfileService terrainProfileService = new TerrainProfileService();
 
     public void export(ProjectModel project, Path targetFile) throws IOException {
         export(project, targetFile, ConstructionDrawingOptions.defaults());
@@ -429,12 +433,15 @@ public final class ConstructionDrawingPdfService {
         double baseHeight = 0.0;
         double angle = Math.toRadians(angleDegrees);
         double depthFactor = isometric ? spatialDepthFactor(project, angle) : 0.0;
-        List<de.schrell.cadas.domain.model.TerrainVertex> terrain = project.terrain().vertices();
+        List<TerrainProfileService.StripSample> terrain = terrainProfileService.sampledStrip(
+                project.terrain(),
+                terrainContourService.contour(project)
+        );
         for (int index = 0; index < terrain.size(); index++) {
-            var firstVertex = terrain.get(index);
-            var secondVertex = terrain.get((index + 1) % terrain.size());
-            SpatialPoint first = project(firstVertex.position(), firstVertex.elevationAboveLowestFloor().toMillimeters(), angle, depthFactor);
-            SpatialPoint second = project(secondVertex.position(), secondVertex.elevationAboveLowestFloor().toMillimeters(), angle, depthFactor);
+            TerrainProfileService.StripSample firstSample = terrain.get(index);
+            TerrainProfileService.StripSample secondSample = terrain.get((index + 1) % terrain.size());
+            SpatialPoint first = project(firstSample.outerPoint(), firstSample.elevationMillimeters(), angle, depthFactor);
+            SpatialPoint second = project(secondSample.outerPoint(), secondSample.elevationMillimeters(), angle, depthFactor);
             lines.add(new SpatialLine(first.x(), first.y(), second.x(), second.y(), true, true));
         }
         for (Level level : project.levels()) {

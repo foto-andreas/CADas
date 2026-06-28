@@ -31,6 +31,7 @@ import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
@@ -297,6 +298,9 @@ class DxfLevelExchangeServiceTest {
                 Length.of(10, LengthUnit.MILLIMETER),
                 Length.of(20, LengthUnit.MILLIMETER),
                 Length.of(20, LengthUnit.MILLIMETER),
+                SurfaceLayoutAnchor.MAX_X_MAX_Y,
+                Length.of(40, LengthUnit.MILLIMETER),
+                Length.of(260, LengthUnit.MILLIMETER),
                 Length.of(2, LengthUnit.MILLIMETER),
                 SurfaceCutRestriction.OUTER_CUTS_ROTATABLE,
                 "Kacheln"
@@ -365,6 +369,9 @@ class DxfLevelExchangeServiceTest {
         assertTrue(importedFloor.layers().getFirst().layoutRotatedQuarterTurn());
         assertEquals(2.0, importedFloor.layers().getFirst().jointWidth().toMillimeters(), 0.001);
         assertEquals(SurfaceCutRestriction.OUTER_CUTS_ROTATABLE, importedFloor.layers().getFirst().cutRestriction());
+        assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, importedFloor.layers().getFirst().layoutAnchor());
+        assertEquals(40.0, importedFloor.layers().getFirst().startRowTrim().toMillimeters(), 0.001);
+        assertEquals(260.0, importedFloor.layers().getFirst().startRowWidth().toMillimeters(), 0.001);
         assertTrue(importedFloor.layers().getFirst().visible());
         assertEquals("Daemmung", importedFloor.layers().get(1).name());
         assertEquals(SurfaceLayoutMode.FIXED, importedFloor.layers().get(1).layoutMode());

@@ -1,6 +1,7 @@
 package de.schrell.cadas.application.layers;
 
 import de.schrell.cadas.domain.geometry.Length;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,9 +35,10 @@ public final class TileLayoutService {
         double minimumEdgeWidth = request.minimumEdgeWidth().toMillimeters();
         double minimumStartEndMargin = request.minimumStartEndMargin().toMillimeters();
         double layoutOffset = request.layoutOffset().toMillimeters();
-        double rowStartTrim = boundedStartTrim(surfaceHeight, tileHeight, minimumStartEndMargin);
+        double rowStartTrim = startTrim(request, surfaceHeight, tileHeight, minimumStartEndMargin);
 
         int row = 0;
+        List<TilePlacement> localPlacements = new ArrayList<>();
         for (double y = -rowStartTrim; y < surfaceHeight - 0.001; y += tileHeight, row++) {
             double rowOffset = switch (request.layoutMode()) {
                 case NONE -> 0.0;
@@ -59,7 +61,7 @@ public final class TileLayoutService {
                 if (remainingWidth <= 0.0 || remainingHeight <= 0.0) {
                     continue;
                 }
-                placements.add(new TilePlacement(
+                localPlacements.add(new TilePlacement(
                         column,
                         row,
                         Length.ofMillimeters(clippedX),
@@ -69,9 +71,62 @@ public final class TileLayoutService {
                 ));
             }
         }
+        SurfaceLayoutAnchor layoutAnchor = request.layoutAnchor();
+        if (layoutAnchor == SurfaceLayoutAnchor.AUTO) {
+            placements.addAll(localPlacements);
+        } else {
+            for (TilePlacement placement : localPlacements) {
+                placements.add(transformPlacement(placement, surfaceWidth, surfaceHeight, layoutAnchor));
+            }
+        }
         List<TilePlacement> result = List.copyOf(placements);
         cache.put(request, result);
         return result;
+    }
+
+    private TilePlacement transformPlacement(
+            TilePlacement placement,
+            double surfaceWidth,
+            double surfaceHeight,
+            SurfaceLayoutAnchor layoutAnchor
+    ) {
+        double localX = placement.xOffset().toMillimeters();
+        double localY = placement.yOffset().toMillimeters();
+        double width = placement.width().toMillimeters();
+        double height = placement.height().toMillimeters();
+        double transformedX = switch (layoutAnchor) {
+            case AUTO, MIN_X_MIN_Y, MIN_X_MAX_Y -> localX;
+            case MAX_X_MIN_Y, MAX_X_MAX_Y -> surfaceWidth - localX - width;
+        };
+        double transformedY = switch (layoutAnchor) {
+            case AUTO, MIN_X_MIN_Y, MAX_X_MIN_Y -> localY;
+            case MAX_X_MAX_Y, MIN_X_MAX_Y -> surfaceHeight - localY - height;
+        };
+        return new TilePlacement(
+                placement.column(),
+                placement.row(),
+                Length.ofMillimeters(transformedX),
+                Length.ofMillimeters(transformedY),
+                Length.ofMillimeters(width),
+                Length.ofMillimeters(height)
+        );
+    }
+
+    private double startTrim(
+            TileLayoutRequest request,
+            double surfaceHeight,
+            double tileHeight,
+            double minimumStartEndMargin
+    ) {
+        double explicitWidth = clamp(request.startRowWidth().toMillimeters(), 0.0, tileHeight);
+        if (explicitWidth > 0.001) {
+            return Math.max(0.0, tileHeight - explicitWidth);
+        }
+        double explicitTrim = clamp(request.startRowTrim().toMillimeters(), 0.0, tileHeight);
+        if (explicitTrim > 0.001 || request.layoutAnchor() != SurfaceLayoutAnchor.AUTO) {
+            return explicitTrim;
+        }
+        return boundedStartTrim(surfaceHeight, tileHeight, minimumStartEndMargin);
     }
 
     private double boundedStartTrim(double surfaceHeight, double tileHeight, double minimumStartEndMargin) {
@@ -100,5 +155,9 @@ public final class TileLayoutService {
             return lowerBound;
         }
         return Math.max(lowerBound, Math.min(requestedOffset, upperBound));
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 }

@@ -69,8 +69,9 @@ import de.schrell.cadas.application.roof.RoofSlopeWallService;
 import de.schrell.cadas.application.roof.RoofWindowPlacementService;
 import de.schrell.cadas.application.stairs.StairUnderbuildService;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
-import de.schrell.cadas.application.terrain.TerrainCornerService;
+import de.schrell.cadas.application.terrain.TerrainContourService;
 import de.schrell.cadas.application.terrain.TerrainGeometryService;
+import de.schrell.cadas.application.terrain.TerrainProfileService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.application.view.WallSurfaceOpeningService;
@@ -127,6 +128,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -256,12 +258,14 @@ public final class CadWorkbench extends BorderPane {
     private static final Color TERRAIN_EDGE_COLOR = Color.web("#8a6337");
     private static final Color TERRAIN_LABEL_COLOR = Color.web("#6f4e2c");
     private static final Color TERRAIN_ELEVATION_COLOR = Color.web("#a67c46");
+    private static final double TERRAIN_SAMPLE_CAPTURE_TOLERANCE_MILLIMETERS = 180.0;
 
     private final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
     private final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     private final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
-    private final TerrainCornerService terrainCornerService = new TerrainCornerService();
+    private final TerrainContourService terrainContourService = new TerrainContourService();
     private final TerrainGeometryService terrainGeometryService = new TerrainGeometryService();
+    private final TerrainProfileService terrainProfileService = new TerrainProfileService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
     private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
@@ -821,7 +825,7 @@ public final class CadWorkbench extends BorderPane {
                 "Gelände",
                 null,
                 this::editTerrainElevations,
-                "Öffnet die Geländehöhen aller äußeren Gebäudeecken relativ zum Boden der untersten Etage. Die Werte steuern Grundriss, Seitenansichten und 3D-Darstellung."
+                "Erklärt die Geländebearbeitung. Geländehöhen werden in der 2D-Ansicht per Rechtsklick im 40-cm-Geländeband außerhalb des Gebäudes gesetzt."
         );
 
         settingsBarStyling();
@@ -1048,65 +1052,109 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void editTerrainElevations() {
-        Terrain synchronizedTerrain = terrainCornerService.synchronize(terrainSourceLevels(), project.terrain());
-        if (!synchronizedTerrain.configured() && project.terrain().configured()) {
-            synchronizedTerrain = project.terrain();
-        }
-        if (!synchronizedTerrain.configured()) {
-            draftLabel.setText("Geländehöhen benötigen mindestens drei äußere Gebäudeecken.");
-            return;
-        }
         if (!interactiveDialogsEnabled) {
             return;
         }
-        List<TextField> elevationFields = new ArrayList<>();
-        VBox rows = new VBox(8.0);
-        TextField widthField = new TextField(formatValue(synchronizedTerrain.displayWidth(), LengthUnit.CENTIMETER, LENGTH_INPUT_DECIMALS));
-        widthField.setPrefColumnCount(8);
-        applyTooltip(widthField, "Legt fest, wie breit das Gelände in Draufsicht und 3D außerhalb des Gebäudes dargestellt wird. Der Wert wird in Zentimetern gespeichert.");
-        rows.getChildren().add(new HBox(10.0, new Label("Darstellungsbreite"), widthField, new Label("cm")));
-        for (int index = 0; index < synchronizedTerrain.vertices().size(); index++) {
-            TerrainVertex vertex = synchronizedTerrain.vertices().get(index);
-            TextField field = new TextField(formatValue(vertex.elevationAboveLowestFloor(), LengthUnit.CENTIMETER, LENGTH_INPUT_DECIMALS));
-            field.setPrefColumnCount(8);
-            applyTooltip(field, "Legt die Geländehöhe an dieser äußeren Gebäudeecke relativ zum Boden der untersten Etage in Zentimetern fest. Positive und negative Werte sind zulässig.");
-            Label label = new Label(String.format(Locale.GERMAN, "Ecke %d bei %.2f / %.2f m", index + 1,
-                    vertex.position().xMillimeters() / 1_000.0, vertex.position().yMillimeters() / 1_000.0));
-            rows.getChildren().add(new HBox(10.0, label, field, new Label("cm")));
-            elevationFields.add(field);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Gelände bearbeiten");
+        alert.setHeaderText("Geländehöhen werden direkt im 2D-Geländeband gesetzt.");
+        alert.setContentText("Blende `Gelände 2D` ein und setze die Höhe per Rechtsklick im 40-cm-Band außerhalb der Außenwände.");
+        Window owner = currentWindow();
+        if (owner != null) {
+            alert.initOwner(owner);
         }
-        ScrollPane scrollPane = new ScrollPane(rows);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setPrefViewportHeight(Math.min(420.0, 52.0 * elevationFields.size()));
-        applyTooltip(scrollPane, "Zeigt alle automatisch aus der äußeren oberirdischen Projektkontur abgeleiteten Geländeecken des Gebäudes.");
+        alert.showAndWait();
+    }
+
+    private boolean handleTerrainBandContextClick(MouseEvent event) {
+        if (!projectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
+            return false;
+        }
+        List<PlanPoint> contour = terrainContourService.contour(project);
+        if (contour.size() < 3) {
+            draftLabel.setText("Für das Gelände wird zuerst eine geschlossene Außenkontur benötigt.");
+            return true;
+        }
+        Optional<TerrainProfileService.ProjectedTerrainPoint> projection = terrainProfileService.projectToBand(
+                screenToWorld(event.getX(), event.getY()),
+                contour
+        );
+        if (projection.isEmpty()) {
+            return false;
+        }
+        editTerrainPoint(projection.orElseThrow(), contour);
+        return true;
+    }
+
+    private void editTerrainPoint(TerrainProfileService.ProjectedTerrainPoint projection, List<PlanPoint> contour) {
+        if (!interactiveDialogsEnabled) {
+            return;
+        }
+        TextField elevationField = new TextField(formatValue(
+                currentTerrainElevation(projection, contour),
+                LengthUnit.CENTIMETER,
+                LENGTH_INPUT_DECIMALS
+        ));
+        elevationField.setPrefColumnCount(8);
+        applyTooltip(elevationField, "Legt die Geländehöhe an diesem Punkt relativ zum Boden der untersten Etage in Zentimetern fest. Der Punkt wird entlang der Außenkontur gespeichert.");
+        HBox row = new HBox(10.0,
+                new Label(String.format(Locale.GERMAN, "Punkt bei %.2f / %.2f m", projection.bandPoint().xMillimeters() / 1_000.0, projection.bandPoint().yMillimeters() / 1_000.0)),
+                elevationField,
+                new Label("cm"));
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Geländehöhen bearbeiten");
+        dialog.setTitle("Geländepunkt bearbeiten");
         dialog.setHeaderText("Höhe über dem Boden der untersten Etage");
-        dialog.getDialogPane().setContent(scrollPane);
+        dialog.getDialogPane().setContent(row);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        dialog.getDialogPane().setPrefWidth(560);
         Window owner = currentWindow();
         if (owner != null) {
             dialog.initOwner(owner);
         }
-        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Übernimmt alle Geländehöhen und aktualisiert 3D- sowie Seitenansichten.");
-        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Verwirft die Eingaben und lässt das Gelände unverändert.");
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Übernimmt die Geländehöhe an diesem Bandpunkt und aktualisiert 2D, Seitenansichten, 3D und PDF.");
+        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Verwirft die Eingabe und belässt das Gelände unverändert.");
         if (dialog.showAndWait().filter(ButtonType.OK::equals).isEmpty()) {
             return;
         }
-        List<TerrainVertex> updatedVertices = new ArrayList<>();
-        for (int index = 0; index < synchronizedTerrain.vertices().size(); index++) {
-            TerrainVertex vertex = synchronizedTerrain.vertices().get(index);
-            Length elevation = parseLength(elevationFields.get(index), LengthUnit.CENTIMETER)
-                    .orElse(vertex.elevationAboveLowestFloor());
-            updatedVertices.add(new TerrainVertex(vertex.position(), elevation));
-        }
-        Length displayWidth = parseLength(widthField, LengthUnit.CENTIMETER)
-                .orElse(synchronizedTerrain.displayWidth());
+        Length elevation = parseLength(elevationField, LengthUnit.CENTIMETER)
+                .orElse(currentTerrainElevation(projection, contour));
         rememberStateForUndo();
-        project.defineTerrain(new Terrain(updatedVertices, displayWidth));
+        project.defineTerrain(updatedTerrainWithPoint(projection, elevation, contour));
         markThreeDDirty();
         render();
+    }
+
+    private Length currentTerrainElevation(TerrainProfileService.ProjectedTerrainPoint projection, List<PlanPoint> contour) {
+        return matchingTerrainSample(projection, contour)
+                .map(TerrainProfileService.ProjectedTerrainPoint::elevation)
+                .orElse(Length.ofMillimeters(
+                        terrainProfileService.interpolatedElevationMillimeters(project.terrain(), contour, projection.contourDistance())
+                ));
+    }
+
+    private Optional<TerrainProfileService.ProjectedTerrainPoint> matchingTerrainSample(
+            TerrainProfileService.ProjectedTerrainPoint projection,
+            List<PlanPoint> contour
+    ) {
+        return terrainProfileService.projectedSamples(project.terrain(), contour).stream()
+                .filter(sample -> Math.abs(sample.contourDistance() - projection.contourDistance()) <= TERRAIN_SAMPLE_CAPTURE_TOLERANCE_MILLIMETERS)
+                .min(Comparator.comparingDouble(sample -> Math.abs(sample.contourDistance() - projection.contourDistance())));
+    }
+
+    private Terrain updatedTerrainWithPoint(
+            TerrainProfileService.ProjectedTerrainPoint projection,
+            Length elevation,
+            List<PlanPoint> contour
+    ) {
+        List<TerrainVertex> updatedVertices = new ArrayList<>(project.terrain().vertices());
+        matchingTerrainSample(projection, contour)
+                .ifPresent(sample -> updatedVertices.removeIf(vertex -> vertex.position().equals(sample.contourPoint())));
+        updatedVertices.add(new TerrainVertex(projection.contourPoint(), elevation));
+        List<TerrainVertex> sortedVertices = updatedVertices.stream()
+                .sorted(Comparator.comparingDouble(vertex -> terrainProfileService.projectToContour(vertex.position(), contour)
+                        .map(TerrainProfileService.ProjectedTerrainPoint::contourDistance)
+                        .orElse(Double.MAX_VALUE)))
+                .toList();
+        return new Terrain(sortedVertices, Terrain.defaultDisplayWidth());
     }
 
     private MenuBar buildMenuBar() {
@@ -2398,11 +2446,18 @@ public final class CadWorkbench extends BorderPane {
     private void handleMouseReleased(MouseEvent event) {
         if (panning) {
             panning = false;
-            if (!panningMoved && pendingContextSelection != null && event.getButton() == MouseButton.SECONDARY) {
-                contextMenuSelection = pendingContextSelection;
-                contextMenuWorldPoint = pendingContextWorldPoint;
-                selectSingle(pendingContextSelection);
-                selectionContextMenu.show(drawingCanvas, event.getScreenX(), event.getScreenY());
+            if (!panningMoved && event.getButton() == MouseButton.SECONDARY) {
+                if (pendingContextSelection != null) {
+                    contextMenuSelection = pendingContextSelection;
+                    contextMenuWorldPoint = pendingContextWorldPoint;
+                    selectSingle(pendingContextSelection);
+                    selectionContextMenu.show(drawingCanvas, event.getScreenX(), event.getScreenY());
+                } else if (handleTerrainBandContextClick(event)) {
+                    pendingContextSelection = null;
+                    pendingContextWorldPoint = null;
+                    updateMouseCursor();
+                    return;
+                }
             }
             pendingContextSelection = null;
             pendingContextWorldPoint = null;
@@ -2757,18 +2812,8 @@ public final class CadWorkbench extends BorderPane {
         updateStatus();
     }
 
-    private List<Level> terrainSourceLevels() {
-        List<Level> aboveGroundLevels = project.levels().stream()
-                .filter(level -> !isBasementLevel(level))
-                .toList();
-        return aboveGroundLevels.isEmpty() ? project.levels() : aboveGroundLevels;
-    }
-
-    private boolean isBasementLevel(Level level) {
-        String normalizedName = level.name().trim().toLowerCase(Locale.GERMAN);
-        return normalizedName.contains("keller")
-                || normalizedName.startsWith("kg")
-                || normalizedName.contains("souterrain");
+    private List<PlanPoint> terrainContour() {
+        return terrainContourService.contour(project);
     }
 
     private void drawGuides(GraphicsContext graphics) {
@@ -3187,16 +3232,26 @@ public final class CadWorkbench extends BorderPane {
             return;
         }
         double sideSign = centerOffset < 0.0 ? -1.0 : 1.0;
-        List<WallSurfaceInterval> visibleIntervals = wallSurfaceOpeningService.visiblePlanIntervals(activeLevel.get(), wall, sideSign);
+        UUID roomId = stack.surfaceType() == SurfaceType.WALL_INTERIOR
+                ? WallSurfaceTargetKey.roomId(stack.targetKey()).orElse(null)
+                : null;
+        List<WallSurfaceInterval> visibleIntervals = roomId == null
+                ? wallSurfaceOpeningService.visiblePlanIntervals(activeLevel.get(), wall, sideSign)
+                : wallSurfaceOpeningService.visiblePlanIntervals(activeLevel.get(), wall, sideSign, roomId);
         if (visibleIntervals.isEmpty()) {
             return;
         }
+        boolean selected = isSelectedSurfaceLayer(stack, layer);
         graphics.save();
-        graphics.setFill(Color.color(0.72, 0.58, 0.34, 0.82));
-        for (WallSurfaceInterval interval : visibleIntervals) {
-            fillWallSurfaceIntervalInPlan(graphics, wall, stack, layer, layerIndex, centerOffset, interval);
+        graphics.setFill(selected ? Color.color(0.86, 0.48, 0.18, 0.88) : Color.color(0.72, 0.58, 0.34, 0.82));
+        if (selected) {
+            graphics.setStroke(Color.color(0.76, 0.28, 0.10, 0.96));
+            graphics.setLineWidth(1.6);
         }
-        drawWallSurfaceJointsInPlan(graphics, wall, layer, centerOffset, visibleIntervals);
+        for (WallSurfaceInterval interval : visibleIntervals) {
+            fillWallSurfaceIntervalInPlan(graphics, wall, stack, layer, layerIndex, centerOffset, interval, selected);
+        }
+        drawWallSurfaceJointsInPlan(graphics, wall, layer, centerOffset, visibleIntervals, selected);
         graphics.restore();
     }
 
@@ -3207,7 +3262,8 @@ public final class CadWorkbench extends BorderPane {
             SurfaceLayer layer,
             int layerIndex,
             double centerOffset,
-            WallSurfaceInterval interval
+            WallSurfaceInterval interval,
+            boolean selected
     ) {
         WallSurfacePlanPolygon polygon = wallSurfacePlanGeometryService.surfacePolygon(
                 activeLevel.get(),
@@ -3223,6 +3279,13 @@ public final class CadWorkbench extends BorderPane {
                 polygon.points().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray(),
                 polygon.points().size()
         );
+        if (selected) {
+            graphics.strokePolygon(
+                    polygon.points().stream().mapToDouble(point -> toScreenProjectedX(point, 0.0)).toArray(),
+                    polygon.points().stream().mapToDouble(point -> toScreenProjectedY(point, 0.0)).toArray(),
+                    polygon.points().size()
+            );
+        }
     }
 
     private void drawWallSurfaceJointsInPlan(
@@ -3230,7 +3293,8 @@ public final class CadWorkbench extends BorderPane {
             Wall wall,
             SurfaceLayer layer,
             double centerOffset,
-            List<WallSurfaceInterval> visibleIntervals
+            List<WallSurfaceInterval> visibleIntervals,
+            boolean selected
     ) {
         double wallLength = wall.axis().length().toMillimeters();
         double jointWidth = layer.jointWidth().toMillimeters();
@@ -3248,8 +3312,8 @@ public final class CadWorkbench extends BorderPane {
                 layer.minimumEdgeWidth(),
                 layer.minimumStartEndMargin()
         );
-        graphics.setStroke(Color.color(0.20, 0.15, 0.09, 0.72));
-        graphics.setLineWidth(Math.max(0.8, jointWidth * scale()));
+        graphics.setStroke(selected ? Color.color(0.78, 0.24, 0.08, 0.92) : Color.color(0.20, 0.15, 0.09, 0.72));
+        graphics.setLineWidth(Math.max(selected ? 1.2 : 0.8, jointWidth * scale()));
         double sideSign = centerOffset < 0.0 ? -1.0 : 1.0;
         var jointPositions = new java.util.HashSet<String>();
         for (TilePlacement tile : tileLayoutService.fillSurface(request)) {
@@ -3298,32 +3362,44 @@ public final class CadWorkbench extends BorderPane {
         for (SurfaceLayer layer : stack.layers()) {
             if (layer.visible()) {
                 if (sides.positiveSide()) {
-                    drawWallSurfaceLayerInElevation(graphics, wall, layer, 1.0);
+                    drawWallSurfaceLayerInElevation(graphics, wall, stack, layer, 1.0);
                 }
                 if (sides.negativeSide()) {
-                    drawWallSurfaceLayerInElevation(graphics, wall, layer, -1.0);
+                    drawWallSurfaceLayerInElevation(graphics, wall, stack, layer, -1.0);
                 }
             }
         }
     }
 
-    private void drawWallSurfaceLayerInElevation(GraphicsContext graphics, Wall wall, SurfaceLayer layer, double sideSign) {
+    private void drawWallSurfaceLayerInElevation(
+            GraphicsContext graphics,
+            Wall wall,
+            SurfaceLayerStack stack,
+            SurfaceLayer layer,
+            double sideSign
+    ) {
         double wallLength = wall.axis().length().toMillimeters();
         double startHorizontal = projectHorizontal(wall.axis().start(), 0.0);
         double endHorizontal = projectHorizontal(wall.axis().end(), 0.0);
         if (wallLength <= 0.0 || Math.abs(endHorizontal - startHorizontal) < 10.0) {
             return;
         }
-        List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(activeLevel.get(), wall, sideSign);
+        UUID roomId = stack.surfaceType() == SurfaceType.WALL_INTERIOR
+                ? WallSurfaceTargetKey.roomId(stack.targetKey()).orElse(null)
+                : null;
+        List<WallSurfaceRectangle> visibleRectangles = roomId == null
+                ? wallSurfaceOpeningService.visibleRectangles(activeLevel.get(), wall, sideSign)
+                : wallSurfaceOpeningService.visibleRectangles(activeLevel.get(), wall, sideSign, roomId);
         if (visibleRectangles.isEmpty()) {
             return;
         }
+        boolean selected = isSelectedSurfaceLayer(stack, layer);
         double startX = toScreenHorizontal(startHorizontal);
         double endX = toScreenHorizontal(endHorizontal);
         graphics.save();
-        graphics.setFill(Color.color(0.72, 0.58, 0.34, 0.26));
-        graphics.setStroke(Color.color(0.47, 0.36, 0.20, 0.80));
-        graphics.setLineWidth(1.2);
+        graphics.setFill(selected ? Color.color(0.86, 0.48, 0.18, 0.34) : Color.color(0.72, 0.58, 0.34, 0.26));
+        graphics.setStroke(selected ? Color.color(0.76, 0.28, 0.10, 0.96) : Color.color(0.47, 0.36, 0.20, 0.80));
+        graphics.setLineWidth(selected ? 1.8 : 1.2);
         for (WallSurfaceRectangle rectangle : visibleRectangles) {
             double startRatio = rectangle.startMillimeters() / wallLength;
             double endRatio = rectangle.endMillimeters() / wallLength;
@@ -3348,7 +3424,7 @@ public final class CadWorkbench extends BorderPane {
                     4
             );
         }
-        drawWallSurfaceJointsInElevation(graphics, wall, layer, startX, endX, visibleRectangles);
+        drawWallSurfaceJointsInElevation(graphics, wall, layer, startX, endX, visibleRectangles, selected);
         graphics.restore();
     }
 
@@ -3358,7 +3434,8 @@ public final class CadWorkbench extends BorderPane {
             SurfaceLayer layer,
             double startX,
             double endX,
-            List<WallSurfaceRectangle> visibleRectangles
+            List<WallSurfaceRectangle> visibleRectangles,
+            boolean selected
     ) {
         double jointWidth = layer.jointWidth().toMillimeters();
         double wallLength = wall.axis().length().toMillimeters();
@@ -3377,8 +3454,8 @@ public final class CadWorkbench extends BorderPane {
                 layer.minimumEdgeWidth(),
                 layer.minimumStartEndMargin()
         );
-        graphics.setStroke(Color.color(0.16, 0.12, 0.08, 0.78));
-        graphics.setLineWidth(Math.max(0.7, jointWidth * scale()));
+        graphics.setStroke(selected ? Color.color(0.78, 0.24, 0.08, 0.92) : Color.color(0.16, 0.12, 0.08, 0.78));
+        graphics.setLineWidth(Math.max(selected ? 1.1 : 0.7, jointWidth * scale()));
         var horizontalKeys = new java.util.HashSet<String>();
         var verticalKeys = new java.util.HashSet<String>();
         for (TilePlacement tile : tileLayoutService.fillSurface(request)) {
@@ -3623,13 +3700,17 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawTerrainElevation(GraphicsContext graphics) {
-        if (projectionService.isPlanView(activeView.get()) || !project.terrain().configured()) {
+        if (projectionService.isPlanView(activeView.get())) {
+            return;
+        }
+        List<TerrainProfileService.StripSample> strip = terrainProfileService.sampledStrip(project.terrain(), terrainContour());
+        if (strip.size() < 2) {
             return;
         }
         java.util.TreeMap<Long, Double> profile = new java.util.TreeMap<>();
-        for (TerrainVertex vertex : project.terrain().vertices()) {
-            long horizontal = Math.round(projectHorizontal(vertex.position(), 0.0));
-            profile.merge(horizontal, vertex.elevationAboveLowestFloor().toMillimeters(), Math::max);
+        for (TerrainProfileService.StripSample sample : strip) {
+            long horizontal = Math.round(projectHorizontal(sample.outerPoint(), 0.0));
+            profile.merge(horizontal, sample.elevationMillimeters(), Math::max);
         }
         if (profile.size() < 2) {
             return;
@@ -3651,10 +3732,11 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawTerrainPlanArea(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured() || !showTerrainInPlan.get()) {
+        if (!projectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
             return;
         }
-        List<PlanPoint> outerOutline = terrainGeometryService.outerOutline(project.terrain());
+        List<PlanPoint> contour = terrainContour();
+        List<PlanPoint> outerOutline = terrainGeometryService.outerOutline(contour, TerrainProfileService.BAND_WIDTH_MILLIMETERS);
         if (outerOutline.size() < 3) {
             return;
         }
@@ -3664,11 +3746,11 @@ public final class CadWorkbench extends BorderPane {
         double[] outerYPoints = outerOutline.stream()
                 .mapToDouble(point -> toScreenProjectedY(point, 0.0))
                 .toArray();
-        double[] innerXPoints = project.terrain().vertices().stream()
-                .mapToDouble(vertex -> toScreenProjectedX(vertex.position(), 0.0))
+        double[] innerXPoints = contour.stream()
+                .mapToDouble(point -> toScreenProjectedX(point, 0.0))
                 .toArray();
-        double[] innerYPoints = project.terrain().vertices().stream()
-                .mapToDouble(vertex -> toScreenProjectedY(vertex.position(), 0.0))
+        double[] innerYPoints = contour.stream()
+                .mapToDouble(point -> toScreenProjectedY(point, 0.0))
                 .toArray();
         graphics.setFill(TERRAIN_FILL_COLOR);
         graphics.fillPolygon(outerXPoints, outerYPoints, outerXPoints.length);
@@ -3677,33 +3759,38 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawTerrainPlanMarkers(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get()) || !project.terrain().configured() || !showTerrainInPlan.get()) {
+        if (!projectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
             return;
         }
-        List<PlanPoint> outerOutline = terrainGeometryService.outerOutline(project.terrain());
+        List<PlanPoint> contour = terrainContour();
+        List<PlanPoint> outerOutline = terrainGeometryService.outerOutline(contour, TerrainProfileService.BAND_WIDTH_MILLIMETERS);
+        if (contour.size() < 3 || outerOutline.size() < 3) {
+            return;
+        }
         graphics.setStroke(TERRAIN_EDGE_COLOR);
         graphics.setFill(TERRAIN_LABEL_COLOR);
         graphics.setLineWidth(2.0);
-        List<TerrainVertex> vertices = project.terrain().vertices();
-        for (int index = 0; index < vertices.size(); index++) {
-            TerrainVertex vertex = vertices.get(index);
-            TerrainVertex next = vertices.get((index + 1) % vertices.size());
-            double x = toScreenProjectedX(vertex.position(), 0.0);
-            double y = toScreenProjectedY(vertex.position(), 0.0);
+        for (int index = 0; index < contour.size(); index++) {
+            PlanPoint point = contour.get(index);
+            PlanPoint next = contour.get((index + 1) % contour.size());
+            double x = toScreenProjectedX(point, 0.0);
+            double y = toScreenProjectedY(point, 0.0);
             graphics.strokeLine(x, y,
-                    toScreenProjectedX(next.position(), 0.0),
-                    toScreenProjectedY(next.position(), 0.0));
+                    toScreenProjectedX(next, 0.0),
+                    toScreenProjectedY(next, 0.0));
+            PlanPoint outerPoint = outerOutline.get(index);
+            graphics.strokeLine(
+                    toScreenProjectedX(outerPoint, 0.0),
+                    toScreenProjectedY(outerPoint, 0.0),
+                    toScreenProjectedX(outerOutline.get((index + 1) % outerOutline.size()), 0.0),
+                    toScreenProjectedY(outerOutline.get((index + 1) % outerOutline.size()), 0.0)
+            );
+        }
+        for (TerrainProfileService.ProjectedTerrainPoint sample : terrainProfileService.projectedSamples(project.terrain(), contour)) {
+            double x = toScreenProjectedX(sample.bandPoint(), 0.0);
+            double y = toScreenProjectedY(sample.bandPoint(), 0.0);
             graphics.fillOval(x - 4.0, y - 4.0, 8.0, 8.0);
-            graphics.fillText(vertex.elevationAboveLowestFloor().format(LengthUnit.METER, 2), x + 7.0, y - 7.0);
-            if (index < outerOutline.size()) {
-                PlanPoint labelPoint = new PlanPoint(
-                        (vertex.position().xMillimeters() + outerOutline.get(index).xMillimeters()) / 2.0,
-                        (vertex.position().yMillimeters() + outerOutline.get(index).yMillimeters()) / 2.0
-                );
-                graphics.fillText(Integer.toString(index + 1),
-                        toScreenProjectedX(labelPoint, 0.0),
-                        toScreenProjectedY(labelPoint, 0.0));
-            }
+            graphics.fillText(sample.elevation().format(LengthUnit.METER, 2), x + 7.0, y - 7.0);
         }
     }
 
@@ -3735,6 +3822,18 @@ public final class CadWorkbench extends BorderPane {
         if (!layer.visible()) {
             return;
         }
+        SurfaceLayer highlightedLayer = stack.layers().stream()
+                .filter(this::isVisibleSurfaceLayer)
+                .filter(candidate -> isSelectedSurfaceLayer(stack, candidate))
+                .findFirst()
+                .orElse(null);
+        drawRoomTileLayer(graphics, room, layer, false);
+        if (highlightedLayer != null) {
+            drawRoomTileLayer(graphics, room, highlightedLayer, true);
+        }
+    }
+
+    private void drawRoomTileLayer(GraphicsContext graphics, Room room, SurfaceLayer layer, boolean highlighted) {
         List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = surfaceRectangleTileLayoutService.tilesForRectangles(
                 floorOpeningGeometryService.floorRectangles(activeLevel.get(), room),
                 layer
@@ -3752,7 +3851,7 @@ public final class CadWorkbench extends BorderPane {
         }
         graphics.closePath();
         graphics.clip();
-        graphics.setFill(Color.color(0.35, 0.25, 0.12, 0.55));
+        graphics.setFill(highlighted ? Color.color(0.80, 0.28, 0.08, 0.82) : Color.color(0.35, 0.25, 0.12, 0.55));
         var horizontalKeys = new java.util.HashSet<String>();
         var verticalKeys = new java.util.HashSet<String>();
         for (SurfaceRectangleTileLayoutService.PlacedSurfaceTile tile : tiles) {
@@ -3776,6 +3875,18 @@ public final class CadWorkbench extends BorderPane {
                     && scale() * SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS
                     >= VARIOTHERM_DETAIL_MIN_SCREEN_SPACING) {
                 drawVariothermPanelGrooves(graphics, tx, ty, tw, th);
+            }
+        }
+        if (highlighted) {
+            graphics.setStroke(Color.color(0.82, 0.28, 0.08, 0.95));
+            graphics.setLineWidth(1.6);
+            for (SurfaceRectangleTileLayoutService.PlacedSurfaceTile tile : tiles) {
+                graphics.strokeRect(
+                        toScreenX(tile.x()),
+                        toScreenY(tile.y()),
+                        tile.width() * scale(),
+                        tile.height() * scale()
+                );
             }
         }
         graphics.restore();
@@ -7497,6 +7608,20 @@ public final class CadWorkbench extends BorderPane {
                         .filter(stack -> stack != null)
                         .toList())
                 .orElseGet(List::of);
+    }
+
+    private boolean isSelectedSurfaceLayer(SurfaceLayerStack stack, SurfaceLayer layer) {
+        SurfaceLayerStack selectedStack = currentDisplaySurfaceLayerStack().orElse(null);
+        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
+        return selectedStack != null
+                && selectedLayer != null
+                && selectedStack.surfaceType() == stack.surfaceType()
+                && selectedStack.targetKey().equals(stack.targetKey())
+                && selectedLayer.id().equals(layer.id());
+    }
+
+    private boolean isVisibleSurfaceLayer(SurfaceLayer layer) {
+        return layer.visible() && layer.thickness().toMillimeters() > 0.0;
     }
 
     private boolean validateSurfaceLayerSelection(SurfaceSelectionContext context) {

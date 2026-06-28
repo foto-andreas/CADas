@@ -13,9 +13,11 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Door;
 import de.schrell.cadas.domain.model.ProjectModel;
+import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class WallSurfaceOpeningServiceTest {
@@ -143,6 +145,41 @@ class WallSurfaceOpeningServiceTest {
         assertTrue(rectangles.stream().anyMatch(rectangle -> rectangleMatches(rectangle, 0.0, 1900.0, 0.0, 1200.0)));
         assertTrue(rectangles.stream().anyMatch(rectangle -> rectangleMatches(rectangle, 2100.0, 4000.0, 0.0, 1200.0)));
         assertTrue(rectangles.stream().anyMatch(rectangle -> rectangleMatches(rectangle, 0.0, 4000.0, 1200.0, 2800.0)));
+    }
+
+    @Test
+    void begrenztInnenwandBelagAufDenTatsächlichAnliegendenRaumabschnitt() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        var level = project.primaryLevel();
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4000, 0)),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2.8, LengthUnit.METER)
+        );
+        level.addWall(wall);
+        Room wc = new Room(
+                UUID.randomUUID(),
+                "WC",
+                List.of(
+                        new PlanPoint(1000, 0),
+                        new PlanPoint(2600, 0),
+                        new PlanPoint(2600, 1800),
+                        new PlanPoint(1000, 1800)
+                ),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER),
+                null
+        );
+        level.addRoom(wc);
+
+        List<WallSurfaceInterval> intervals = service.visiblePlanIntervals(level, wall, 1.0, wc.id());
+        List<WallSurfaceRectangle> rectangles = service.visibleRectangles(level, wall, 1.0, wc.id());
+
+        assertEquals(1, intervals.size());
+        assertTrue(intervalMatches(intervals.getFirst(), 1000.0, 2600.0));
+        assertEquals(1, rectangles.size());
+        assertTrue(rectangleMatches(rectangles.getFirst(), 1000.0, 2600.0, 0.0, 2800.0));
     }
 
     private boolean rectangleMatches(WallSurfaceRectangle rectangle, double start, double end, double lower, double upper) {

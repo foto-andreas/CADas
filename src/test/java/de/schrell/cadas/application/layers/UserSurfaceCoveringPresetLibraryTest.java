@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
 import java.nio.file.FileAlreadyExistsException;
@@ -36,6 +37,9 @@ class UserSurfaceCoveringPresetLibraryTest {
                 Length.of(7, LengthUnit.CENTIMETER),
                 Length.of(6, LengthUnit.CENTIMETER),
                 Length.of(12, LengthUnit.CENTIMETER),
+                SurfaceLayoutAnchor.MAX_X_MAX_Y,
+                Length.of(4, LengthUnit.CENTIMETER),
+                Length.of(41, LengthUnit.CENTIMETER),
                 Length.of(3, LengthUnit.MILLIMETER),
                 SurfaceCutRestriction.OUTER_CUTS_ROTATABLE,
                 "Standard: Test"
@@ -56,6 +60,9 @@ class UserSurfaceCoveringPresetLibraryTest {
         assertEquals(Length.of(7, LengthUnit.CENTIMETER), loadedPreset.minimumOffset());
         assertEquals(Length.of(6, LengthUnit.CENTIMETER), loadedPreset.minimumEdgeWidth());
         assertEquals(Length.of(12, LengthUnit.CENTIMETER), loadedPreset.minimumStartEndMargin());
+        assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, loadedPreset.layoutAnchor());
+        assertEquals(Length.of(4, LengthUnit.CENTIMETER), loadedPreset.startRowTrim());
+        assertEquals(Length.of(41, LengthUnit.CENTIMETER), loadedPreset.startRowWidth());
         assertEquals(Length.of(3, LengthUnit.MILLIMETER), loadedPreset.jointWidth());
         assertEquals(SurfaceCutRestriction.OUTER_CUTS_ROTATABLE, loadedPreset.cutRestriction());
     }

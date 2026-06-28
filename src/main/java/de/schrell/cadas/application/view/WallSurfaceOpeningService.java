@@ -10,20 +10,26 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.UUID;
 
 public final class WallSurfaceOpeningService {
 
     private static final double EPSILON = 0.001;
+    private final WallSurfaceRoomIntervalService wallSurfaceRoomIntervalService = new WallSurfaceRoomIntervalService();
 
     public List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall) {
-        return visibleRectangles(level, wall, null);
+        return visibleRectangles(level, wall, null, null);
     }
 
     public List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall, double sideSign) {
-        return visibleRectangles(level, wall, Double.valueOf(sideSign < 0.0 ? -1.0 : 1.0));
+        return visibleRectangles(level, wall, sideSign, null);
     }
 
-    private List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall, Double sideSign) {
+    public List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall, double sideSign, UUID roomId) {
+        return visibleRectangles(level, wall, Double.valueOf(sideSign < 0.0 ? -1.0 : 1.0), roomId);
+    }
+
+    private List<WallSurfaceRectangle> visibleRectangles(Level level, Wall wall, Double sideSign, UUID roomId) {
         double wallLength = wall.axis().length().toMillimeters();
         double wallHeight = wall.maximumHeightMillimeters();
         if (wallLength <= EPSILON || wallHeight <= EPSILON) {
@@ -33,40 +39,49 @@ public final class WallSurfaceOpeningService {
         if (sideSign != null) {
             openings = withWallInterruptions(level, wall, sideSign, openings);
         }
+        List<WallSurfaceRectangle> merged;
         if (openings.isEmpty()) {
-            return List.of(new WallSurfaceRectangle(0.0, wallLength, 0.0, wallHeight));
-        }
-
-        TreeSet<Double> heightCuts = new TreeSet<>();
-        heightCuts.add(0.0);
-        heightCuts.add(wallHeight);
-        for (WallOpeningRectangle opening : openings) {
-            heightCuts.add(opening.lowerHeightMillimeters());
-            heightCuts.add(opening.upperHeightMillimeters());
-        }
-
-        List<Double> heights = new ArrayList<>(heightCuts);
-        List<WallSurfaceRectangle> bands = new ArrayList<>();
-        for (int index = 0; index < heights.size() - 1; index++) {
-            double lower = heights.get(index);
-            double upper = heights.get(index + 1);
-            if (upper - lower <= EPSILON) {
-                continue;
+            merged = List.of(new WallSurfaceRectangle(0.0, wallLength, 0.0, wallHeight));
+        } else {
+            TreeSet<Double> heightCuts = new TreeSet<>();
+            heightCuts.add(0.0);
+            heightCuts.add(wallHeight);
+            for (WallOpeningRectangle opening : openings) {
+                heightCuts.add(opening.lowerHeightMillimeters());
+                heightCuts.add(opening.upperHeightMillimeters());
             }
-            addVisibleBandRectangles(bands, openings, wallLength, lower, upper);
+
+            List<Double> heights = new ArrayList<>(heightCuts);
+            List<WallSurfaceRectangle> bands = new ArrayList<>();
+            for (int index = 0; index < heights.size() - 1; index++) {
+                double lower = heights.get(index);
+                double upper = heights.get(index + 1);
+                if (upper - lower <= EPSILON) {
+                    continue;
+                }
+                addVisibleBandRectangles(bands, openings, wallLength, lower, upper);
+            }
+            merged = mergeVertically(bands);
         }
-        return mergeVertically(bands);
+        if (sideSign == null || roomId == null) {
+            return merged;
+        }
+        return clipRectanglesToIntervals(merged, wallSurfaceRoomIntervalService.intervals(level, wall, roomId, sideSign));
     }
 
     public List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall) {
-        return visiblePlanIntervals(level, wall, null);
+        return visiblePlanIntervals(level, wall, null, null);
     }
 
     public List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall, double sideSign) {
-        return visiblePlanIntervals(level, wall, Double.valueOf(sideSign < 0.0 ? -1.0 : 1.0));
+        return visiblePlanIntervals(level, wall, sideSign, null);
     }
 
-    private List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall, Double sideSign) {
+    public List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall, double sideSign, UUID roomId) {
+        return visiblePlanIntervals(level, wall, Double.valueOf(sideSign < 0.0 ? -1.0 : 1.0), roomId);
+    }
+
+    private List<WallSurfaceInterval> visiblePlanIntervals(Level level, Wall wall, Double sideSign, UUID roomId) {
         double wallLength = wall.axis().length().toMillimeters();
         if (wallLength <= EPSILON) {
             return List.of();
@@ -75,22 +90,27 @@ public final class WallSurfaceOpeningService {
         if (sideSign != null) {
             openings = withWallInterruptions(level, wall, sideSign, openings);
         }
+        List<WallSurfaceInterval> intervals;
         if (openings.isEmpty()) {
-            return List.of(new WallSurfaceInterval(0.0, wallLength));
-        }
-        List<WallSurfaceInterval> mergedOpenings = mergeOpeningIntervals(openings);
-        List<WallSurfaceInterval> intervals = new ArrayList<>();
-        double cursor = 0.0;
-        for (WallSurfaceInterval opening : mergedOpenings) {
-            if (opening.startMillimeters() - cursor > EPSILON) {
-                intervals.add(new WallSurfaceInterval(cursor, opening.startMillimeters()));
+            intervals = List.of(new WallSurfaceInterval(0.0, wallLength));
+        } else {
+            List<WallSurfaceInterval> mergedOpenings = mergeOpeningIntervals(openings);
+            intervals = new ArrayList<>();
+            double cursor = 0.0;
+            for (WallSurfaceInterval opening : mergedOpenings) {
+                if (opening.startMillimeters() - cursor > EPSILON) {
+                    intervals.add(new WallSurfaceInterval(cursor, opening.startMillimeters()));
+                }
+                cursor = Math.max(cursor, opening.endMillimeters());
             }
-            cursor = Math.max(cursor, opening.endMillimeters());
+            if (wallLength - cursor > EPSILON) {
+                intervals.add(new WallSurfaceInterval(cursor, wallLength));
+            }
         }
-        if (wallLength - cursor > EPSILON) {
-            intervals.add(new WallSurfaceInterval(cursor, wallLength));
+        if (sideSign == null || roomId == null) {
+            return List.copyOf(intervals);
         }
-        return List.copyOf(intervals);
+        return intersectIntervals(intervals, wallSurfaceRoomIntervalService.intervals(level, wall, roomId, sideSign));
     }
 
     public List<WallOpeningRectangle> openingRectangles(Level level, Wall wall) {
@@ -250,6 +270,51 @@ public final class WallSurfaceOpeningService {
             }
         }
         return List.copyOf(merged);
+    }
+
+    private List<WallSurfaceRectangle> clipRectanglesToIntervals(
+            List<WallSurfaceRectangle> rectangles,
+            List<WallSurfaceInterval> intervals
+    ) {
+        if (intervals.isEmpty()) {
+            return List.of();
+        }
+        List<WallSurfaceRectangle> clipped = new ArrayList<>();
+        for (WallSurfaceRectangle rectangle : rectangles) {
+            for (WallSurfaceInterval interval : intervals) {
+                double start = Math.max(rectangle.startMillimeters(), interval.startMillimeters());
+                double end = Math.min(rectangle.endMillimeters(), interval.endMillimeters());
+                if (end - start > EPSILON) {
+                    clipped.add(new WallSurfaceRectangle(
+                            start,
+                            end,
+                            rectangle.lowerHeightMillimeters(),
+                            rectangle.upperHeightMillimeters()
+                    ));
+                }
+            }
+        }
+        return List.copyOf(clipped);
+    }
+
+    private List<WallSurfaceInterval> intersectIntervals(
+            List<WallSurfaceInterval> visibleIntervals,
+            List<WallSurfaceInterval> allowedIntervals
+    ) {
+        if (allowedIntervals.isEmpty()) {
+            return List.of();
+        }
+        List<WallSurfaceInterval> result = new ArrayList<>();
+        for (WallSurfaceInterval visible : visibleIntervals) {
+            for (WallSurfaceInterval allowed : allowedIntervals) {
+                double start = Math.max(visible.startMillimeters(), allowed.startMillimeters());
+                double end = Math.min(visible.endMillimeters(), allowed.endMillimeters());
+                if (end - start > EPSILON) {
+                    result.add(new WallSurfaceInterval(start, end));
+                }
+            }
+        }
+        return List.copyOf(result);
     }
 
     private int findVerticalMergeCandidate(List<WallSurfaceRectangle> rectangles, WallSurfaceRectangle rectangle) {

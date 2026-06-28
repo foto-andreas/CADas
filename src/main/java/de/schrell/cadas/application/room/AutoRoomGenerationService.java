@@ -7,7 +7,6 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
-import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
 
 import java.util.ArrayDeque;
@@ -584,15 +583,11 @@ public final class AutoRoomGenerationService {
         if (outline.isEmpty()) {
             return List.of();
         }
-        Set<UUID> ignoredWallIds = ignoredCeilingHeightWallIds(level);
         List<Length> heights = new ArrayList<>();
         for (PlanPoint point : outline) {
             double sum = 0.0;
             int count = 0;
             for (Wall wall : level.walls()) {
-                if (ignoredWallIds.contains(wall.id())) {
-                    continue;
-                }
                 double distance = wall.axis().distanceTo(point).toMillimeters();
                 double tolerance = wall.thickness().toMillimeters() / 2.0
                         + surfaceLayerEffectService.maximumWallInteriorThicknessMillimeters(level, wall)
@@ -605,98 +600,12 @@ public final class AutoRoomGenerationService {
                 count++;
             }
             if (count == 0) {
-                heights.add(null);
+                heights.add(defaultHeight == null ? Length.zero() : defaultHeight);
             } else {
                 heights.add(Length.ofMillimeters(sum / count));
             }
         }
-        return normalizeThinWallEndHeights(outline, ersetzeFehlendeEckhöhen(heights, defaultHeight));
-    }
-
-    private Set<UUID> ignoredCeilingHeightWallIds(Level level) {
-        Set<UUID> ignoredWallIds = new HashSet<>();
-        for (Wall wall : level.walls()) {
-            if (!wall.hasVariableTopHeight()) {
-                continue;
-            }
-            if (level.staircases().stream().anyMatch(staircase -> liegtAnTreppenseite(wall, staircase))) {
-                ignoredWallIds.add(wall.id());
-            }
-        }
-        return ignoredWallIds;
-    }
-
-    private List<Length> ersetzeFehlendeEckhöhen(List<Length> heights, Length defaultHeight) {
-        if (heights.stream().noneMatch(java.util.Objects::isNull)) {
-            return List.copyOf(heights);
-        }
-        List<Length> resolvedHeights = new ArrayList<>(heights);
-        for (int index = 0; index < resolvedHeights.size(); index++) {
-            if (resolvedHeights.get(index) != null) {
-                continue;
-            }
-            resolvedHeights.set(index, benachbarteEckhöhe(resolvedHeights, index, defaultHeight));
-        }
-        return List.copyOf(resolvedHeights);
-    }
-
-    private Length benachbarteEckhöhe(List<Length> heights, int index, Length defaultHeight) {
-        Length previousHeight = null;
-        for (int offset = 1; offset < heights.size(); offset++) {
-            Length candidate = heights.get((index - offset + heights.size()) % heights.size());
-            if (candidate != null) {
-                previousHeight = candidate;
-                break;
-            }
-        }
-        Length nextHeight = null;
-        for (int offset = 1; offset < heights.size(); offset++) {
-            Length candidate = heights.get((index + offset) % heights.size());
-            if (candidate != null) {
-                nextHeight = candidate;
-                break;
-            }
-        }
-        if (previousHeight != null && nextHeight != null) {
-            return Length.ofMillimeters(Math.max(previousHeight.toMillimeters(), nextHeight.toMillimeters()));
-        }
-        if (previousHeight != null) {
-            return previousHeight;
-        }
-        if (nextHeight != null) {
-            return nextHeight;
-        }
-        return defaultHeight == null ? Length.zero() : defaultHeight;
-    }
-
-    private boolean liegtAnTreppenseite(Wall wall, Staircase staircase) {
-        double wallMinX = Math.min(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()) - wall.thickness().toMillimeters() / 2.0;
-        double wallMaxX = Math.max(wall.axis().start().xMillimeters(), wall.axis().end().xMillimeters()) + wall.thickness().toMillimeters() / 2.0;
-        double wallMinY = Math.min(wall.axis().start().yMillimeters(), wall.axis().end().yMillimeters()) - wall.thickness().toMillimeters() / 2.0;
-        double wallMaxY = Math.max(wall.axis().start().yMillimeters(), wall.axis().end().yMillimeters()) + wall.thickness().toMillimeters() / 2.0;
-        double axisX = (wall.axis().start().xMillimeters() + wall.axis().end().xMillimeters()) / 2.0;
-        double axisY = (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0;
-        if (isNearlyVertical(wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters(),
-                wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters())) {
-            boolean overlapsY = wallMaxY >= staircase.minY() - EPSILON && wallMinY <= staircase.maxY() + EPSILON;
-            return overlapsY && (
-                    Math.abs(axisX - staircase.minX()) <= wall.thickness().toMillimeters() / 2.0 + EPSILON
-                            || Math.abs(axisX - staircase.maxX()) <= wall.thickness().toMillimeters() / 2.0 + EPSILON
-                            || Math.abs(wallMaxX - staircase.minX()) <= EPSILON
-                            || Math.abs(wallMinX - staircase.maxX()) <= EPSILON
-            );
-        }
-        if (isNearlyHorizontal(wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters(),
-                wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters())) {
-            boolean overlapsX = wallMaxX >= staircase.minX() - EPSILON && wallMinX <= staircase.maxX() + EPSILON;
-            return overlapsX && (
-                    Math.abs(axisY - staircase.minY()) <= wall.thickness().toMillimeters() / 2.0 + EPSILON
-                            || Math.abs(axisY - staircase.maxY()) <= wall.thickness().toMillimeters() / 2.0 + EPSILON
-                            || Math.abs(wallMaxY - staircase.minY()) <= EPSILON
-                            || Math.abs(wallMinY - staircase.maxY()) <= EPSILON
-            );
-        }
-        return false;
+        return normalizeThinWallEndHeights(outline, heights);
     }
 
     private List<Length> normalizeThinWallEndHeights(List<PlanPoint> outline, List<Length> heights) {

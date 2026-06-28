@@ -34,6 +34,7 @@ import de.schrell.cadas.domain.model.RoofType;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
@@ -355,6 +356,9 @@ class DxfProjectExchangeServiceTest {
                 Length.of(5, LengthUnit.MILLIMETER),
                 Length.of(10, LengthUnit.MILLIMETER),
                 Length.of(10, LengthUnit.MILLIMETER),
+                SurfaceLayoutAnchor.MIN_X_MAX_Y,
+                Length.of(25, LengthUnit.MILLIMETER),
+                Length.of(475, LengthUnit.MILLIMETER),
                 Length.of(1, LengthUnit.MILLIMETER),
                 SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
                 "Holz"
@@ -424,6 +428,9 @@ class DxfProjectExchangeServiceTest {
         assertTrue(importedEg.surfaceLayerStacks().getFirst().layers().getFirst().layoutRotatedQuarterTurn());
         assertEquals(1.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().jointWidth().toMillimeters(), 0.001);
         assertEquals(SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().cutRestriction());
+        assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().layoutAnchor());
+        assertEquals(25.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().startRowTrim().toMillimeters(), 0.001);
+        assertEquals(475.0, importedEg.surfaceLayerStacks().getFirst().layers().getFirst().startRowWidth().toMillimeters(), 0.001);
         assertEquals(1, importedEg.roomObjects().size());
         assertEquals("DWG-Spiegel", importedEg.roomObjects().getFirst().name());
         assertEquals(RoomObjectMountingMode.WALL_MOUNTED, importedEg.roomObjects().getFirst().mountingMode());

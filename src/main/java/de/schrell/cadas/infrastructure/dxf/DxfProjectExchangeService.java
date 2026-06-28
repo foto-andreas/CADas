@@ -32,10 +32,8 @@ import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
-import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
-import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Terrain;
 import de.schrell.cadas.domain.model.TerrainVertex;
@@ -285,24 +283,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     case "SLL" -> {
                         SurfaceLayerStack stack = lastStackByLevel.get(DxfMetadataCodec.decode(parts[1], encodedFields));
                         if (stack != null) {
-                            SurfaceLayer layer = new SurfaceLayer(
-                                    UUID.fromString(parts[2]),
-                                    DxfMetadataCodec.decode(parts[3], encodedFields),
-                                    Length.ofMillimeters(parseDouble(parts[4])),
-                                    Boolean.parseBoolean(parts[5]),
-                                    Length.ofMillimeters(parseDouble(parts[6])),
-                                    Length.ofMillimeters(parseDouble(parts[7])),
-                                    SurfaceLayoutMode.valueOf(parts[8]),
-                                    Length.ofMillimeters(parseDouble(parts[9])),
-                                    Length.ofMillimeters(parseDouble(parts[10])),
-                                    Length.ofMillimeters(parseDouble(parts[11])),
-                                    Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[12]) : parseDouble(parts[11])),
-                                    Length.ofMillimeters(parts.length >= 15 ? parseDouble(parts[13]) : parseDouble(parts[12])),
-                                    SurfaceCutRestriction.fromStoredValue(parts.length >= 16 ? parts[15] : null),
-                                    DxfMetadataCodec.decode(parts.length >= 15 ? parts[14] : parts[13], encodedFields),
-                                    parts.length >= 17 && Boolean.parseBoolean(parts[16])
-                            );
-                            stack.addLayer(layer);
+                            stack.addLayer(SurfaceLayerMetadataCodec.deserializeProject(parts, encodedFields));
                         }
                     }
                     case "OBJ" -> {
@@ -590,26 +571,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     DxfMetadataCodec.encode(sls.targetKey())
             ));
             for (SurfaceLayer layer : sls.layers()) {
-                appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
-                        Locale.US,
-                        "SLL|%s|%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s",
-                        DxfMetadataCodec.encode(level.name()),
-                        layer.id(),
-                        DxfMetadataCodec.encode(layer.name()),
-                        layer.thickness().toMillimeters(),
-                        layer.visible(),
-                        layer.tileWidth().toMillimeters(),
-                        layer.tileHeight().toMillimeters(),
-                        layer.layoutMode().name(),
-                        layer.layoutOffset().toMillimeters(),
-                        layer.minimumOffset().toMillimeters(),
-                        layer.minimumEdgeWidth().toMillimeters(),
-                        layer.minimumStartEndMargin().toMillimeters(),
-                        layer.jointWidth().toMillimeters(),
-                        DxfMetadataCodec.encode(layer.coveringSource()),
-                        layer.cutRestriction().name(),
-                        layer.layoutRotatedQuarterTurn()
-                ));
+                appendMetadataText(dxf, context, new PlanPoint(0, 0), SurfaceLayerMetadataCodec.serializeProject(level.name(), layer));
             }
         }
         for (RoomObject roomObject : level.roomObjects()) {

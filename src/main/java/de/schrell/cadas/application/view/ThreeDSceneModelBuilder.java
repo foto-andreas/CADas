@@ -18,7 +18,8 @@ import de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceIn
 import de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle;
 import de.schrell.cadas.application.view.WallSurfacePlanGeometryService.WallSurfacePlanPolygon;
 import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService;
-import de.schrell.cadas.application.terrain.TerrainGeometryService;
+import de.schrell.cadas.application.terrain.TerrainContourService;
+import de.schrell.cadas.application.terrain.TerrainProfileService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Door;
@@ -36,7 +37,6 @@ import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
-import de.schrell.cadas.domain.model.TerrainVertex;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 
@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 public final class ThreeDSceneModelBuilder {
 
@@ -63,7 +64,8 @@ public final class ThreeDSceneModelBuilder {
     private static final double JOINT_HEIGHT = 2.5;
     private static final double JOINT_SURFACE_OFFSET = 2.0;
     private final OrthogonalPolygonDecompositionService decompositionService = new OrthogonalPolygonDecompositionService();
-    private final TerrainGeometryService terrainGeometryService = new TerrainGeometryService();
+    private final TerrainContourService terrainContourService = new TerrainContourService();
+    private final TerrainProfileService terrainProfileService = new TerrainProfileService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final WallSurfaceSideService wallSurfaceSideService = new WallSurfaceSideService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
@@ -130,33 +132,27 @@ public final class ThreeDSceneModelBuilder {
     }
 
     private void buildTerrain(ProjectModel project) {
-        List<TerrainVertex> vertices = project.terrain().vertices();
-        if (vertices.size() < 3) {
+        List<PlanPoint> contour = terrainContourService.contour(project);
+        List<TerrainProfileService.StripSample> strip = terrainProfileService.sampledStrip(project.terrain(), contour);
+        if (strip.size() < 3) {
             return;
         }
-        double minimumElevation = vertices.stream().mapToDouble(vertex -> vertex.elevationAboveLowestFloor().toMillimeters()).min().orElse(0.0);
-        double maximumElevation = vertices.stream().mapToDouble(vertex -> vertex.elevationAboveLowestFloor().toMillimeters()).max().orElse(0.0);
-        List<MeshPoint> inner = vertices.stream()
-                .map(vertex -> new MeshPoint(
-                        vertex.position().xMillimeters(),
-                        vertex.elevationAboveLowestFloor().toMillimeters() - minimumElevation,
-                        vertex.position().yMillimeters()
+        double minimumElevation = strip.stream().mapToDouble(TerrainProfileService.StripSample::elevationMillimeters).min().orElse(0.0);
+        double maximumElevation = strip.stream().mapToDouble(TerrainProfileService.StripSample::elevationMillimeters).max().orElse(0.0);
+        List<MeshPoint> inner = strip.stream()
+                .map(sample -> new MeshPoint(
+                        sample.contourPoint().xMillimeters(),
+                        sample.elevationMillimeters() - minimumElevation,
+                        sample.contourPoint().yMillimeters()
                 ))
                 .toList();
-        List<PlanPoint> outerOutline = terrainGeometryService.outerOutline(project.terrain());
-        if (outerOutline.size() != inner.size()) {
-            return;
-        }
-        List<MeshPoint> outer = new ArrayList<>();
-        for (int index = 0; index < outerOutline.size(); index++) {
-            TerrainVertex vertex = vertices.get(index);
-            PlanPoint point = outerOutline.get(index);
-            outer.add(new MeshPoint(
-                    point.xMillimeters(),
-                    vertex.elevationAboveLowestFloor().toMillimeters() - minimumElevation,
-                    point.yMillimeters()
-            ));
-        }
+        List<MeshPoint> outer = strip.stream()
+                .map(sample -> new MeshPoint(
+                        sample.outerPoint().xMillimeters(),
+                        sample.elevationMillimeters() - minimumElevation,
+                        sample.outerPoint().yMillimeters()
+                ))
+                .toList();
         List<Float> trianglePoints = new ArrayList<>();
         for (int index = 0; index < inner.size(); index++) {
             int next = (index + 1) % inner.size();
@@ -908,13 +904,23 @@ public final class ThreeDSceneModelBuilder {
             double centerOffset = cumulativeThickness + layer.thickness().toMillimeters() / 2.0;
             if (wallLayerSides.positiveSide()) {
                 int visibleLayerIndex = layerIndex;
-                List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(level, wall, 1.0);
+                UUID roomId = stack.surfaceType() == SurfaceType.WALL_INTERIOR
+                        ? WallSurfaceTargetKey.roomId(stack.targetKey()).orElse(null)
+                        : null;
+                List<WallSurfaceRectangle> visibleRectangles = roomId == null
+                        ? wallSurfaceOpeningService.visibleRectangles(level, wall, 1.0)
+                        : wallSurfaceOpeningService.visibleRectangles(level, wall, 1.0, roomId);
                 visibleRectangles.forEach(rectangle -> wallSurfaceLayerBox(level, levelName, wall, stack, layer, visibleLayerIndex, rectangle, baseHeight, centerOffset).ifPresent(boxes::add));
                 boxes.addAll(buildWallSurfaceJoints(level, levelName, wall, stack, layer, visibleLayerIndex, visibleRectangles, baseHeight, cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0));
             }
             if (wallLayerSides.negativeSide()) {
                 int visibleLayerIndex = layerIndex;
-                List<WallSurfaceRectangle> visibleRectangles = wallSurfaceOpeningService.visibleRectangles(level, wall, -1.0);
+                UUID roomId = stack.surfaceType() == SurfaceType.WALL_INTERIOR
+                        ? WallSurfaceTargetKey.roomId(stack.targetKey()).orElse(null)
+                        : null;
+                List<WallSurfaceRectangle> visibleRectangles = roomId == null
+                        ? wallSurfaceOpeningService.visibleRectangles(level, wall, -1.0)
+                        : wallSurfaceOpeningService.visibleRectangles(level, wall, -1.0, roomId);
                 visibleRectangles.forEach(rectangle -> wallSurfaceLayerBox(level, levelName, wall, stack, layer, visibleLayerIndex, rectangle, baseHeight, -centerOffset).ifPresent(boxes::add));
                 boxes.addAll(buildWallSurfaceJoints(level, levelName, wall, stack, layer, visibleLayerIndex, visibleRectangles, baseHeight, -(cumulativeThickness + layer.thickness().toMillimeters() + JOINT_SURFACE_OFFSET + JOINT_HEIGHT / 2.0)));
             }

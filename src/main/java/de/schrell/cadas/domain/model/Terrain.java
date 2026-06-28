@@ -9,7 +9,7 @@ import java.util.Set;
 
 public record Terrain(List<TerrainVertex> vertices, Length displayWidth) {
 
-    private static final Length DEFAULT_DISPLAY_WIDTH = Length.ofMillimeters(2_000.0);
+    private static final Length DEFAULT_DISPLAY_WIDTH = Length.ofMillimeters(400.0);
 
     public Terrain {
         Objects.requireNonNull(vertices, "vertices darf nicht null sein.");
