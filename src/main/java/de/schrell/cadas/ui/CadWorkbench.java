@@ -600,6 +600,7 @@ public final class CadWorkbench extends BorderPane {
     private Runnable applicationExitAction = Platform::exit;
     private UiErrorDialogs.ErrorPresentation lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
     private WarningPresentation lastWarningDialog = WarningPresentation.empty();
+    private Level.RoomReplacementImpact pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
 
     public CadWorkbench() {
         // Oberer Bereich (Werkzeugleiste) soll bündig oben anliegen, daher
@@ -2401,7 +2402,7 @@ public final class CadWorkbench extends BorderPane {
                         .toList();
                 resizedStaircasesWithUnderbuild.forEach(this::synchronizeStairUnderbuild);
                 if (isWallHandle || !resizedStaircasesWithUnderbuild.isEmpty()) {
-                    synchronizeRoomsFromWalls(activeLevel.get());
+                    previewRoomSynchronizationFromWalls(activeLevel.get());
                 }
                 markThreeDDirty();
                 render();
@@ -2429,7 +2430,7 @@ public final class CadWorkbench extends BorderPane {
                         snappedPoint,
                         !event.isShiftDown()
                 ));
-                synchronizeRoomsFromWalls(activeLevel.get());
+                previewRoomSynchronizationFromWalls(activeLevel.get());
                 markThreeDDirty();
                 render();
             }
@@ -2464,7 +2465,7 @@ public final class CadWorkbench extends BorderPane {
                 activeLevel.get().replaceWindows(activeLevel.get().windows().stream()
                         .map(window -> window.id().equals(openingDragId) ? window.withOffset(newOffset) : window)
                         .toList());
-                synchronizeRoomsFromWalls(activeLevel.get());
+                previewRoomSynchronizationFromWalls(activeLevel.get());
                 markThreeDDirty();
                 render();
                 return;
@@ -2545,6 +2546,7 @@ public final class CadWorkbench extends BorderPane {
             edgeResizeBaseFloorOpenings = List.of();
             edgeResizeBaseHeatingExclusionAreas = List.of();
             edgeResizeBaseHydronicHeatings = List.of();
+            boolean hadDrag = historyCapturedForDrag;
             historyCapturedForDrag = false;
             if (isHeatingZoneHandle(releasedHandle) || releasedHandle.elementKind() == RenderableKind.HEATING_MANIFOLD) {
                 if (isHeatingZoneHandle(releasedHandle)) {
@@ -2556,6 +2558,9 @@ public final class CadWorkbench extends BorderPane {
                     scheduleHeatingLayoutRecalculation(releasedHandle.elementId());
                 }
             }
+            if (hadDrag) {
+                flushPendingRoomSynchronizationWarning();
+            }
             updatePropertySectionVisibility();
             updateActionButtons();
             render();
@@ -2563,7 +2568,11 @@ public final class CadWorkbench extends BorderPane {
         }
 
         if (selectedEndpointGroup != null) {
+            boolean hadDrag = historyCapturedForDrag;
             historyCapturedForDrag = false;
+            if (hadDrag) {
+                flushPendingRoomSynchronizationWarning();
+            }
             updatePropertySectionVisibility();
             updateActionButtons();
             render();
@@ -2575,7 +2584,11 @@ public final class CadWorkbench extends BorderPane {
             openingDragWallAxis = null;
             openingDragWidth = 0;
             openingDragOffsetDelta = 0;
+            boolean hadDrag = historyCapturedForDrag;
             historyCapturedForDrag = false;
+            if (hadDrag) {
+                flushPendingRoomSynchronizationWarning();
+            }
             updatePropertySectionVisibility();
             updateActionButtons();
             render();
@@ -2590,10 +2603,14 @@ public final class CadWorkbench extends BorderPane {
             selectionDragBaseFloorOpenings = List.of();
             selectionDragBaseHeatingExclusionAreas = List.of();
             selectionDragBaseHydronicHeatings = List.of();
+            boolean hadDrag = historyCapturedForDrag;
             historyCapturedForDrag = false;
             if (selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.HEATING_ZONE
                     || selection.kind() == RenderableKind.HEATING_MANIFOLD)) {
                 scheduleHeatingLayoutRecalculation();
+            }
+            if (hadDrag) {
+                flushPendingRoomSynchronizationWarning();
             }
             updatePropertySectionVisibility();
             updateActionButtons();
@@ -3876,7 +3893,7 @@ public final class CadWorkbench extends BorderPane {
             return blockers;
         }
         for (Room room : activeLevel.get().rooms()) {
-            PlanPoint center = room.centerPoint();
+            PlanPoint center = roomLabelCenter(room);
             blockers.addAll(drawRoomLabel(graphics, room, center));
         }
         return blockers;
@@ -4056,11 +4073,13 @@ public final class CadWorkbench extends BorderPane {
         List<TextBlockingBox> blockers = new ArrayList<>();
         double centerX = toScreenProjectedX(center, 0.0);
         double centerY = toScreenProjectedY(center, 0.0);
+        graphics.save();
         graphics.setFill(Color.web("#5d4527"));
+        graphics.setTextAlign(TextAlignment.CENTER);
         graphics.setFont(Font.font("Menlo", 12));
         String name = room.name();
-        graphics.fillText(name, centerX - 26, centerY - 6);
-        blockers.add(textBlockingBox(name, Font.font("Menlo", 12), centerX - 26, centerY - 6));
+        graphics.fillText(name, centerX, centerY - 6);
+        blockers.add(centeredTextBlockingBox(name, Font.font("Menlo", 12), centerX, centerY - 6));
         String areaVolume = String.format(
                 Locale.GERMAN,
                 "%.2f m² | %.2f m³",
@@ -4068,16 +4087,28 @@ public final class CadWorkbench extends BorderPane {
                 surfaceLayerEffectService.effectiveVolumeCubicMeters(activeLevel.get(), room)
         );
         graphics.setFont(Font.font("Menlo", 11));
-        graphics.fillText(areaVolume, centerX - 42, centerY + 12);
-        blockers.add(textBlockingBox(areaVolume, Font.font("Menlo", 11), centerX - 42, centerY + 12));
+        graphics.fillText(areaVolume, centerX, centerY + 12);
+        blockers.add(centeredTextBlockingBox(areaVolume, Font.font("Menlo", 11), centerX, centerY + 12));
+        graphics.restore();
         return blockers;
     }
 
-    private TextBlockingBox textBlockingBox(String text, Font font, double x, double y) {
+    private PlanPoint roomLabelCenter(Room room) {
+        PlanPoint center = room.centerPoint();
+        if (de.schrell.cadas.domain.geometry.PlanPolygonSupport.containsPoint(room.outline(), center)) {
+            return center;
+        }
+        return new de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService().decompose(room.outline()).stream()
+                .max(Comparator.comparingDouble(rectangle -> rectangle.width() * rectangle.height()))
+                .map(rectangle -> new PlanPoint(rectangle.centerX(), rectangle.centerY()))
+                .orElse(center);
+    }
+
+    private TextBlockingBox centeredTextBlockingBox(String text, Font font, double centerX, double y) {
         Text measure = new Text(text);
         measure.setFont(font);
         var bounds = measure.getLayoutBounds();
-        double boxX = x + bounds.getMinX() - DIMENSION_TEXT_PADDING;
+        double boxX = centerX - bounds.getWidth() / 2.0 - DIMENSION_TEXT_PADDING;
         double boxY = y + bounds.getMinY() - DIMENSION_TEXT_PADDING;
         return new TextBlockingBox(
                 boxX,
@@ -8859,10 +8890,35 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void synchronizeRoomsFromWalls(Level level) {
+        pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
+        Level.RoomReplacementImpact impact = synchronizeRoomsFromWalls(level, true);
+        showRoomSynchronizationWarning(impact);
+    }
+
+    private void previewRoomSynchronizationFromWalls(Level level) {
+        pendingRoomSynchronizationImpact = synchronizeRoomsFromWalls(level, false);
+    }
+
+    private Level.RoomReplacementImpact synchronizeRoomsFromWalls(Level level, boolean showWarning) {
         List<Room> synchronizedRooms = autoRoomGenerationService.synchronize(level, currentRoomDefaults());
         Level.RoomReplacementImpact impact = level.roomReplacementImpact(synchronizedRooms);
         level.replaceRooms(synchronizedRooms);
-        showRoomSynchronizationWarning(impact);
+        if (showWarning) {
+            showRoomSynchronizationWarning(impact);
+        }
+        return impact;
+    }
+
+    private void flushPendingRoomSynchronizationWarning() {
+        try {
+            showRoomSynchronizationWarning(pendingRoomSynchronizationImpact);
+        } finally {
+            pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
+        }
+    }
+
+    private static Level.RoomReplacementImpact emptyRoomSynchronizationImpact() {
+        return new Level.RoomReplacementImpact(0, List.of(), List.of(), 0, 0, 0, 0, 0);
     }
 
     private void synchronizeStairUnderbuild(Staircase staircase) {
@@ -8929,7 +8985,7 @@ public final class CadWorkbench extends BorderPane {
         activeLevel.get().replaceHeatingExclusionAreas(translationResult.heatingExclusionAreas());
         activeLevel.get().replaceHydronicHeatings(translationResult.hydronicHeatings());
         if (selectedTranslationAffectsRooms()) {
-            synchronizeRoomsFromWalls(activeLevel.get());
+            previewRoomSynchronizationFromWalls(activeLevel.get());
         }
         markThreeDDirty();
     }

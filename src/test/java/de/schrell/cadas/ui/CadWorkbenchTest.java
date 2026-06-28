@@ -1152,6 +1152,39 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void zeigtRaumneuabgleichWarnungBeimVerschiebenErstNachDemLoslassen() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationSetErrorDialogsEnabled(false);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSetViewport(1.0, 100.0, 100.0);
+            instanz.automationSelect("WALL", 0, false);
+            instanz.automationClearLastWarning();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationCanvasPress(300, 100, javafx.scene.input.MouseButton.PRIMARY);
+            workbench.automationCanvasDragTo(300, 140, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        Assertions.assertEquals("", aufFxThread(workbench::automationLastWarningTitle));
+
+        aufFxThread(() -> {
+            workbench.automationCanvasRelease(300, 140, javafx.scene.input.MouseButton.PRIMARY);
+            return null;
+        });
+
+        Assertions.assertEquals("Räume und Zuordnungen geändert", aufFxThread(workbench::automationLastWarningTitle));
+    }
+
+    @Test
     void alterRaumWerkzeugAliasWechseltAufBearbeiten() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -1337,6 +1370,57 @@ class CadWorkbenchTest {
                 darkPixels > 3,
                 "Die Objektbezeichnung wurde in der 2D-Ansicht nicht sichtbar gezeichnet. Dunkle Pixel: " + darkPixels
         );
+    }
+
+    @Test
+    void lFoermigerRaumTextBleibtInnerhalbDesRaums() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.project.primaryLevel().addRoom(new Room(
+                    java.util.UUID.randomUUID(),
+                    "L-Raum",
+                    List.of(
+                            new PlanPoint(100, 100),
+                            new PlanPoint(3_100, 100),
+                            new PlanPoint(3_100, 1_100),
+                            new PlanPoint(1_100, 1_100),
+                            new PlanPoint(1_100, 3_100),
+                            new PlanPoint(100, 3_100)
+                    ),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200),
+                    (de.schrell.cadas.domain.model.SlopedCeilingProfile) null,
+                    null
+            ));
+            instanz.automationSetViewport(1.0, 60.0, 60.0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+        int notchMinX = (int) Math.round(snapshot.offsetX() + 1_250.0 * 0.1 * snapshot.zoom());
+        int notchMinY = (int) Math.round(snapshot.offsetY() + 1_250.0 * 0.1 * snapshot.zoom());
+        int notchMaxX = (int) Math.round(snapshot.offsetX() + 2_950.0 * 0.1 * snapshot.zoom());
+        int notchMaxY = (int) Math.round(snapshot.offsetY() + 2_950.0 * 0.1 * snapshot.zoom());
+        int topArmMinX = (int) Math.round(snapshot.offsetX() + 250.0 * 0.1 * snapshot.zoom());
+        int topArmMinY = (int) Math.round(snapshot.offsetY() + 250.0 * 0.1 * snapshot.zoom());
+        int topArmMaxX = (int) Math.round(snapshot.offsetX() + 2_950.0 * 0.1 * snapshot.zoom());
+        int topArmMaxY = (int) Math.round(snapshot.offsetY() + 950.0 * 0.1 * snapshot.zoom());
+        int leftArmMinX = (int) Math.round(snapshot.offsetX() + 250.0 * 0.1 * snapshot.zoom());
+        int leftArmMinY = (int) Math.round(snapshot.offsetY() + 1_250.0 * 0.1 * snapshot.zoom());
+        int leftArmMaxX = (int) Math.round(snapshot.offsetX() + 950.0 * 0.1 * snapshot.zoom());
+        int leftArmMaxY = (int) Math.round(snapshot.offsetY() + 2_950.0 * 0.1 * snapshot.zoom());
+
+        int notchPixels = countDarkPixels(image, notchMinX, notchMinY, notchMaxX, notchMaxY);
+        int insidePixels = countDarkPixels(image, topArmMinX, topArmMinY, topArmMaxX, topArmMaxY)
+                + countDarkPixels(image, leftArmMinX, leftArmMinY, leftArmMaxX, leftArmMaxY);
+
+        Assertions.assertTrue(insidePixels > 4, "Die Rauminfo wurde in keinem Innenbereich gezeichnet. Innenpixel: " + insidePixels);
+        Assertions.assertTrue(notchPixels < insidePixels, "Die Rauminfo landet noch im ausgesparten Bereich.");
     }
 
     @Test
@@ -2449,7 +2533,7 @@ class CadWorkbenchTest {
         for (int x = Math.max(0, minX); x <= Math.min((int) image.getWidth() - 1, maxX); x++) {
             for (int y = Math.max(0, minY); y <= Math.min((int) image.getHeight() - 1, maxY); y++) {
                 var color = image.getPixelReader().getColor(x, y);
-                if (color.getRed() < 0.20 && color.getGreen() < 0.32 && color.getBlue() < 0.30) {
+                if (color.getRed() < 0.55 && color.getGreen() < 0.50 && color.getBlue() < 0.40) {
                     count++;
                 }
             }
