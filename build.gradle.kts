@@ -114,7 +114,7 @@ abstract class GenerateThirdPartyLicensesTask : DefaultTask() {
     }
 }
 
-val generateThirdPartyLicenses by tasks.registering(GenerateThirdPartyLicensesTask::class) {
+val generateThirdPartyLicenses = tasks.register<GenerateThirdPartyLicensesTask>("generateThirdPartyLicenses") {
     artifactFiles.from(configurations.runtimeClasspath)
     outputFile.set(layout.buildDirectory.file("generated/licenses/drittanbieter-lizenzen.md"))
 }
@@ -466,21 +466,21 @@ val commonJpackageArguments = listOf(
     "--java-options", "--add-modules=org.apache.pdfbox,org.apache.commons.logging"
 )
 
-val cleanMacOsAppImage by tasks.registering(Delete::class) {
+val cleanMacOsAppImage = tasks.register<Delete>("cleanMacOsAppImage") {
     delete(appImageOutputDirectory.resolve("CADas.app"))
 }
 
-val cleanMacOsDmg by tasks.registering(Delete::class) {
+val cleanMacOsDmg = tasks.register<Delete>("cleanMacOsDmg") {
     delete(dmgOutputDirectory)
 }
 
-val cleanMacOsPkg by tasks.registering(Delete::class) {
+val cleanMacOsPkg = tasks.register<Delete>("cleanMacOsPkg") {
     delete(pkgOutputDirectory)
 }
 
 // Bereinigter Modulpfad für jlink: kopiert nur proper modules (echte Java-Module) aus dem
 // lib-Verzeichnis, sodass jlink keine automatic modules vorfindet.
-val prepareJlinkModulePath by tasks.registering(PrepareModulePathTask::class) {
+val prepareJlinkModulePath = tasks.register<PrepareModulePathTask>("prepareJlinkModulePath") {
     sourceDirectory.set(installLibDirectory)
     excludedJarNames.set(classpathJars)
     targetDirectory.set(jlinkModulePath)
@@ -490,7 +490,7 @@ val prepareJlinkModulePath by tasks.registering(PrepareModulePathTask::class) {
 // Erzeugt das Laufzeitimage per jlink mit nur echten Modulen (JDK + JavaFX + commonmark).
 // Die automatischen Module liegen später auf dem App-Modulpfad und werden per --add-modules
 // in den Laufzeit-Layer aufgenommen.
-val jlinkRuntimeImage by tasks.registering(JlinkRuntimeImageTask::class) {
+val jlinkRuntimeImage = tasks.register<JlinkRuntimeImageTask>("jlinkRuntimeImage") {
     group = "distribution"
     description = "Erzeugt das Java-Laufzeitimage für die macOS-Paketierung per jlink."
     enabled = macOsPackagingSupported.get()
@@ -510,7 +510,7 @@ val jlinkRuntimeImage by tasks.registering(JlinkRuntimeImageTask::class) {
     jlinkToolExecutable.set(jlinkExecutable)
 }
 
-val renameMacOsAppImage by tasks.registering(RenamePackagedDirectoryTask::class) {
+val renameMacOsAppImage = tasks.register<RenamePackagedDirectoryTask>("renameMacOsAppImage") {
     dependsOn("packageMacOsAppImage")
     outputDirectory.set(appImageOutputDirectory)
     generatedDirectoryName.set("CADas.app")
@@ -536,12 +536,12 @@ tasks.register<JpackageAppImageTask>("packageMacOsAppImage") {
 // Vordefiniertes App-Image für die DMG-Erzeugung.
 val macOsAppImageForDmg = layout.buildDirectory.dir("installer/macos/app-image-for-dmg").get().asFile
 
-val cleanMacOsAppImageForDmg by tasks.registering(Delete::class) {
+val cleanMacOsAppImageForDmg = tasks.register<Delete>("cleanMacOsAppImageForDmg") {
     delete(macOsAppImageForDmg)
 }
 
 // Phase 1: App-Image in ein temporäres Verzeichnis erzeugen.
-val prepareMacOsAppImageForDmg by tasks.registering(JpackageAppImageTask::class) {
+val prepareMacOsAppImageForDmg = tasks.register<JpackageAppImageTask>("prepareMacOsAppImageForDmg") {
     group = "distribution"
     description = "Erzeugt das App-Image als Vorlage für das DMG (intern)."
     enabled = macOsPackagingSupported.get()
@@ -569,13 +569,13 @@ fun deleteTreeWithoutFollowingLinks(directory: File) {
     }
 }
 
-val cleanMacOsDmgStaging by tasks.registering(DefaultTask::class) {
+val cleanMacOsDmgStaging = tasks.register<DefaultTask>("cleanMacOsDmgStaging") {
     doLast {
         deleteTreeWithoutFollowingLinks(dmgStagingDirectory)
     }
 }
 
-val stageDmgContent by tasks.registering(DefaultTask::class) {
+val stageDmgContent = tasks.register<DefaultTask>("stageDmgContent") {
     group = "distribution"
     description = "Stagt das App-Image für das DMG (intern)."
     dependsOn(prepareMacOsAppImageForDmg, cleanMacOsDmgStaging)
@@ -592,7 +592,7 @@ val stageDmgContent by tasks.registering(DefaultTask::class) {
 }
 
 // Phase 2c: DMG aus dem Staging-Verzeichnis per hdiutil erzeugen (UDZO).
-val buildMacOsDmg by tasks.registering(Exec::class) {
+val buildMacOsDmg = tasks.register<Exec>("buildMacOsDmg") {
     group = "distribution"
     description = "Erzeugt das finale DMG per hdiutil (intern)."
     dependsOn(stageDmgContent, cleanMacOsDmg)
