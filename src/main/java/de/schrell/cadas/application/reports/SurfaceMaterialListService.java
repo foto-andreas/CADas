@@ -41,6 +41,7 @@ import java.util.UUID;
 public final class SurfaceMaterialListService {
 
     private static final double EPSILON = 0.001;
+    private static final double MINIMUM_REUSABLE_REST_EDGE_MILLIMETERS = 20.0;
 
     private final OrthogonalPolygonDecompositionService decompositionService = new OrthogonalPolygonDecompositionService();
     private final WallSurfaceOpeningService wallSurfaceOpeningService = new WallSurfaceOpeningService();
@@ -736,6 +737,16 @@ public final class SurfaceMaterialListService {
         private double areaSquareMillimeters() {
             return widthMillimeters * heightMillimeters;
         }
+
+        private double shortestEdgeMillimeters() {
+            return Math.min(widthMillimeters, heightMillimeters);
+        }
+
+        private RestPiece normalized() {
+            return widthMillimeters >= heightMillimeters
+                    ? this
+                    : new RestPiece(heightMillimeters, widthMillimeters);
+        }
     }
 
     private record FitCandidate(int restIndex, double widthMillimeters, double heightMillimeters, double wasteSquareMillimeters) {
@@ -823,23 +834,41 @@ public final class SurfaceMaterialListService {
         }
 
         private static List<RestPiece> splitRestPiece(RestPiece source, double usedWidth, double usedHeight) {
-            List<RestPiece> verticalFirst = List.of(
+            List<RestPiece> verticalFirst = usableRestPieces(List.of(
                     new RestPiece(source.widthMillimeters() - usedWidth, source.heightMillimeters()),
                     new RestPiece(usedWidth, source.heightMillimeters() - usedHeight)
-            );
-            List<RestPiece> horizontalFirst = List.of(
+            ));
+            List<RestPiece> horizontalFirst = usableRestPieces(List.of(
                     new RestPiece(source.widthMillimeters(), source.heightMillimeters() - usedHeight),
                     new RestPiece(source.widthMillimeters() - usedWidth, usedHeight)
-            );
-            return usableRestPieces(score(verticalFirst) >= score(horizontalFirst) ? verticalFirst : horizontalFirst);
+            ));
+            return compare(score(verticalFirst), score(horizontalFirst)) >= 0 ? verticalFirst : horizontalFirst;
         }
 
-        private static double score(List<RestPiece> restPieces) {
-            return restPieces.stream()
-                    .filter(MaterialCuttingOptimizer::isUsable)
-                    .mapToDouble(RestPiece::areaSquareMillimeters)
-                    .max()
-                    .orElse(0.0);
+        private static RestPieceScore score(List<RestPiece> restPieces) {
+            List<RestPiece> usableRestPieces = usableRestPieces(restPieces);
+            return new RestPieceScore(
+                    usableRestPieces.size(),
+                    usableRestPieces.stream().mapToDouble(RestPiece::shortestEdgeMillimeters).sum(),
+                    usableRestPieces.stream().mapToDouble(RestPiece::areaSquareMillimeters).sum(),
+                    usableRestPieces.stream().mapToDouble(RestPiece::areaSquareMillimeters).max().orElse(0.0)
+            );
+        }
+
+        private static int compare(RestPieceScore first, RestPieceScore second) {
+            int usableCount = Integer.compare(first.usableCount(), second.usableCount());
+            if (usableCount != 0) {
+                return usableCount;
+            }
+            int shortestEdge = Double.compare(first.shortestEdgeSumMillimeters(), second.shortestEdgeSumMillimeters());
+            if (shortestEdge != 0) {
+                return shortestEdge;
+            }
+            int totalArea = Double.compare(first.totalAreaSquareMillimeters(), second.totalAreaSquareMillimeters());
+            if (totalArea != 0) {
+                return totalArea;
+            }
+            return Double.compare(first.maxAreaSquareMillimeters(), second.maxAreaSquareMillimeters());
         }
 
         private static List<RestPiece> usableRestPieces(List<RestPiece> candidates) {
@@ -849,13 +878,15 @@ public final class SurfaceMaterialListService {
         }
 
         private static boolean isUsable(RestPiece restPiece) {
-            return restPiece.widthMillimeters() > EPSILON && restPiece.heightMillimeters() > EPSILON;
+            return restPiece.widthMillimeters() + EPSILON >= MINIMUM_REUSABLE_REST_EDGE_MILLIMETERS
+                    && restPiece.heightMillimeters() + EPSILON >= MINIMUM_REUSABLE_REST_EDGE_MILLIMETERS;
         }
 
         private static List<RestPieceSummary> groupedRestPieces(List<RestPiece> restPieces) {
             Map<String, RestPieceAccumulator> groups = new LinkedHashMap<>();
             restPieces.stream()
                     .filter(MaterialCuttingOptimizer::isUsable)
+                    .map(RestPiece::normalized)
                     .sorted(Comparator.comparingDouble(RestPiece::areaSquareMillimeters).reversed())
                     .forEach(restPiece -> groups.computeIfAbsent(restKey(restPiece), ignored -> new RestPieceAccumulator(restPiece))
                             .add());
@@ -869,6 +900,14 @@ public final class SurfaceMaterialListService {
                     + "|"
                     + Math.round(restPiece.heightMillimeters() * 1000.0);
         }
+    }
+
+    private record RestPieceScore(
+            int usableCount,
+            double shortestEdgeSumMillimeters,
+            double totalAreaSquareMillimeters,
+            double maxAreaSquareMillimeters
+    ) {
     }
 
     private static final class RestPieceAccumulator {

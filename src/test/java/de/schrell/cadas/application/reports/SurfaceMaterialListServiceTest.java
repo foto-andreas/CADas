@@ -300,6 +300,30 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
+    void ignoriertReststueckeUnterZweiZentimetern() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Bad",
+                new PlanPoint(0, 0),
+                new PlanPoint(500, 490),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        stack.addLayer(layer("Fliese", Length.of(50, LengthUnit.CENTIMETER), Length.of(50, LengthUnit.CENTIMETER)));
+        project.primaryLevel().addSurfaceLayerStack(stack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        MaterialSummary material = report.materials().getFirst();
+        assertEquals(1, material.requiredPieces());
+        assertTrue(material.restPieces().isEmpty());
+        assertFalse(report.toMarkdown().contains("1,0 cm"));
+    }
+
+    @Test
     void verwendetReststueckeUeberRaumgrenzenHinweg() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Room flur = Room.rectangular(
