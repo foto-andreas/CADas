@@ -179,6 +179,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.WritableImage;
+import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -330,6 +331,7 @@ public final class CadWorkbench extends BorderPane {
     final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
     private final BooleanProperty showRoomObjects = new SimpleBooleanProperty(true);
     private final BooleanProperty showTerrainInPlan = new SimpleBooleanProperty(true);
+    private final BooleanProperty showVariothermCircles = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuideDistances = new SimpleBooleanProperty(true);
     private final BooleanProperty snapToGuides = new SimpleBooleanProperty(true);
@@ -573,7 +575,7 @@ public final class CadWorkbench extends BorderPane {
     private EdgeResizeService.EdgeHandle activeEdgeHandle;
     private List<Wall> edgeResizeBaseWalls = List.of();
     private List<Door> edgeResizeBaseDoors = List.of();
-    private ImagePattern variothermGroovePattern;
+    private Image variothermGroovePatternImage;
     private double variothermGroovePatternPitchPixels = -1.0;
     private List<WindowElement> edgeResizeBaseWindows = List.of();
     private List<Staircase> edgeResizeBaseStaircases = List.of();
@@ -670,6 +672,7 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(dimensionTextStyle);
         registerRenderListener(showAreaVolume);
         registerRenderListener(showTerrainInPlan);
+        registerRenderListener(showVariothermCircles);
         registerRenderListener(showGuides);
         registerRenderListener(showGuideDistances);
         registerRenderListener(snapToGuides);
@@ -795,6 +798,10 @@ public final class CadWorkbench extends BorderPane {
         terrainPlanBox.selectedProperty().bindBidirectional(showTerrainInPlan);
         applyTooltip(terrainPlanBox, "Blendet das Gelände in der 2D-Ansicht als Band außerhalb des Gebäudes ein oder aus. Seitenansichten und 3D bleiben davon unberührt.");
 
+        CheckBox variothermCirclesBox = new CheckBox("Variotherm-Kreise");
+        variothermCirclesBox.selectedProperty().bindBidirectional(showVariothermCircles);
+        applyTooltip(variothermCirclesBox, "Blendet die Kreis-Markierungen der Variotherm-Trockenbauplatten global in der 2D-Ansicht ein oder aus. Die Belagsgeometrie und Mengenberechnung bleiben unverändert.");
+
         Button addLevelButton = createActionButton(
                 "Etage hinzufügen",
                 null,
@@ -860,7 +867,8 @@ public final class CadWorkbench extends BorderPane {
                 dimensionsBox,
                 dimensionTextPartsBox,
                 objectsBox,
-                terrainPlanBox
+                terrainPlanBox,
+                variothermCirclesBox
         );
     }
 
@@ -1256,6 +1264,7 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("Erweiterte Maßtexte anzeigen", dimensionTextStyle, DimensionTextStyle.FULL, DimensionTextStyle.LENGTH_ONLY),
                 checkMenuItem("Objekte anzeigen", showRoomObjects),
                 checkMenuItem("Gelände in 2D anzeigen", showTerrainInPlan),
+                checkMenuItem("Variotherm-Kreise anzeigen", showVariothermCircles),
                 checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
                 checkMenuItem("Nordpfeil anzeigen", showCompass)
         );
@@ -3922,7 +3931,8 @@ public final class CadWorkbench extends BorderPane {
                 double screenY = toScreenY(ty);
                 graphics.fillRect(screenX, screenY, jointPx, th * scale());
             }
-            if (SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource())
+            if (showVariothermCircles.get()
+                    && SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource())
                     && scale() * SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS
                     >= VARIOTHERM_DETAIL_MIN_SCREEN_SPACING) {
                 drawVariothermPanelGrooves(graphics, tx, ty, tw, th);
@@ -3948,15 +3958,21 @@ public final class CadWorkbench extends BorderPane {
         double radius = Math.max(1.0, (pitch - SurfaceCoveringPresetService.VARIOTHERM_PIPE_DIAMETER_MILLIMETERS) / 2.0);
         double pitchPixels = pitch * scale();
         double radiusPixels = radius * scale();
+        double screenX = toScreenX(tileX);
+        double screenY = toScreenY(tileY);
         graphics.save();
-        graphics.setFill(variothermGroovePattern(pitchPixels, radiusPixels));
-        graphics.fillRect(toScreenX(tileX), toScreenY(tileY + tileHeight), tileWidth * scale(), tileHeight * scale());
+        graphics.setFill(variothermGroovePattern(screenX, screenY, pitchPixels, radiusPixels));
+        graphics.fillRect(screenX, screenY, tileWidth * scale(), tileHeight * scale());
         graphics.restore();
     }
 
-    private ImagePattern variothermGroovePattern(double pitchPixels, double radiusPixels) {
-        if (variothermGroovePattern != null && Math.abs(variothermGroovePatternPitchPixels - pitchPixels) <= 0.01) {
-            return variothermGroovePattern;
+    private ImagePattern variothermGroovePattern(double tileScreenX, double tileScreenY, double pitchPixels, double radiusPixels) {
+        return new ImagePattern(variothermGroovePatternImage(pitchPixels, radiusPixels), tileScreenX, tileScreenY, pitchPixels, pitchPixels, false);
+    }
+
+    private Image variothermGroovePatternImage(double pitchPixels, double radiusPixels) {
+        if (variothermGroovePatternImage != null && Math.abs(variothermGroovePatternPitchPixels - pitchPixels) <= 0.01) {
+            return variothermGroovePatternImage;
         }
         double canvasSize = Math.max(2.0, pitchPixels);
         Canvas patternCanvas = new Canvas(canvasSize, canvasSize);
@@ -3969,10 +3985,9 @@ public final class CadWorkbench extends BorderPane {
                 radiusPixels * 2.0,
                 radiusPixels * 2.0
         );
-        WritableImage patternImage = patternCanvas.snapshot(null, null);
-        variothermGroovePattern = new ImagePattern(patternImage, 0.0, 0.0, canvasSize, canvasSize, false);
+        variothermGroovePatternImage = patternCanvas.snapshot(null, null);
         variothermGroovePatternPitchPixels = pitchPixels;
-        return variothermGroovePattern;
+        return variothermGroovePatternImage;
     }
 
     private List<TextBlockingBox> drawRoomLabel(GraphicsContext graphics, Room room, PlanPoint center) {
@@ -9168,6 +9183,10 @@ public final class CadWorkbench extends BorderPane {
 
     public void automationSetShowDimensions(boolean visible) {
         showDimensions.set(visible);
+    }
+
+    public void automationSetShowVariothermCircles(boolean visible) {
+        showVariothermCircles.set(visible);
     }
 
     public int automationFloorExtensionCount() {

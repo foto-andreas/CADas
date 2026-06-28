@@ -1,5 +1,6 @@
 package de.schrell.cadas.ui;
 
+import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.application.view.RenderableKind;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
@@ -1648,6 +1649,66 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void variothermKreiseLassenSichGlobalAusblenden() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3_900, 2_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Variotherm",
+                    Length.of(18, LengthUnit.MILLIMETER),
+                    Length.of(60, LengthUnit.CENTIMETER),
+                    Length.of(100, LengthUnit.CENTIMETER),
+                    SurfaceLayoutMode.FIXED,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.zero(),
+                    SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetViewport(3.0, 20.0, 20.0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage mitKreisen = aufFxThread(workbench::automationDrawingSnapshot);
+        int sichtbareKreisPixel = countVariothermCirclePixels(
+                mitKreisen,
+                snapshot,
+                new PlanPoint(200, 200),
+                new PlanPoint(3_600, 2_500)
+        );
+
+        aufFxThread(() -> {
+            workbench.automationSetShowVariothermCircles(false);
+            return null;
+        });
+        WritableImage ohneKreise = aufFxThread(workbench::automationDrawingSnapshot);
+        int ausgeblendeteKreisPixel = countVariothermCirclePixels(
+                ohneKreise,
+                snapshot,
+                new PlanPoint(200, 200),
+                new PlanPoint(3_600, 2_500)
+        );
+
+        Assertions.assertTrue(sichtbareKreisPixel > 120, "Variotherm-Kreise wurden nicht sichtbar gezeichnet.");
+        Assertions.assertTrue(ausgeblendeteKreisPixel < sichtbareKreisPixel / 5, "Variotherm-Kreise bleiben trotz globalem Abschalten sichtbar.");
+    }
+
+    @Test
     void importierteInnenwandFliesenAktualisierenDie3dAnsichtMitFugen() throws Exception {
         Path projektDatei = erzeugeProjektMitInnenwandfliesenAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {
@@ -2211,6 +2272,30 @@ class CadWorkbenchTest {
             }
         }
         Assertions.assertTrue(highlightedJointFound, "Kein hervorgehobener Belag im Raumbereich gefunden.");
+    }
+
+    private int countVariothermCirclePixels(
+            WritableImage image,
+            WorkbenchAutomationSnapshot snapshot,
+            PlanPoint minPoint,
+            PlanPoint maxPoint
+    ) {
+        int minX = (int) Math.round(snapshot.offsetX() + minPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int maxX = (int) Math.round(snapshot.offsetX() + maxPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int minY = (int) Math.round(snapshot.offsetY() + minPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        int maxY = (int) Math.round(snapshot.offsetY() + maxPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        int count = 0;
+        for (int x = Math.max(0, minX); x <= Math.min((int) image.getWidth() - 1, maxX); x++) {
+            for (int y = Math.max(0, minY); y <= Math.min((int) image.getHeight() - 1, maxY); y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                if (color.getBlue() > color.getRed() + 0.04
+                        && color.getGreen() > color.getRed() + 0.02
+                        && color.getBlue() > 0.32) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     private Path erzeugeProjektMitInnenwandfliesenAlsDxf() throws Exception {

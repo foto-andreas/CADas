@@ -363,8 +363,9 @@ class SurfaceMaterialListServiceTest {
 
         MaterialSummary material = report.materials().getFirst();
         assertEquals(2, material.requiredPieces());
-        assertTrue(material.values().contains("Verlegung Kein Versatz um 90° gedreht"));
-        assertTrue(report.toMarkdown().contains("um 90° gedreht"));
+        assertTrue(material.values().contains("Drehung 90°"));
+        assertTrue(material.values().contains("Richtung Links nach rechts"));
+        assertTrue(report.toMarkdown().contains("Drehung 90°"));
     }
 
     @Test
