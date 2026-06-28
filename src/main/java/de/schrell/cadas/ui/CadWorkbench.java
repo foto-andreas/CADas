@@ -595,6 +595,7 @@ public final class CadWorkbench extends BorderPane {
     private long nextChangeRevision = 1;
     private Runnable applicationExitAction = Platform::exit;
     private UiErrorDialogs.ErrorPresentation lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
+    private WarningPresentation lastWarningDialog = WarningPresentation.empty();
 
     public CadWorkbench() {
         // Oberer Bereich (Werkzeugleiste) soll bündig oben anliegen, daher
@@ -6760,6 +6761,65 @@ public final class CadWorkbench extends BorderPane {
         alert.showAndWait();
     }
 
+    private void showRoomSynchronizationWarning(Level.RoomReplacementImpact impact) {
+        if (!impact.needsWarning()) {
+            return;
+        }
+        List<String> lines = new ArrayList<>();
+        if (impact.changedRoomCount() > 0) {
+            lines.add(impact.changedRoomCount() + " Raum/Räume geometrisch angepasst.");
+        }
+        if (impact.removedRoomCount() > 0) {
+            lines.add(impact.removedRoomCount() + " Raum/Räume entfallen.");
+        }
+        if (impact.addedRoomCount() > 0) {
+            lines.add(impact.addedRoomCount() + " Raum/Räume neu erkannt.");
+        }
+        if (impact.removedHeatingCircuitCount() > 0) {
+            lines.add(impact.removedHeatingCircuitCount() + " Heizkreis(e) entfernt.");
+        } else if (impact.removedHydronicHeatingCount() > 0) {
+            lines.add(impact.removedHydronicHeatingCount() + " Heizfläche(n) entfernt.");
+        }
+        if (impact.removedHeatingExclusionAreaCount() > 0) {
+            lines.add(impact.removedHeatingExclusionAreaCount() + " FBH-Sperrfläche(n) entfernt.");
+        }
+        if (impact.removedSurfaceLayerCount() > 0) {
+            lines.add(impact.removedSurfaceLayerCount() + " Belagsebene(n) entfernt.");
+        }
+        List<String> affectedRooms = new ArrayList<>();
+        affectedRooms.addAll(impact.changedRoomNames());
+        affectedRooms.addAll(impact.removedRoomNames());
+        if (!affectedRooms.isEmpty()) {
+            List<String> distinctRooms = affectedRooms.stream().distinct().toList();
+            String preview = distinctRooms.stream().limit(3).collect(java.util.stream.Collectors.joining(", "));
+            if (distinctRooms.size() > 3) {
+                preview += " ...";
+            }
+            lines.add("Betroffene Räume: " + preview);
+        }
+        lines.add("Bitte Raumzuordnung, Heizflächen und Beläge direkt prüfen.");
+        rememberWarning(
+                "Räume und Zuordnungen geändert",
+                "Durch die Bauteiländerung wurden Räume neu ausgewertet.",
+                String.join(System.lineSeparator(), lines)
+        );
+    }
+
+    private void rememberWarning(String title, String header, String content) {
+        lastWarningDialog = new WarningPresentation(title, header, content);
+        if (!interactiveDialogsEnabled) {
+            return;
+        }
+        Alert alert = new Alert(Alert.AlertType.WARNING, content, ButtonType.OK);
+        alert.setTitle(title);
+        alert.setHeaderText(header);
+        Window owner = currentWindow();
+        if (owner != null) {
+            alert.initOwner(owner);
+        }
+        alert.showAndWait();
+    }
+
     private HydronicHeating heatingFromInputs(Room room, UUID heatingId) {
         HeatingSurfacePosition surfacePosition = Optional.ofNullable(heatingSurfacePositionSelector.getValue())
                 .orElse(HeatingSurfacePosition.FLOOR);
@@ -8692,7 +8752,10 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void synchronizeRoomsFromWalls(Level level) {
-        level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults()));
+        List<Room> synchronizedRooms = autoRoomGenerationService.synchronize(level, currentRoomDefaults());
+        Level.RoomReplacementImpact impact = level.roomReplacementImpact(synchronizedRooms);
+        level.replaceRooms(synchronizedRooms);
+        showRoomSynchronizationWarning(impact);
     }
 
     private void synchronizeStairUnderbuild(Staircase staircase) {
@@ -9358,6 +9421,10 @@ public final class CadWorkbench extends BorderPane {
         lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
     }
 
+    public void automationClearLastWarning() {
+        lastWarningDialog = WarningPresentation.empty();
+    }
+
     public String automationLastErrorTitle() {
         return lastErrorDialog.title();
     }
@@ -9372,6 +9439,18 @@ public final class CadWorkbench extends BorderPane {
 
     public String automationLastErrorStackTrace() {
         return lastErrorDialog.stackTrace();
+    }
+
+    public String automationLastWarningTitle() {
+        return lastWarningDialog.title();
+    }
+
+    public String automationLastWarningHeader() {
+        return lastWarningDialog.header();
+    }
+
+    public String automationLastWarningContent() {
+        return lastWarningDialog.content();
     }
 
     public void automationDisableApplicationExit() {
@@ -9656,6 +9735,13 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private record TranslationDelta(double deltaX, double deltaY) {
+    }
+
+    private record WarningPresentation(String title, String header, String content) {
+
+        private static WarningPresentation empty() {
+            return new WarningPresentation("", "", "");
+        }
     }
 
     private MouseEvent mouseEvent(javafx.event.EventType<MouseEvent> type,

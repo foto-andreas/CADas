@@ -1,8 +1,11 @@
 package de.schrell.cadas.domain.model;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 public final class Level {
@@ -79,11 +82,54 @@ public final class Level {
         rooms.add(Objects.requireNonNull(room, "room darf nicht null sein."));
     }
 
+    public RoomReplacementImpact roomReplacementImpact(List<Room> updatedRooms) {
+        List<Room> requiredRooms = Objects.requireNonNull(updatedRooms, "updatedRooms darf nicht null sein.");
+        Map<UUID, Room> currentRoomsById = roomsById(rooms);
+        Map<UUID, Room> updatedRoomsById = roomsById(requiredRooms);
+        Set<UUID> remainingRoomIds = Set.copyOf(updatedRoomsById.keySet());
+        List<String> changedRoomNames = currentRoomsById.values().stream()
+                .filter(room -> updatedRoomsById.containsKey(room.id()))
+                .filter(room -> !room.equals(updatedRoomsById.get(room.id())))
+                .map(Room::name)
+                .toList();
+        List<String> removedRoomNames = currentRoomsById.values().stream()
+                .filter(room -> !updatedRoomsById.containsKey(room.id()))
+                .map(Room::name)
+                .toList();
+        int addedRoomCount = (int) updatedRoomsById.values().stream()
+                .filter(room -> !currentRoomsById.containsKey(room.id()))
+                .count();
+        int removedHydronicHeatingCount = (int) hydronicHeatings.stream()
+                .filter(heating -> !remainingRoomIds.contains(heating.roomId()))
+                .count();
+        int removedHeatingCircuitCount = hydronicHeatings.stream()
+                .filter(heating -> !remainingRoomIds.contains(heating.roomId()))
+                .mapToInt(heating -> heating.zones().size())
+                .sum();
+        int removedHeatingExclusionAreaCount = (int) heatingExclusionAreas.stream()
+                .filter(area -> !remainingRoomIds.contains(area.roomId()))
+                .count();
+        int removedSurfaceLayerCount = surfaceLayerStacks.stream()
+                .filter(stack -> targetsMissingRoom(stack, remainingRoomIds))
+                .mapToInt(stack -> stack.layers().size())
+                .sum();
+        return new RoomReplacementImpact(
+                currentRoomsById.size(),
+                changedRoomNames,
+                removedRoomNames,
+                addedRoomCount,
+                removedHydronicHeatingCount,
+                removedHeatingCircuitCount,
+                removedHeatingExclusionAreaCount,
+                removedSurfaceLayerCount
+        );
+    }
+
     public void replaceRooms(List<Room> updatedRooms) {
+        Set<UUID> remainingRoomIds = roomIds(Objects.requireNonNull(updatedRooms, "updatedRooms darf nicht null sein."));
         rooms.clear();
-        rooms.addAll(Objects.requireNonNull(updatedRooms, "updatedRooms darf nicht null sein."));
-        heatingExclusionAreas.removeIf(area -> rooms.stream().noneMatch(room -> room.id().equals(area.roomId())));
-        hydronicHeatings.removeIf(heating -> rooms.stream().noneMatch(room -> room.id().equals(heating.roomId())));
+        rooms.addAll(updatedRooms);
+        removeDetachedRoomReferences(remainingRoomIds);
     }
 
     public List<Door> doors() {
@@ -344,5 +390,87 @@ public final class Level {
     @Override
     public String toString() {
         return name;
+    }
+
+    private Map<UUID, Room> roomsById(List<Room> sourceRooms) {
+        Map<UUID, Room> roomsById = new LinkedHashMap<>();
+        sourceRooms.forEach(room -> roomsById.put(room.id(), room));
+        return roomsById;
+    }
+
+    private Set<UUID> roomIds(List<Room> sourceRooms) {
+        return sourceRooms.stream().map(Room::id).collect(java.util.stream.Collectors.toSet());
+    }
+
+    private void removeDetachedRoomReferences(Set<UUID> remainingRoomIds) {
+        heatingExclusionAreas.removeIf(area -> !remainingRoomIds.contains(area.roomId()));
+        hydronicHeatings.removeIf(heating -> !remainingRoomIds.contains(heating.roomId()));
+        surfaceLayerStacks.removeIf(stack -> targetsMissingRoom(stack, remainingRoomIds));
+    }
+
+    private boolean targetsMissingRoom(SurfaceLayerStack stack, Set<UUID> remainingRoomIds) {
+        UUID roomId = targetedRoomId(stack);
+        return roomId != null && !remainingRoomIds.contains(roomId);
+    }
+
+    private UUID targetedRoomId(SurfaceLayerStack stack) {
+        if (stack.surfaceType() == SurfaceType.FLOOR || stack.surfaceType() == SurfaceType.CEILING) {
+            return parseUuid(stack.targetKey());
+        }
+        if (stack.surfaceType() != SurfaceType.WALL_INTERIOR) {
+            return null;
+        }
+        int separatorIndex = stack.targetKey().indexOf('@');
+        if (separatorIndex < 0 || separatorIndex + 1 >= stack.targetKey().length()) {
+            return null;
+        }
+        return parseUuid(stack.targetKey().substring(separatorIndex + 1));
+    }
+
+    private UUID parseUuid(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    public record RoomReplacementImpact(
+            int previousRoomCount,
+            List<String> changedRoomNames,
+            List<String> removedRoomNames,
+            int addedRoomCount,
+            int removedHydronicHeatingCount,
+            int removedHeatingCircuitCount,
+            int removedHeatingExclusionAreaCount,
+            int removedSurfaceLayerCount
+    ) {
+
+        public RoomReplacementImpact {
+            if (previousRoomCount < 0 || addedRoomCount < 0 || removedHydronicHeatingCount < 0
+                    || removedHeatingCircuitCount < 0 || removedHeatingExclusionAreaCount < 0
+                    || removedSurfaceLayerCount < 0) {
+                throw new IllegalArgumentException("Auswirkungszähler dürfen nicht negativ sein.");
+            }
+            changedRoomNames = List.copyOf(Objects.requireNonNull(changedRoomNames, "changedRoomNames darf nicht null sein."));
+            removedRoomNames = List.copyOf(Objects.requireNonNull(removedRoomNames, "removedRoomNames darf nicht null sein."));
+        }
+
+        public int changedRoomCount() {
+            return changedRoomNames.size();
+        }
+
+        public int removedRoomCount() {
+            return removedRoomNames.size();
+        }
+
+        public boolean needsWarning() {
+            return changedRoomCount() > 0
+                    || removedRoomCount() > 0
+                    || previousRoomCount > 0 && addedRoomCount > 0
+                    || removedHydronicHeatingCount > 0
+                    || removedHeatingExclusionAreaCount > 0
+                    || removedSurfaceLayerCount > 0;
+        }
     }
 }

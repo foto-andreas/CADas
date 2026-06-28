@@ -174,11 +174,57 @@ class LevelTest {
         assertEquals(retainedRoom.id(), level.hydronicHeatings().getFirst().roomId());
     }
 
+    @Test
+    void entferntRaumgebundeneBelagsebenenNichtMehrVorhandenerRäume() {
+        Level level = new Level("Erdgeschoss");
+        Room retainedRoom = Room.rectangular(
+                "Wohnen", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        Room removedRoom = Room.rectangular(
+                "Küche", new PlanPoint(4_000, 0), new PlanPoint(7_000, 3_000),
+                Length.ofMillimeters(2_500), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        SurfaceLayerStack retainedFloorStack = new SurfaceLayerStack(SurfaceType.FLOOR, retainedRoom.id().toString());
+        retainedFloorStack.addLayer(surfaceLayer("Parkett"));
+        SurfaceLayerStack removedFloorStack = new SurfaceLayerStack(SurfaceType.FLOOR, removedRoom.id().toString());
+        removedFloorStack.addLayer(surfaceLayer("Fliese"));
+        SurfaceLayerStack removedWallStack = new SurfaceLayerStack(
+                SurfaceType.WALL_INTERIOR,
+                UUID.randomUUID() + "@" + removedRoom.id()
+        );
+        removedWallStack.addLayer(surfaceLayer("Putz"));
+        level.addRoom(retainedRoom);
+        level.addRoom(removedRoom);
+        level.addSurfaceLayerStack(retainedFloorStack);
+        level.addSurfaceLayerStack(removedFloorStack);
+        level.addSurfaceLayerStack(removedWallStack);
+
+        Level.RoomReplacementImpact impact = level.roomReplacementImpact(java.util.List.of(retainedRoom));
+        level.replaceRooms(java.util.List.of(retainedRoom));
+
+        assertTrue(impact.needsWarning());
+        assertEquals(1, impact.removedRoomCount());
+        assertEquals(2, impact.removedSurfaceLayerCount());
+        assertEquals(1, level.surfaceLayerStacks().size());
+        assertEquals(retainedFloorStack.id(), level.surfaceLayerStacks().getFirst().id());
+    }
+
     private HydronicHeating heating(UUID roomId, HeatingSurfacePosition surfacePosition) {
         return HydronicHeating.create(
                 roomId, surfacePosition, HeatingLayoutPattern.MEANDER,
                 Length.ofMillimeters(150), Length.ofMillimeters(16), Length.ofMillimeters(80_000),
                 Length.ofMillimeters(100), new PlanPoint(0, 0), new PlanPoint(100, 0)
+        );
+    }
+
+    private SurfaceLayer surfaceLayer(String name) {
+        return SurfaceLayer.create(
+                name,
+                Length.ofMillimeters(12),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(300),
+                Length.ofMillimeters(2)
         );
     }
 

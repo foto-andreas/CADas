@@ -1114,6 +1114,40 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void warntBeiRaumneuabgleichÜberEntfernteHeizungUndBeläge() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationSetErrorDialogsEnabled(false);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetSurfaceType("FLOOR");
+            instanz.automationInvoke("addSurfaceLayer", null);
+            instanz.automationSetField("heatingMaximumPipeLength", "20000");
+            instanz.automationPlanHydronicHeating("FLOOR", "MEANDER");
+            instanz.automationClearLastWarning();
+            instanz.automationSelect("WALL", 0, false);
+            instanz.automationDeleteSelection();
+            return instanz;
+        });
+
+        Assertions.assertEquals(0, aufFxThread(() -> workbench.automationSnapshot().roomCount()));
+        Assertions.assertEquals(0, aufFxThread(workbench::automationHydronicHeatingCount));
+        Assertions.assertEquals("Räume und Zuordnungen geändert", aufFxThread(workbench::automationLastWarningTitle));
+        Assertions.assertEquals(
+                "Durch die Bauteiländerung wurden Räume neu ausgewertet.",
+                aufFxThread(workbench::automationLastWarningHeader)
+        );
+        Assertions.assertTrue(aufFxThread(workbench::automationLastWarningContent).contains("Raum/Räume entfallen"));
+        Assertions.assertTrue(aufFxThread(workbench::automationLastWarningContent).contains("Heizkreis(e) entfernt"));
+        Assertions.assertTrue(aufFxThread(workbench::automationLastWarningContent).contains("Belagsebene(n) entfernt"));
+    }
+
+    @Test
     void alterRaumWerkzeugAliasWechseltAufBearbeiten() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
