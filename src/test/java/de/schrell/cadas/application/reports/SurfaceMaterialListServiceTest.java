@@ -376,29 +376,111 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
-    void nutztGedrehteVerlegerichtungInMaterialbedarfUndAusgabe() {
+    void gruppiertMaterialbedarfUnabhaengigVonDrehungUndRichtung() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
-        Room room = Room.rectangular(
-                "Flur",
+        Room links = Room.rectangular(
+                "Links",
                 new PlanPoint(0, 0),
                 new PlanPoint(1000, 600),
                 Length.of(2.5, LengthUnit.METER),
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(1, LengthUnit.MILLIMETER)
         );
-        project.primaryLevel().addRoom(room);
-        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
-        stack.addLayer(layer("Diele", Length.of(100, LengthUnit.CENTIMETER), Length.of(60, LengthUnit.CENTIMETER))
-                .withLayoutRotatedQuarterTurn(true));
-        project.primaryLevel().addSurfaceLayerStack(stack);
+        Room rechts = Room.rectangular(
+                "Rechts",
+                new PlanPoint(1200, 0),
+                new PlanPoint(2200, 600),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(links);
+        project.primaryLevel().addRoom(rechts);
+        SurfaceLayerStack linksStack = new SurfaceLayerStack(SurfaceType.FLOOR, links.id().toString());
+        linksStack.addLayer(layer("Diele", Length.of(100, LengthUnit.CENTIMETER), Length.of(60, LengthUnit.CENTIMETER)));
+        SurfaceLayerStack rechtsStack = new SurfaceLayerStack(SurfaceType.FLOOR, rechts.id().toString());
+        rechtsStack.addLayer(layer("Diele", Length.of(100, LengthUnit.CENTIMETER), Length.of(60, LengthUnit.CENTIMETER))
+                .withLayoutOrientation(
+                        de.schrell.cadas.domain.model.SurfaceLayoutRotation.DEGREES_90,
+                        de.schrell.cadas.domain.model.SurfaceLayoutDirection.RIGHT_TO_LEFT
+                ));
+        project.primaryLevel().addSurfaceLayerStack(linksStack);
+        project.primaryLevel().addSurfaceLayerStack(rechtsStack);
 
         SurfaceMaterialReport report = service.create(project);
 
         MaterialSummary material = report.materials().getFirst();
-        assertEquals(2, material.requiredPieces());
-        assertTrue(material.values().contains("Drehung 90°"));
-        assertTrue(material.values().contains("Richtung Links nach rechts"));
-        assertTrue(report.toMarkdown().contains("Drehung 90°"));
+        assertEquals(1, report.materials().size());
+        assertEquals(3, material.requiredPieces());
+        assertFalse(material.values().contains("Drehung"));
+        assertFalse(material.values().contains("Richtung"));
+    }
+
+    @Test
+    void ordnetZusammenfassungNachNameUndListetTrennmerkmaleVorHeizungen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room a = Room.rectangular(
+                "A",
+                new PlanPoint(0, 0),
+                new PlanPoint(1000, 1000),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        Room b = Room.rectangular(
+                "B",
+                new PlanPoint(1200, 0),
+                new PlanPoint(2200, 1000),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        Room c = Room.rectangular(
+                "C",
+                new PlanPoint(2400, 0),
+                new PlanPoint(3400, 1000),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(a);
+        project.primaryLevel().addRoom(b);
+        project.primaryLevel().addRoom(c);
+        SurfaceLayerStack aStack = new SurfaceLayerStack(SurfaceType.FLOOR, a.id().toString());
+        aStack.addLayer(layer("Zeta", Length.of(50, LengthUnit.CENTIMETER), Length.of(50, LengthUnit.CENTIMETER)));
+        SurfaceLayerStack bStack = new SurfaceLayerStack(SurfaceType.FLOOR, b.id().toString());
+        bStack.addLayer(layer("Alpha", Length.of(50, LengthUnit.CENTIMETER), Length.of(50, LengthUnit.CENTIMETER)));
+        SurfaceLayerStack cStack = new SurfaceLayerStack(SurfaceType.FLOOR, c.id().toString());
+        cStack.addLayer(SurfaceLayer.create(
+                "Alpha",
+                Length.of(12, LengthUnit.MILLIMETER),
+                Length.of(50, LengthUnit.CENTIMETER),
+                Length.of(50, LengthUnit.CENTIMETER),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.of(2, LengthUnit.MILLIMETER),
+                ""
+        ));
+        project.primaryLevel().addSurfaceLayerStack(aStack);
+        project.primaryLevel().addSurfaceLayerStack(bStack);
+        project.primaryLevel().addSurfaceLayerStack(cStack);
+
+        String markdown = service.create(project).toMarkdown();
+        int zusammenfassung = markdown.indexOf("## Zusammenfassung");
+        int heizungen = markdown.indexOf("## Flächenheizungen");
+        int alpha = markdown.indexOf("| Alpha |");
+        int zeta = markdown.indexOf("| Zeta |");
+
+        assertTrue(zusammenfassung >= 0 && heizungen > zusammenfassung);
+        assertTrue(alpha >= 0 && zeta > alpha);
+        assertTrue(markdown.contains("### Trennmerkmale bei mehrfachen Materialnamen"));
+        assertTrue(markdown.contains("* Alpha:"));
+        assertTrue(markdown.contains("Dicke"));
+        assertTrue(markdown.contains("10 mm"));
+        assertTrue(markdown.contains("12 mm"));
     }
 
     @Test

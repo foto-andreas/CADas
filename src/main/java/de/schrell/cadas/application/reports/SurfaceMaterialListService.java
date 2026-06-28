@@ -24,8 +24,10 @@ import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 
@@ -63,6 +65,8 @@ public final class SurfaceMaterialListService {
         }
         List<MaterialSummary> materialSummaries = materials.values().stream()
                 .map(MaterialAccumulator::toSummary)
+                .sorted(Comparator.comparing(MaterialSummary::name, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(material -> material.description(), String.CASE_INSENSITIVE_ORDER))
                 .toList();
         Map<String, RoomAccumulator> rooms = new LinkedHashMap<>();
         for (MaterialSummary material : materialSummaries) {
@@ -185,10 +189,11 @@ public final class SurfaceMaterialListService {
                     if (estimate.placedPieceCount() == 0) {
                         continue;
                     }
-                    String materialKey = materialKey(stack.surfaceType(), layer);
+                    MaterialProperties materialProperties = MaterialProperties.from(stack.surfaceType(), layer);
+                    String materialKey = materialKey(layer.name(), materialProperties);
                     MaterialAccumulator material = materials.computeIfAbsent(
                             materialKey,
-                            ignored -> new MaterialAccumulator(layer, stack.surfaceType())
+                            ignored -> new MaterialAccumulator(layer.name(), materialProperties)
                     );
                     PendingMaterialRoomEntry entry = new PendingMaterialRoomEntry(
                             coverage.levelName(),
@@ -418,28 +423,8 @@ public final class SurfaceMaterialListService {
         return accumulator.toEstimate();
     }
 
-    private String materialKey(SurfaceType surfaceType, SurfaceLayer layer) {
-        return String.join("|",
-                surfaceType.name(),
-                layer.name(),
-                Double.toString(layer.thickness().toMillimeters()),
-                Double.toString(layer.tileWidth().toMillimeters()),
-                Double.toString(layer.tileHeight().toMillimeters()),
-                layer.layoutMode().name(),
-                Double.toString(layer.layoutOffset().toMillimeters()),
-                Double.toString(layer.minimumOffset().toMillimeters()),
-                Double.toString(layer.minimumEdgeWidth().toMillimeters()),
-                Double.toString(layer.minimumStartEndMargin().toMillimeters()),
-                Double.toString(layer.freeMargins().left().toMillimeters()),
-                Double.toString(layer.freeMargins().right().toMillimeters()),
-                Double.toString(layer.freeMargins().top().toMillimeters()),
-                Double.toString(layer.freeMargins().bottom().toMillimeters()),
-                Double.toString(layer.jointWidth().toMillimeters()),
-                layer.cutRestriction().name(),
-                layer.layoutRotation().name(),
-                layer.layoutDirection().name(),
-                layer.coveringSource()
-        );
+    private String materialKey(String name, MaterialProperties materialProperties) {
+        return name + "|" + materialProperties.key();
     }
 
     private String shortId(String id) {
@@ -684,7 +669,7 @@ public final class SurfaceMaterialListService {
                 return;
             }
             cutPieceCount++;
-            cutPieces.add(new CutPiece(width, height));
+            cutPieces.add(normalizedMaterialCutPiece(width, height));
             if (cutsWidth) {
                 cutCount++;
                 cutPenaltySum += 1.0 - clamp(height / tileHeight, 0.0, 1.0);
@@ -693,6 +678,12 @@ public final class SurfaceMaterialListService {
                 cutCount++;
                 cutPenaltySum += 1.0 - clamp(width / tileWidth, 0.0, 1.0);
             }
+        }
+
+        private CutPiece normalizedMaterialCutPiece(double width, double height) {
+            return layer.layoutRotatedQuarterTurn()
+                    ? new CutPiece(height, width)
+                    : new CutPiece(width, height);
         }
 
         private CoverageEstimate toEstimate() {
@@ -956,8 +947,8 @@ public final class SurfaceMaterialListService {
 
     private static final class MaterialAccumulator {
 
-        private final SurfaceLayer layer;
-        private final SurfaceType surfaceType;
+        private final String materialName;
+        private final MaterialProperties materialProperties;
         private final List<PendingMaterialRoomEntry> pendingEntries = new ArrayList<>();
         private int placedPieceCount;
         private int fullPieceCount;
@@ -966,9 +957,9 @@ public final class SurfaceMaterialListService {
         private double coveredAreaSquareMeters;
         private double cutPenaltySum;
 
-        private MaterialAccumulator(SurfaceLayer layer, SurfaceType surfaceType) {
-            this.layer = layer;
-            this.surfaceType = surfaceType;
+        private MaterialAccumulator(String materialName, MaterialProperties materialProperties) {
+            this.materialName = materialName;
+            this.materialProperties = materialProperties;
         }
 
         private void add(PendingMaterialRoomEntry entry) {
@@ -984,7 +975,7 @@ public final class SurfaceMaterialListService {
 
         private MaterialSummary toSummary() {
             MaterialCutOptimization optimization = optimizeCutPieces();
-            double tileAreaSquareMillimeters = layer.tileWidth().toMillimeters() * layer.tileHeight().toMillimeters();
+            double tileAreaSquareMillimeters = materialProperties.tileWidthMillimeters() * materialProperties.tileHeightMillimeters();
             List<MaterialRoomEntry> roomEntries = new ArrayList<>();
             for (int index = 0; index < pendingEntries.size(); index++) {
                 PendingMaterialRoomEntry pendingEntry = pendingEntries.get(index);
@@ -1006,10 +997,11 @@ public final class SurfaceMaterialListService {
             }
             int requiredPieces = fullPieceCount + optimization.requiredCutSheets();
             return new MaterialSummary(
-                    layer.name(),
-                    surfaceType,
-                    layer.coveringSource().isBlank() ? surfaceType.toString() : surfaceType + ", Quelle: " + layer.coveringSource(),
-                    values(layer),
+                    materialName,
+                    materialProperties.surfaceType(),
+                    materialProperties.description(),
+                    materialProperties.values(),
+                    materialProperties.labeledValues(),
                     coveredAreaSquareMeters,
                     requiredPieces,
                     squareMeters(requiredPieces * tileAreaSquareMillimeters),
@@ -1030,35 +1022,113 @@ public final class SurfaceMaterialListService {
                 }
             }
             return MaterialCuttingOptimizer.optimize(
-                    layer.effectiveTileWidth().toMillimeters(),
-                    layer.effectiveTileHeight().toMillimeters(),
+                    materialProperties.tileWidthMillimeters(),
+                    materialProperties.tileHeightMillimeters(),
                     cutPieces,
-                    layer.cutRestriction().allowsMaterialRotation(),
+                    materialProperties.cutRestriction().allowsMaterialRotation(),
                     pendingEntries.size()
             );
         }
+    }
 
-        private String values(SurfaceLayer layer) {
-            return "Dicke " + length(layer.thickness(), LengthUnit.MILLIMETER, 1)
-                    + ", Format " + length(layer.tileWidth(), LengthUnit.CENTIMETER, 1)
-                    + " x " + length(layer.tileHeight(), LengthUnit.CENTIMETER, 1)
-                    + ", Verlegung " + layer.layoutMode()
-                    + ", Drehung " + layer.layoutRotation().label()
-                    + ", Richtung " + layer.layoutDirection().label()
-                    + ", Versatz " + length(layer.layoutOffset(), LengthUnit.CENTIMETER, 1)
-                    + ", Mindestversatz " + length(layer.minimumOffset(), LengthUnit.CENTIMETER, 1)
-                    + ", Mindestrand " + length(layer.minimumEdgeWidth(), LengthUnit.CENTIMETER, 1)
-                    + ", Anfang/Ende " + length(layer.minimumStartEndMargin(), LengthUnit.CENTIMETER, 1)
-                    + ", Freiränder L/R/O/U "
-                    + length(layer.freeMargins().left(), LengthUnit.CENTIMETER, 1)
-                    + "/"
-                    + length(layer.freeMargins().right(), LengthUnit.CENTIMETER, 1)
-                    + "/"
-                    + length(layer.freeMargins().top(), LengthUnit.CENTIMETER, 1)
-                    + "/"
-                    + length(layer.freeMargins().bottom(), LengthUnit.CENTIMETER, 1)
-                    + ", Fuge " + length(layer.jointWidth(), LengthUnit.MILLIMETER, 1)
-                    + ", Schnittbeschränkung " + layer.cutRestriction().label();
+    private record MaterialProperties(
+            SurfaceType surfaceType,
+            double thicknessMillimeters,
+            double tileWidthMillimeters,
+            double tileHeightMillimeters,
+            SurfaceLayoutMode layoutMode,
+            double layoutOffsetMillimeters,
+            double minimumOffsetMillimeters,
+            double minimumEdgeWidthMillimeters,
+            double minimumStartEndMarginMillimeters,
+            double freeMarginLeftMillimeters,
+            double freeMarginRightMillimeters,
+            double freeMarginTopMillimeters,
+            double freeMarginBottomMillimeters,
+            double jointWidthMillimeters,
+            SurfaceCutRestriction cutRestriction,
+            String coveringSource
+    ) {
+
+        private static MaterialProperties from(SurfaceType surfaceType, SurfaceLayer layer) {
+            return new MaterialProperties(
+                    surfaceType,
+                    layer.thickness().toMillimeters(),
+                    layer.tileWidth().toMillimeters(),
+                    layer.tileHeight().toMillimeters(),
+                    layer.layoutMode(),
+                    layer.layoutOffset().toMillimeters(),
+                    layer.minimumOffset().toMillimeters(),
+                    layer.minimumEdgeWidth().toMillimeters(),
+                    layer.minimumStartEndMargin().toMillimeters(),
+                    layer.freeMargins().left().toMillimeters(),
+                    layer.freeMargins().right().toMillimeters(),
+                    layer.freeMargins().top().toMillimeters(),
+                    layer.freeMargins().bottom().toMillimeters(),
+                    layer.jointWidth().toMillimeters(),
+                    layer.cutRestriction(),
+                    layer.coveringSource()
+            );
+        }
+
+        private String key() {
+            return String.join("|",
+                    surfaceType.name(),
+                    Double.toString(thicknessMillimeters),
+                    Double.toString(tileWidthMillimeters),
+                    Double.toString(tileHeightMillimeters),
+                    layoutMode.name(),
+                    Double.toString(layoutOffsetMillimeters),
+                    Double.toString(minimumOffsetMillimeters),
+                    Double.toString(minimumEdgeWidthMillimeters),
+                    Double.toString(minimumStartEndMarginMillimeters),
+                    Double.toString(freeMarginLeftMillimeters),
+                    Double.toString(freeMarginRightMillimeters),
+                    Double.toString(freeMarginTopMillimeters),
+                    Double.toString(freeMarginBottomMillimeters),
+                    Double.toString(jointWidthMillimeters),
+                    cutRestriction.name(),
+                    coveringSource
+            );
+        }
+
+        private String description() {
+            return coveringSource.isBlank() ? surfaceType.toString() : surfaceType + ", Quelle: " + coveringSource;
+        }
+
+        private String values() {
+            return labeledValues().entrySet().stream()
+                    .map(entry -> entry.getKey() + " " + entry.getValue())
+                    .collect(java.util.stream.Collectors.joining(", "));
+        }
+
+        private Map<String, String> labeledValues() {
+            Map<String, String> values = new LinkedHashMap<>();
+            values.put("Dicke", length(Length.ofMillimeters(thicknessMillimeters), LengthUnit.MILLIMETER, 1));
+            values.put(
+                    "Format",
+                    length(Length.ofMillimeters(tileWidthMillimeters), LengthUnit.CENTIMETER, 1)
+                            + " x "
+                            + length(Length.ofMillimeters(tileHeightMillimeters), LengthUnit.CENTIMETER, 1)
+            );
+            values.put("Verlegung", layoutMode.toString());
+            values.put("Versatz", length(Length.ofMillimeters(layoutOffsetMillimeters), LengthUnit.CENTIMETER, 1));
+            values.put("Mindestversatz", length(Length.ofMillimeters(minimumOffsetMillimeters), LengthUnit.CENTIMETER, 1));
+            values.put("Mindestrand", length(Length.ofMillimeters(minimumEdgeWidthMillimeters), LengthUnit.CENTIMETER, 1));
+            values.put("Anfang/Ende", length(Length.ofMillimeters(minimumStartEndMarginMillimeters), LengthUnit.CENTIMETER, 1));
+            values.put(
+                    "Freiränder L/R/O/U",
+                    length(Length.ofMillimeters(freeMarginLeftMillimeters), LengthUnit.CENTIMETER, 1)
+                            + "/"
+                            + length(Length.ofMillimeters(freeMarginRightMillimeters), LengthUnit.CENTIMETER, 1)
+                            + "/"
+                            + length(Length.ofMillimeters(freeMarginTopMillimeters), LengthUnit.CENTIMETER, 1)
+                            + "/"
+                            + length(Length.ofMillimeters(freeMarginBottomMillimeters), LengthUnit.CENTIMETER, 1)
+            );
+            values.put("Fuge", length(Length.ofMillimeters(jointWidthMillimeters), LengthUnit.MILLIMETER, 1));
+            values.put("Schnittbeschränkung", cutRestriction.label());
+            return java.util.Collections.unmodifiableMap(values);
         }
     }
 
@@ -1121,13 +1191,15 @@ public final class SurfaceMaterialListService {
             StringBuilder markdown = new StringBuilder();
             markdown.append("# Materialliste Beläge – ").append(projectName).append("\n\n");
             appendRooms(markdown);
-            appendHeatingPlans(markdown, includeHeatingPlanSvg);
-            appendHeatingElements(markdown);
             if (materials.isEmpty()) {
+                appendHeatingPlans(markdown, includeHeatingPlanSvg);
+                appendHeatingElements(markdown);
                 markdown.append("## Beläge\n\nKeine sichtbaren Beläge vorhanden.\n");
                 return markdown.toString();
             }
             appendMaterialSummary(markdown);
+            appendHeatingPlans(markdown, includeHeatingPlanSvg);
+            appendHeatingElements(markdown);
             appendMaterialDetails(markdown);
             appendRoomComplexities(markdown);
             return markdown.toString();
@@ -1287,6 +1359,47 @@ public final class SurfaceMaterialListService {
                         .append(" |\n");
             }
             markdown.append('\n');
+            appendMaterialSplitReasons(markdown);
+        }
+
+        private void appendMaterialSplitReasons(StringBuilder markdown) {
+            Map<String, List<MaterialSummary>> materialsByName = materials.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            MaterialSummary::name,
+                            LinkedHashMap::new,
+                            java.util.stream.Collectors.toList()
+                    ));
+            List<Map.Entry<String, List<MaterialSummary>>> splitMaterials = materialsByName.entrySet().stream()
+                    .filter(entry -> entry.getValue().size() > 1)
+                    .toList();
+            if (splitMaterials.isEmpty()) {
+                return;
+            }
+            markdown.append("### Trennmerkmale bei mehrfachen Materialnamen\n\n");
+            for (Map.Entry<String, List<MaterialSummary>> entry : splitMaterials) {
+                markdown.append("* ")
+                        .append(markdownCell(entry.getKey()))
+                        .append(": ")
+                        .append(markdownCell(String.join(", ", differingPropertyDescriptions(entry.getValue()))))
+                        .append('\n');
+            }
+            markdown.append('\n');
+        }
+
+        private List<String> differingPropertyDescriptions(List<MaterialSummary> materialsWithSameName) {
+            List<String> descriptions = new ArrayList<>();
+            LinkedHashMap<String, List<String>> valuesByLabel = new LinkedHashMap<>();
+            for (MaterialSummary material : materialsWithSameName) {
+                material.labeledValues().forEach((label, value) -> valuesByLabel.computeIfAbsent(label, ignored -> new ArrayList<>()).add(value));
+            }
+            for (Map.Entry<String, List<String>> entry : valuesByLabel.entrySet()) {
+                List<String> distinctValues = entry.getValue().stream().distinct().toList();
+                if (distinctValues.size() <= 1) {
+                    continue;
+                }
+                descriptions.add(entry.getKey() + " " + String.join(" | ", distinctValues));
+            }
+            return descriptions;
         }
 
         private void appendMaterialDetails(StringBuilder markdown) {
@@ -1371,6 +1484,7 @@ public final class SurfaceMaterialListService {
             SurfaceType surfaceType,
             String description,
             String values,
+            Map<String, String> labeledValues,
             double coveredAreaSquareMeters,
             int requiredPieces,
             double requiredMaterialAreaSquareMeters,
