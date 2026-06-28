@@ -12,6 +12,9 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Comparator
 import java.util.zip.ZipFile
 
@@ -23,6 +26,10 @@ plugins {
 
 group = "de.schrell"
 version = "1.4.0"
+
+val buildTimestampUtc = providers.provider {
+    OffsetDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+}
 
 repositories {
     mavenCentral()
@@ -53,6 +60,32 @@ application {
 tasks.jar {
     manifest {
         attributes["Implementation-Version"] = project.version
+        attributes["Build-Timestamp"] = buildTimestampUtc.get()
+    }
+}
+
+abstract class GenerateBuildInformationTask : DefaultTask() {
+
+    @get:Input
+    abstract val applicationVersion: Property<String>
+
+    @get:Input
+    abstract val buildTimestamp: Property<String>
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun generate() {
+        val target = outputFile.get().asFile.toPath()
+        Files.createDirectories(target.parent)
+        Files.writeString(
+            target,
+            """
+            version=${applicationVersion.get()}
+            buildTimestamp=${buildTimestamp.get()}
+            """.trimIndent() + System.lineSeparator()
+        )
     }
 }
 
@@ -119,11 +152,19 @@ val generateThirdPartyLicenses = tasks.register<GenerateThirdPartyLicensesTask>(
     outputFile.set(layout.buildDirectory.file("generated/licenses/drittanbieter-lizenzen.md"))
 }
 
+val generateBuildInformation = tasks.register<GenerateBuildInformationTask>("generateBuildInformation") {
+    applicationVersion.set(project.version.toString())
+    buildTimestamp.set(buildTimestampUtc)
+    outputFile.set(layout.buildDirectory.file("generated/build/build-info.properties"))
+}
+
 tasks.processResources {
     dependsOn(generateThirdPartyLicenses)
+    dependsOn(generateBuildInformation)
     from(generateThirdPartyLicenses.flatMap { it.outputFile }) {
         into("docs")
     }
+    from(generateBuildInformation.flatMap { it.outputFile })
 }
 
 dependencies {
