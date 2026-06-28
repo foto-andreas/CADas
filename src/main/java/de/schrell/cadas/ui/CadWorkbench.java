@@ -2230,11 +2230,9 @@ public final class CadWorkbench extends BorderPane {
             historyCapturedForDrag = false;
             if (selectedEndpointGroup != null) {
                 syncEndpointHeightInputFromSelection();
-                activeLevel.get().walls().stream()
-                        .filter(wall -> selectedEndpointGroup.startWallIds().contains(wall.id()) || selectedEndpointGroup.endWallIds().contains(wall.id()))
-                        .findFirst()
-                        .ifPresent(wall -> updateSelection(
-                                new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()),
+                preferredEndpointWallSelection(editPoint, selectedEndpointGroup)
+                        .ifPresent(selection -> updateSelection(
+                                selection,
                                 event.isShortcutDown() || event.isShiftDown()
                         ));
                 draftLabel.setText("Wandecke ausgewählt. `Eckhöhe anwenden` setzt die Höhe auf alle verbundenen Wandenden.");
@@ -2318,6 +2316,24 @@ public final class CadWorkbench extends BorderPane {
         SelectionKey nextSelection = candidates.get((currentIndex + 1) % candidates.size());
         draftLabel.setText("Auswahl umgeschaltet: " + selectionLabel(nextSelection) + ".");
         return nextSelection;
+    }
+
+    private Optional<SelectionKey> preferredEndpointWallSelection(PlanPoint editPoint, WallEndpointSelection endpointSelection) {
+        Set<String> endpointWallIds = java.util.stream.Stream.concat(
+                endpointSelection.startWallIds().stream(),
+                endpointSelection.endWallIds().stream()
+        ).map(UUID::toString).collect(java.util.stream.Collectors.toSet());
+        Optional<SelectionKey> hitWall = selectionQueryService.findSelections(activeLevel.get(), editPoint, SNAP_TOLERANCE).stream()
+                .filter(selection -> selection.kind() == RenderableKind.WALL)
+                .filter(selection -> endpointWallIds.contains(selection.elementId()))
+                .findFirst();
+        if (hitWall.isPresent()) {
+            return hitWall;
+        }
+        return activeLevel.get().walls().stream()
+                .filter(wall -> endpointWallIds.contains(wall.id().toString()))
+                .findFirst()
+                .map(wall -> new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()));
     }
 
     private void handleMouseDragged(MouseEvent event) {
@@ -8308,20 +8324,21 @@ public final class CadWorkbench extends BorderPane {
         }
         return wallIntersectionSplitService.findCandidate(
                 activeLevel.get(),
-                selectedWalls().stream().map(Wall::id).toList(),
+                contextWallSplitWallIds(),
                 contextMenuWorldPoint,
                 SNAP_TOLERANCE
         );
     }
 
     private void splitSelectedWallsAtContextIntersection() {
-        if (contextMenuWorldPoint == null || selectedWalls().isEmpty()) {
-            draftLabel.setText("Für die Wandteilung braucht es eine ausgewählte Wand und einen Kreuzungspunkt.");
+        List<UUID> wallIds = contextWallSplitWallIds();
+        if (contextMenuWorldPoint == null || wallIds.isEmpty()) {
+            draftLabel.setText("Für die Wandteilung braucht es am Kontextpunkt eine aufteilbare Wandkreuzung.");
             return;
         }
         WallIntersectionSplitService.SplitResult result = wallIntersectionSplitService.split(
                 activeLevel.get(),
-                selectedWalls().stream().map(Wall::id).toList(),
+                wallIds,
                 contextMenuWorldPoint,
                 SNAP_TOLERANCE
         );
@@ -8336,6 +8353,20 @@ public final class CadWorkbench extends BorderPane {
                 ? "Wand an der Kreuzung aufgeteilt."
                 : "Wände an der Kreuzung aufgeteilt.");
         render();
+    }
+
+    private List<UUID> contextWallSplitWallIds() {
+        if (contextMenuWorldPoint == null) {
+            return List.of();
+        }
+        LinkedHashSet<UUID> wallIds = selectedWalls().stream()
+                .map(Wall::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        selectionQueryService.findSelections(activeLevel.get(), contextMenuWorldPoint, SNAP_TOLERANCE).stream()
+                .filter(selection -> selection.kind() == RenderableKind.WALL)
+                .map(selection -> UUID.fromString(selection.elementId()))
+                .forEach(wallIds::add);
+        return List.copyOf(wallIds);
     }
 
     private void openInteriorViewFromContextLocation() {

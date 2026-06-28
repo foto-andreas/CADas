@@ -190,6 +190,29 @@ class SelectionQueryServiceTest {
     }
 
     @Test
+    void bevorzugtAnTAnschlussDieGetroffeneDurchgehendeWand() {
+        Level level = new Level("Erdgeschoss");
+        Wall horizontalWall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 1_000), new PlanPoint(4_000, 1_000)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        );
+        Wall verticalWall = Wall.create(
+                new PlanSegment(new PlanPoint(2_000, 1_000), new PlanPoint(2_000, 3_000)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        );
+        level.addWall(horizontalWall);
+        level.addWall(verticalWall);
+
+        List<SelectionKey> selections = selectionQueryService.findSelections(level, new PlanPoint(2_060, 1_060), TOLERANCE);
+
+        assertEquals(2, selections.size());
+        assertEquals(horizontalWall.id().toString(), selections.getFirst().elementId());
+        assertEquals(verticalWall.id().toString(), selections.get(1).elementId());
+    }
+
+    @Test
     void liefertLeerWennKeinElementGetroffenWird() {
         Level level = new Level("Leeres Geschoss");
 

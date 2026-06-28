@@ -159,10 +159,26 @@ public final class SelectionQueryService {
 
     private List<SelectionKey> findWallSelections(Level level, PlanPoint point, Length tolerance) {
         return level.walls().stream()
-                .filter(wall -> wall.axis().distanceTo(point).toMillimeters() <= Math.max(tolerance.toMillimeters(), wall.thickness().toMillimeters() / 2.0))
-                .sorted(Comparator.comparingDouble(wall -> wall.axis().distanceTo(point).toMillimeters()))
-                .map(wall -> new SelectionKey(RenderableKind.WALL, level.name(), wall.id().toString()))
+                .map(wall -> wallSelectionHit(wall, point))
+                .filter(hit -> hit.distanceMillimeters() <= Math.max(
+                        tolerance.toMillimeters(),
+                        hit.wall().thickness().toMillimeters() / 2.0
+                ))
+                .sorted(Comparator.comparingDouble(WallSelectionHit::distanceMillimeters)
+                        .thenComparing(Comparator.comparingDouble(WallSelectionHit::endpointClearanceMillimeters).reversed())
+                        .thenComparing(hit -> hit.wall().id()))
+                .map(hit -> new SelectionKey(RenderableKind.WALL, level.name(), hit.wall().id().toString()))
                 .toList();
+    }
+
+    private WallSelectionHit wallSelectionHit(Wall wall, PlanPoint point) {
+        double projection = wall.axis().projectedLength(point).toMillimeters();
+        double axisLength = wall.axis().length().toMillimeters();
+        return new WallSelectionHit(
+                wall,
+                wall.axis().distanceTo(point).toMillimeters(),
+                Math.min(projection, Math.max(0.0, axisLength - projection))
+        );
     }
 
     private boolean containsPoint(Room room, PlanPoint point) {
@@ -190,5 +206,12 @@ public final class SelectionQueryService {
             lastIndex = currentIndex;
         }
         return inside;
+    }
+
+    private record WallSelectionHit(
+            Wall wall,
+            double distanceMillimeters,
+            double endpointClearanceMillimeters
+    ) {
     }
 }
