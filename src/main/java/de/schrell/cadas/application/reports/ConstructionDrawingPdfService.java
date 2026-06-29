@@ -76,8 +76,8 @@ public final class ConstructionDrawingPdfService {
     private static final double PDF_TEXT_AWAY_DISTANCE = 4.0;
     private static final double PDF_PARALLEL_TEXT_AWAY_DISTANCE = 8.0;
     private static final double PDF_DIMENSION_LINE_BLOCKING_PADDING = 2.0;
-    private static final double SPATIAL_VIEW_RENDER_FACTOR = 1.8;
-    private static final double SPATIAL_VIEW_MINIMUM_PIXELS = 320.0;
+    private static final double SPATIAL_VIEW_RENDER_FACTOR = 2.8;
+    private static final double SPATIAL_VIEW_MINIMUM_PIXELS = 560.0;
     private static final double STANDARD_SPATIAL_DEPTH_FACTOR = 0.45;
     private static final double MAXIMUM_SAME_LEVEL_DEPTH_SHIFT_RATIO = 0.55;
     private static final AtomicBoolean JAVA_FX_STARTED = new AtomicBoolean();
@@ -452,7 +452,7 @@ public final class ConstructionDrawingPdfService {
         BufferedImage renderedImage = renderSpatialViewImage(project, angleDegrees, isometric, width, height).orElse(null);
         if (renderedImage != null) {
             canvas.text(x + 4, y + height - 12, 8.5f, spatialViewGraphicLabel(angleDegrees, isometric));
-            canvas.image(renderedImage, x + 6, y + 18, width - 12, height - 38);
+            drawFittedImage(canvas, renderedImage, x + 2, y + 8, width - 4, height - 24);
             drawOverallDimension(canvas, x + 12, y + 8, x + width - 12, y + 8, "grafische 3D-Ansicht");
             return;
         }
@@ -548,13 +548,28 @@ public final class ConstructionDrawingPdfService {
 
     private void configureSpatialViewport(ThreeDViewport viewport, double angleDegrees, boolean isometric) {
         if (isometric) {
-            viewport.applyViewPreset(ThreeDViewPreset.FRONT);
-            viewport.setProjectionMode(ProjectionMode.PERSPECTIVE);
-            viewport.automationOrbit(angleDegrees, 24.0);
+            viewport.resetToDefaultView();
+            viewport.automationOrbit(angleDegrees - 45.0, 0.0);
             return;
         }
         viewport.applyViewPreset(sideViewPreset(angleDegrees));
         viewport.setProjectionMode(ProjectionMode.ORTHOGRAPHIC);
+    }
+
+    private void drawFittedImage(
+            PageCanvas canvas,
+            BufferedImage image,
+            double left,
+            double bottom,
+            double width,
+            double height
+    ) throws IOException {
+        double scale = Math.min(width / Math.max(1.0, image.getWidth()), height / Math.max(1.0, image.getHeight()));
+        double drawWidth = image.getWidth() * scale;
+        double drawHeight = image.getHeight() * scale;
+        double drawX = left + (width - drawWidth) / 2.0;
+        double drawY = bottom + (height - drawHeight) / 2.0;
+        canvas.image(image, drawX, drawY, drawWidth, drawHeight);
     }
 
     private ThreeDViewPreset sideViewPreset(double angleDegrees) {

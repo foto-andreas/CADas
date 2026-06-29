@@ -81,6 +81,7 @@ public final class ThreeDViewport extends BorderPane {
     private static final double PERSPECTIVE_FIT_PADDING = 1.8;
     private static final double ORTHO_FOV_DEGREES = 15.0;
     private static final double ORTHO_FIT_PADDING = 1.4;
+    private static final double SIDE_VIEW_FIT_DISTANCE_FACTOR = 1.18;
     private static final double INTERIOR_FOV_DEGREES = 64.0;
     private static final double INTERIOR_MIN_FOV_DEGREES = 28.0;
     private static final double INTERIOR_MAX_FOV_DEGREES = 115.0;
@@ -1274,6 +1275,9 @@ public final class ThreeDViewport extends BorderPane {
                 MIN_CAMERA_DISTANCE_UNITS,
                 MAX_CAMERA_DISTANCE_UNITS
         );
+        if (isSideOnOrbitAxis(cameraPose.azimuthDegrees())) {
+            clamped = Math.min(MAX_CAMERA_DISTANCE_UNITS, clamped * SIDE_VIEW_FIT_DISTANCE_FACTOR);
+        }
 
         cameraPose = new CameraPose(
                 cameraPose.projectionMode(),
@@ -1286,6 +1290,11 @@ public final class ThreeDViewport extends BorderPane {
         );
         fitToSceneRequested = false;
         updateCamera();
+    }
+
+    private boolean isSideOnOrbitAxis(double azimuthDegrees) {
+        double normalized = ((azimuthDegrees % 360.0) + 360.0) % 360.0;
+        return Math.abs(normalized - 90.0) < 0.001 || Math.abs(normalized - 270.0) < 0.001;
     }
 
     private void resetInteriorPose() {
