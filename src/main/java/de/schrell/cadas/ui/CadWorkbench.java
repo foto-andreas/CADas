@@ -1632,9 +1632,7 @@ public final class CadWorkbench extends BorderPane {
         undoButton.setDisable(!history.canUndo());
         redoButton.setDisable(!history.canRedo());
         boolean hasSelection = !selectedSelections.isEmpty();
-        boolean hasDeletableSelection = selectedSelections.stream().anyMatch(selection -> selection.kind() != RenderableKind.ROOM_VOLUME
-                && selection.kind() != RenderableKind.ROOM_FLOOR
-                && selection.kind() != RenderableKind.ROOM_CEILING);
+        boolean hasDeletableSelection = selectedSelections.stream().anyMatch(this::isDeletableSelection);
         deleteSelectionButton.setDisable(!hasDeletableSelection);
         clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
         applySelectionPropertiesButton.setDisable(!hasSelection);
@@ -2735,6 +2733,11 @@ public final class CadWorkbench extends BorderPane {
 
     private void handleGlobalShortcuts(KeyEvent event) {
         if (event.getEventType() != KeyEvent.KEY_PRESSED) {
+            return;
+        }
+        if (!event.isShortcutDown() && event.getCode() == KeyCode.DELETE) {
+            runGuardedAction("Auswahl löschen", this::deleteSelection);
+            event.consume();
             return;
         }
         if (!event.isShortcutDown() && moveSelectionWithArrowKey(event.getCode())) {
@@ -8119,6 +8122,10 @@ public final class CadWorkbench extends BorderPane {
         if (selectedSelections.isEmpty()) {
             return;
         }
+        if (!confirmSelectionDeletion()) {
+            draftLabel.setText("Löschen abgebrochen.");
+            return;
+        }
         rememberStateForUndo();
         boolean removed = false;
         boolean synchronizeRoomsAfterRemoval = false;
@@ -8159,6 +8166,40 @@ public final class CadWorkbench extends BorderPane {
         }
         draftLabel.setText("Auswahl konnte nicht gelöscht werden.");
         updateActionButtons();
+    }
+
+    private boolean confirmSelectionDeletion() {
+        if (!interactiveDialogsEnabled) {
+            return true;
+        }
+        long deletableCount = selectedSelections.stream().filter(this::isDeletableSelection).count();
+        String header = deletableCount == 1
+                ? "Ausgewähltes Bauteil wirklich löschen?"
+                : "Ausgewählte Bauteile wirklich löschen?";
+        String content = deletableCount <= 1
+                ? "Das ausgewählte Bauteil wird entfernt. Dieser Schritt kann über Rückgängig wiederhergestellt werden, solange der Verlauf erhalten bleibt."
+                : "Die ausgewählten Bauteile werden entfernt. Dieser Schritt kann über Rückgängig wiederhergestellt werden, solange der Verlauf erhalten bleibt.";
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, content, ButtonType.CANCEL, ButtonType.OK);
+        alert.setTitle("Auswahl löschen");
+        alert.setHeaderText(header);
+        alert.getDialogPane().setPrefWidth(520);
+        Window owner = currentWindow();
+        if (owner != null) {
+            alert.initOwner(owner);
+        }
+        applyTooltip(alert.getDialogPane().lookupButton(ButtonType.OK),
+                "Bestätigt das Löschen der aktuell ausgewählten Bauteile. Der Schritt bleibt über Rückgängig wiederherstellbar, solange der Verlauf verfügbar ist.");
+        applyTooltip(alert.getDialogPane().lookupButton(ButtonType.CANCEL),
+                "Bricht das Löschen ab und belässt alle ausgewählten Bauteile unverändert im Plan.");
+        return alert.showAndWait()
+                .filter(ButtonType.OK::equals)
+                .isPresent();
+    }
+
+    private boolean isDeletableSelection(SelectionKey selection) {
+        return selection.kind() != RenderableKind.ROOM_VOLUME
+                && selection.kind() != RenderableKind.ROOM_FLOOR
+                && selection.kind() != RenderableKind.ROOM_CEILING;
     }
 
     private void applySelectionRectangle() {
@@ -9476,6 +9517,19 @@ public final class CadWorkbench extends BorderPane {
 
     public boolean automationMoveSelectionWithArrowKey(KeyCode keyCode) {
         return moveSelectionByArrowKey(keyCode);
+    }
+
+    public void automationTriggerGlobalKey(KeyCode keyCode) {
+        handleGlobalShortcuts(new KeyEvent(
+                KeyEvent.KEY_PRESSED,
+                "",
+                "",
+                keyCode,
+                false,
+                false,
+                false,
+                false
+        ));
     }
 
     public FloorExtension automationFloorExtension(int index) {

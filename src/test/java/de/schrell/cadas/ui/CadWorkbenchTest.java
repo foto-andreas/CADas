@@ -333,6 +333,29 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void deleteTasteLoeschtAusgewaehlteBauteileUeberDenGlobalenShortcutPfad() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetViewport(1.0, 100.0, 100.0);
+            instanz.automationSetTool("WALL");
+            instanz.automationCanvasDrag(150, 150, 250, 150, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("WALL", 0, false);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationTriggerGlobalKey(KeyCode.DELETE);
+            return null;
+        });
+
+        Assertions.assertEquals(0, aufFxThread(() -> workbench.automationSnapshot().wallCount()));
+    }
+
+    @Test
     void bodenklickSetztNeuenStandortDerInnenansicht() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Test", "Erdgeschoss");
         Room room = Room.rectangular(
