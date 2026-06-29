@@ -153,6 +153,40 @@ class ConstructionDrawingPdfServiceTest {
     }
 
     @Test
+    void zoomtHeizelementseiteAufRelevanteRäumeStattAufDenGesamtenGrundriss() throws Exception {
+        ProjectModel project = sampleProject();
+        project.primaryLevel().addWall(Wall.create(
+                new PlanSegment(new PlanPoint(60_000, 0), new PlanPoint(80_000, 0)),
+                Length.of(24, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        ));
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "konvektor",
+                "Konvektor",
+                RoomObjectType.CUBOID,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(2_000, 2_000),
+                Length.of(120, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ).withHeatingType(RoomObjectHeatingType.HEATING_ELEMENT).withHeatOutputWatts(900.0));
+        Path target = tempDir.resolve("heizelemente-zoom.pdf");
+
+        new ConstructionDrawingPdfService().export(project, target);
+
+        try (var document = Loader.loadPDF(target.toFile())) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            stripper.setStartPage(2);
+            stripper.setEndPage(2);
+            String heatingPageText = stripper.getText(document);
+            assertTrue(heatingPageText.contains("Heizelemente - Erdgeschoss"));
+            assertTrue(heatingPageText.contains("M 1:25"));
+        }
+    }
+
+    @Test
     void exportiertOhneDirektesÜberschreibenBereitsGeöffneterPdfDateien() throws Exception {
         ProjectModel project = sampleProject();
         Path target = tempDir.resolve("bauzeichnung.pdf");

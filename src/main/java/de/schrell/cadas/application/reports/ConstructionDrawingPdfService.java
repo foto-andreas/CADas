@@ -283,7 +283,7 @@ public final class ConstructionDrawingPdfService {
             Level level
     ) throws IOException {
         List<HeatingElementEntry> entries = heatingElementEntries(level);
-        Viewport viewport = planViewport(level, ConstructionDrawingOptions.defaults());
+        Viewport viewport = heatingElementViewport(level, entries);
         try (PageCanvas canvas = addPage(document, project.name(), "Heizelemente – " + level.name(), "M 1:" + viewport.scale())) {
             for (Room room : level.rooms()) {
                 drawPolygon(canvas, viewport, room.outline(), new Color(247, 247, 244), 0.35f);
@@ -295,6 +295,28 @@ public final class ConstructionDrawingPdfService {
                 drawHeatingElement(canvas, viewport, entry);
             }
         }
+    }
+
+    private Viewport heatingElementViewport(Level level, List<HeatingElementEntry> entries) {
+        List<PlanPoint> points = new ArrayList<>();
+        entries.forEach(entry -> {
+            points.addAll(entry.room().outline());
+            RoomObject roomObject = entry.roomObject();
+            points.add(new PlanPoint(roomObject.minXMillimeters(), roomObject.minYMillimeters()));
+            points.add(new PlanPoint(roomObject.maxXMillimeters(), roomObject.maxYMillimeters()));
+        });
+        Bounds bounds = points.isEmpty() ? levelBounds(level) : new Bounds(
+                points.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0),
+                points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0),
+                points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(10_000.0),
+                points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(7_000.0)
+        );
+        Bounds expandedBounds = bounds.expanded(400.0);
+        int scale = chooseScale(
+                expandedBounds.width(), expandedBounds.height(),
+                PAGE_WIDTH - 2 * MARGIN, PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT
+        );
+        return centeredViewport(expandedBounds, scale);
     }
 
     private void drawHeatingElement(PageCanvas canvas, Viewport viewport, HeatingElementEntry entry) throws IOException {
