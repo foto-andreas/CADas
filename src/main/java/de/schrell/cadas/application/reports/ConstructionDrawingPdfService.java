@@ -52,6 +52,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -80,6 +81,7 @@ public final class ConstructionDrawingPdfService {
     private static final double SPATIAL_VIEW_MINIMUM_PIXELS = 560.0;
     private static final double STANDARD_SPATIAL_DEPTH_FACTOR = 0.45;
     private static final double MAXIMUM_SAME_LEVEL_DEPTH_SHIFT_RATIO = 0.55;
+    private static final String RASTER_SUBTITLE = "Grafische Rasteransicht";
     private static final AtomicBoolean JAVA_FX_STARTED = new AtomicBoolean();
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
@@ -93,34 +95,146 @@ public final class ConstructionDrawingPdfService {
     private final TerrainContourService terrainContourService = new TerrainContourService();
     private final TerrainProfileService terrainProfileService = new TerrainProfileService();
 
+    public enum GraphicVariant {
+        VEKTOR,
+        RASTERGRAFIK
+    }
+
+    public record ExportAssets(
+            GraphicVariant graphicVariant,
+            Map<String, BufferedImage> levelPlanImages,
+            Map<String, BufferedImage> heatingPlanImages
+    ) {
+        public ExportAssets {
+            Objects.requireNonNull(graphicVariant, "graphicVariant darf nicht null sein.");
+            levelPlanImages = Map.copyOf(levelPlanImages);
+            heatingPlanImages = Map.copyOf(heatingPlanImages);
+        }
+
+        public static ExportAssets empty() {
+            return new ExportAssets(GraphicVariant.VEKTOR, Map.of(), Map.of());
+        }
+    }
+
+    @FunctionalInterface
+    public interface ProgressListener {
+        void update(double progress, String section);
+
+        static ProgressListener noOp() {
+            return (progress, section) -> {
+            };
+        }
+    }
+
     public void export(ProjectModel project, Path targetFile) throws IOException {
         export(project, targetFile, ConstructionDrawingOptions.defaults());
     }
 
     public void export(ProjectModel project, Path targetFile, ConstructionDrawingOptions options) throws IOException {
+        export(project, targetFile, options, ExportAssets.empty(), ProgressListener.noOp());
+    }
+
+    public void export(
+            ProjectModel project,
+            Path targetFile,
+            ConstructionDrawingOptions options,
+            ExportAssets exportAssets
+    ) throws IOException {
+        export(project, targetFile, options, exportAssets, ProgressListener.noOp());
+    }
+
+    public void export(
+            ProjectModel project,
+            Path targetFile,
+            ConstructionDrawingOptions options,
+            ProgressListener progressListener
+    ) throws IOException {
+        export(project, targetFile, options, ExportAssets.empty(), progressListener);
+    }
+
+    public void export(
+            ProjectModel project,
+            Path targetFile,
+            ConstructionDrawingOptions options,
+            ExportAssets exportAssets,
+            ProgressListener progressListener
+    ) throws IOException {
         Objects.requireNonNull(project, "project darf nicht null sein.");
         Objects.requireNonNull(targetFile, "targetFile darf nicht null sein.");
         Objects.requireNonNull(options, "options darf nicht null sein.");
+        Objects.requireNonNull(exportAssets, "exportAssets darf nicht null sein.");
+        Objects.requireNonNull(progressListener, "progressListener darf nicht null sein.");
         Path parent = targetFile.toAbsolutePath().normalize().getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
+        int totalSteps = exportStepCount(project);
+        int completedSteps = 0;
         try (PDDocument document = new PDDocument()) {
             for (Level level : project.levels()) {
-                addPlanPage(document, project, level, options);
+                reportProgress(progressListener, completedSteps, totalSteps, planPageTitle(level));
+                BufferedImage levelPlanImage = exportAssets.graphicVariant() == GraphicVariant.RASTERGRAFIK
+                        ? exportAssets.levelPlanImages().get(level.name())
+                        : null;
+                if (levelPlanImage != null) {
+                    addRasterPage(document, project.name(), planPageTitle(level), levelPlanImage);
+                } else {
+                    addPlanPage(document, project, level, options);
+                }
+                completedSteps++;
                 for (HeatingSurfacePosition surfacePosition : HeatingSurfacePosition.values()) {
                     if (level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == surfacePosition)) {
-                        addHeatingPage(document, project, level, surfacePosition);
+                        reportProgress(progressListener, completedSteps, totalSteps, heatingPageTitle(level, surfacePosition));
+                        BufferedImage heatingPlanImage = exportAssets.graphicVariant() == GraphicVariant.RASTERGRAFIK
+                                ? exportAssets.heatingPlanImages().get(heatingPageKey(level.name(), surfacePosition))
+                                : null;
+                        if (heatingPlanImage != null) {
+                            addRasterPage(document, project.name(), heatingPageTitle(level, surfacePosition), heatingPlanImage);
+                        } else {
+                            addHeatingPage(document, project, level, surfacePosition);
+                        }
+                        completedSteps++;
                     }
                 }
                 if (!heatingElementEntries(level).isEmpty()) {
+                    reportProgress(progressListener, completedSteps, totalSteps, heatingElementPageTitle(level));
                     addHeatingElementsPage(document, project, level);
+                    completedSteps++;
                 }
             }
+            reportProgress(progressListener, completedSteps, totalSteps, "3D-ISO – gesamtes Gebäude");
             addSpatialViewsPage(document, project, true);
+            completedSteps++;
+            reportProgress(progressListener, completedSteps, totalSteps, "Seitenansichten – gesamtes Gebäude");
             addSpatialViewsPage(document, project, false);
+            completedSteps++;
+            reportProgress(progressListener, completedSteps, totalSteps, "PDF-Datei wird geschrieben");
             saveAtomically(document, targetFile.toAbsolutePath().normalize());
+            reportProgress(progressListener, totalSteps, totalSteps, "Bauzeichnung abgeschlossen");
         }
+    }
+
+    private int exportStepCount(ProjectModel project) {
+        int totalSteps = 3;
+        for (Level level : project.levels()) {
+            totalSteps++;
+            for (HeatingSurfacePosition surfacePosition : HeatingSurfacePosition.values()) {
+                if (level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == surfacePosition)) {
+                    totalSteps++;
+                }
+            }
+            if (!heatingElementEntries(level).isEmpty()) {
+                totalSteps++;
+            }
+        }
+        return totalSteps;
+    }
+
+    private void reportProgress(ProgressListener progressListener, int completedSteps, int totalSteps, String section) {
+        double boundedProgress = totalSteps <= 0
+                ? 1.0
+                : Math.max(0.0, Math.min(1.0, completedSteps / (double) totalSteps));
+        progressListener.update(boundedProgress, section);
     }
 
     private void saveAtomically(PDDocument document, Path targetFile) throws IOException {
@@ -144,9 +258,43 @@ public final class ConstructionDrawingPdfService {
         return prefix.length() < 3 ? "pdf" : prefix;
     }
 
+    private String planPageTitle(Level level) {
+        return "2D-Grundriss – " + level.name();
+    }
+
+    private String heatingPageTitle(Level level, HeatingSurfacePosition surfacePosition) {
+        return "Heizflächen " + surfacePosition + " – " + level.name();
+    }
+
+    private String heatingElementPageTitle(Level level) {
+        return "Heizelemente – " + level.name();
+    }
+
+    private String heatingPageKey(String levelName, HeatingSurfacePosition surfacePosition) {
+        return levelName + "\u0000" + surfacePosition.name();
+    }
+
+    private void addRasterPage(
+            PDDocument document,
+            String projectName,
+            String title,
+            BufferedImage image
+    ) throws IOException {
+        try (PageCanvas canvas = addPage(document, projectName, title, RASTER_SUBTITLE)) {
+            drawFittedImage(
+                    canvas,
+                    image,
+                    MARGIN + 2.0,
+                    MARGIN + 6.0,
+                    PAGE_WIDTH - 2.0 * MARGIN - 4.0,
+                    PAGE_HEIGHT - 2.0 * MARGIN - TITLE_HEIGHT - 12.0
+            );
+        }
+    }
+
     private void addPlanPage(PDDocument document, ProjectModel project, Level level, ConstructionDrawingOptions options) throws IOException {
         Viewport viewport = planViewport(level, options);
-        try (PageCanvas canvas = addPage(document, project.name(), "2D-Grundriss – " + level.name(), "M 1:" + viewport.scale())) {
+        try (PageCanvas canvas = addPage(document, project.name(), planPageTitle(level), "M 1:" + viewport.scale())) {
             for (Room room : level.rooms()) {
                 drawPolygon(canvas, viewport, room.outline(), new Color(225, 231, 221), 0.45f);
             }
@@ -200,7 +348,7 @@ public final class ConstructionDrawingPdfService {
                 .filter(heating -> heating.surfacePosition() == surfacePosition)
                 .toList();
         Viewport viewport = heatingViewport(level, heatings);
-        String title = "Heizflächen " + surfacePosition + " – " + level.name();
+        String title = heatingPageTitle(level, surfacePosition);
         try (PageCanvas canvas = addPage(document, project.name(), title, "M 1:" + viewport.scale())) {
             for (Room room : level.rooms()) {
                 drawPolygon(canvas, viewport, room.outline(), new Color(247, 247, 244), 0.35f);
@@ -306,7 +454,7 @@ public final class ConstructionDrawingPdfService {
     ) throws IOException {
         List<HeatingElementEntry> entries = heatingElementEntries(level);
         Viewport viewport = heatingElementViewport(level, entries);
-        try (PageCanvas canvas = addPage(document, project.name(), "Heizelemente – " + level.name(), "M 1:" + viewport.scale())) {
+        try (PageCanvas canvas = addPage(document, project.name(), heatingElementPageTitle(level), "M 1:" + viewport.scale())) {
             for (Room room : level.rooms()) {
                 drawPolygon(canvas, viewport, room.outline(), new Color(247, 247, 244), 0.35f);
             }

@@ -3,6 +3,7 @@ package de.schrell.cadas.ui;
 import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
+import de.schrell.cadas.application.reports.ConstructionDrawingPdfService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService.SurfaceMaterialReport;
 import de.schrell.cadas.application.reports.SurfaceMaterialReportPdfService;
@@ -13,11 +14,17 @@ import de.schrell.cadas.domain.model.SurfaceType;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -27,12 +34,15 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.web.WebView;
 import javafx.stage.FileChooser;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -49,10 +59,26 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void showSurfaceMaterialReportWindow() {
-        SurfaceMaterialReport report = owner.surfaceMaterialListService.create(owner.project);
-        String markdown = report.toDisplayMarkdown();
+        runWithProgressDialog(
+                "Materialliste wird erstellt",
+                "Materialdaten werden gesammelt",
+                "Materialliste konnte nicht erstellt werden",
+                progress -> {
+                    progress.update(0.15, "Materialdaten werden gesammelt");
+                    SurfaceMaterialReport report = owner.surfaceMaterialListService.create(owner.project);
+                    progress.update(0.8, "Ansicht wird vorbereitet");
+                    return new MaterialReportWindowContent(
+                            report,
+                            owner.markdownHtmlRenderer.renderDocument(report.toDisplayMarkdown())
+                    );
+                },
+                content -> showSurfaceMaterialReportWindow(content.report(), content.renderedHtml())
+        );
+    }
+
+    private void showSurfaceMaterialReportWindow(SurfaceMaterialReport report, String renderedHtml) {
         WebView reportView = new WebView();
-        reportView.getEngine().loadContent(owner.markdownHtmlRenderer.renderDocument(markdown));
+        reportView.getEngine().loadContent(renderedHtml);
         VBox.setVgrow(reportView, Priority.ALWAYS);
         Button exportButton = new Button("Markdown exportieren");
         exportButton.setOnAction(event -> exportSurfaceMaterialReportMarkdown(report));
@@ -81,11 +107,23 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportConstructionDrawingPdf() {
+        exportConstructionDrawingPdf(false);
+    }
+
+    void exportConstructionDrawingPdfRaster() {
+        exportConstructionDrawingPdf(true);
+    }
+
+    private void exportConstructionDrawingPdf(boolean raster) {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Maßstabgerechte Bauzeichnung als PDF speichern");
+        fileChooser.setTitle(raster
+                ? "Gerasterte Bauzeichnung als PDF speichern"
+                : "Maßstabgerechte Bauzeichnung als PDF speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
         String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName + "_Bauzeichnung.pdf");
+        fileChooser.setInitialFileName(raster
+                ? projectName + "_Bauzeichnung_Raster.pdf"
+                : projectName + "_Bauzeichnung.pdf");
         java.io.File file = fileChooser.showSaveDialog(owner.currentWindow());
         if (file == null) {
             return;
@@ -97,8 +135,25 @@ final class CadWorkbenchDocumentSupport {
                     owner.showDimensions.get(),
                     owner.showAreaVolume.get()
             );
-            owner.constructionDrawingPdfService.export(owner.project, target, options);
-            owner.draftLabel.setText("Bauzeichnungs-PDF exportiert: " + target.getFileName());
+            runWithProgressDialog(
+                    raster ? "Raster-Bauzeichnung wird exportiert" : "Bauzeichnung wird exportiert",
+                    "Bauplan wird vorbereitet",
+                    "PDF-Export fehlgeschlagen",
+                    progress -> {
+                        ConstructionDrawingPdfService.ExportAssets exportAssets = raster
+                                ? createConstructionDrawingExportAssets(progress.range(0.0, 0.35))
+                                : ConstructionDrawingPdfService.ExportAssets.empty();
+                        owner.constructionDrawingPdfService.export(
+                                owner.project,
+                                target,
+                                options,
+                                exportAssets,
+                                progress.range(raster ? 0.35 : 0.0, 1.0)::update
+                        );
+                        return target;
+                    },
+                    exportPath -> owner.draftLabel.setText("Bauzeichnungs-PDF exportiert: " + exportPath.getFileName())
+            );
         } catch (Exception exception) {
             owner.showOperationException("PDF-Export fehlgeschlagen", exception);
         }
@@ -249,7 +304,7 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf() {
-        exportSurfaceMaterialReportPdf(owner.surfaceMaterialListService.create(owner.project));
+        exportSurfaceMaterialReportPdf((SurfaceMaterialReport) null);
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report) {
@@ -257,7 +312,7 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdfRaster() {
-        exportSurfaceMaterialReportPdf(owner.surfaceMaterialListService.create(owner.project), SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
+        exportSurfaceMaterialReportPdf(null, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
     }
 
     void exportSurfaceMaterialReportPdfRaster(SurfaceMaterialReport report) {
@@ -282,7 +337,7 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf(Path targetFile) {
-        exportSurfaceMaterialReportPdf(owner.surfaceMaterialListService.create(owner.project), targetFile);
+        exportSurfaceMaterialReportPdf(null, targetFile);
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile) {
@@ -292,8 +347,32 @@ final class CadWorkbenchDocumentSupport {
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant) {
         try {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
-            surfaceMaterialReportPdfService.export(report, exportPath, createExportAssets(report, variant));
-            owner.draftLabel.setText("Materialliste als PDF exportiert: " + exportPath.getFileName());
+            runWithProgressDialog(
+                    variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK
+                            ? "Materialliste mit Rastergrafiken wird exportiert"
+                            : "Materialliste wird exportiert",
+                    "Materialliste wird vorbereitet",
+                    "Materiallisten-PDF-Export fehlgeschlagen",
+                    progress -> {
+                        SurfaceMaterialReport effectiveReport = report;
+                        double assetStart = 0.0;
+                        if (effectiveReport == null) {
+                            progress.update(0.08, "Materialdaten werden gesammelt");
+                            effectiveReport = owner.surfaceMaterialListService.create(owner.project);
+                            assetStart = 0.18;
+                        }
+                        SurfaceMaterialReportPdfService.ExportAssets exportAssets = createExportAssets(
+                                effectiveReport,
+                                variant,
+                                progress.range(assetStart, 0.85)
+                        );
+                        progress.update(0.9, "Materiallisten-PDF wird geschrieben");
+                        surfaceMaterialReportPdfService.export(effectiveReport, exportPath, exportAssets);
+                        progress.update(1.0, "Materialliste abgeschlossen");
+                        return exportPath;
+                    },
+                    path -> owner.draftLabel.setText("Materialliste als PDF exportiert: " + path.getFileName())
+            );
         } catch (Exception exception) {
             owner.showOperationException("Materiallisten-PDF-Export fehlgeschlagen", exception);
         }
@@ -301,35 +380,68 @@ final class CadWorkbenchDocumentSupport {
 
     private SurfaceMaterialReportPdfService.ExportAssets createExportAssets(
             SurfaceMaterialReport report,
-            SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant
-    ) {
+            SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant,
+            ProgressCallback progress
+    ) throws Exception {
+        List<MaterialRoomCapture> materialCaptures = report.materials().stream()
+                .filter(material -> material.surfaceType() == SurfaceType.FLOOR)
+                .flatMap(material -> material.roomEntries().stream()
+                        .map(entry -> new MaterialRoomCapture(material, entry)))
+                .toList();
+        List<SurfaceMaterialListService.HeatingPlanSummary> heatingPlans = variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK
+                ? report.heatingPlans()
+                : List.of();
+        int totalSteps = Math.max(1, owner.project.levels().size() + materialCaptures.size() + heatingPlans.size());
+        int completedSteps = 0;
         Map<String, BufferedImage> levelPlanImages = new LinkedHashMap<>();
         for (Level level : owner.project.levels()) {
-            levelPlanImages.put(level.name(), SwingFXUtils.fromFXImage(owner.reportLevelSnapshot(level.name()), null));
+            progress.update(completedSteps / (double) totalSteps, "2D-Ansicht " + level.name() + " wird erstellt");
+            levelPlanImages.put(level.name(), captureLevelPlanImage(level.name()));
+            completedSteps++;
         }
         Map<String, BufferedImage> heatingPlanImages = new LinkedHashMap<>();
         Map<String, BufferedImage> materialRoomImages = new LinkedHashMap<>();
-        report.materials().stream()
-                .filter(material -> material.surfaceType() == SurfaceType.FLOOR)
-                .forEach(material -> material.roomEntries().forEach(entry -> {
-                    BufferedImage image = captureMaterialRoomImage(material, entry);
-                    if (image != null) {
-                        materialRoomImages.put(
-                                SurfaceMaterialReportPdfService.materialRoomImageKey(material, entry),
-                                image
-                        );
-                    }
-                }));
-        if (variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK) {
-            report.heatingPlans().forEach(plan -> heatingPlanImages.computeIfAbsent(
-                    heatingPlanImageKey(plan),
-                    ignored -> captureHeatingPlanImage(plan)
-            ));
+        for (MaterialRoomCapture capture : materialCaptures) {
+            progress.update(completedSteps / (double) totalSteps, "Raumgrafik " + capture.entry().roomName() + " wird erstellt");
+            BufferedImage image = captureMaterialRoomImage(capture.material(), capture.entry());
+            if (image != null) {
+                materialRoomImages.put(
+                        SurfaceMaterialReportPdfService.materialRoomImageKey(capture.material(), capture.entry()),
+                        image
+                );
+            }
+            completedSteps++;
         }
+        if (variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK) {
+            for (SurfaceMaterialListService.HeatingPlanSummary plan : heatingPlans) {
+                progress.update(completedSteps / (double) totalSteps, "Heizplan " + plan.roomName() + " wird erstellt");
+                String imageKey = heatingPlanImageKey(plan);
+                if (!heatingPlanImages.containsKey(imageKey)) {
+                    heatingPlanImages.put(imageKey, captureHeatingPlanImage(plan));
+                }
+                completedSteps++;
+            }
+        }
+        progress.update(1.0, "Materialgrafiken abgeschlossen");
         return new SurfaceMaterialReportPdfService.ExportAssets(variant, levelPlanImages, heatingPlanImages, materialRoomImages);
     }
 
-    private BufferedImage captureHeatingPlanImage(SurfaceMaterialListService.HeatingPlanSummary plan) {
+    private BufferedImage captureLevelPlanImage(String levelName) throws Exception {
+        return runOnFxThread(() -> SwingFXUtils.fromFXImage(owner.reportLevelSnapshot(levelName), null));
+    }
+
+    private BufferedImage captureFilteredLevelPlanImage(
+            String levelName,
+            Set<java.util.UUID> visibleLayerIds,
+            boolean includeHydronicHeating
+    ) throws Exception {
+        return runOnFxThread(() -> SwingFXUtils.fromFXImage(
+                owner.reportLevelSnapshot(levelName, visibleLayerIds, includeHydronicHeating),
+                null
+        ));
+    }
+
+    private BufferedImage captureHeatingPlanImage(SurfaceMaterialListService.HeatingPlanSummary plan) throws Exception {
         String levelName = plan.levelName();
         String roomName = plan.roomName();
         Level level = owner.project.levels().stream()
@@ -341,16 +453,16 @@ final class CadWorkbenchDocumentSupport {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Raum `" + roomName + "` ist unbekannt."));
         Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, room, plan.surfacePosition());
-        return SwingFXUtils.fromFXImage(
+        return runOnFxThread(() -> SwingFXUtils.fromFXImage(
                 owner.reportRoomSnapshot(level.name(), room.outline(), visibleLayerIds, !plan.objectBased()),
                 null
-        );
+        ));
     }
 
     private BufferedImage captureMaterialRoomImage(
             SurfaceMaterialListService.MaterialSummary material,
             SurfaceMaterialListService.MaterialRoomEntry entry
-    ) {
+    ) throws Exception {
         Level level = owner.project.levels().stream()
                 .filter(candidate -> candidate.name().equals(entry.levelName()))
                 .findFirst()
@@ -369,9 +481,49 @@ final class CadWorkbenchDocumentSupport {
         if (visibleLayerIds.isEmpty()) {
             return null;
         }
-        return SwingFXUtils.fromFXImage(
+        return runOnFxThread(() -> SwingFXUtils.fromFXImage(
                 owner.reportRoomSnapshot(level.name(), room.outline(), visibleLayerIds, false),
                 null
+        ));
+    }
+
+    private ConstructionDrawingPdfService.ExportAssets createConstructionDrawingExportAssets(ProgressCallback progress) throws Exception {
+        List<HeatingPlanCapture> heatingCaptures = new ArrayList<>();
+        for (Level level : owner.project.levels()) {
+            for (var surfacePosition : de.schrell.cadas.domain.model.HeatingSurfacePosition.values()) {
+                if (level.hydronicHeatings().stream().noneMatch(heating -> heating.surfacePosition() == surfacePosition)) {
+                    continue;
+                }
+                Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, surfacePosition == de.schrell.cadas.domain.model.HeatingSurfacePosition.CEILING
+                        ? SurfaceType.CEILING
+                        : SurfaceType.FLOOR);
+                if (!visibleLayerIds.isEmpty()) {
+                    heatingCaptures.add(new HeatingPlanCapture(level.name(), surfacePosition, visibleLayerIds));
+                }
+            }
+        }
+        int totalSteps = Math.max(1, owner.project.levels().size() + heatingCaptures.size());
+        int completedSteps = 0;
+        Map<String, BufferedImage> levelPlanImages = new LinkedHashMap<>();
+        for (Level level : owner.project.levels()) {
+            progress.update(completedSteps / (double) totalSteps, "Bauplan " + level.name() + " wird gerastert");
+            levelPlanImages.put(level.name(), captureLevelPlanImage(level.name()));
+            completedSteps++;
+        }
+        Map<String, BufferedImage> heatingPlanImages = new LinkedHashMap<>();
+        for (HeatingPlanCapture capture : heatingCaptures) {
+            progress.update(completedSteps / (double) totalSteps, "Heizflächen " + capture.surfacePosition() + " – " + capture.levelName() + " werden gerastert");
+            heatingPlanImages.put(
+                    constructionDrawingHeatingImageKey(capture.levelName(), capture.surfacePosition()),
+                    captureFilteredLevelPlanImage(capture.levelName(), capture.visibleLayerIds(), false)
+            );
+            completedSteps++;
+        }
+        progress.update(1.0, "Rastergrafiken abgeschlossen");
+        return new ConstructionDrawingPdfService.ExportAssets(
+                ConstructionDrawingPdfService.GraphicVariant.RASTERGRAFIK,
+                levelPlanImages,
+                heatingPlanImages
         );
     }
 
@@ -382,6 +534,15 @@ final class CadWorkbenchDocumentSupport {
             return Set.of();
         }
         return stack.layers().stream()
+                .filter(layer -> SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource()))
+                .map(de.schrell.cadas.domain.model.SurfaceLayer::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<java.util.UUID> variothermLayerIds(Level level, SurfaceType surfaceType) {
+        return level.surfaceLayerStacks().stream()
+                .filter(stack -> stack.surfaceType() == surfaceType)
+                .flatMap(stack -> stack.layers().stream())
                 .filter(layer -> SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource()))
                 .map(de.schrell.cadas.domain.model.SurfaceLayer::id)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
@@ -400,5 +561,127 @@ final class CadWorkbenchDocumentSupport {
 
     private String heatingPlanImageKey(SurfaceMaterialListService.HeatingPlanSummary plan) {
         return plan.levelName() + "\u0000" + plan.roomName() + "\u0000" + plan.surfacePosition();
+    }
+
+    private String constructionDrawingHeatingImageKey(String levelName, de.schrell.cadas.domain.model.HeatingSurfacePosition surfacePosition) {
+        return levelName + "\u0000" + surfacePosition.name();
+    }
+
+    private <T> void runWithProgressDialog(
+            String title,
+            String initialMessage,
+            String errorTitle,
+            BackgroundOperation<T> operation,
+            java.util.function.Consumer<T> onSuccess
+    ) {
+        if (!owner.interactiveDialogsEnabled) {
+            try {
+                T result = operation.run((progress, message) -> {
+                });
+                onSuccess.accept(result);
+            } catch (Exception exception) {
+                owner.showOperationException(errorTitle, exception);
+            }
+            return;
+        }
+        ProgressBar progressBar = new ProgressBar(0.0);
+        progressBar.setPrefWidth(320.0);
+        progressBar.setMaxWidth(Double.MAX_VALUE);
+        Label messageLabel = new Label(initialMessage);
+        messageLabel.setWrapText(true);
+        VBox container = new VBox(12.0, messageLabel, progressBar);
+        container.setPadding(new Insets(16));
+        Stage dialog = new Stage();
+        dialog.setTitle(title);
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        Window ownerWindow = owner.currentWindow();
+        if (ownerWindow != null) {
+            dialog.initOwner(ownerWindow);
+        }
+        dialog.setOnCloseRequest(event -> event.consume());
+        dialog.setScene(new Scene(container, 380, 120));
+        Task<T> task = new Task<>() {
+            @Override
+            protected T call() throws Exception {
+                return operation.run((progress, message) -> {
+                    updateProgress(Math.max(0.0, Math.min(1.0, progress)), 1.0);
+                    updateMessage(message);
+                });
+            }
+        };
+        task.progressProperty().addListener((ignored, oldValue, newValue) ->
+                progressBar.setProgress(Math.max(0.0, newValue == null ? 0.0 : newValue.doubleValue())));
+        task.messageProperty().addListener((ignored, oldValue, newValue) ->
+                messageLabel.setText(newValue == null || newValue.isBlank() ? initialMessage : newValue));
+        task.setOnSucceeded(event -> {
+            dialog.close();
+            onSuccess.accept(task.getValue());
+        });
+        task.setOnFailed(event -> {
+            dialog.close();
+            owner.showOperationException(errorTitle, task.getException());
+        });
+        Thread worker = new Thread(task, "CADas-Export");
+        worker.setDaemon(true);
+        worker.start();
+        dialog.showAndWait();
+    }
+
+    private <T> T runOnFxThread(FxCallable<T> callable) throws Exception {
+        if (Platform.isFxApplicationThread()) {
+            return callable.call();
+        }
+        FutureTask<T> task = new FutureTask<>(callable::call);
+        Platform.runLater(task);
+        try {
+            return task.get();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw exception;
+        } catch (ExecutionException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof Exception wrappedException) {
+                throw wrappedException;
+            }
+            throw new IllegalStateException("JavaFX-Aufgabe ist fehlgeschlagen.", cause);
+        }
+    }
+
+    private record MaterialReportWindowContent(SurfaceMaterialReport report, String renderedHtml) {
+    }
+
+    private record MaterialRoomCapture(
+            SurfaceMaterialListService.MaterialSummary material,
+            SurfaceMaterialListService.MaterialRoomEntry entry
+    ) {
+    }
+
+    private record HeatingPlanCapture(
+            String levelName,
+            de.schrell.cadas.domain.model.HeatingSurfacePosition surfacePosition,
+            Set<java.util.UUID> visibleLayerIds
+    ) {
+    }
+
+    @FunctionalInterface
+    private interface BackgroundOperation<T> {
+        T run(ProgressCallback progress) throws Exception;
+    }
+
+    @FunctionalInterface
+    private interface FxCallable<T> {
+        T call() throws Exception;
+    }
+
+    @FunctionalInterface
+    private interface ProgressCallback {
+        void update(double progress, String message);
+
+        default ProgressCallback range(double start, double end) {
+            return (progress, message) -> {
+                double bounded = Math.max(0.0, Math.min(1.0, progress));
+                update(start + (end - start) * bounded, message);
+            };
+        }
     }
 }

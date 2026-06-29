@@ -32,6 +32,11 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -149,6 +154,35 @@ class ConstructionDrawingPdfServiceTest {
             assertTrue(text.contains("Konvektor"));
             assertTrue(text.contains("Heizelement"));
             assertTrue(text.contains("900 W"));
+        }
+    }
+
+    @Test
+    void exportiertRasterbauzeichnungMitGrafischenPlanseiten() throws Exception {
+        ProjectModel project = sampleProject();
+        Room room = project.primaryLevel().rooms().getFirst();
+        project.primaryLevel().addHydronicHeating(heating(
+                room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.MEANDER, "FBH 1"
+        ));
+        Path target = tempDir.resolve("bauzeichnung_raster.pdf");
+
+        new ConstructionDrawingPdfService().export(
+                project,
+                target,
+                ConstructionDrawingOptions.defaults(),
+                new ConstructionDrawingPdfService.ExportAssets(
+                        ConstructionDrawingPdfService.GraphicVariant.RASTERGRAFIK,
+                        Map.of("Erdgeschoss", filledImage(620, 420, new Color(226, 238, 228))),
+                        Map.of("Erdgeschoss\u0000FLOOR", filledImage(620, 420, new Color(238, 230, 222)))
+                )
+        );
+
+        try (var document = Loader.loadPDF(target.toFile())) {
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("2D-Grundriss - Erdgeschoss"));
+            assertTrue(text.contains("Heizflächen Fußboden - Erdgeschoss"));
+            assertTrue(text.contains("Grafische Rasteransicht"));
+            assertTrue(text.contains("3D-ISO - gesamtes Gebäude"));
         }
     }
 
@@ -325,6 +359,30 @@ class ConstructionDrawingPdfServiceTest {
         assertTrue(depthSpan * factor < 1_400.0);
     }
 
+    @Test
+    void meldetExportfortschrittMitAbschnittsbezeichnungen() throws Exception {
+        ProjectModel project = sampleProject();
+        Path target = tempDir.resolve("bauzeichnung_progress.pdf");
+        List<String> sections = new ArrayList<>();
+        List<Double> progressValues = new ArrayList<>();
+
+        new ConstructionDrawingPdfService().export(
+                project,
+                target,
+                ConstructionDrawingOptions.defaults(),
+                ConstructionDrawingPdfService.ExportAssets.empty(),
+                (progress, section) -> {
+                    progressValues.add(progress);
+                    sections.add(section);
+                }
+        );
+
+        assertFalse(sections.isEmpty());
+        assertTrue(sections.getFirst().contains("2D-Grundriss"));
+        assertTrue(sections.getLast().contains("abgeschlossen"));
+        assertTrue(progressValues.getLast() >= 1.0);
+    }
+
     private ProjectModel sampleProject() {
         ProjectModel project = ProjectModel.withDefaultLevel("Wohnhaus", "Erdgeschoss");
         Wall wall = Wall.create(
@@ -363,6 +421,18 @@ class ConstructionDrawingPdfServiceTest {
                 Length.ofMillimeters(1_000), Length.ofMillimeters(1_500)
         ));
         return project;
+    }
+
+    private BufferedImage filledImage(int width, int height, Color color) {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D graphics = image.createGraphics();
+        try {
+            graphics.setColor(color);
+            graphics.fillRect(0, 0, width, height);
+        } finally {
+            graphics.dispose();
+        }
+        return image;
     }
 
     private HydronicHeating heating(

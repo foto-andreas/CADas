@@ -1284,6 +1284,7 @@ public final class CadWorkbench extends BorderPane {
         Menu berichteMenu = new Menu("Berichte");
         berichteMenu.getItems().addAll(
                 menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
+                menuItem("Bauzeichnung als PDF exportieren (Rastergrafik)", this::exportConstructionDrawingPdfRaster, null),
                 menuItem("Räume und Materialien anzeigen", this::showSurfaceMaterialReportWindow, null),
                 menuItem("Räume und Materialien als PDF exportieren (SVG-Heizpläne)", this::exportSurfaceMaterialReportPdf, null),
                 menuItem("Räume und Materialien als PDF exportieren (Rastergrafik)", this::exportSurfaceMaterialReportPdfRaster, null),
@@ -6189,6 +6190,10 @@ public final class CadWorkbench extends BorderPane {
 
     private void exportConstructionDrawingPdf() {
         documentSupport.exportConstructionDrawingPdf();
+    }
+
+    private void exportConstructionDrawingPdfRaster() {
+        documentSupport.exportConstructionDrawingPdfRaster();
     }
 
     private void showHelpWindow() {
