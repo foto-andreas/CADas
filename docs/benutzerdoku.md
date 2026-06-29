@@ -448,7 +448,7 @@ Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepfleg
 * Wähle den Flächentyp, zum Beispiel `WALL_INTERIOR`, `WALL_EXTERIOR`, `FLOOR` oder `CEILING`.
   Bei reiner Wandauswahl bleibt `WALL_EXTERIOR` der Standard; `WALL_INTERIOR` ist zusätzlich verfügbar, wenn CADas angrenzende Räume erkennt, und gilt dann für alle betroffenen Raumseiten.
 * Wähle optional ein Preset wie `Fliese`, `Variotherm Trockenbau-FBH-Platte 60 x 100 cm`, `Dämmplatte`, `Rigipsplatte`, `OSB-Platte`, `Tapete` oder eine registrierte `DWG-Referenz`.
-* Lege Name, Dicke, Platten- oder Fliesenmaß, Verlegeart, Mindestversatz und Mindestbreite fest.
+* Lege Name, Dicke, Platten- oder Fliesenmaß, Startecke, Verlegerichtung, Mindestversatz und Mindestbreite fest.
 * Lege die Schnittbeschränkung fest: `frei`, `Schnitt nur außen` oder `Verlegerichtung, Schnitt nur außen`.
 * `Speichern` neben dem Namen legt die aktuell eingetragenen Belagswerte als eigenes Preset ab.
 * `Ebene hinzufügen` legt den Belag auf der gewählten Fläche an.

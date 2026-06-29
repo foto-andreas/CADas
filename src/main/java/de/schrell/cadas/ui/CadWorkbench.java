@@ -111,7 +111,6 @@ import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
 import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
-import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
@@ -454,7 +453,9 @@ public final class CadWorkbench extends BorderPane {
     private final ComboBox<LengthUnit> surfaceTileWidthUnit = new ComboBox<>();
     private final TextField surfaceTileHeightField = new TextField("30");
     private final ComboBox<LengthUnit> surfaceTileHeightUnit = new ComboBox<>();
-    private final ComboBox<SurfaceLayoutRotation> surfaceLayoutRotationSelector = new ComboBox<>();
+    private final Button surfaceLayoutCornerPreviousButton = new Button("←");
+    private final Label surfaceLayoutCornerLabel = new Label("Unten links");
+    private final Button surfaceLayoutCornerNextButton = new Button("→");
     private final ComboBox<SurfaceLayoutDirection> surfaceLayoutDirectionSelector = new ComboBox<>();
     private final ComboBox<SurfaceLayoutMode> surfaceLayoutModeSelector = new ComboBox<>();
     private final TextField surfaceLayoutOffsetField = new TextField("0");
@@ -486,6 +487,7 @@ public final class CadWorkbench extends BorderPane {
     private final Label surfaceLayerTargetLabel = new Label("Keine Fläche ausgewählt.");
     private final Label surfaceLayerSelectionHintLabel = new Label("Für Beläge zuerst eine passende Fläche auswählen.");
     private final Label surfaceLayerCoverageLabel = new Label("Keine Ebenen ausgewählt.");
+    private final ObjectProperty<SurfaceLayoutAnchor> surfaceLayoutAnchorSelection = new SimpleObjectProperty<>(SurfaceLayoutAnchor.MIN_X_MIN_Y);
     private final ComboBox<Level> levelSelector = new ComboBox<>();
     private final ComboBox<DrawingTool> toolSelector = new ComboBox<>();
     private final ObservableList<DoorPreset> availableDoorPresets = FXCollections.observableArrayList();
@@ -1415,7 +1417,7 @@ public final class CadWorkbench extends BorderPane {
                         propertyRow("Dicke", surfaceLayerThicknessField, surfaceLayerThicknessUnit),
                         propertyRow("Modulbreite", surfaceTileWidthField, surfaceTileWidthUnit),
                         propertyRow("Modulhöhe", surfaceTileHeightField, surfaceTileHeightUnit),
-                        propertyRow("Drehung", surfaceLayoutRotationSelector),
+                        propertyRow("Startecke", surfaceLayoutCornerPreviousButton, surfaceLayoutCornerLabel, surfaceLayoutCornerNextButton),
                         propertyRow("Verlegerichtung", surfaceLayoutDirectionSelector),
                         propertyRow("Versatzmodus", surfaceLayoutModeSelector),
                         propertyRow("Versatz", surfaceLayoutOffsetField, surfaceLayoutOffsetUnit),
@@ -1489,6 +1491,8 @@ public final class CadWorkbench extends BorderPane {
         updateSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene aktualisieren", this::updateSurfaceLayer));
         removeSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene entfernen", this::removeSurfaceLayer));
         toggleSurfaceLayerVisibilityButton.setOnAction(event -> runGuardedAction("Sichtbarkeit umschalten", this::toggleSurfaceLayerVisibility));
+        surfaceLayoutCornerPreviousButton.setOnAction(event -> cycleSurfaceLayoutCorner(false));
+        surfaceLayoutCornerNextButton.setOnAction(event -> cycleSurfaceLayoutCorner(true));
         moveSurfaceLayerUpButton.setOnAction(event -> runGuardedAction("Ebene nach oben", () -> moveSurfaceLayer(-1)));
         moveSurfaceLayerDownButton.setOnAction(event -> runGuardedAction("Ebene nach unten", () -> moveSurfaceLayer(1)));
         saveSurfacePresetButton.setOnAction(event -> runGuardedAction("Belagspreset speichern", this::saveCurrentSurfacePreset));
@@ -1511,6 +1515,8 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(updateSurfaceLayerButton, "Übernimmt die aktuellen Ebenenwerte auf den in der Liste markierten Belag.");
         applyTooltip(removeSurfaceLayerButton, "Entfernt den in der Liste markierten Belag von der aktuell ausgewählten Fläche.");
         applyTooltip(toggleSurfaceLayerVisibilityButton, "Schaltet die Sichtbarkeit des markierten Belags um und passt Raumwirkung sowie 3D-Darstellung direkt an.");
+        applyTooltip(surfaceLayoutCornerPreviousButton, "Schaltet die Startecke des Belags gegen den Uhrzeigersinn zur vorherigen Raumecke weiter. Die Verlegerichtung wird dabei passend auf die neue Ecke mitgeführt.");
+        applyTooltip(surfaceLayoutCornerNextButton, "Schaltet die Startecke des Belags im Uhrzeigersinn zur nächsten Raumecke weiter. Die Verlegerichtung wird dabei passend auf die neue Ecke mitgeführt.");
         applyTooltip(moveSurfaceLayerUpButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach oben.");
         applyTooltip(moveSurfaceLayerDownButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach unten.");
         applyTooltip(saveSurfacePresetButton, "Speichert die aktuell eingetragenen Belagswerte als eigenes Preset unter `~/.config/CADas/Belag`, fragt vor dem Überschreiben nach und fügt das Preset der Auswahl hinzu.");
@@ -1862,14 +1868,20 @@ public final class CadWorkbench extends BorderPane {
         if (!availableSurfacePresets.isEmpty()) {
             surfacePresetSelector.setValue(availableSurfacePresets.getFirst());
         }
-        surfaceLayoutRotationSelector.getItems().setAll(SurfaceLayoutRotation.values());
-        surfaceLayoutRotationSelector.setValue(SurfaceLayoutRotation.DEGREES_0);
+        surfaceLayoutCornerPreviousButton.setFocusTraversable(false);
+        surfaceLayoutCornerPreviousButton.setMinWidth(34.0);
+        surfaceLayoutCornerNextButton.setFocusTraversable(false);
+        surfaceLayoutCornerNextButton.setMinWidth(34.0);
+        surfaceLayoutCornerLabel.setMinWidth(110.0);
+        surfaceLayoutCornerLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4d4135;");
         surfaceLayoutDirectionSelector.getItems().setAll(SurfaceLayoutDirection.values());
         surfaceLayoutDirectionSelector.setValue(SurfaceLayoutDirection.LEFT_TO_RIGHT);
+        surfaceLayoutDirectionSelector.valueProperty().addListener((ignored, oldValue, newValue) -> syncSurfaceLayoutAnchorForDirection(newValue));
         surfaceLayoutModeSelector.getItems().setAll(SurfaceLayoutMode.values());
         surfaceLayoutModeSelector.setValue(SurfaceLayoutMode.AUTOMATIC);
         surfaceCutRestrictionSelector.getItems().setAll(SurfaceCutRestriction.values());
         surfaceCutRestrictionSelector.setValue(SurfaceCutRestriction.fallback());
+        updateSurfaceLayoutCornerLabel();
         surfaceLayerList.setPrefHeight(120);
         surfaceLayerList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> syncInputsFromSelectedSurfaceLayer());
         surfaceTypeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
@@ -2080,10 +2092,10 @@ public final class CadWorkbench extends BorderPane {
         applyTooltip(surfaceTileWidthUnit, "Bestimmt die Einheit für die Breite der Fliese oder Platte.");
         applyTooltip(surfaceTileHeightField, "Legt die Höhe beziehungsweise Länge einer Fliese oder Platte für die Belegungsbasis fest.");
         applyTooltip(surfaceTileHeightUnit, "Bestimmt die Einheit für die Höhe oder Länge des Belags.");
-        applyTooltip(surfaceLayoutRotationSelector, "Legt die absolute Verlegedrehung fest. 0° und 180° behalten Breite und Höhe bei, 90° und 270° tauschen Modulbreite und Modulhöhe für Belegung, Darstellung und Materialberechnung.");
-        applyTooltip(surfaceLayoutDirectionSelector, "Legt fest, ob die Verlegung innerhalb jeder Reihe von links nach rechts oder von rechts nach links startet. Daraus wird die passende Startecke automatisch abgeleitet.");
+        applyTooltip(surfaceLayoutCornerLabel, "Zeigt die aktuell gewählte Startecke des Belags an. Von dieser Raumecke aus beginnt die erste Reihe.");
+        applyTooltip(surfaceLayoutDirectionSelector, "Legt fest, auf welcher Raumseite die erste Reihe startet. Beim Umschalten bleibt die obere oder untere Startecke erhalten und wechselt nur auf die passende linke oder rechte Seite.");
         applyTooltip(surfaceLayoutModeSelector, "Bestimmt, ob ohne Versatz, mit automatischem Versatz oder mit festem Reihenversatz belegt wird.");
-        applyTooltip(surfaceLayoutOffsetField, "Legt bei festem Versatz den horizontalen Reihenversatz fest.");
+        applyTooltip(surfaceLayoutOffsetField, "Legt bei festem Versatz den Reihenversatz entlang der langen Modulkante fest. Der Wert wird von Reihe zu Reihe fortgeschrieben.");
         applyTooltip(surfaceLayoutOffsetUnit, "Bestimmt die Einheit für den festen Reihenversatz.");
         applyTooltip(surfaceMinimumOffsetField, "Legt den kleinsten zulässigen automatischen Versatz zwischen zwei Reihen fest.");
         applyTooltip(surfaceMinimumOffsetUnit, "Bestimmt die Einheit für den Mindestversatz.");
@@ -6680,7 +6692,7 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceMinimumStartEndMargin(),
                 currentSurfaceFreeMargins(),
                 currentSurfaceLayoutAnchor(),
-                currentSurfaceLayoutRotatedQuarterTurn(),
+                false,
                 Length.zero(),
                 Length.zero(),
                 currentSurfaceJointWidth(),
@@ -6754,10 +6766,9 @@ public final class CadWorkbench extends BorderPane {
         }
         surfaceLayerNameField.setText(preset.name().replace("DWG-Referenz: ", "").replace("DWG-Block: ", ""));
         setLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, preset.thickness(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, preset.tileWidth(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, preset.tileHeight(), LengthUnit.CENTIMETER);
-        surfaceLayoutRotationSelector.setValue(preset.layoutRotation());
-        surfaceLayoutDirectionSelector.setValue(preset.layoutDirection());
+        setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, displayTileWidth(preset.tileWidth(), preset.tileHeight(), preset.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, displayTileHeight(preset.tileWidth(), preset.tileHeight(), preset.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
+        applySurfaceLayoutAnchorSelection(normalizedSurfaceLayoutAnchor(preset.layoutAnchor(), preset.layoutDirection()));
         surfaceLayoutModeSelector.setValue(preset.layoutMode());
         setLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, preset.offset(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, preset.minimumOffset(), LengthUnit.CENTIMETER);
@@ -7346,7 +7357,7 @@ public final class CadWorkbench extends BorderPane {
                 + " | "
                 + visibility
                 + " | "
-                + layer.layoutRotation().label()
+                + formatSurfaceLayoutCorner(layer.layoutAnchor())
                 + " | "
                 + layer.layoutDirection().label()
                 + " | "
@@ -7384,10 +7395,9 @@ public final class CadWorkbench extends BorderPane {
         }
         surfaceLayerNameField.setText(selectedLayer.name());
         syncLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, selectedLayer.thickness(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, selectedLayer.tileWidth(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, selectedLayer.tileHeight(), LengthUnit.CENTIMETER);
-        surfaceLayoutRotationSelector.setValue(selectedLayer.layoutRotation());
-        surfaceLayoutDirectionSelector.setValue(selectedLayer.layoutDirection());
+        syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, displayTileWidth(selectedLayer.tileWidth(), selectedLayer.tileHeight(), selectedLayer.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, displayTileHeight(selectedLayer.tileWidth(), selectedLayer.tileHeight(), selectedLayer.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
+        applySurfaceLayoutAnchorSelection(normalizedSurfaceLayoutAnchor(selectedLayer.layoutAnchor(), selectedLayer.layoutDirection()));
         surfaceLayoutModeSelector.setValue(selectedLayer.layoutMode());
         syncLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, selectedLayer.layoutOffset(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, selectedLayer.minimumOffset(), LengthUnit.CENTIMETER);
@@ -7454,7 +7464,7 @@ public final class CadWorkbench extends BorderPane {
                     currentSurfaceJointWidth(),
                     currentSurfaceCutRestriction(),
                     currentSurfaceCoveringSource(),
-                    currentSurfaceLayoutRotatedQuarterTurn()
+                    false
             ));
         }
         afterSurfaceLayerMutation("Ebene aktualisiert.");
@@ -7598,7 +7608,7 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceJointWidth(),
                 currentSurfaceCutRestriction(),
                 currentSurfaceCoveringSource()
-        ).withFreeMargins(currentSurfaceFreeMargins()).withLayoutOrientation(currentSurfaceLayoutRotation(), currentSurfaceLayoutDirection());
+        ).withFreeMargins(currentSurfaceFreeMargins()).withLayoutAnchor(currentSurfaceLayoutAnchor());
     }
 
     private String currentSurfaceLayerName() {
@@ -7618,20 +7628,82 @@ public final class CadWorkbench extends BorderPane {
         return parseLength(surfaceTileHeightField, surfaceTileHeightUnit.getValue()).orElse(Length.of(30, LengthUnit.CENTIMETER));
     }
 
-    private SurfaceLayoutRotation currentSurfaceLayoutRotation() {
-        return Optional.ofNullable(surfaceLayoutRotationSelector.getValue()).orElse(SurfaceLayoutRotation.DEGREES_0);
+    private Length displayTileWidth(Length tileWidth, Length tileHeight, boolean rotatedQuarterTurn) {
+        return rotatedQuarterTurn ? tileHeight : tileWidth;
+    }
+
+    private Length displayTileHeight(Length tileWidth, Length tileHeight, boolean rotatedQuarterTurn) {
+        return rotatedQuarterTurn ? tileWidth : tileHeight;
+    }
+
+    private void cycleSurfaceLayoutCorner(boolean forward) {
+        SurfaceLayoutAnchor currentAnchor = currentSurfaceLayoutAnchor();
+        applySurfaceLayoutAnchorSelection(forward ? currentAnchor.nextManual() : currentAnchor.previousManual());
+    }
+
+    private void syncSurfaceLayoutAnchorForDirection(SurfaceLayoutDirection direction) {
+        if (direction == null) {
+            return;
+        }
+        SurfaceLayoutAnchor currentAnchor = currentSurfaceLayoutAnchor();
+        if (startsAtMaximumX(currentAnchor) == (direction == SurfaceLayoutDirection.RIGHT_TO_LEFT)) {
+            updateSurfaceLayoutCornerLabel();
+            return;
+        }
+        applySurfaceLayoutAnchorSelection(direction == SurfaceLayoutDirection.RIGHT_TO_LEFT
+                ? (startsAtMaximumY(currentAnchor) ? SurfaceLayoutAnchor.MAX_X_MAX_Y : SurfaceLayoutAnchor.MAX_X_MIN_Y)
+                : (startsAtMaximumY(currentAnchor) ? SurfaceLayoutAnchor.MIN_X_MAX_Y : SurfaceLayoutAnchor.MIN_X_MIN_Y));
+    }
+
+    private void applySurfaceLayoutAnchorSelection(SurfaceLayoutAnchor anchor) {
+        SurfaceLayoutAnchor manualAnchor = anchor == null || anchor == SurfaceLayoutAnchor.AUTO
+                ? SurfaceLayoutAnchor.MIN_X_MIN_Y
+                : anchor;
+        surfaceLayoutAnchorSelection.set(manualAnchor);
+        SurfaceLayoutDirection direction = startsAtMaximumX(manualAnchor)
+                ? SurfaceLayoutDirection.RIGHT_TO_LEFT
+                : SurfaceLayoutDirection.LEFT_TO_RIGHT;
+        if (surfaceLayoutDirectionSelector.getValue() != direction) {
+            surfaceLayoutDirectionSelector.setValue(direction);
+        }
+        updateSurfaceLayoutCornerLabel();
+    }
+
+    private SurfaceLayoutAnchor normalizedSurfaceLayoutAnchor(SurfaceLayoutAnchor anchor, SurfaceLayoutDirection direction) {
+        if (anchor != null && anchor != SurfaceLayoutAnchor.AUTO) {
+            return anchor;
+        }
+        return direction == SurfaceLayoutDirection.RIGHT_TO_LEFT
+                ? SurfaceLayoutAnchor.MAX_X_MIN_Y
+                : SurfaceLayoutAnchor.MIN_X_MIN_Y;
+    }
+
+    private void updateSurfaceLayoutCornerLabel() {
+        surfaceLayoutCornerLabel.setText(formatSurfaceLayoutCorner(currentSurfaceLayoutAnchor()));
+    }
+
+    private String formatSurfaceLayoutCorner(SurfaceLayoutAnchor anchor) {
+        return switch (anchor == null ? SurfaceLayoutAnchor.MIN_X_MIN_Y : anchor) {
+            case AUTO -> "Automatisch";
+            case MIN_X_MIN_Y -> "Unten links";
+            case MAX_X_MIN_Y -> "Unten rechts";
+            case MAX_X_MAX_Y -> "Oben rechts";
+            case MIN_X_MAX_Y -> "Oben links";
+        };
     }
 
     private SurfaceLayoutDirection currentSurfaceLayoutDirection() {
-        return Optional.ofNullable(surfaceLayoutDirectionSelector.getValue()).orElse(SurfaceLayoutDirection.LEFT_TO_RIGHT);
-    }
-
-    private boolean currentSurfaceLayoutRotatedQuarterTurn() {
-        return currentSurfaceLayoutRotation().rotatedQuarterTurn();
+        SurfaceLayoutDirection selection = surfaceLayoutDirectionSelector.getValue();
+        if (selection != null) {
+            return selection;
+        }
+        return startsAtMaximumX(currentSurfaceLayoutAnchor())
+                ? SurfaceLayoutDirection.RIGHT_TO_LEFT
+                : SurfaceLayoutDirection.LEFT_TO_RIGHT;
     }
 
     private de.schrell.cadas.domain.model.SurfaceLayoutAnchor currentSurfaceLayoutAnchor() {
-        return SurfaceLayer.anchorFor(currentSurfaceLayoutRotation(), currentSurfaceLayoutDirection());
+        return Optional.ofNullable(surfaceLayoutAnchorSelection.get()).orElse(SurfaceLayoutAnchor.MIN_X_MIN_Y);
     }
 
     private SurfaceLayoutMode currentSurfaceLayoutMode() {
@@ -9827,6 +9899,16 @@ public final class CadWorkbench extends BorderPane {
         render();
     }
 
+    public void automationSetSurfaceLayoutDirection(String directionName) {
+        SurfaceLayoutDirection direction = SurfaceLayoutDirection.valueOf(directionName.trim().toUpperCase(Locale.ROOT));
+        surfaceLayoutDirectionSelector.setValue(direction);
+        render();
+    }
+
+    public String automationSurfaceLayoutCornerLabel() {
+        return surfaceLayoutCornerLabel.getText();
+    }
+
     public void automationSelect(String kindName, int index, boolean toggle) {
         SelectionKey selectionKey = switch (kindName.trim().toUpperCase(Locale.ROOT)) {
             case "WALL" -> selectionKeyByIndex(activeLevel.get().walls(), index, RenderableKind.WALL, Wall::id, "Wandindex");
@@ -10085,6 +10167,8 @@ public final class CadWorkbench extends BorderPane {
             case "toggleSurfaceLayerVisibility" -> toggleSurfaceLayerVisibility();
             case "addSurfaceLayer" -> addSurfaceLayer();
             case "updateSurfaceLayer" -> updateSurfaceLayer();
+            case "surfaceLayoutCornerPrevious" -> cycleSurfaceLayoutCorner(false);
+            case "surfaceLayoutCornerNext" -> cycleSurfaceLayoutCorner(true);
             case "editTerrainElevations" -> editTerrainElevations();
             case "rotateSelectedComponentsClockwise", "rotateSelectedStairsClockwise" -> rotateSelectedComponentsClockwise();
             case "rotateSelectedComponentsCounterClockwise", "rotateSelectedStairsCounterClockwise" -> rotateSelectedComponentsCounterClockwise();

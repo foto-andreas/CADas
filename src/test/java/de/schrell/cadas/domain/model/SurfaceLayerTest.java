@@ -38,4 +38,17 @@ class SurfaceLayerTest {
         assertEquals(SurfaceLayoutRotation.DEGREES_270, layer.layoutRotation());
         assertEquals(SurfaceLayoutDirection.RIGHT_TO_LEFT, layer.layoutDirection());
     }
+
+    @Test
+    void schaltetManuelleStarteckenImUhrzeigersinnWeiterUndZurueck() {
+        assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, SurfaceLayoutAnchor.MIN_X_MIN_Y.nextManual());
+        assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, SurfaceLayoutAnchor.MAX_X_MIN_Y.nextManual());
+        assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, SurfaceLayoutAnchor.MAX_X_MAX_Y.nextManual());
+        assertEquals(SurfaceLayoutAnchor.MIN_X_MIN_Y, SurfaceLayoutAnchor.MIN_X_MAX_Y.nextManual());
+
+        assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, SurfaceLayoutAnchor.MIN_X_MIN_Y.previousManual());
+        assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, SurfaceLayoutAnchor.MIN_X_MAX_Y.previousManual());
+        assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, SurfaceLayoutAnchor.MAX_X_MAX_Y.previousManual());
+        assertEquals(SurfaceLayoutAnchor.MIN_X_MIN_Y, SurfaceLayoutAnchor.MAX_X_MIN_Y.previousManual());
+    }
 }

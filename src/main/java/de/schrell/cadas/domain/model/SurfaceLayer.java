@@ -262,6 +262,10 @@ public record SurfaceLayer(
         return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, newLayoutRotatedQuarterTurn);
     }
 
+    public SurfaceLayer withLayoutAnchor(SurfaceLayoutAnchor newLayoutAnchor) {
+        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, newLayoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn);
+    }
+
     public Length effectiveTileWidth() {
         return layoutRotatedQuarterTurn ? tileHeight : tileWidth;
     }

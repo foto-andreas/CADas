@@ -21,8 +21,21 @@ public enum SurfaceLayoutAnchor {
         return label;
     }
 
-    public SurfaceLayoutAnchor next() {
-        SurfaceLayoutAnchor[] values = values();
-        return values[(ordinal() + 1) % values.length];
+    public SurfaceLayoutAnchor nextManual() {
+        return switch (this) {
+            case AUTO, MIN_X_MIN_Y -> MAX_X_MIN_Y;
+            case MAX_X_MIN_Y -> MAX_X_MAX_Y;
+            case MAX_X_MAX_Y -> MIN_X_MAX_Y;
+            case MIN_X_MAX_Y -> MIN_X_MIN_Y;
+        };
+    }
+
+    public SurfaceLayoutAnchor previousManual() {
+        return switch (this) {
+            case AUTO, MIN_X_MIN_Y -> MIN_X_MAX_Y;
+            case MIN_X_MAX_Y -> MAX_X_MAX_Y;
+            case MAX_X_MAX_Y -> MAX_X_MIN_Y;
+            case MAX_X_MIN_Y -> MIN_X_MIN_Y;
+        };
     }
 }

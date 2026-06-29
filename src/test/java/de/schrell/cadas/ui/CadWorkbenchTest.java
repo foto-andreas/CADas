@@ -688,6 +688,116 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void belagStarteckeLaesstSichPerPfeilenUndRichtungKonsistentUmschalten() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            ));
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetSurfaceType("FLOOR");
+            return instanz;
+        });
+
+        Assertions.assertEquals("Unten links", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        aufFxThread(() -> {
+            workbench.automationInvoke("surfaceLayoutCornerNext", null);
+            return null;
+        });
+        Assertions.assertEquals("Unten rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        aufFxThread(() -> {
+            workbench.automationInvoke("addSurfaceLayer", null);
+            return null;
+        });
+
+        SurfaceLayer angelegt = aufFxThread(() -> workbench.project.primaryLevel()
+                .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
+                .layers()
+                .getFirst());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, angelegt.layoutAnchor());
+
+        aufFxThread(() -> {
+            workbench.automationSelectSurfaceLayer(0);
+            workbench.automationInvoke("surfaceLayoutCornerNext", null);
+            workbench.automationSetSurfaceLayoutDirection("LEFT_TO_RIGHT");
+            workbench.automationInvoke("updateSurfaceLayer", null);
+            return null;
+        });
+
+        Assertions.assertEquals("Oben links", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        SurfaceLayer aktualisiert = aufFxThread(() -> workbench.project.primaryLevel()
+                .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
+                .layers()
+                .getFirst());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, aktualisiert.layoutAnchor());
+        Assertions.assertFalse(aktualisiert.layoutRotatedQuarterTurn());
+    }
+
+    @Test
+    void gedrehteBelagsebeneWirdBeimAktualisierenAufSichtbareModulmaßeNormalisiert() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Schlafen",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Platte",
+                    Length.ofMillimeters(18),
+                    Length.ofMillimeters(600),
+                    Length.ofMillimeters(1_000),
+                    SurfaceLayoutMode.FIXED,
+                    Length.ofMillimeters(200),
+                    Length.ofMillimeters(100),
+                    Length.ofMillimeters(100),
+                    Length.ofMillimeters(100),
+                    Length.zero(),
+                    SurfaceCutRestriction.FREE,
+                    "Test"
+            ).withLayoutOrientation(SurfaceLayoutRotation.DEGREES_270, SurfaceLayoutDirection.RIGHT_TO_LEFT));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetSurfaceType("FLOOR");
+            instanz.automationSelectSurfaceLayer(0);
+            return instanz;
+        });
+
+        Assertions.assertEquals("Oben rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        aufFxThread(() -> {
+            workbench.automationInvoke("updateSurfaceLayer", null);
+            return null;
+        });
+
+        SurfaceLayer aktualisiert = aufFxThread(() -> workbench.project.primaryLevel()
+                .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
+                .layers()
+                .getFirst());
+        Assertions.assertEquals(1_000.0, aktualisiert.tileWidth().toMillimeters(), 0.001);
+        Assertions.assertEquals(600.0, aktualisiert.tileHeight().toMillimeters(), 0.001);
+        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, aktualisiert.layoutAnchor());
+        Assertions.assertFalse(aktualisiert.layoutRotatedQuarterTurn());
+    }
+
+    @Test
     void ziehtBalkonAlsRechteckigeFußbodenplatteAuf() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
