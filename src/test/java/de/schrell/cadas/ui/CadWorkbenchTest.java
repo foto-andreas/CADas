@@ -1152,6 +1152,31 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void zeigtRaumneuabgleichWarnungBeimLöschenNurEinmal() throws Exception {
+        Path projektDatei = erzeugeEinfachesProjektAlsDxf();
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationSetErrorDialogsEnabled(false);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetSurfaceType("FLOOR");
+            instanz.automationInvoke("addSurfaceLayer", null);
+            instanz.automationSetField("heatingMaximumPipeLength", "20000");
+            instanz.automationPlanHydronicHeating("FLOOR", "MEANDER");
+            instanz.automationClearLastWarning();
+            instanz.automationSelect("WALL", 0, false);
+            instanz.automationDeleteSelection();
+            return instanz;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(workbench::automationWarningCount));
+    }
+
+    @Test
     void zeigtRaumneuabgleichWarnungBeimVerschiebenErstNachDemLoslassen() throws Exception {
         Path projektDatei = erzeugeEinfachesProjektAlsDxf();
         CadWorkbench workbench = aufFxThread(() -> {

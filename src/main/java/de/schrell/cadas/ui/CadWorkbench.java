@@ -128,6 +128,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -600,6 +601,7 @@ public final class CadWorkbench extends BorderPane {
     private Runnable applicationExitAction = Platform::exit;
     private UiErrorDialogs.ErrorPresentation lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
     private WarningPresentation lastWarningDialog = WarningPresentation.empty();
+    private int rememberedWarningCount;
     private Level.RoomReplacementImpact pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
 
     public CadWorkbench() {
@@ -6930,6 +6932,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void rememberWarning(String title, String header, String content) {
         lastWarningDialog = new WarningPresentation(title, header, content);
+        rememberedWarningCount++;
         if (!interactiveDialogsEnabled) {
             return;
         }
@@ -8891,8 +8894,7 @@ public final class CadWorkbench extends BorderPane {
 
     private void synchronizeRoomsFromWalls(Level level) {
         pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
-        Level.RoomReplacementImpact impact = synchronizeRoomsFromWalls(level, true);
-        showRoomSynchronizationWarning(impact);
+        synchronizeRoomsFromWalls(level, true);
     }
 
     private void previewRoomSynchronizationFromWalls(Level level) {
@@ -9590,6 +9592,7 @@ public final class CadWorkbench extends BorderPane {
 
     public void automationClearLastWarning() {
         lastWarningDialog = WarningPresentation.empty();
+        rememberedWarningCount = 0;
     }
 
     public String automationLastErrorTitle() {
@@ -9618,6 +9621,10 @@ public final class CadWorkbench extends BorderPane {
 
     public String automationLastWarningContent() {
         return lastWarningDialog.content();
+    }
+
+    public int automationWarningCount() {
+        return rememberedWarningCount;
     }
 
     public void automationDisableApplicationExit() {
