@@ -48,7 +48,7 @@ final class CadWorkbenchDocumentSupport {
         owner.applyTooltip(exportButton, "Exportiert genau diese Materialliste als Markdown-Datei.");
         Button exportPdfButton = new Button("PDF exportieren");
         exportPdfButton.setOnAction(event -> exportSurfaceMaterialReportPdf(report));
-        owner.applyTooltip(exportPdfButton, "Exportiert genau diese Materialliste als PDF-Datei ohne eingebettete SVG-Vorschauen.");
+        owner.applyTooltip(exportPdfButton, "Exportiert genau diese Materialliste als PDF-Datei mit Tabellenlayout und eingebetteten Heizplan-Grafiken.");
         Button printButton = new Button("Drucken");
         printButton.setOnAction(event -> printSurfaceMaterialReport(reportView));
         owner.applyTooltip(printButton, "Druckt die gerenderte Materialliste so, wie sie in diesem Fenster angezeigt wird.");

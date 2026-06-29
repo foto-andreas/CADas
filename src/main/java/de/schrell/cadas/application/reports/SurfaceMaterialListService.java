@@ -19,11 +19,13 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.FloorExtension;
 import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
@@ -94,54 +96,94 @@ public final class SurfaceMaterialListService {
     private List<HeatingPlanSummary> heatingPlans(ProjectModel project) {
         List<HeatingPlanSummary> summaries = new ArrayList<>();
         for (Level level : project.levels()) {
-            for (HydronicHeating heating : level.hydronicHeatings()) {
-                Room room = level.rooms().stream()
-                        .filter(candidate -> candidate.id().equals(heating.roomId()))
-                        .findFirst()
-                        .orElse(null);
-                if (room == null) {
-                    continue;
-                }
-                List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layoutBestEffort(heating).circuits();
-                String svg = hydronicHeatingLayoutService.toSvg(
-                        level, room, heating, level.floorOpenings(), level.heatingExclusionAreas()
-                );
+            for (Room room : level.rooms()) {
                 RoomHeatingOutputService.RoomHeatTotals roomHeatTotals = roomHeatingOutputService.totals(level, room);
-                for (HeatingZone zone : heating.zones()) {
-                    double pipeLength = circuits.stream()
-                            .filter(circuit -> circuit.zoneId().equals(zone.id()))
-                            .findFirst()
-                            .map(circuit -> circuit.pipeLength().toMillimeters())
-                            .orElse(0.0);
-                    summaries.add(new HeatingPlanSummary(
-                            level.name(),
-                            room.name(),
-                            heating.surfacePosition().toString(),
-                            zone.layoutPattern().toString(),
-                            zone.name(),
-                            zone.areaSquareMeters(),
-                            pipeLength / 1_000.0,
-                            heating.maximumPipeLength().toMillimeters() / 1_000.0,
-                            zone.heatOutputWattsPerSquareMeter(),
-                            zone.heatOutputWatts(),
-                            roomHeatTotals.floorHeatingWatts(),
-                            roomHeatTotals.ceilingHeatingWatts(),
-                            roomHeatTotals.additionalSurfaceHeatingWatts(),
-                            roomHeatTotals.surfaceHeatingWatts(),
-                            roomHeatTotals.heatingElementWatts(),
-                            roomHeatTotals.totalHeatOutputWatts(),
-                            svg
-                    ));
-                }
+                level.hydronicHeatings().stream()
+                        .filter(heating -> heating.roomId().equals(room.id()))
+                        .forEach(heating -> appendHydronicHeatingPlans(
+                                summaries, level, room, heating, roomHeatTotals
+                        ));
+                roomHeatingOutputService.heatingElements(level, room).stream()
+                        .filter(element -> !element.heatingType().countsAsHeatingElement())
+                        .forEach(element -> summaries.add(new HeatingPlanSummary(
+                                level.name(),
+                                room.name(),
+                                surfacePosition(element.heatingType()),
+                                "Raumobjekt",
+                                element.objectName(),
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                element.heatOutputWatts(),
+                                roomHeatTotals.floorHeatingWatts(),
+                                roomHeatTotals.ceilingHeatingWatts(),
+                                roomHeatTotals.additionalSurfaceHeatingWatts(),
+                                roomHeatTotals.surfaceHeatingWatts(),
+                                roomHeatTotals.heatingElementWatts(),
+                                roomHeatTotals.totalHeatOutputWatts(),
+                                "",
+                                true
+                        )));
             }
         }
         return List.copyOf(summaries);
+    }
+
+    private void appendHydronicHeatingPlans(
+            List<HeatingPlanSummary> summaries,
+            Level level,
+            Room room,
+            HydronicHeating heating,
+            RoomHeatingOutputService.RoomHeatTotals roomHeatTotals
+    ) {
+        List<HydronicHeatingLayoutService.CircuitLayout> circuits = hydronicHeatingLayoutService.layoutBestEffort(heating).circuits();
+        String svg = hydronicHeatingLayoutService.toSvg(
+                level, room, heating, level.floorOpenings(), level.heatingExclusionAreas()
+        );
+        for (HeatingZone zone : heating.zones()) {
+            double pipeLength = circuits.stream()
+                    .filter(circuit -> circuit.zoneId().equals(zone.id()))
+                    .findFirst()
+                    .map(circuit -> circuit.pipeLength().toMillimeters())
+                    .orElse(0.0);
+            summaries.add(new HeatingPlanSummary(
+                    level.name(),
+                    room.name(),
+                    heating.surfacePosition().toString(),
+                    zone.layoutPattern().toString(),
+                    zone.name(),
+                    zone.areaSquareMeters(),
+                    pipeLength / 1_000.0,
+                    heating.maximumPipeLength().toMillimeters() / 1_000.0,
+                    zone.heatOutputWattsPerSquareMeter(),
+                    zone.heatOutputWatts(),
+                    roomHeatTotals.floorHeatingWatts(),
+                    roomHeatTotals.ceilingHeatingWatts(),
+                    roomHeatTotals.additionalSurfaceHeatingWatts(),
+                    roomHeatTotals.surfaceHeatingWatts(),
+                    roomHeatTotals.heatingElementWatts(),
+                    roomHeatTotals.totalHeatOutputWatts(),
+                    svg,
+                    false
+            ));
+        }
+    }
+
+    private String surfacePosition(RoomObjectHeatingType heatingType) {
+        return switch (heatingType) {
+            case FLOOR_HEATING -> HeatingSurfacePosition.FLOOR.toString();
+            case CEILING_HEATING -> HeatingSurfacePosition.CEILING.toString();
+            case SURFACE_HEATING -> "Fläche";
+            default -> "";
+        };
     }
 
     private List<HeatingElementSummary> heatingElements(ProjectModel project) {
         List<HeatingElementSummary> summaries = new ArrayList<>();
         for (Level level : project.levels()) {
             for (Room room : level.rooms()) {
+                RoomHeatingOutputService.RoomHeatTotals roomHeatTotals = roomHeatingOutputService.totals(level, room);
                 roomHeatingOutputService.heatingElements(level, room).forEach(element -> summaries.add(
                         new HeatingElementSummary(
                                 level.name(),
@@ -149,7 +191,13 @@ public final class SurfaceMaterialListService {
                                 element.objectName(),
                                 element.objectType(),
                                 element.heatingType().toString(),
-                                element.heatOutputWatts()
+                                element.heatOutputWatts(),
+                                roomHeatTotals.floorHeatingWatts(),
+                                roomHeatTotals.ceilingHeatingWatts(),
+                                roomHeatTotals.additionalSurfaceHeatingWatts(),
+                                roomHeatTotals.surfaceHeatingWatts(),
+                                roomHeatTotals.heatingElementWatts(),
+                                roomHeatTotals.totalHeatOutputWatts()
                         )
                 ));
             }
@@ -1273,13 +1321,13 @@ public final class SurfaceMaterialListService {
                         .append(" | ")
                         .append(markdownCell(plan.zoneName()))
                         .append(" | ")
-                        .append(decimal(plan.areaSquareMeters(), 2)).append(" m²")
+                        .append(heatingPlanMetric(plan, plan.areaSquareMeters(), 2, " m²"))
                         .append(" | ")
-                        .append(decimal(plan.pipeLengthMeters(), 1)).append(" m")
+                        .append(heatingPlanMetric(plan, plan.pipeLengthMeters(), 1, " m"))
                         .append(" | ")
-                        .append(decimal(plan.maximumPipeLengthMeters(), 1)).append(" m")
+                        .append(heatingPlanMetric(plan, plan.maximumPipeLengthMeters(), 1, " m"))
                         .append(" | ")
-                        .append(decimal(plan.heatOutputWattsPerSquareMeter(), 1))
+                        .append(heatingPlanMetric(plan, plan.heatOutputWattsPerSquareMeter(), 1, ""))
                         .append(" | ")
                         .append(decimal(plan.heatOutputWatts(), 0)).append(" W")
                         .append(" | ")
@@ -1299,6 +1347,7 @@ public final class SurfaceMaterialListService {
                 return;
             }
             heatingPlans.stream()
+                    .filter(plan -> !plan.objectBased())
                     .collect(java.util.stream.Collectors.groupingBy(
                             plan -> plan.levelName() + "\u0000" + plan.roomName() + "\u0000" + plan.surfacePosition(),
                             LinkedHashMap::new,
@@ -1321,22 +1370,37 @@ public final class SurfaceMaterialListService {
                 markdown.append("Keine Heizelemente vorhanden.\n\n");
                 return;
             }
-            markdown.append("| Raum | Objekt | Typ | Heizart | Leistung |\n");
-            markdown.append("|---|---|---|---|---:|\n");
+            markdown.append("| Raum | Objekt | Heizart | Leistung | Raum FBH | Raum DH | Raum Fläche | Raum Heizelemente | Raum gesamt |\n");
+            markdown.append("|---|---|---|---:|---:|---:|---:|---:|---:|\n");
             for (HeatingElementSummary element : heatingElements) {
                 markdown.append("| ")
                         .append(markdownCell(element.levelName() + " / " + element.roomName()))
                         .append(" | ")
                         .append(markdownCell(element.objectName()))
                         .append(" | ")
-                        .append(markdownCell(element.objectType()))
-                        .append(" | ")
                         .append(markdownCell(element.heatingType()))
                         .append(" | ")
                         .append(decimal(element.heatOutputWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(decimal(element.roomFloorHeatOutputWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(decimal(element.roomCeilingHeatOutputWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(decimal(element.roomAdditionalSurfaceHeatOutputWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(decimal(element.roomHeatingElementWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(decimal(element.roomTotalHeatOutputWatts(), 0)).append(" W")
                         .append(" |\n");
             }
             markdown.append('\n');
+        }
+
+        private String heatingPlanMetric(HeatingPlanSummary plan, double value, int decimals, String unit) {
+            if (plan.objectBased()) {
+                return "-";
+            }
+            return decimal(value, decimals) + unit;
         }
 
         private void appendMaterialSummary(StringBuilder markdown) {
@@ -1514,7 +1578,8 @@ public final class SurfaceMaterialListService {
             double roomSurfaceHeatOutputWatts,
             double roomHeatingElementWatts,
             double roomTotalHeatOutputWatts,
-            String svg
+            String svg,
+            boolean objectBased
     ) {
     }
 
@@ -1524,7 +1589,13 @@ public final class SurfaceMaterialListService {
             String objectName,
             String objectType,
             String heatingType,
-            double heatOutputWatts
+            double heatOutputWatts,
+            double roomFloorHeatOutputWatts,
+            double roomCeilingHeatOutputWatts,
+            double roomAdditionalSurfaceHeatOutputWatts,
+            double roomSurfaceHeatOutputWatts,
+            double roomHeatingElementWatts,
+            double roomTotalHeatOutputWatts
     ) {
     }
 

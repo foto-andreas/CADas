@@ -21,6 +21,7 @@ import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
@@ -139,7 +140,7 @@ class SurfaceMaterialListServiceTest {
         String displayMarkdown = report.toDisplayMarkdown();
         assertTrue(exportMarkdown.contains("## Flächenheizungen"));
         assertTrue(exportMarkdown.contains("## Heizelemente"));
-        assertTrue(exportMarkdown.contains("| Raum | Objekt | Typ | Heizart | Leistung |"));
+        assertTrue(exportMarkdown.contains("| Raum | Objekt | Heizart | Leistung | Raum FBH | Raum DH | Raum Fläche | Raum Heizelemente | Raum gesamt |"));
         assertTrue(exportMarkdown.contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
         assertTrue(exportMarkdown.contains("105 W"));
         assertTrue(exportMarkdown.contains("Konvektor"));
@@ -150,6 +151,46 @@ class SurfaceMaterialListServiceTest {
         assertTrue(displayMarkdown.contains("1005 W"));
         assertFalse(displayMarkdown.contains("<svg"));
         assertFalse(displayMarkdown.contains("### Heizplan Erdgeschoss / Bad / Fußboden"));
+    }
+
+    @Test
+    void listetAlsDeckenheizungMarkiertesObjektAuchBeiFlächenheizungen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Bad",
+                new PlanPoint(0, 0),
+                new PlanPoint(2_000, 1_500),
+                Length.ofMillimeters(2_600),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200)
+        );
+        project.primaryLevel().addRoom(room);
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "deckensegel",
+                "Deckensegel",
+                RoomObjectType.CUBOID,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(1_000, 750),
+                Length.of(120, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                Length.of(10, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ).withHeatingType(RoomObjectHeatingType.CEILING_HEATING).withHeatOutputWatts(700.0));
+
+        SurfaceMaterialReport report = service.create(project);
+
+        assertEquals(1, report.heatingPlans().size());
+        assertEquals(1, report.heatingElements().size());
+        assertTrue(report.heatingPlans().getFirst().objectBased());
+        assertEquals("Decke", report.heatingPlans().getFirst().surfacePosition());
+        assertEquals("Raumobjekt", report.heatingPlans().getFirst().layoutPattern());
+        assertEquals("Deckensegel", report.heatingPlans().getFirst().zoneName());
+        assertEquals(700.0, report.heatingPlans().getFirst().heatOutputWatts(), 0.001);
+        assertEquals(700.0, report.rooms().getFirst().ceilingHeatingWatts(), 0.001);
+        assertEquals(700.0, report.rooms().getFirst().surfaceHeatingWatts(), 0.001);
+        assertTrue(report.toMarkdown().contains("Deckensegel"));
+        assertTrue(report.toMarkdown().contains("Raumobjekt"));
     }
 
     @Test
