@@ -63,7 +63,7 @@ final class HydronicHeatingLayoutSvgRenderer {
         svg.append(String.format(Locale.US,
                 "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0.000 0.000 %.3f %.3f\">\n",
                 width, height));
-        appendVariothermPatternDefinition(svg);
+        appendVariothermPatternDefinition(svg, transform);
         if (!roomWalls.isEmpty()) {
             svg.append("<g id=\"waende\" fill=\"").append(WALL_FILL).append("\" stroke=\"").append(WALL_STROKE)
                     .append("\" stroke-width=\"8\">\n");
@@ -137,12 +137,16 @@ final class HydronicHeatingLayoutSvgRenderer {
         }
     }
 
-    private static void appendVariothermPatternDefinition(StringBuilder svg) {
+    private static void appendVariothermPatternDefinition(StringBuilder svg, CoordinateTransform transform) {
         double pitch = SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS;
         double radius = (pitch - SurfaceCoveringPresetService.VARIOTHERM_PIPE_DIAMETER_MILLIMETERS) / 2.0;
+        double patternOffsetX = positiveModulo(-transform.minX(), pitch);
+        double patternOffsetY = positiveModulo(-transform.minY(), pitch);
         svg.append(String.format(Locale.US,
-                "<defs><pattern id=\"%s\" patternUnits=\"userSpaceOnUse\" x=\"0.000\" y=\"0.000\" width=\"%.3f\" height=\"%.3f\">",
+                "<defs><pattern id=\"%s\" patternUnits=\"userSpaceOnUse\" x=\"%.3f\" y=\"%.3f\" width=\"%.3f\" height=\"%.3f\">",
                 VARIOTHERM_PATTERN_ID,
+                patternOffsetX,
+                patternOffsetY,
                 pitch,
                 pitch
         ));
@@ -229,6 +233,11 @@ final class HydronicHeatingLayoutSvgRenderer {
 
     private static double snapUp(double coordinate, double pitch) {
         return Math.ceil((coordinate - EPSILON) / pitch) * pitch;
+    }
+
+    private static double positiveModulo(double value, double modulo) {
+        double remainder = value % modulo;
+        return remainder < 0.0 ? remainder + modulo : remainder;
     }
 
     private record Bounds(double minX, double maxX, double minY, double maxY) {

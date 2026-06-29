@@ -258,6 +258,25 @@ class HydronicHeatingLayoutServiceTest {
     }
 
     @Test
+    void verankertVariothermSvgAmGlobalenRasterStattAmAusschnitt() {
+        Room room = Room.rectangular(
+                "Bad",
+                new PlanPoint(250, 350),
+                new PlanPoint(2_250, 1_350),
+                Length.ofMillimeters(2_500),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200)
+        );
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000)
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)));
+
+        String svg = service.toSvg(room, heating);
+
+        assertTrue(svg.contains("patternUnits=\"userSpaceOnUse\" x=\"50.000\" y=\"50.000\""),
+                "Pattern-Offset muss das globale Raster erhalten: " + svg);
+    }
+
+    @Test
     void erhältLFormAlsVeränderbarenHeizbereich() {
         Room room = lShapedRoom();
         HydronicHeating heating = heating(room, HeatingSurfacePosition.CEILING, HeatingLayoutPattern.MEANDER, 200_000);
