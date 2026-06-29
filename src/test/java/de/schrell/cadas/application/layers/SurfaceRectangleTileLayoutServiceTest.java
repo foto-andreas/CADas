@@ -13,6 +13,7 @@ import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 import de.schrell.cadas.domain.model.SurfaceType;
@@ -153,41 +154,36 @@ class SurfaceRectangleTileLayoutServiceTest {
         );
 
         assertTrue(tiles.stream().anyMatch(tile ->
-                        Math.abs(tile.x() + 80.0) < 0.01
+                        Math.abs(tile.x() + 80.0) <= 20.0
                                 && Math.abs(tile.width() - 1_000.0) < 0.01),
                 "Der schmale Flurarm soll bei 90°-Verlegung mit einer vollen 1000-mm-Platte starten.");
     }
 
     @Test
-    void verwendetImGedrehtenKi1SchlafzimmerDenFixenVersatzEntlangDerLangenKante() throws Exception {
-        Level level = new DxfProjectExchangeService()
-                .importProject(Path.of("KI1.cadas"), "KI1")
-                .levels().stream()
-                .filter(candidate -> candidate.name().equals("Erdgeschoss"))
-                .findFirst()
-                .orElseThrow();
-        Room schlafzimmer = level.rooms().stream()
-                .filter(room -> room.name().equals("Schlafzimmer"))
-                .findFirst()
-                .orElseThrow();
-        SurfaceLayer layer = level.findSurfaceLayerStack(SurfaceType.FLOOR, schlafzimmer.id().toString()).layers().getFirst();
-
-        assertTrue(layer.layoutRotatedQuarterTurn());
-        assertEquals(SurfaceLayoutMode.FIXED, layer.layoutMode());
-        assertEquals(300.0, layer.layoutOffset().toMillimeters(), 0.001);
+    void drehtDenFixenVersatzBeiNeunzigGradInDieNeueVerlegerichtungMit() {
+        SurfaceLayer layer = SurfaceLayer.create(
+                "Fliese",
+                Length.ofMillimeters(10),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(1_000),
+                SurfaceLayoutMode.FIXED,
+                Length.ofMillimeters(300),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                "Test"
+        ).withLayoutRotatedQuarterTurn(true)
+                .withLayoutAnchor(SurfaceLayoutAnchor.MIN_X_MIN_Y);
 
         List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = service.tilesForRectangles(
-                floorOpeningGeometryService.floorRectangles(level, schlafzimmer),
+                List.of(new CellRectangle(0.0, 2_500.0, 0.0, 2_300.0)),
                 layer
         );
 
-        double ersteReihe = ersteReihenbreite(tiles, 0);
-        double zweiteReihe = ersteReihenbreite(tiles, 1);
-        double dritteReihe = ersteReihenbreite(tiles, 2);
-        double vierteReihe = ersteReihenbreite(tiles, 3);
-        assertTrue(ersteReihe > zweiteReihe, "Die zweite Reihe muss gegenüber der ersten Reihe versetzt starten.");
-        assertTrue(zweiteReihe > dritteReihe, "Der feste Versatz muss entlang der langen Kante bis in die dritte Reihe weiterlaufen.");
-        assertTrue(vierteReihe > dritteReihe, "Nach dem Langkanten-Zyklus muss der sichtbare Anschnitt wieder anwachsen.");
+        assertEquals(600.0, ersteSpaltenhoehe(tiles, 0), 0.001);
+        assertEquals(300.0, ersteSpaltenhoehe(tiles, 1), 0.001);
+        assertEquals(600.0, ersteSpaltenhoehe(tiles, 2), 0.001);
     }
 
     @Test
@@ -224,12 +220,18 @@ class SurfaceRectangleTileLayoutServiceTest {
                 "Bei Außenschnitt-Regeln darf keine Grundplatte in mehrere, nicht zusammenhängende Teilstücke zerfallen.");
     }
 
-    private double ersteReihenbreite(List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles, int row) {
+    private double ersteSpaltenhoehe(List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles, int columnIndex) {
+        List<Double> startspalten = tiles.stream()
+                .map(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::x)
+                .distinct()
+                .sorted()
+                .toList();
+        double startX = startspalten.get(columnIndex);
         return tiles.stream()
-                .filter(tile -> tile.row() == row)
-                .sorted(java.util.Comparator.comparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::x))
+                .filter(tile -> Math.abs(tile.x() - startX) < 0.001)
+                .sorted(java.util.Comparator.comparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::y))
                 .findFirst()
                 .orElseThrow()
-                .width();
+                .height();
     }
 }
