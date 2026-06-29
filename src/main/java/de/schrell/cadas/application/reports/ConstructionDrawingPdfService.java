@@ -171,6 +171,11 @@ public final class ConstructionDrawingPdfService {
                 Wall wall = level.findWall(window.wallId());
                 drawOpening(canvas, viewport, wall, window.offsetFromStart().toMillimeters(), window.width().toMillimeters(), new Color(30, 105, 155));
             }
+            for (RoomObject roomObject : level.roomObjects()) {
+                if (roomObject.visible()) {
+                    drawRoomObject(canvas, viewport, roomObject);
+                }
+            }
             for (var stair : level.staircases()) {
                 canvas.rectangle(
                         viewport.x(stair.minX()), viewport.y(stair.maxY()),
@@ -528,7 +533,7 @@ public final class ConstructionDrawingPdfService {
         ThreeDViewport viewport = new ThreeDViewport(ignored -> { }, () -> { });
         viewport.setPrefSize(widthPixels, heightPixels);
         viewport.resize(widthPixels, heightPixels);
-        viewport.setRoomObjectsVisible(false);
+        viewport.setRoomObjectsVisible(true);
         viewport.setSurfaceLayersVisible(false);
         viewport.setSurfaceRenderingEnabled(true);
         viewport.syncLevels(project.levels(), project.primaryLevel().name());
@@ -543,7 +548,7 @@ public final class ConstructionDrawingPdfService {
         viewport.centerCurrentView();
         scene.getRoot().applyCss();
         scene.getRoot().layout();
-        return SwingFXUtils.fromFXImage(viewport.snapshotSceneOnly(javafx.scene.paint.Color.WHITE), null);
+        return trimWhiteMargins(SwingFXUtils.fromFXImage(viewport.snapshotSceneOnly(javafx.scene.paint.Color.WHITE), null));
     }
 
     private void configureSpatialViewport(ThreeDViewport viewport, double angleDegrees, boolean isometric) {
@@ -570,6 +575,44 @@ public final class ConstructionDrawingPdfService {
         double drawX = left + (width - drawWidth) / 2.0;
         double drawY = bottom + (height - drawHeight) / 2.0;
         canvas.image(image, drawX, drawY, drawWidth, drawHeight);
+    }
+
+    private BufferedImage trimWhiteMargins(BufferedImage image) {
+        int minX = image.getWidth();
+        int minY = image.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int rgb = image.getRGB(x, y);
+                int red = (rgb >> 16) & 0xFF;
+                int green = (rgb >> 8) & 0xFF;
+                int blue = rgb & 0xFF;
+                if (red >= 248 && green >= 248 && blue >= 248) {
+                    continue;
+                }
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x);
+                maxY = Math.max(maxY, y);
+            }
+        }
+        if (maxX < minX || maxY < minY) {
+            return image;
+        }
+        int padding = 4;
+        int left = Math.max(0, minX - padding);
+        int top = Math.max(0, minY - padding);
+        int right = Math.min(image.getWidth() - 1, maxX + padding);
+        int bottom = Math.min(image.getHeight() - 1, maxY + padding);
+        BufferedImage trimmed = new BufferedImage(right - left + 1, bottom - top + 1, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D graphics = trimmed.createGraphics();
+        try {
+            graphics.drawImage(image, 0, 0, trimmed.getWidth(), trimmed.getHeight(), left, top, right + 1, bottom + 1, null);
+        } finally {
+            graphics.dispose();
+        }
+        return trimmed;
     }
 
     private ThreeDViewPreset sideViewPreset(double angleDegrees) {
@@ -769,6 +812,44 @@ public final class ConstructionDrawingPdfService {
 
     private void drawWall(PageCanvas canvas, Viewport viewport, Wall wall, Color fill, Color stroke, float width) throws IOException {
         drawPolygon(canvas, viewport, wallPlanOutlineService.outline(wall), fill, stroke, width);
+    }
+
+    private void drawRoomObject(PageCanvas canvas, Viewport viewport, RoomObject roomObject) throws IOException {
+        canvas.polygon(rotatedRoomObjectOutline(viewport, roomObject), 0.75f, new Color(63, 96, 90), new Color(229, 239, 235));
+        if (!roomObject.name().isBlank()) {
+            canvas.text(
+                    viewport.x(roomObject.center().xMillimeters()) + 5.0,
+                    viewport.y(roomObject.center().yMillimeters()) - 5.0,
+                    6.5f,
+                    roomObject.name()
+            );
+        }
+    }
+
+    private float[] rotatedRoomObjectOutline(Viewport viewport, RoomObject roomObject) {
+        double halfWidth = roomObject.width().toMillimeters() / 2.0;
+        double halfDepth = roomObject.depth().toMillimeters() / 2.0;
+        double radians = Math.toRadians(roomObject.rotationDegrees());
+        double cos = Math.cos(radians);
+        double sin = Math.sin(radians);
+        double centerX = roomObject.center().xMillimeters();
+        double centerY = roomObject.center().yMillimeters();
+        double[][] corners = {
+                {-halfWidth, -halfDepth},
+                {halfWidth, -halfDepth},
+                {halfWidth, halfDepth},
+                {-halfWidth, halfDepth}
+        };
+        float[] coordinates = new float[corners.length * 2];
+        for (int index = 0; index < corners.length; index++) {
+            double localX = corners[index][0];
+            double localY = corners[index][1];
+            double rotatedX = centerX + localX * cos - localY * sin;
+            double rotatedY = centerY + localX * sin + localY * cos;
+            coordinates[index * 2] = (float) viewport.x(rotatedX);
+            coordinates[index * 2 + 1] = (float) viewport.y(rotatedY);
+        }
+        return coordinates;
     }
 
     private void drawOpening(PageCanvas canvas, Viewport viewport, Wall wall, double offset, double width, Color color) throws IOException {
@@ -1093,6 +1174,10 @@ public final class ConstructionDrawingPdfService {
         List<PlanPoint> points = new ArrayList<>();
         level.walls().forEach(wall -> points.addAll(wallPlanOutlineService.outline(wall)));
         level.rooms().forEach(room -> points.addAll(room.outline()));
+        level.roomObjects().forEach(roomObject -> {
+            points.add(new PlanPoint(roomObject.minXMillimeters(), roomObject.minYMillimeters()));
+            points.add(new PlanPoint(roomObject.maxXMillimeters(), roomObject.maxYMillimeters()));
+        });
         level.staircases().forEach(stair -> {
             points.add(stair.firstCorner());
             points.add(stair.oppositeCorner());

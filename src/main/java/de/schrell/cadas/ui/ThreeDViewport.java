@@ -81,7 +81,7 @@ public final class ThreeDViewport extends BorderPane {
     private static final double PERSPECTIVE_FIT_PADDING = 1.8;
     private static final double ORTHO_FOV_DEGREES = 15.0;
     private static final double ORTHO_FIT_PADDING = 1.4;
-    private static final double SIDE_VIEW_FIT_DISTANCE_FACTOR = 1.18;
+    private static final double SIDE_VIEW_FIT_DISTANCE_FACTOR = 1.26;
     private static final double INTERIOR_FOV_DEGREES = 64.0;
     private static final double INTERIOR_MIN_FOV_DEGREES = 28.0;
     private static final double INTERIOR_MAX_FOV_DEGREES = 115.0;
@@ -162,7 +162,7 @@ public final class ThreeDViewport extends BorderPane {
     public void syncLevels(List<Level> levels, String activeLevelName) {
         for (Level level : levels) {
             if (!levelVisibility.containsKey(level.name())) {
-                levelVisibility.put(level.name(), new SimpleBooleanProperty(level.name().equals(activeLevelName) || levels.size() == 1));
+                levelVisibility.put(level.name(), new SimpleBooleanProperty(true));
             }
         }
         levelVisibility.keySet().removeIf(name -> levels.stream().noneMatch(level -> level.name().equals(name)));

@@ -153,6 +153,31 @@ class ConstructionDrawingPdfServiceTest {
     }
 
     @Test
+    void exportiertRaumobjekteImGrundrissDerBauzeichnung() throws Exception {
+        ProjectModel project = sampleProject();
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "sofa",
+                "Sofa",
+                RoomObjectType.CUBOID,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(2_400, 2_200),
+                Length.of(220, LengthUnit.CENTIMETER),
+                Length.of(90, LengthUnit.CENTIMETER),
+                Length.of(85, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ).withRotationDegrees(15.0));
+        Path target = tempDir.resolve("bauzeichnung_mit_objekten.pdf");
+
+        new ConstructionDrawingPdfService().export(project, target);
+
+        try (var document = Loader.loadPDF(target.toFile())) {
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("Sofa"));
+        }
+    }
+
+    @Test
     void stelltDachheizungenInDerBauzeichnungOhneRaumpraefixDar() throws Exception {
         ProjectModel project = sampleProject();
         project.primaryLevel().addRoomObject(RoomObject.create(
