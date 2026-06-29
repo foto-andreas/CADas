@@ -2,6 +2,7 @@ package de.schrell.cadas.application.layers;
 
 import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService.CellRectangle;
 import de.schrell.cadas.domain.geometry.Length;
+import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
@@ -103,10 +104,12 @@ public final class SurfaceRectangleTileLayoutService {
         double tileWidth = layer.effectiveTileWidth().toMillimeters();
         double tileHeight = layer.effectiveTileHeight().toMillimeters();
         double tileArea = tileWidth * tileHeight;
+        List<PlacedSurfaceTile> clippedTiles = clipTilesToRectangles(rectangles, layer, bounds, anchorX, anchorY);
+        int splitTileCount = splitTileCount(clippedTiles, layer.cutRestriction());
         int cutTiles = 0;
         double wasteArea = 0.0;
         double usedArea = 0.0;
-        for (PlacedSurfaceTile tile : clipTilesToRectangles(rectangles, layer, bounds, anchorX, anchorY)) {
+        for (PlacedSurfaceTile tile : clippedTiles) {
             double area = tile.width() * tile.height();
             if (area <= EPSILON) {
                 continue;
@@ -119,12 +122,26 @@ public final class SurfaceRectangleTileLayoutService {
         }
         double alignmentPenalty = alignmentPenalty(rectangles, layer, bounds, anchorX, anchorY, tileWidth, tileHeight);
         return new LayoutScore(
+                splitTileCount,
                 cutTiles,
                 wasteArea,
                 alignmentPenalty,
                 -usedArea,
                 anchorDistance(anchorX, bounds.minX(), tileWidth) + anchorDistance(anchorY, bounds.minY(), tileHeight)
         );
+    }
+
+    private int splitTileCount(List<PlacedSurfaceTile> tiles, SurfaceCutRestriction cutRestriction) {
+        if (cutRestriction != SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS) {
+            return 0;
+        }
+        Map<TileKey, Integer> pieceCountByTile = new LinkedHashMap<>();
+        for (PlacedSurfaceTile tile : tiles) {
+            pieceCountByTile.merge(new TileKey(tile.column(), tile.row()), 1, Integer::sum);
+        }
+        return (int) pieceCountByTile.values().stream()
+                .filter(pieceCount -> pieceCount > 1)
+                .count();
     }
 
     private double alignmentPenalty(
@@ -430,6 +447,7 @@ public final class SurfaceRectangleTileLayoutService {
     }
 
     private record LayoutScore(
+            int splitTileCount,
             int cutTiles,
             double wasteArea,
             double alignmentPenalty,
@@ -440,6 +458,10 @@ public final class SurfaceRectangleTileLayoutService {
 
         @Override
         public int compareTo(LayoutScore other) {
+            int splitComparison = Integer.compare(splitTileCount, other.splitTileCount);
+            if (splitComparison != 0) {
+                return splitComparison;
+            }
             int cutComparison = Integer.compare(cutTiles, other.cutTiles);
             if (cutComparison != 0) {
                 return cutComparison;

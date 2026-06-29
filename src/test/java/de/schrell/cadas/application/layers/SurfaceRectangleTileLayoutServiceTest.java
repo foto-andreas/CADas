@@ -9,6 +9,7 @@ import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
@@ -17,6 +18,8 @@ import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
@@ -142,6 +145,40 @@ class SurfaceRectangleTileLayoutServiceTest {
         assertEquals(594.088, ersteReihe, 0.02);
         assertEquals(414.088, zweiteReihe, 0.02);
         assertEquals(594.088, dritteReihe, 0.02);
+    }
+
+    @Test
+    void vermeidetInnenschnitteBeiNichtRotierbaremAussenschnittAnInnenverspruengen() {
+        SurfaceLayer layer = SurfaceLayer.create(
+                "Variotherm",
+                Length.ofMillimeters(18),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(1_000),
+                SurfaceLayoutMode.FIXED,
+                Length.ofMillimeters(200),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(100),
+                Length.zero(),
+                SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
+                "Test"
+        );
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = service.tilesForRectangles(
+                List.of(
+                        new CellRectangle(1540.716, 4409.000, -6867.513, -3880.802),
+                        new CellRectangle(1548.734, 4409.000, -3880.802, -3316.802),
+                        new CellRectangle(301.000, 4409.000, -3316.802, -418.664)
+                ),
+                layer
+        );
+
+        Map<String, Long> tilesProGrundplatte = tiles.stream()
+                .collect(Collectors.groupingBy(
+                        tile -> tile.row() + ":" + tile.column(),
+                        Collectors.counting()
+                ));
+        assertTrue(tilesProGrundplatte.values().stream().allMatch(anzahl -> anzahl == 1L),
+                "Bei Außenschnitt-Regeln darf keine Grundplatte in mehrere, nicht zusammenhängende Teilstücke zerfallen.");
     }
 
     private double ersteReihenbreite(List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles, int row) {
