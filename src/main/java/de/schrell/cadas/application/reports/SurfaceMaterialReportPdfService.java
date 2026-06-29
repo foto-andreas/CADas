@@ -6,6 +6,8 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -18,6 +20,7 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
@@ -53,10 +56,42 @@ public final class SurfaceMaterialReportPdfService {
     private static final Color SVG_FRAME_STROKE = new Color(182, 186, 191);
     private static final float SVG_INNER_PADDING = 10.0f;
     private static final float SVG_MAX_HEIGHT = 240.0f;
+    private static final float HEATING_PLAN_MAX_HEIGHT = SVG_MAX_HEIGHT * 1.8f;
+    private static final float LEVEL_PLAN_MAX_HEIGHT = 220.0f;
+
+    public enum HeatingPlanGraphicVariant {
+        SVG,
+        RASTERGRAFIK
+    }
+
+    public record ExportAssets(
+            HeatingPlanGraphicVariant heatingPlanGraphicVariant,
+            Map<String, BufferedImage> levelPlanImages,
+            Map<String, BufferedImage> heatingPlanImages
+    ) {
+        public ExportAssets {
+            Objects.requireNonNull(heatingPlanGraphicVariant, "heatingPlanGraphicVariant darf nicht null sein.");
+            levelPlanImages = Map.copyOf(levelPlanImages);
+            heatingPlanImages = Map.copyOf(heatingPlanImages);
+        }
+
+        public static ExportAssets empty() {
+            return new ExportAssets(HeatingPlanGraphicVariant.SVG, Map.of(), Map.of());
+        }
+    }
 
     public void export(SurfaceMaterialListService.SurfaceMaterialReport report, Path targetFile) throws IOException {
+        export(report, targetFile, ExportAssets.empty());
+    }
+
+    public void export(
+            SurfaceMaterialListService.SurfaceMaterialReport report,
+            Path targetFile,
+            ExportAssets exportAssets
+    ) throws IOException {
         Objects.requireNonNull(report, "report darf nicht null sein.");
         Objects.requireNonNull(targetFile, "targetFile darf nicht null sein.");
+        Objects.requireNonNull(exportAssets, "exportAssets darf nicht null sein.");
         Path exportPath = targetFile.toAbsolutePath().normalize();
         Path parent = exportPath.getParent();
         if (parent != null) {
@@ -65,9 +100,9 @@ public final class SurfaceMaterialReportPdfService {
         try (PDDocument document = new PDDocument()) {
             try (PdfWriter writer = new PdfWriter(document)) {
                 writer.title("Räume und Materialien - " + report.projectName());
-                appendRooms(writer, report.rooms());
+                appendRooms(writer, report.rooms(), exportAssets.levelPlanImages());
                 appendMaterialSummary(writer, report.materials());
-                appendHeatingPlans(writer, report.heatingPlans());
+                appendHeatingPlans(writer, report.heatingPlans(), exportAssets);
                 appendHeatingElements(writer, report.heatingElements());
                 appendMaterialDetails(writer, report.materials());
                 appendRoomComplexities(writer, report.roomComplexities());
@@ -76,7 +111,11 @@ public final class SurfaceMaterialReportPdfService {
         }
     }
 
-    private void appendRooms(PdfWriter writer, List<SurfaceMaterialListService.RoomSummary> rooms) throws IOException {
+    private void appendRooms(
+            PdfWriter writer,
+            List<SurfaceMaterialListService.RoomSummary> rooms,
+            Map<String, BufferedImage> levelPlanImages
+    ) throws IOException {
         writer.section("Räume und Mietflächen nach WoFlV");
         if (rooms.isEmpty()) {
             writer.paragraph("Keine Räume vorhanden.");
@@ -106,6 +145,10 @@ public final class SurfaceMaterialReportPdfService {
         );
         for (Map.Entry<String, List<SurfaceMaterialListService.RoomSummary>> entry : roomsByLevel.entrySet()) {
             writer.subsection(entry.getKey());
+            BufferedImage levelPlanImage = levelPlanImages.get(entry.getKey());
+            if (levelPlanImage != null) {
+                writer.imageBlock("2D-Ansicht " + entry.getKey(), levelPlanImage, LEVEL_PLAN_MAX_HEIGHT);
+            }
             List<List<String>> rows = new ArrayList<>();
             for (SurfaceMaterialListService.RoomSummary room : entry.getValue()) {
                 rows.add(List.of(
@@ -190,7 +233,11 @@ public final class SurfaceMaterialReportPdfService {
         );
     }
 
-    private void appendHeatingPlans(PdfWriter writer, List<SurfaceMaterialListService.HeatingPlanSummary> heatingPlans) throws IOException {
+    private void appendHeatingPlans(
+            PdfWriter writer,
+            List<SurfaceMaterialListService.HeatingPlanSummary> heatingPlans,
+            ExportAssets exportAssets
+    ) throws IOException {
         writer.section("Flächenheizungen");
         if (heatingPlans.isEmpty()) {
             writer.paragraph("Keine Flächenheizungen vorhanden.");
@@ -245,11 +292,18 @@ public final class SurfaceMaterialReportPdfService {
                 ));
         for (List<SurfaceMaterialListService.HeatingPlanSummary> plans : groupedPlans.values()) {
             SurfaceMaterialListService.HeatingPlanSummary first = plans.getFirst();
-            writer.svgBlock(
-                    "Heizplan " + first.levelName() + " / " + first.roomName() + " / " + first.surfacePosition(),
-                    first.svg()
-            );
+            String title = "Heizplan " + first.levelName() + " / " + first.roomName() + " / " + first.surfacePosition();
+            BufferedImage heatingPlanImage = exportAssets.heatingPlanImages().get(heatingPlanImageKey(first));
+            if (exportAssets.heatingPlanGraphicVariant() == HeatingPlanGraphicVariant.RASTERGRAFIK && heatingPlanImage != null) {
+                writer.imageBlock(title, heatingPlanImage, HEATING_PLAN_MAX_HEIGHT);
+            } else {
+                writer.svgBlock(title, first.svg(), HEATING_PLAN_MAX_HEIGHT);
+            }
         }
+    }
+
+    private String heatingPlanImageKey(SurfaceMaterialListService.HeatingPlanSummary heatingPlan) {
+        return heatingPlan.levelName() + "\u0000" + heatingPlan.roomName() + "\u0000" + heatingPlan.surfacePosition();
     }
 
     private void appendHeatingElements(PdfWriter writer, List<SurfaceMaterialListService.HeatingElementSummary> heatingElements) throws IOException {
@@ -550,11 +604,11 @@ public final class SurfaceMaterialReportPdfService {
             gap(8.0f);
         }
 
-        private void svgBlock(String title, String svgMarkup) throws IOException {
+        private void svgBlock(String title, String svgMarkup, float maximumHeight) throws IOException {
             SvgDocument svg = svgRenderer.parse(svgMarkup);
             float frameWidth = availableWidth();
             float innerWidth = frameWidth - SVG_INNER_PADDING * 2.0f;
-            float svgHeight = svg.scaledHeight(innerWidth, SVG_MAX_HEIGHT);
+            float svgHeight = svg.scaledHeight(innerWidth, maximumHeight);
             float blockHeight = estimateWrappedHeight(normalize(title), FONT_BOLD, SUBSECTION_FONT_SIZE, availableWidth())
                     + 4.0f
                     + svgHeight
@@ -575,6 +629,29 @@ public final class SurfaceMaterialReportPdfService {
                     innerWidth,
                     svgHeight
             );
+            y = top - frameHeight - 6.0f;
+        }
+
+        private void imageBlock(String title, BufferedImage image, float maximumHeight) throws IOException {
+            float frameWidth = availableWidth();
+            float innerWidth = frameWidth - SVG_INNER_PADDING * 2.0f;
+            float scale = Math.min(innerWidth / Math.max(1.0f, image.getWidth()), maximumHeight / Math.max(1.0f, image.getHeight()));
+            float imageWidth = (float) (image.getWidth() * scale);
+            float imageHeight = (float) (image.getHeight() * scale);
+            float blockHeight = estimateWrappedHeight(normalize(title), FONT_BOLD, SUBSECTION_FONT_SIZE, availableWidth())
+                    + 4.0f
+                    + imageHeight
+                    + SVG_INNER_PADDING * 2.0f
+                    + 6.0f;
+            if (!hasSpace(blockHeight)) {
+                newPage();
+            }
+            writeWrappedText(normalize(title), FONT_BOLD, SUBSECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 3.0f);
+            float top = y;
+            float frameHeight = imageHeight + SVG_INNER_PADDING * 2.0f;
+            canvas.rectangle(PAGE_MARGIN, top - frameHeight, frameWidth, frameHeight, 0.65f, SVG_FRAME_STROKE, SVG_FRAME_FILL);
+            float imageX = PAGE_MARGIN + SVG_INNER_PADDING + (innerWidth - imageWidth) / 2.0f;
+            canvas.image(image, imageX, top - SVG_INNER_PADDING - imageHeight, imageWidth, imageHeight);
             y = top - frameHeight - 6.0f;
         }
 
@@ -724,9 +801,11 @@ public final class SurfaceMaterialReportPdfService {
     private static final class PageCanvas implements AutoCloseable {
 
         private static final double CIRCLE_KAPPA = 0.552284749831;
+        private final PDDocument document;
         private final PDPageContentStream stream;
 
         private PageCanvas(PDDocument document, PDPage page) throws IOException {
+            this.document = document;
             this.stream = new PDPageContentStream(document, page);
         }
 
@@ -861,6 +940,11 @@ public final class SurfaceMaterialReportPdfService {
             stream.newLineAtOffset((float) x, (float) y);
             stream.showText(text);
             stream.endText();
+        }
+
+        private void image(BufferedImage image, double x, double y, double width, double height) throws IOException {
+            PDImageXObject imageObject = LosslessFactory.createFromImage(document, image);
+            stream.drawImage(imageObject, (float) x, (float) y, (float) width, (float) height);
         }
 
         private void save() throws IOException {

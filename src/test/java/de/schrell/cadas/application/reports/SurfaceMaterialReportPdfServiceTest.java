@@ -17,9 +17,11 @@ import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
 
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -32,6 +34,52 @@ class SurfaceMaterialReportPdfServiceTest {
 
     @Test
     void exportiertMaterialberichtAlsPdf() throws Exception {
+        SurfaceMaterialListService.SurfaceMaterialReport report = reportService.create(beispielProjekt());
+        Path targetFile = Files.createTempFile("materialbericht-", ".pdf");
+        Files.deleteIfExists(targetFile);
+
+        pdfService.export(report, targetFile);
+
+        assertStandardInhalt(targetFile, true);
+        Files.deleteIfExists(targetFile);
+    }
+
+    @Test
+    void exportiertMaterialberichtMitRastergrafikenUndEtagenbild() throws Exception {
+        SurfaceMaterialListService.SurfaceMaterialReport report = reportService.create(beispielProjekt());
+        Path targetFile = Files.createTempFile("materialbericht-raster-", ".pdf");
+        Files.deleteIfExists(targetFile);
+
+        BufferedImage levelImage = new BufferedImage(640, 360, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D levelGraphics = levelImage.createGraphics();
+        levelGraphics.fillRect(0, 0, 640, 360);
+        levelGraphics.dispose();
+        BufferedImage heatingImage = new BufferedImage(520, 420, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D heatingGraphics = heatingImage.createGraphics();
+        heatingGraphics.fillRect(0, 0, 520, 420);
+        heatingGraphics.dispose();
+
+        pdfService.export(
+                report,
+                targetFile,
+                new SurfaceMaterialReportPdfService.ExportAssets(
+                        SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK,
+                        Map.of("Erdgeschoss", levelImage),
+                        Map.of("Erdgeschoss\u0000Wohnen\u0000Fußboden", heatingImage)
+                )
+        );
+
+        assertStandardInhalt(targetFile, false);
+        try (var document = Loader.loadPDF(targetFile.toFile())) {
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("2D-Ansicht Erdgeschoss"));
+            assertTrue(text.contains("Heizplan Erdgeschoss / Wohnen / Fußboden"));
+        }
+
+        Files.deleteIfExists(targetFile);
+    }
+
+    private ProjectModel beispielProjekt() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Room room = Room.rectangular(
                 "Wohnen",
@@ -68,12 +116,10 @@ class SurfaceMaterialReportPdfServiceTest {
                 room.outline().getFirst(),
                 new PlanPoint(200, 0)
         ).withZones(List.of(HeatingZone.create("FBH 1", room.outline(), HeatingLayoutPattern.MEANDER))));
+        return project;
+    }
 
-        Path targetFile = Files.createTempFile("materialbericht-", ".pdf");
-        Files.deleteIfExists(targetFile);
-
-        pdfService.export(reportService.create(project), targetFile);
-
+    private void assertStandardInhalt(Path targetFile, boolean expectSvgText) throws Exception {
         assertTrue(Files.exists(targetFile));
         assertTrue(Files.size(targetFile) > 100);
         byte[] bytes = Files.readAllBytes(targetFile);
@@ -88,11 +134,11 @@ class SurfaceMaterialReportPdfServiceTest {
             assertTrue(text.contains("Zusammenfassung"));
             assertTrue(text.contains("Flächenheizungen"));
             assertTrue(text.contains("Heizplan Erdgeschoss / Wohnen"));
-            assertTrue(text.contains("V1"));
-            assertTrue(text.contains("R1"));
+            if (expectSvgText) {
+                assertTrue(text.contains("V1"));
+                assertTrue(text.contains("R1"));
+            }
             assertTrue(text.contains("Beläge"));
         }
-
-        Files.deleteIfExists(targetFile);
     }
 }

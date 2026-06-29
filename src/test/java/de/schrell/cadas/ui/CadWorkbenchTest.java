@@ -1191,6 +1191,29 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void berichteMenueEnthaeltBeideMaterialPdfVarianten() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        Assertions.assertTrue(aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            List<String> berichte = menuBar.getMenus().stream()
+                    .filter(menu -> "Berichte".equals(menu.getText()))
+                    .flatMap(menu -> menu.getItems().stream())
+                    .map(MenuItem::getText)
+                    .toList();
+            return berichte.contains("Räume und Materialien als PDF exportieren (SVG-Heizpläne)")
+                    && berichte.contains("Räume und Materialien als PDF exportieren (Rastergrafik)");
+        }));
+    }
+
+    @Test
     void rueckgaengigShortcutGreiftAuchVomTextfeldAus() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

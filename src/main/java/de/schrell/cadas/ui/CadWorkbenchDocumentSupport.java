@@ -3,11 +3,18 @@ package de.schrell.cadas.ui;
 import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
+import de.schrell.cadas.application.reports.SurfaceMaterialListService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService.SurfaceMaterialReport;
 import de.schrell.cadas.application.reports.SurfaceMaterialReportPdfService;
+import de.schrell.cadas.domain.model.Level;
+import de.schrell.cadas.domain.model.Room;
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.print.PrinterJob;
@@ -46,13 +53,16 @@ final class CadWorkbenchDocumentSupport {
         Button exportButton = new Button("Markdown exportieren");
         exportButton.setOnAction(event -> exportSurfaceMaterialReportMarkdown(report));
         owner.applyTooltip(exportButton, "Exportiert genau diese Materialliste als Markdown-Datei.");
-        Button exportPdfButton = new Button("PDF exportieren");
-        exportPdfButton.setOnAction(event -> exportSurfaceMaterialReportPdf(report));
-        owner.applyTooltip(exportPdfButton, "Exportiert genau diese Materialliste als PDF-Datei mit Tabellenlayout und eingebetteten Heizplan-Grafiken.");
+        Button exportPdfSvgButton = new Button("PDF exportieren (SVG)");
+        exportPdfSvgButton.setOnAction(event -> exportSurfaceMaterialReportPdf(report));
+        owner.applyTooltip(exportPdfSvgButton, "Exportiert diese Materialliste als PDF-Datei mit SVG-Heizplänen und zusätzlichen 2D-Etagenbildern aus der Workbench.");
+        Button exportPdfRasterButton = new Button("PDF exportieren (Raster)");
+        exportPdfRasterButton.setOnAction(event -> exportSurfaceMaterialReportPdfRaster(report));
+        owner.applyTooltip(exportPdfRasterButton, "Exportiert diese Materialliste als PDF-Datei mit Raster-Heizplänen und zusätzlichen 2D-Etagenbildern aus der Workbench.");
         Button printButton = new Button("Drucken");
         printButton.setOnAction(event -> printSurfaceMaterialReport(reportView));
         owner.applyTooltip(printButton, "Druckt die gerenderte Materialliste so, wie sie in diesem Fenster angezeigt wird.");
-        HBox actions = new HBox(8.0, printButton, exportPdfButton, exportButton);
+        HBox actions = new HBox(8.0, printButton, exportPdfSvgButton, exportPdfRasterButton, exportButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
         VBox container = new VBox(10.0, reportView, actions);
         container.setPadding(new Insets(12));
@@ -239,16 +249,32 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report) {
+        exportSurfaceMaterialReportPdf(report, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.SVG);
+    }
+
+    void exportSurfaceMaterialReportPdfRaster() {
+        exportSurfaceMaterialReportPdf(owner.surfaceMaterialListService.create(owner.project), SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
+    }
+
+    void exportSurfaceMaterialReportPdfRaster(SurfaceMaterialReport report) {
+        exportSurfaceMaterialReportPdf(report, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
+    }
+
+    void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant) {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Materialliste als PDF speichern");
+        fileChooser.setTitle(variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK
+                ? "Materialliste als PDF mit Rastergrafiken speichern"
+                : "Materialliste als PDF speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
         String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName + "_Räume_und_Material.pdf");
+        fileChooser.setInitialFileName(variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK
+                ? projectName + "_Räume_und_Material_Raster.pdf"
+                : projectName + "_Räume_und_Material.pdf");
         java.io.File file = fileChooser.showSaveDialog(owner.currentWindow());
         if (file == null) {
             return;
         }
-        exportSurfaceMaterialReportPdf(report, file.toPath());
+        exportSurfaceMaterialReportPdf(report, file.toPath(), variant);
     }
 
     void exportSurfaceMaterialReportPdf(Path targetFile) {
@@ -256,12 +282,53 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile) {
+        exportSurfaceMaterialReportPdf(report, targetFile, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.SVG);
+    }
+
+    void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant) {
         try {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
-            surfaceMaterialReportPdfService.export(report, exportPath);
+            surfaceMaterialReportPdfService.export(report, exportPath, createExportAssets(report, variant));
             owner.draftLabel.setText("Materialliste als PDF exportiert: " + exportPath.getFileName());
         } catch (Exception exception) {
             owner.showOperationException("Materiallisten-PDF-Export fehlgeschlagen", exception);
         }
+    }
+
+    private SurfaceMaterialReportPdfService.ExportAssets createExportAssets(
+            SurfaceMaterialReport report,
+            SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant
+    ) {
+        Map<String, BufferedImage> levelPlanImages = new LinkedHashMap<>();
+        for (Level level : owner.project.levels()) {
+            levelPlanImages.put(level.name(), SwingFXUtils.fromFXImage(owner.reportLevelSnapshot(level.name()), null));
+        }
+        if (variant != SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK) {
+            return new SurfaceMaterialReportPdfService.ExportAssets(variant, levelPlanImages, Map.of());
+        }
+        Map<String, BufferedImage> heatingPlanImages = new LinkedHashMap<>();
+        report.heatingPlans().stream()
+                .filter(plan -> !plan.objectBased())
+                .forEach(plan -> heatingPlanImages.computeIfAbsent(
+                        heatingPlanImageKey(plan),
+                        ignored -> captureHeatingPlanImage(plan.levelName(), plan.roomName())
+                ));
+        return new SurfaceMaterialReportPdfService.ExportAssets(variant, levelPlanImages, heatingPlanImages);
+    }
+
+    private BufferedImage captureHeatingPlanImage(String levelName, String roomName) {
+        Level level = owner.project.levels().stream()
+                .filter(candidate -> candidate.name().equals(levelName))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Etage `" + levelName + "` ist unbekannt."));
+        Room room = level.rooms().stream()
+                .filter(candidate -> candidate.name().equals(roomName))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Raum `" + roomName + "` ist unbekannt."));
+        return SwingFXUtils.fromFXImage(owner.reportRoomSnapshot(level.name(), room.outline()), null);
+    }
+
+    private String heatingPlanImageKey(SurfaceMaterialListService.HeatingPlanSummary plan) {
+        return plan.levelName() + "\u0000" + plan.roomName() + "\u0000" + plan.surfacePosition();
     }
 }

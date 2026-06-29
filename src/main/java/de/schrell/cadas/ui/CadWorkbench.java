@@ -1280,7 +1280,8 @@ public final class CadWorkbench extends BorderPane {
         berichteMenu.getItems().addAll(
                 menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Räume und Materialien anzeigen", this::showSurfaceMaterialReportWindow, null),
-                menuItem("Räume und Materialien als PDF exportieren", this::exportSurfaceMaterialReportPdf, null),
+                menuItem("Räume und Materialien als PDF exportieren (SVG-Heizpläne)", this::exportSurfaceMaterialReportPdf, null),
+                menuItem("Räume und Materialien als PDF exportieren (Rastergrafik)", this::exportSurfaceMaterialReportPdfRaster, null),
                 menuItem("Räume und Materialien als MD exportieren", this::exportSurfaceMaterialReportMarkdown, null)
         );
 
@@ -6081,6 +6082,10 @@ public final class CadWorkbench extends BorderPane {
         documentSupport.exportSurfaceMaterialReportPdf();
     }
 
+    private void exportSurfaceMaterialReportPdfRaster() {
+        documentSupport.exportSurfaceMaterialReportPdfRaster();
+    }
+
     private void exportSurfaceMaterialReportPdf(Path targetFile) {
         documentSupport.exportSurfaceMaterialReportPdf(targetFile);
     }
@@ -7971,21 +7976,64 @@ public final class CadWorkbench extends BorderPane {
         double viewportWidth = Math.max(drawingPane.getWidth(), 640.0);
         double viewportHeight = Math.max(drawingPane.getHeight(), 420.0);
         projectedBoundsService.bounds(activeLevel.get(), activeView.get()).ifPresentOrElse(bounds -> {
-            double contentWidth = Math.max(bounds.widthMillimeters(), 1_000.0);
-            double contentHeight = Math.max(bounds.heightMillimeters(), 1_000.0);
-            double horizontalPadding = projectionService.isPlanView(activeView.get()) ? 80.0 : 64.0;
-            double verticalPadding = projectionService.isPlanView(activeView.get()) ? 96.0 : 72.0;
-            double availableWidth = Math.max(220.0, viewportWidth - horizontalPadding);
-            double availableHeight = Math.max(180.0, viewportHeight - verticalPadding);
-            double fitScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
-            zoom = twoDZoomRange.clamp(fitScale / BASE_PIXELS_PER_MILLIMETER);
-            offsetX = viewportWidth / 2.0 - bounds.centerHorizontalMillimeters() * scale();
-            offsetY = viewportHeight / 2.0 - bounds.centerVerticalMillimeters() * scale();
+            fitViewportToBounds(
+                    viewportWidth,
+                    viewportHeight,
+                    bounds.widthMillimeters(),
+                    bounds.heightMillimeters(),
+                    bounds.centerHorizontalMillimeters(),
+                    bounds.centerVerticalMillimeters(),
+                    projectionService.isPlanView(activeView.get()) ? 80.0 : 64.0,
+                    projectionService.isPlanView(activeView.get()) ? 96.0 : 72.0
+            );
         }, () -> {
             zoom = 1.0;
             offsetX = viewportWidth / 2.0;
             offsetY = viewportHeight / 2.0;
         });
+    }
+
+    private void fitPlanViewToPoints(List<PlanPoint> points, double paddingMillimeters) {
+        if (points.isEmpty()) {
+            fitCurrentViewToContent();
+            return;
+        }
+        double minX = points.stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0) - paddingMillimeters;
+        double maxX = points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0) + paddingMillimeters;
+        double minY = points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0) - paddingMillimeters;
+        double maxY = points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0) + paddingMillimeters;
+        double viewportWidth = Math.max(drawingPane.getWidth(), 640.0);
+        double viewportHeight = Math.max(drawingPane.getHeight(), 420.0);
+        fitViewportToBounds(
+                viewportWidth,
+                viewportHeight,
+                maxX - minX,
+                maxY - minY,
+                (minX + maxX) / 2.0,
+                (minY + maxY) / 2.0,
+                80.0,
+                96.0
+        );
+    }
+
+    private void fitViewportToBounds(
+            double viewportWidth,
+            double viewportHeight,
+            double contentWidthMillimeters,
+            double contentHeightMillimeters,
+            double centerHorizontalMillimeters,
+            double centerVerticalMillimeters,
+            double horizontalPadding,
+            double verticalPadding
+    ) {
+        double contentWidth = Math.max(contentWidthMillimeters, 1_000.0);
+        double contentHeight = Math.max(contentHeightMillimeters, 1_000.0);
+        double availableWidth = Math.max(220.0, viewportWidth - horizontalPadding);
+        double availableHeight = Math.max(180.0, viewportHeight - verticalPadding);
+        double fitScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
+        zoom = twoDZoomRange.clamp(fitScale / BASE_PIXELS_PER_MILLIMETER);
+        offsetX = viewportWidth / 2.0 - centerHorizontalMillimeters * scale();
+        offsetY = viewportHeight / 2.0 - centerVerticalMillimeters * scale();
     }
 
     private void clearProject() {
@@ -9448,6 +9496,58 @@ public final class CadWorkbench extends BorderPane {
     public WritableImage automationDrawingSnapshot() {
         ensureCanvasReady();
         return drawingCanvas.snapshot(null, null);
+    }
+
+    WritableImage reportLevelSnapshot(String levelName) {
+        return reportSnapshot(levelName, null, 0.0);
+    }
+
+    WritableImage reportRoomSnapshot(String levelName, List<PlanPoint> focusPoints) {
+        return reportSnapshot(levelName, List.copyOf(focusPoints), 280.0);
+    }
+
+    private WritableImage reportSnapshot(String levelName, List<PlanPoint> focusPoints, double paddingMillimeters) {
+        WorkspaceMode previousWorkspace = activeWorkspaceMode.get();
+        ViewOrientation previousView = activeView.get();
+        Level previousLevel = activeLevel.get();
+        double previousZoom = zoom;
+        double previousOffsetX = offsetX;
+        double previousOffsetY = offsetY;
+        SelectionKey previousPrimarySelection = selectedSelection.get();
+        List<SelectionKey> previousSelections = List.copyOf(selectedSelections);
+        try {
+            activeWorkspaceMode.set(WorkspaceMode.TWO_D);
+            updateWorkspaceMode();
+            activeView.set(ViewOrientation.TOP);
+            activeLevel.set(resolveLevelForReport(levelName));
+            clearSelection();
+            if (focusPoints == null || focusPoints.isEmpty()) {
+                fitCurrentViewToContent();
+            } else {
+                fitPlanViewToPoints(focusPoints, paddingMillimeters);
+            }
+            render();
+            return automationDrawingSnapshot();
+        } finally {
+            activeLevel.set(previousLevel);
+            activeView.set(previousView);
+            activeWorkspaceMode.set(previousWorkspace);
+            zoom = previousZoom;
+            offsetX = previousOffsetX;
+            offsetY = previousOffsetY;
+            selectedSelections.clear();
+            selectedSelections.addAll(previousSelections);
+            selectedSelection.set(previousPrimarySelection);
+            updateWorkspaceMode();
+            render();
+        }
+    }
+
+    private Level resolveLevelForReport(String levelName) {
+        return availableLevels.stream()
+                .filter(level -> level.name().equals(levelName))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Etage `" + levelName + "` ist unbekannt."));
     }
 
     public void automationRememberUndoState() {
