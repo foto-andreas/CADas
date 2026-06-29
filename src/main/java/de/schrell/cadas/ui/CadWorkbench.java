@@ -7513,6 +7513,72 @@ public final class CadWorkbench extends BorderPane {
         render();
     }
 
+    private void repairSelectedSurfaceLayerLayout() {
+        List<SurfaceLayerStack> stacks = currentSurfaceLayerStacks();
+        int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
+        if (stacks.isEmpty() || selectedIndex < 0) {
+            return;
+        }
+        boolean changed = false;
+        for (SurfaceLayerStack stack : stacks) {
+            SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
+            SurfaceLayer repairedLayer = repairedSurfaceLayer(selectedLayer);
+            if (repairedLayer.equals(selectedLayer)) {
+                continue;
+            }
+            if (!changed) {
+                rememberStateForUndo();
+                changed = true;
+            }
+            replaceSurfaceLayer(stack, selectedLayer.id(), repairedLayer);
+        }
+        if (changed) {
+            afterSurfaceLayerMutation("Belag-Verlegung repariert.");
+            return;
+        }
+        draftLabel.setText("Belag erfüllt bereits die aktuellen Verlegeregeln.");
+        render();
+    }
+
+    private boolean selectedSurfaceLayerNeedsRepair() {
+        return selectedSurfaceLayer().map(this::surfaceLayerNeedsRepair).orElse(false);
+    }
+
+    private boolean surfaceLayerNeedsRepair(SurfaceLayer layer) {
+        return layer.layoutAnchor() == SurfaceLayoutAnchor.AUTO
+                || layer.startRowTrim().toMillimeters() > 0.001
+                || layer.startRowWidth().toMillimeters() > 0.001
+                || isVariothermSurfaceLayer(layer) && layer.cutRestriction() != SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS;
+    }
+
+    private SurfaceLayer repairedSurfaceLayer(SurfaceLayer layer) {
+        SurfaceLayoutAnchor repairedAnchor = layer.layoutAnchor() == SurfaceLayoutAnchor.AUTO
+                ? SurfaceLayer.anchorFor(layer.layoutRotation(), layer.layoutDirection())
+                : layer.layoutAnchor();
+        SurfaceCutRestriction repairedCutRestriction = isVariothermSurfaceLayer(layer)
+                ? SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS
+                : layer.cutRestriction();
+        return layer.reconfigure(
+                layer.name(),
+                layer.thickness(),
+                layer.tileWidth(),
+                layer.tileHeight(),
+                layer.layoutMode(),
+                layer.layoutOffset(),
+                layer.minimumOffset(),
+                layer.minimumEdgeWidth(),
+                layer.minimumStartEndMargin(),
+                layer.freeMargins(),
+                repairedAnchor,
+                Length.zero(),
+                Length.zero(),
+                layer.jointWidth(),
+                repairedCutRestriction,
+                layer.coveringSource(),
+                layer.layoutRotatedQuarterTurn()
+        );
+    }
+
     private SurfaceLayer buildSurfaceLayerFromInputs() {
         return SurfaceLayer.create(
                 currentSurfaceLayerName(),
@@ -7941,6 +8007,10 @@ public final class CadWorkbench extends BorderPane {
 
     private boolean isVisibleSurfaceLayer(SurfaceLayer layer) {
         return layer.visible() && layer.thickness().toMillimeters() > 0.0;
+    }
+
+    private boolean isVariothermSurfaceLayer(SurfaceLayer layer) {
+        return SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource());
     }
 
     private boolean validateSurfaceLayerSelection(SurfaceSelectionContext context) {
@@ -8475,6 +8545,9 @@ public final class CadWorkbench extends BorderPane {
                 && selection.kind() != RenderableKind.ROOM_FLOOR
                 && selection.kind() != RenderableKind.ROOM_CEILING)) {
             selectionContextMenu.getItems().add(menuItem("Auswahl löschen", this::deleteSelection, null));
+        }
+        if (selectedSurfaceLayerNeedsRepair()) {
+            selectionContextMenu.getItems().add(menuItem("Belag-Verlegung reparieren", this::repairSelectedSurfaceLayerLayout, null));
         }
         if (selectedSelections.stream().anyMatch(this::isRotatableSelection)) {
             selectionContextMenu.getItems().addAll(

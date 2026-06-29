@@ -20,7 +20,9 @@ import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
+import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
@@ -36,6 +38,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -591,6 +594,74 @@ class CadWorkbenchTest {
         Assertions.assertEquals(rightBefore.roomHeight(), rightAfter.roomHeight());
         Assertions.assertEquals(rightBefore.floorThickness(), rightAfter.floorThickness());
         Assertions.assertEquals(rightBefore.ceilingThickness(), rightAfter.ceilingThickness());
+    }
+
+    @Test
+    void belagkontextRepariertLegacyVariothermVerlegung() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(new SurfaceLayer(
+                    UUID.randomUUID(),
+                    "Variotherm",
+                    Length.of(18, LengthUnit.MILLIMETER),
+                    true,
+                    Length.of(60, LengthUnit.CENTIMETER),
+                    Length.of(100, LengthUnit.CENTIMETER),
+                    SurfaceLayoutMode.FIXED,
+                    Length.of(20, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    SurfaceLayoutMargins.zero(),
+                    SurfaceLayoutAnchor.AUTO,
+                    Length.ofMillimeters(120),
+                    Length.ofMillimeters(880),
+                    Length.zero(),
+                    SurfaceCutRestriction.OUTER_CUTS_ROTATABLE,
+                    SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE,
+                    false
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetSurfaceType("FLOOR");
+            instanz.automationSelectSurfaceLayer(0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationPrepareSelectionContextMenu(100.0, 80.0);
+            return null;
+        });
+
+        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems).contains("Belag-Verlegung reparieren"));
+        aufFxThread(() -> {
+            workbench.automationInvokeSelectionContextMenuItem("Belag-Verlegung reparieren");
+            return null;
+        });
+
+        SurfaceLayer repaired = aufFxThread(() -> workbench.project.primaryLevel()
+                .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
+                .layers()
+                .getFirst());
+        Assertions.assertEquals(SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS, repaired.cutRestriction());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MIN_X_MIN_Y, repaired.layoutAnchor());
+        Assertions.assertEquals(0.0, repaired.startRowTrim().toMillimeters(), 0.001);
+        Assertions.assertEquals(0.0, repaired.startRowWidth().toMillimeters(), 0.001);
     }
 
     @Test
