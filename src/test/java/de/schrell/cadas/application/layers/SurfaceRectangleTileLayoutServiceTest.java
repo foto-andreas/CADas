@@ -159,7 +159,7 @@ class SurfaceRectangleTileLayoutServiceTest {
     }
 
     @Test
-    void hältDenFixenVersatzInGedrehterKi1SchlafzimmerbelegungInJederZweitenReihe() throws Exception {
+    void verwendetImGedrehtenKi1SchlafzimmerDenFixenVersatzEntlangDerLangenKante() throws Exception {
         Level level = new DxfProjectExchangeService()
                 .importProject(Path.of("KI1.cadas"), "KI1")
                 .levels().stream()
@@ -184,9 +184,10 @@ class SurfaceRectangleTileLayoutServiceTest {
         double ersteReihe = ersteReihenbreite(tiles, 0);
         double zweiteReihe = ersteReihenbreite(tiles, 1);
         double dritteReihe = ersteReihenbreite(tiles, 2);
-        assertEquals(594.088, ersteReihe, 0.02);
-        assertEquals(414.088, zweiteReihe, 0.02);
-        assertEquals(594.088, dritteReihe, 0.02);
+        double vierteReihe = ersteReihenbreite(tiles, 3);
+        assertTrue(ersteReihe > zweiteReihe, "Die zweite Reihe muss gegenüber der ersten Reihe versetzt starten.");
+        assertTrue(zweiteReihe > dritteReihe, "Der feste Versatz muss entlang der langen Kante bis in die dritte Reihe weiterlaufen.");
+        assertTrue(vierteReihe > dritteReihe, "Nach dem Langkanten-Zyklus muss der sichtbare Anschnitt wieder anwachsen.");
     }
 
     @Test

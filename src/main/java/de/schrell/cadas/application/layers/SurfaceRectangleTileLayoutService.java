@@ -353,15 +353,15 @@ public final class SurfaceRectangleTileLayoutService {
 
     private double rowOffset(SurfaceLayer layer, int row, int firstVisibleRow) {
         double tileWidth = layer.effectiveTileWidth().toMillimeters();
-        double minimumOffset = layer.minimumOffset().toMillimeters();
-        double minimumEdgeWidth = layer.minimumEdgeWidth().toMillimeters();
-        int relativeRow = row - firstVisibleRow;
-        double requestedOffset = switch (layer.layoutMode()) {
-            case NONE -> 0.0;
-            case FIXED -> modulo(relativeRow * layer.layoutOffset().toMillimeters(), tileWidth);
-            case AUTOMATIC -> relativeRow % 2 == 0 ? 0.0 : tileWidth / 2.0;
-        };
-        return boundedOffset(requestedOffset, tileWidth, minimumOffset, minimumEdgeWidth);
+        return SurfaceLayoutOffsetCalculator.rowOffset(
+                tileWidth,
+                layer.effectiveTileHeight().toMillimeters(),
+                layer.layoutMode(),
+                layer.layoutOffset().toMillimeters(),
+                layer.minimumOffset().toMillimeters(),
+                layer.minimumEdgeWidth().toMillimeters(),
+                row - firstVisibleRow
+        );
     }
 
     private double boundedStartTrim(double surfaceHeight, double tileHeight, double minimumStartEndMargin) {
@@ -375,21 +375,6 @@ public final class SurfaceRectangleTileLayoutService {
         double requiredTrim = minimumStartEndMargin - trailingHeight;
         double maximumTrim = Math.max(0.0, tileHeight - minimumStartEndMargin);
         return Math.min(requiredTrim, maximumTrim);
-    }
-
-    private double boundedOffset(double requestedOffset, double tileWidth, double minimumOffset, double minimumEdgeWidth) {
-        if (tileWidth <= EPSILON) {
-            return 0.0;
-        }
-        double lowerBound = Math.max(minimumOffset, minimumEdgeWidth);
-        if (lowerBound <= EPSILON) {
-            return Math.max(0.0, Math.min(requestedOffset, tileWidth));
-        }
-        double upperBound = tileWidth - lowerBound;
-        if (upperBound < lowerBound) {
-            return lowerBound;
-        }
-        return Math.max(lowerBound, Math.min(requestedOffset, upperBound));
     }
 
     private double candidateInBounds(double candidate, double minX, double tileWidth) {

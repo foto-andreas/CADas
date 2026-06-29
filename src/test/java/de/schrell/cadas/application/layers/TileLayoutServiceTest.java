@@ -152,6 +152,28 @@ class TileLayoutServiceTest {
     }
 
     @Test
+    void fixerVersatzVerwendetBeiHochformatPlattenDieLangeKanteAlsZyklus() {
+        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+                Length.ofMillimeters(3_000),
+                Length.ofMillimeters(5_000),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(1_000),
+                SurfaceLayoutMode.FIXED,
+                Length.ofMillimeters(250),
+                Length.zero(),
+                Length.ofMillimeters(100)
+        ));
+
+        assertFalse(placements.isEmpty());
+        TilePlacement firstRow1 = placements.stream().filter(t -> t.row() == 1).findFirst().orElseThrow();
+        TilePlacement firstRow2 = placements.stream().filter(t -> t.row() == 2).findFirst().orElseThrow();
+        TilePlacement firstRow3 = placements.stream().filter(t -> t.row() == 3).findFirst().orElseThrow();
+        assertEquals(350.0, firstRow1.width().toMillimeters(), 0.01);
+        assertEquals(100.0, firstRow2.width().toMillimeters(), 0.01);
+        assertEquals(100.0, firstRow3.width().toMillimeters(), 0.01);
+    }
+
+    @Test
     void mindestrandAnAnfangUndEndeBeschneidetDieErsteReiheWennNoetig() {
         List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
                 Length.ofMillimeters(3000),

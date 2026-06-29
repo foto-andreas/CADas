@@ -49,15 +49,15 @@ public final class TileLayoutService {
         int row = 0;
         List<TilePlacement> localPlacements = new ArrayList<>();
         for (double y = -rowStartTrim; y < availableHeight - 0.001; y += tileHeight, row++) {
-            double rowOffset = switch (request.layoutMode()) {
-                case NONE -> 0.0;
-                case FIXED -> boundedOffset(
-                        (row * layoutOffset) % tileWidth,
-                        tileWidth, minimumOffset, minimumEdgeWidth);
-                case AUTOMATIC -> boundedOffset(
-                        row % 2 == 0 ? 0.0 : tileWidth / 2.0,
-                        tileWidth, minimumOffset, minimumEdgeWidth);
-            };
+            double rowOffset = SurfaceLayoutOffsetCalculator.rowOffset(
+                    tileWidth,
+                    tileHeight,
+                    request.layoutMode(),
+                    layoutOffset,
+                    minimumOffset,
+                    minimumEdgeWidth,
+                    row
+            );
             double clippedY = Math.max(0.0, y);
             double remainingHeight = Math.min(tileHeight - Math.max(0.0, -y), availableHeight - clippedY);
             if (remainingHeight <= 0.0) {
@@ -151,21 +151,6 @@ public final class TileLayoutService {
         double requiredTrim = minimumStartEndMargin - trailingHeight;
         double maximumTrim = Math.max(0.0, tileHeight - minimumStartEndMargin);
         return Math.min(requiredTrim, maximumTrim);
-    }
-
-    private double boundedOffset(double requestedOffset, double tileWidth, double minimumOffset, double minimumEdgeWidth) {
-        if (tileWidth <= 0.001) {
-            return 0.0;
-        }
-        double lowerBound = Math.max(minimumOffset, minimumEdgeWidth);
-        if (lowerBound <= 0.001) {
-            return Math.max(0.0, Math.min(requestedOffset, tileWidth));
-        }
-        double upperBound = tileWidth - lowerBound;
-        if (upperBound < lowerBound) {
-            return lowerBound;
-        }
-        return Math.max(lowerBound, Math.min(requestedOffset, upperBound));
     }
 
     private double clamp(double value, double min, double max) {
