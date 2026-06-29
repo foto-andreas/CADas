@@ -15,6 +15,7 @@ import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService;
 import de.schrell.cadas.application.view.WallSurfaceOpeningService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.FloorExtension;
@@ -215,6 +216,7 @@ public final class SurfaceMaterialListService {
                 surfaceLayerEffectService.effectiveMinimumCeilingHeightMillimeters(level, room),
                 surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(level, room),
                 surfaceLayerEffectService.effectiveAreaSquareMeters(level, room),
+                PlanPolygonSupport.perimeterMillimeters(room.outline()),
                 surfaceLayerEffectService.effectiveVolumeCubicMeters(level, room),
                 residentialAreaService.residentialAreaSquareMeters(level, room),
                 roomHeatTotals.floorHeatingWatts(),
@@ -1264,8 +1266,8 @@ public final class SurfaceMaterialListService {
                     ))
                     .forEach((levelName, levelRooms) -> {
                         markdown.append("### ").append(levelName).append("\n\n");
-                        markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Mietfläche | Volumen | FBH | DH | Flächenheizung | Heizelemente | Gesamtwärme |\n");
-                        markdown.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+                        markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Innenumfang | Mietfläche | Volumen | FBH | DH | Flächenheizung | Heizelemente | Gesamtwärme |\n");
+                        markdown.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
                         for (RoomSummary room : levelRooms) {
                             markdown.append("| ")
                                     .append(markdownCell(room.roomName()))
@@ -1279,6 +1281,8 @@ public final class SurfaceMaterialListService {
                             }
                             markdown.append(" m | ")
                                     .append(decimal(room.areaSquareMeters(), 2)).append(" m²")
+                                    .append(" | ")
+                                    .append(decimal(room.innerPerimeterMillimeters() / 1000.0, 2)).append(" m")
                                     .append(" | ")
                                     .append(decimal(room.residentialAreaSquareMeters(), 2)).append(" m²")
                                     .append(" | ")
@@ -1638,6 +1642,7 @@ public final class SurfaceMaterialListService {
             double minimumHeightMillimeters,
             double maximumHeightMillimeters,
             double areaSquareMeters,
+            double innerPerimeterMillimeters,
             double volumeCubicMeters,
             double residentialAreaSquareMeters,
             double floorHeatingWatts,

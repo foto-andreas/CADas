@@ -41,6 +41,19 @@ public final class PlanPolygonSupport {
         return inside;
     }
 
+    public static double perimeterMillimeters(List<PlanPoint> polygon) {
+        if (polygon.size() < 2) {
+            return 0.0;
+        }
+        double perimeter = 0.0;
+        int previousIndex = polygon.size() - 1;
+        for (int index = 0; index < polygon.size(); index++) {
+            perimeter += distanceMillimeters(polygon.get(previousIndex), polygon.get(index));
+            previousIndex = index;
+        }
+        return perimeter;
+    }
+
     private static boolean pointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end, double epsilon) {
         double cross = orientation(start, end, point);
         if (Math.abs(cross) > epsilon) {
@@ -55,5 +68,11 @@ public final class PlanPolygonSupport {
     private static double orientation(PlanPoint first, PlanPoint second, PlanPoint third) {
         return (second.xMillimeters() - first.xMillimeters()) * (third.yMillimeters() - first.yMillimeters())
                 - (second.yMillimeters() - first.yMillimeters()) * (third.xMillimeters() - first.xMillimeters());
+    }
+
+    private static double distanceMillimeters(PlanPoint first, PlanPoint second) {
+        double deltaX = second.xMillimeters() - first.xMillimeters();
+        double deltaY = second.yMillimeters() - first.yMillimeters();
+        return Math.hypot(deltaX, deltaY);
     }
 }

@@ -131,6 +131,8 @@ class SurfaceMaterialReportPdfServiceTest {
             String text = new PDFTextStripper().getText(document);
             assertTrue(text.contains("Räume und Materialien - Haus"));
             assertTrue(text.contains("Räume und Mietflächen nach WoFlV"));
+            assertTrue(text.contains("Innenumfang"));
+            assertTrue(text.contains("14,00 m"));
             assertTrue(text.contains("Zusammenfassung"));
             assertTrue(text.contains("Flächenheizungen"));
             assertTrue(text.contains("Heizplan Erdgeschoss / Wohnen"));

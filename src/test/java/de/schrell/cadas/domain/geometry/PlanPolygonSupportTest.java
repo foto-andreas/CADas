@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlanPolygonSupportTest {
@@ -24,6 +25,11 @@ class PlanPolygonSupportTest {
     void lehntÄußerenPunktUndLeeresPolygonAb() {
         assertFalse(PlanPolygonSupport.containsPoint(rechteck(), new PlanPoint(1_100, 400)));
         assertFalse(PlanPolygonSupport.containsPoint(List.of(), new PlanPoint(0, 0)));
+    }
+
+    @Test
+    void berechnetDenPolygonUmfang() {
+        assertEquals(3_600.0, PlanPolygonSupport.perimeterMillimeters(rechteck()), 0.001);
     }
 
     private List<PlanPoint> rechteck() {

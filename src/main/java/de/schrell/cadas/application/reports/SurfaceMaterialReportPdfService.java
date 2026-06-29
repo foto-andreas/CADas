@@ -128,18 +128,19 @@ public final class SurfaceMaterialReportPdfService {
                         java.util.stream.Collectors.toList()
                 ));
         TableDefinition roomTable = new TableDefinition(
-                7.3f,
+                7.9f,
                 List.of(
-                        new TableColumn("Raum", 1.3f, TableAlignment.LEFT),
-                        new TableColumn("Maße", 1.0f, TableAlignment.LEFT),
-                        new TableColumn("Lichte Höhe", 0.9f, TableAlignment.RIGHT),
-                        new TableColumn("Grundfläche", 0.85f, TableAlignment.RIGHT),
-                        new TableColumn("Mietfläche", 0.85f, TableAlignment.RIGHT),
-                        new TableColumn("Volumen", 0.85f, TableAlignment.RIGHT),
-                        new TableColumn("FBH", 0.6f, TableAlignment.RIGHT),
-                        new TableColumn("DH", 0.6f, TableAlignment.RIGHT),
-                        new TableColumn("Fläche", 0.7f, TableAlignment.RIGHT),
-                        new TableColumn("Heizelemente", 0.95f, TableAlignment.RIGHT),
+                        new TableColumn("Raum", 1.1f, TableAlignment.LEFT),
+                        new TableColumn("Maße", 0.95f, TableAlignment.LEFT),
+                        new TableColumn("Lichte Höhe", 0.8f, TableAlignment.RIGHT),
+                        new TableColumn("Grundfläche", 0.7f, TableAlignment.RIGHT),
+                        new TableColumn("Innenumfang", 0.8f, TableAlignment.RIGHT),
+                        new TableColumn("Mietfläche", 0.7f, TableAlignment.RIGHT),
+                        new TableColumn("Volumen", 0.7f, TableAlignment.RIGHT),
+                        new TableColumn("FBH", 0.45f, TableAlignment.RIGHT),
+                        new TableColumn("DH", 0.45f, TableAlignment.RIGHT),
+                        new TableColumn("Fläche", 0.55f, TableAlignment.RIGHT),
+                        new TableColumn("Heizelemente", 0.8f, TableAlignment.RIGHT),
                         new TableColumn("Gesamtwärme", 0.9f, TableAlignment.RIGHT)
                 )
         );
@@ -156,6 +157,7 @@ public final class SurfaceMaterialReportPdfService {
                         decimal(room.widthMillimeters() / 1000.0, 2) + " x " + decimal(room.depthMillimeters() / 1000.0, 2) + " m",
                         roomHeightText(room),
                         decimal(room.areaSquareMeters(), 2) + " m²",
+                        decimal(room.innerPerimeterMillimeters() / 1000.0, 2) + " m",
                         decimal(room.residentialAreaSquareMeters(), 2) + " m²",
                         decimal(room.volumeCubicMeters(), 2) + " m³",
                         decimal(room.floorHeatingWatts(), 0) + " W",

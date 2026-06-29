@@ -4227,17 +4227,22 @@ public final class CadWorkbench extends BorderPane {
         String name = room.name();
         graphics.fillText(name, centerX, centerY - 6);
         blockers.add(centeredTextBlockingBox(name, Font.font("Menlo", 12), centerX, centerY - 6));
-        String areaVolume = String.format(
-                Locale.GERMAN,
-                "%.2f m² | %.2f m³",
-                surfaceLayerEffectService.effectiveAreaSquareMeters(activeLevel.get(), room),
-                surfaceLayerEffectService.effectiveVolumeCubicMeters(activeLevel.get(), room)
-        );
+        String areaVolume = roomMetricsText(room);
         graphics.setFont(Font.font("Menlo", 11));
         graphics.fillText(areaVolume, centerX, centerY + 12);
         blockers.add(centeredTextBlockingBox(areaVolume, Font.font("Menlo", 11), centerX, centerY + 12));
         graphics.restore();
         return blockers;
+    }
+
+    private String roomMetricsText(Room room) {
+        return String.format(
+                Locale.GERMAN,
+                "%.2f m² | %.2f m³ | U %.2f m",
+                surfaceLayerEffectService.effectiveAreaSquareMeters(activeLevel.get(), room),
+                surfaceLayerEffectService.effectiveVolumeCubicMeters(activeLevel.get(), room),
+                de.schrell.cadas.domain.geometry.PlanPolygonSupport.perimeterMillimeters(room.outline()) / 1000.0
+        );
     }
 
     private PlanPoint roomLabelCenter(Room room) {
@@ -10181,12 +10186,7 @@ public final class CadWorkbench extends BorderPane {
 
     private String automationSelectedRoomMetrics() {
         return selectedSurfaceRoom()
-                .map(room -> String.format(
-                        Locale.GERMAN,
-                        "%.2f m² | %.2f m³",
-                        surfaceLayerEffectService.effectiveAreaSquareMeters(activeLevel.get(), room),
-                        surfaceLayerEffectService.effectiveVolumeCubicMeters(activeLevel.get(), room)
-                ))
+                .map(this::roomMetricsText)
                 .orElse("");
     }
 

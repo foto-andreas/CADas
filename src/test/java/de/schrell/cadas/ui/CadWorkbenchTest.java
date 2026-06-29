@@ -597,6 +597,29 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void ausgewaehlterRaumZeigtImMetriktextAuchDenInnenumfang() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.project.primaryLevel().addRoom(Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            ));
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("ROOM", 0, false);
+            return instanz;
+        });
+
+        Assertions.assertEquals("12,00 m² | 31,20 m³ | U 14,00 m", aufFxThread(() -> workbench.automationSnapshot().selectedRoomMetrics()));
+    }
+
+    @Test
     void belagkontextRepariertLegacyVariothermVerlegung() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

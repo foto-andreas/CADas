@@ -58,11 +58,14 @@ class SurfaceMaterialListServiceTest {
 
         assertEquals(1, report.rooms().size());
         assertEquals(12.0, report.rooms().getFirst().areaSquareMeters(), 0.001);
+        assertEquals(14_000.0, report.rooms().getFirst().innerPerimeterMillimeters(), 0.001);
         assertEquals(31.2, report.rooms().getFirst().volumeCubicMeters(), 0.001);
         assertEquals(12.0, report.rooms().getFirst().residentialAreaSquareMeters(), 0.001);
         assertTrue(report.toMarkdown().contains("Räume und Mietflächen nach WoFlV"));
         assertTrue(report.toMarkdown().contains("### Erdgeschoss"));
         assertTrue(report.toMarkdown().contains("4,00 × 3,00 m"));
+        assertTrue(report.toMarkdown().contains("Innenumfang"));
+        assertTrue(report.toMarkdown().contains("14,00 m"));
     }
 
     @Test
