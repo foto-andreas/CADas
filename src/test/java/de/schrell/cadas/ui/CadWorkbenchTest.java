@@ -333,6 +333,41 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void rechteckauswahlStartetAuchBeimAufziehenAusEinemRaumHeraus() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Keller",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_500),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            ));
+            instanz.automationSetViewport(1.0, 100.0, 100.0);
+            instanz.automationSetTool("OBJECT");
+            instanz.automationCanvasClick(250, 220, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            instanz.automationSetTool("EDIT");
+            return instanz;
+        });
+
+        RoomObject before = aufFxThread(() -> workbench.automationRoomObject(0));
+        aufFxThread(() -> {
+            workbench.automationCanvasDrag(150, 150, 330, 280, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            return null;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(() -> workbench.automationSnapshot().selectionCount()));
+        Assertions.assertTrue(aufFxThread(() -> workbench.automationMoveSelectionWithArrowKey(KeyCode.RIGHT)));
+        RoomObject after = aufFxThread(() -> workbench.automationRoomObject(0));
+        Assertions.assertEquals(before.center().xMillimeters() + 10.0, after.center().xMillimeters(), 0.001);
+        Assertions.assertEquals(before.center().yMillimeters(), after.center().yMillimeters(), 0.001);
+    }
+
+    @Test
     void deleteTasteLoeschtAusgewaehlteBauteileUeberDenGlobalenShortcutPfad() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

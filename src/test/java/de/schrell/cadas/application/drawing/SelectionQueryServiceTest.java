@@ -244,6 +244,24 @@ class SelectionQueryServiceTest {
     }
 
     @Test
+    void trifftDegenerierteTreppeMitMindesttoleranz() {
+        Level level = new Level("Erdgeschoss");
+        Staircase staircase = Staircase.create(
+                StairType.STRAIGHT,
+                new PlanPoint(2_000, 1_000),
+                new PlanPoint(2_000, 3_000),
+                Length.of(2.8, LengthUnit.METER),
+                14
+        );
+        level.addStaircase(staircase);
+
+        SelectionKey selection = selectionQueryService.findSelection(level, new PlanPoint(2_040, 2_000), TOLERANCE).orElseThrow();
+
+        assertEquals(RenderableKind.STAIR, selection.kind());
+        assertEquals(staircase.id().toString(), selection.elementId());
+    }
+
+    @Test
     void trifftRundesRaumobjektNichtNurUeberSeineBoundingBox() {
         Level level = new Level("Erdgeschoss");
         RoomObject table = RoomObject.create(

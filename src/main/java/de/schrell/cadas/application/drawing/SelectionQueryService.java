@@ -13,6 +13,7 @@ import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.RoofWindow;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
 
@@ -174,10 +175,7 @@ public final class SelectionQueryService {
 
     private List<SelectionKey> findStairSelections(Level level, PlanPoint point) {
         return level.staircases().stream()
-                .filter(staircase -> point.xMillimeters() >= staircase.minX()
-                        && point.xMillimeters() <= staircase.maxX()
-                        && point.yMillimeters() >= staircase.minY()
-                        && point.yMillimeters() <= staircase.maxY())
+                .filter(staircase -> containsStair(staircase, point))
                 .map(staircase -> new SelectionKey(RenderableKind.STAIR, level.name(), staircase.id().toString()))
                 .toList();
     }
@@ -349,6 +347,18 @@ public final class SelectionQueryService {
             lastIndex = currentIndex;
         }
         return inside;
+    }
+
+    private boolean containsStair(Staircase staircase, PlanPoint point) {
+        double minimumHalfExtent = 60.0;
+        double halfWidth = Math.max(staircase.widthMillimeters() / 2.0, minimumHalfExtent);
+        double halfHeight = Math.max(staircase.heightMillimeters() / 2.0, minimumHalfExtent);
+        double centerX = (staircase.minX() + staircase.maxX()) / 2.0;
+        double centerY = (staircase.minY() + staircase.maxY()) / 2.0;
+        return point.xMillimeters() >= centerX - halfWidth
+                && point.xMillimeters() <= centerX + halfWidth
+                && point.yMillimeters() >= centerY - halfHeight
+                && point.yMillimeters() <= centerY + halfHeight;
     }
 
     private boolean outlineWithin(RectangleSelectionBounds bounds, List<PlanPoint> outline) {

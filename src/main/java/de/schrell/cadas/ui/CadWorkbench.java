@@ -2247,7 +2247,7 @@ public final class CadWorkbench extends BorderPane {
             } else {
                 SelectionKey editSelection = editSelectionAt(editPoint, event.isAltDown());
                 updateSelection(editSelection, event.isShortcutDown() || event.isShiftDown());
-                if (editSelection == null) {
+                if (shouldStartSelectionRectangle(editSelection)) {
                     selectionRectangleStart = editPoint;
                     selectionRectangleEnd = editPoint;
                     selectionRectangleToggle = event.isShortcutDown() || event.isShiftDown();
@@ -3103,6 +3103,13 @@ public final class CadWorkbench extends BorderPane {
         graphics.setLineWidth(1.5);
         graphics.strokeRect(x, y, width, height);
         graphics.restore();
+    }
+
+    private boolean shouldStartSelectionRectangle(SelectionKey editSelection) {
+        return editSelection == null
+                || editSelection.kind() == RenderableKind.ROOM_VOLUME
+                || editSelection.kind() == RenderableKind.ROOM_FLOOR
+                || editSelection.kind() == RenderableKind.ROOM_CEILING;
     }
 
     private void drawSelectedOpening(GraphicsContext graphics, UUID wallId, Length offset, Length width) {
