@@ -565,6 +565,9 @@ public final class CadWorkbench extends BorderPane {
     private boolean keepViewportOrbitPoseOnNextThreeDActivation;
     private boolean historyCapturedForDrag;
     private PlanPoint selectionDragAnchor;
+    private PlanPoint selectionRectangleStart;
+    private PlanPoint selectionRectangleEnd;
+    private boolean selectionRectangleToggle;
     private List<Wall> selectionDragBaseWalls = List.of();
     private List<Staircase> selectionDragBaseStaircases = List.of();
     private List<RoomObject> selectionDragBaseRoomObjects = List.of();
@@ -2227,6 +2230,7 @@ public final class CadWorkbench extends BorderPane {
             PlanPoint editPoint = rawEditPoint;
             selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, pointerSelectionTolerance()).orElse(null);
             selectionDragAnchor = null;
+            clearSelectionRectangle();
             selectionDragBaseWalls = List.of();
             selectionDragBaseStaircases = List.of();
             selectionDragBaseRoomObjects = List.of();
@@ -2245,6 +2249,13 @@ public final class CadWorkbench extends BorderPane {
             } else {
                 SelectionKey editSelection = editSelectionAt(editPoint, event.isAltDown());
                 updateSelection(editSelection, event.isShortcutDown() || event.isShiftDown());
+                if (editSelection == null) {
+                    selectionRectangleStart = editPoint;
+                    selectionRectangleEnd = editPoint;
+                    selectionRectangleToggle = event.isShortcutDown() || event.isShiftDown();
+                } else {
+                    clearSelectionRectangle();
+                }
                 prepareSelectionDrag(editSelection, editPoint);
                 openingDragId = null;
                 openingDragWallAxis = null;
@@ -2353,6 +2364,11 @@ public final class CadWorkbench extends BorderPane {
         }
 
         if (draftStart == null) {
+            if (selectionRectangleStart != null) {
+                selectionRectangleEnd = screenToWorld(event.getX(), event.getY());
+                render();
+                return;
+            }
             if (activeEdgeHandle != null) {
                 if (!historyCapturedForDrag) {
                     rememberStateForUndo();
@@ -2616,6 +2632,19 @@ public final class CadWorkbench extends BorderPane {
             }
             updatePropertySectionVisibility();
             updateActionButtons();
+            render();
+            return;
+        }
+
+        if (selectionRectangleStart != null) {
+            if (selectionRectangleEnd == null) {
+                selectionRectangleEnd = selectionRectangleStart;
+            }
+            if (hasSelectionRectangleArea()) {
+                applySelectionRectangle();
+            } else {
+                clearSelectionRectangle();
+            }
             render();
             return;
         }
@@ -2887,6 +2916,7 @@ public final class CadWorkbench extends BorderPane {
         drawTerrainPlanMarkers(graphics);
         drawGrid(graphics);
         drawSelectionOverlay(graphics);
+        drawSelectionRectangle(graphics);
         drawEditablePoints(graphics);
         drawEdgeResizeHandles(graphics);
         if (previewSegment != null) {
@@ -3048,6 +3078,27 @@ public final class CadWorkbench extends BorderPane {
                 }
             }
         }
+        graphics.restore();
+    }
+
+    private void drawSelectionRectangle(GraphicsContext graphics) {
+        if (!projectionService.isPlanView(activeView.get())
+                || selectionRectangleStart == null
+                || selectionRectangleEnd == null
+                || !hasSelectionRectangleArea()) {
+            return;
+        }
+        double x = Math.min(toScreenX(selectionRectangleStart.xMillimeters()), toScreenX(selectionRectangleEnd.xMillimeters()));
+        double y = Math.min(toScreenY(selectionRectangleStart.yMillimeters()), toScreenY(selectionRectangleEnd.yMillimeters()));
+        double width = Math.abs(toScreenX(selectionRectangleEnd.xMillimeters()) - toScreenX(selectionRectangleStart.xMillimeters()));
+        double height = Math.abs(toScreenY(selectionRectangleEnd.yMillimeters()) - toScreenY(selectionRectangleStart.yMillimeters()));
+        graphics.save();
+        graphics.setFill(Color.color(0.85, 0.5, 0.18, 0.12));
+        graphics.fillRect(x, y, width, height);
+        graphics.setStroke(Color.web("#d97f2f"));
+        graphics.setLineDashes(8.0, 6.0);
+        graphics.setLineWidth(1.5);
+        graphics.strokeRect(x, y, width, height);
         graphics.restore();
     }
 
@@ -8048,6 +8099,7 @@ public final class CadWorkbench extends BorderPane {
         clearSelectionsInternal();
         selectedEndpointGroup = null;
         selectionDragAnchor = null;
+        clearSelectionRectangle();
         selectionDragBaseWalls = List.of();
         selectionDragBaseStaircases = List.of();
         selectionDragBaseRoomObjects = List.of();
@@ -8107,6 +8159,48 @@ public final class CadWorkbench extends BorderPane {
         }
         draftLabel.setText("Auswahl konnte nicht gelöscht werden.");
         updateActionButtons();
+    }
+
+    private void applySelectionRectangle() {
+        List<SelectionKey> containedSelections = selectionQueryService.findSelectionsWithin(
+                activeLevel.get(),
+                selectionRectangleStart,
+                selectionRectangleEnd
+        );
+        if (selectionRectangleToggle) {
+            for (SelectionKey selection : containedSelections) {
+                if (!selectedSelections.add(selection)) {
+                    selectedSelections.remove(selection);
+                }
+            }
+            selectedSelection.set(selectedSelections.stream().reduce((first, second) -> second).orElse(null));
+        } else {
+            selectedSelections.clear();
+            selectedSelections.addAll(containedSelections);
+            selectedSelection.set(containedSelections.isEmpty() ? null : containedSelections.getLast());
+        }
+        clearSelectionRectangle();
+        syncSelectionState();
+        if (selectedSelections.isEmpty()) {
+            draftLabel.setText("Keine vollständig enthaltenen Bauteile im Auswahlrahmen gefunden.");
+            return;
+        }
+        draftLabel.setText(selectedSelections.size() + " Bauteile per Auswahlrahmen markiert.");
+    }
+
+    private boolean hasSelectionRectangleArea() {
+        if (selectionRectangleStart == null || selectionRectangleEnd == null) {
+            return false;
+        }
+        double widthPixels = Math.abs(selectionRectangleEnd.xMillimeters() - selectionRectangleStart.xMillimeters()) * scale();
+        double heightPixels = Math.abs(selectionRectangleEnd.yMillimeters() - selectionRectangleStart.yMillimeters()) * scale();
+        return widthPixels >= 4.0 && heightPixels >= 4.0;
+    }
+
+    private void clearSelectionRectangle() {
+        selectionRectangleStart = null;
+        selectionRectangleEnd = null;
+        selectionRectangleToggle = false;
     }
 
     private boolean removeStaircaseWithUnderbuild(UUID staircaseId) {

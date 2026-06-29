@@ -300,6 +300,39 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void rechteckauswahlMarkiertNurVollstaendigImRahmenLiegendeBauteile() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetViewport(1.0, 100.0, 100.0);
+            instanz.automationSetTool("WALL");
+            instanz.automationCanvasDrag(150, 150, 250, 150, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            instanz.automationCanvasDrag(220, 150, 420, 150, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            instanz.automationSetTool("EDIT");
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationCanvasDrag(140, 140, 260, 160, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            return null;
+        });
+
+        Assertions.assertEquals(1, aufFxThread(() -> workbench.automationSnapshot().selectionCount()));
+        Wall beforeFirstWall = aufFxThread(() -> workbench.automationWall(0));
+        Wall beforeSecondWall = aufFxThread(() -> workbench.automationWall(1));
+        Assertions.assertTrue(aufFxThread(() -> workbench.automationMoveSelectionWithArrowKey(KeyCode.DOWN)));
+
+        Wall firstWall = aufFxThread(() -> workbench.automationWall(0));
+        Wall secondWall = aufFxThread(() -> workbench.automationWall(1));
+        Assertions.assertEquals(10.0, firstWall.axis().start().yMillimeters() - beforeFirstWall.axis().start().yMillimeters(), 0.001);
+        Assertions.assertEquals(10.0, firstWall.axis().end().yMillimeters() - beforeFirstWall.axis().end().yMillimeters(), 0.001);
+        Assertions.assertEquals(0.0, secondWall.axis().start().yMillimeters() - beforeSecondWall.axis().start().yMillimeters(), 0.001);
+        Assertions.assertEquals(0.0, secondWall.axis().end().yMillimeters() - beforeSecondWall.axis().end().yMillimeters(), 0.001);
+    }
+
+    @Test
     void bodenklickSetztNeuenStandortDerInnenansicht() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Test", "Erdgeschoss");
         Room room = Room.rectangular(

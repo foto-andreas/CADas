@@ -217,6 +217,33 @@ class SelectionQueryServiceTest {
     }
 
     @Test
+    void rechteckauswahlNimmtNurVollstaendigEnthalteneElemente() {
+        Level level = new Level("Erdgeschoss");
+        Wall fullyContainedWall = Wall.create(
+                new PlanSegment(new PlanPoint(500, 500), new PlanPoint(1_500, 500)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        );
+        Wall intersectedWall = Wall.create(
+                new PlanSegment(new PlanPoint(1_200, 500), new PlanPoint(3_200, 500)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.75, LengthUnit.METER)
+        );
+        level.addWall(fullyContainedWall);
+        level.addWall(intersectedWall);
+
+        List<SelectionKey> selections = selectionQueryService.findSelectionsWithin(
+                level,
+                new PlanPoint(350, 350),
+                new PlanPoint(1_700, 700)
+        );
+
+        assertEquals(1, selections.size());
+        assertEquals(RenderableKind.WALL, selections.getFirst().kind());
+        assertEquals(fullyContainedWall.id().toString(), selections.getFirst().elementId());
+    }
+
+    @Test
     void trifftRundesRaumobjektNichtNurUeberSeineBoundingBox() {
         Level level = new Level("Erdgeschoss");
         RoomObject table = RoomObject.create(
