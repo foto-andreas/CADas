@@ -709,11 +709,13 @@ class CadWorkbenchTest {
         });
 
         Assertions.assertEquals("Unten links", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        Assertions.assertEquals("LEFT_TO_RIGHT", aufFxThread(workbench::automationSurfaceLayoutDirection));
         aufFxThread(() -> {
             workbench.automationInvoke("surfaceLayoutCornerNext", null);
             return null;
         });
         Assertions.assertEquals("Unten rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        Assertions.assertEquals("LEFT_TO_RIGHT", aufFxThread(workbench::automationSurfaceLayoutDirection));
         aufFxThread(() -> {
             workbench.automationInvoke("addSurfaceLayer", null);
             return null;
@@ -724,22 +726,38 @@ class CadWorkbenchTest {
                 .layers()
                 .getFirst());
         Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, angelegt.layoutAnchor());
+        Assertions.assertTrue(angelegt.layoutRotatedQuarterTurn());
 
         aufFxThread(() -> {
             workbench.automationSelectSurfaceLayer(0);
-            workbench.automationInvoke("surfaceLayoutCornerNext", null);
-            workbench.automationSetSurfaceLayoutDirection("LEFT_TO_RIGHT");
+            workbench.automationSetSurfaceLayoutDirection("RIGHT_TO_LEFT");
             workbench.automationInvoke("updateSurfaceLayer", null);
             return null;
         });
 
-        Assertions.assertEquals("Oben links", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
-        SurfaceLayer aktualisiert = aufFxThread(() -> workbench.project.primaryLevel()
+        Assertions.assertEquals("Unten rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        Assertions.assertEquals("RIGHT_TO_LEFT", aufFxThread(workbench::automationSurfaceLayoutDirection));
+        SurfaceLayer ohneVierteldrehung = aufFxThread(() -> workbench.project.primaryLevel()
                 .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
                 .layers()
                 .getFirst());
-        Assertions.assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, aktualisiert.layoutAnchor());
-        Assertions.assertFalse(aktualisiert.layoutRotatedQuarterTurn());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, ohneVierteldrehung.layoutAnchor());
+        Assertions.assertFalse(ohneVierteldrehung.layoutRotatedQuarterTurn());
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("surfaceLayoutCornerNext", null);
+            workbench.automationInvoke("updateSurfaceLayer", null);
+            return null;
+        });
+
+        Assertions.assertEquals("Oben rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        Assertions.assertEquals("RIGHT_TO_LEFT", aufFxThread(workbench::automationSurfaceLayoutDirection));
+        SurfaceLayer weitergeschaltet = aufFxThread(() -> workbench.project.primaryLevel()
+                .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
+                .layers()
+                .getFirst());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, weitergeschaltet.layoutAnchor());
+        Assertions.assertTrue(weitergeschaltet.layoutRotatedQuarterTurn());
     }
 
     @Test
@@ -791,10 +809,10 @@ class CadWorkbenchTest {
                 .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
                 .layers()
                 .getFirst());
-        Assertions.assertEquals(1_000.0, aktualisiert.tileWidth().toMillimeters(), 0.001);
-        Assertions.assertEquals(600.0, aktualisiert.tileHeight().toMillimeters(), 0.001);
+        Assertions.assertEquals(600.0, aktualisiert.tileWidth().toMillimeters(), 0.001);
+        Assertions.assertEquals(1_000.0, aktualisiert.tileHeight().toMillimeters(), 0.001);
         Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, aktualisiert.layoutAnchor());
-        Assertions.assertFalse(aktualisiert.layoutRotatedQuarterTurn());
+        Assertions.assertTrue(aktualisiert.layoutRotatedQuarterTurn());
     }
 
     @Test

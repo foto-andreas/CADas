@@ -4094,53 +4094,82 @@ public final class CadWorkbench extends BorderPane {
             SurfaceLayer layer,
             List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles
     ) {
-        SurfaceRectangleTileLayoutService.PlacedSurfaceTile firstTile = firstSurfaceTileForDirectionArrow(layer, tiles);
-        if (firstTile == null) {
+        boolean verticalArrow = layer.layoutRotatedQuarterTurn();
+        for (SurfaceRectangleTileLayoutService.PlacedSurfaceTile tile : orderedSurfaceTilesForDirectionArrow(layer, tiles)) {
+            double tileX = toScreenX(tile.x());
+            double tileY = toScreenY(tile.y());
+            double tileWidth = tile.width() * scale();
+            double tileHeight = tile.height() * scale();
+            double primarySpan = verticalArrow ? tileHeight : tileWidth;
+            double secondarySpan = verticalArrow ? tileWidth : tileHeight;
+            if (primarySpan < 8.0 || secondarySpan < 4.5) {
+                continue;
+            }
+            double padding = Math.max(1.5, Math.min(primarySpan * 0.16, secondarySpan * 0.22));
+            Point2D start;
+            Point2D end;
+            double bubbleX;
+            double bubbleY;
+            double bubbleWidth;
+            double bubbleHeight;
+            if (verticalArrow) {
+                double topY = tileY + padding;
+                double bottomY = tileY + tileHeight - padding;
+                if (bottomY - topY < 4.0) {
+                    continue;
+                }
+                double centerX = tileX + tileWidth / 2.0;
+                start = startsAtMaximumY(layer.layoutAnchor())
+                        ? new Point2D(centerX, bottomY)
+                        : new Point2D(centerX, topY);
+                end = startsAtMaximumY(layer.layoutAnchor())
+                        ? new Point2D(centerX, topY)
+                        : new Point2D(centerX, bottomY);
+                bubbleWidth = Math.max(6.0, Math.min(tileWidth - 1.0, 12.0));
+                bubbleHeight = Math.max(8.0, Math.min(tileHeight - 1.0, Math.abs(end.getY() - start.getY()) + 2.0 * padding));
+                bubbleX = centerX - bubbleWidth / 2.0;
+                bubbleY = Math.max(tileY + 0.5, Math.min(start.getY(), end.getY()) - padding);
+            } else {
+                double leftX = tileX + padding;
+                double rightX = tileX + tileWidth - padding;
+                if (rightX - leftX < 4.0) {
+                    continue;
+                }
+                double centerY = tileY + tileHeight / 2.0;
+                start = startsAtMaximumX(layer.layoutAnchor())
+                        ? new Point2D(rightX, centerY)
+                        : new Point2D(leftX, centerY);
+                end = startsAtMaximumX(layer.layoutAnchor())
+                        ? new Point2D(leftX, centerY)
+                        : new Point2D(rightX, centerY);
+                bubbleWidth = Math.max(8.0, Math.min(tileWidth - 1.0, Math.abs(end.getX() - start.getX()) + 2.0 * padding));
+                bubbleHeight = Math.max(6.0, Math.min(tileHeight - 1.0, 12.0));
+                bubbleX = Math.max(tileX + 0.5, Math.min(start.getX(), end.getX()) - padding);
+                bubbleY = centerY - bubbleHeight / 2.0;
+            }
+            graphics.setFill(Color.color(0.98, 0.97, 0.93, 0.82));
+            graphics.fillRoundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, bubbleHeight, bubbleHeight);
+            strokeSurfaceLayerDirectionArrow(graphics, start, end, Color.color(0.15, 0.12, 0.10, 0.95), Math.max(1.2, Math.min(2.2, Math.min(bubbleWidth, bubbleHeight) * 0.18)));
             return;
         }
-        double tileX = toScreenX(firstTile.x());
-        double tileY = toScreenY(firstTile.y());
-        double tileWidth = firstTile.width() * scale();
-        double tileHeight = firstTile.height() * scale();
-        if (tileWidth < 6.0 || tileHeight < 5.0) {
-            return;
-        }
-        double padding = Math.max(1.5, Math.min(tileWidth * 0.16, tileHeight * 0.22));
-        double leftX = tileX + padding;
-        double rightX = tileX + tileWidth - padding;
-        if (rightX - leftX < 4.0) {
-            return;
-        }
-        double centerY = tileY + tileHeight / 2.0;
-        Point2D start = layer.layoutDirection() == SurfaceLayoutDirection.RIGHT_TO_LEFT
-                ? new Point2D(rightX, centerY)
-                : new Point2D(leftX, centerY);
-        Point2D end = layer.layoutDirection() == SurfaceLayoutDirection.RIGHT_TO_LEFT
-                ? new Point2D(leftX, centerY)
-                : new Point2D(rightX, centerY);
-        double bubbleWidth = Math.max(8.0, Math.min(tileWidth - 1.0, Math.abs(end.getX() - start.getX()) + 2.0 * padding));
-        double bubbleHeight = Math.max(6.0, Math.min(tileHeight - 1.0, 12.0));
-        double bubbleX = Math.max(tileX + 0.5, Math.min(start.getX(), end.getX()) - padding);
-        double bubbleY = centerY - bubbleHeight / 2.0;
-        graphics.setFill(Color.color(0.98, 0.97, 0.93, 0.82));
-        graphics.fillRoundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, bubbleHeight, bubbleHeight);
-        strokeSurfaceLayerDirectionArrow(graphics, start, end, Color.color(0.15, 0.12, 0.10, 0.95), Math.max(1.2, Math.min(2.2, bubbleHeight * 0.18)));
     }
 
-    private SurfaceRectangleTileLayoutService.PlacedSurfaceTile firstSurfaceTileForDirectionArrow(
+    private List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> orderedSurfaceTilesForDirectionArrow(
             SurfaceLayer layer,
             List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles
     ) {
         Comparator<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> rowComparator = Comparator.comparingDouble(tile ->
-                layer.layoutRotation().maximumYStart() ? -(tile.y() + tile.height()) : tile.y());
+                startsAtMaximumY(layer.layoutAnchor()) ? -(tile.y() + tile.height()) : tile.y());
         Comparator<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> columnComparator = Comparator.comparingDouble(tile ->
-                layer.layoutDirection() == SurfaceLayoutDirection.RIGHT_TO_LEFT ? -(tile.x() + tile.width()) : tile.x());
+                startsAtMaximumX(layer.layoutAnchor()) ? -(tile.x() + tile.width()) : tile.x());
+        Comparator<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> startComparator = layer.layoutRotatedQuarterTurn()
+                ? columnComparator.thenComparing(rowComparator)
+                : rowComparator.thenComparing(columnComparator);
         return tiles.stream()
-                .min(rowComparator
-                        .thenComparing(columnComparator)
+                .sorted(startComparator
                         .thenComparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::y)
                         .thenComparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::x))
-                .orElse(null);
+                .toList();
     }
 
     private void strokeSurfaceLayerDirectionArrow(GraphicsContext graphics, Point2D start, Point2D end, Color color, double lineWidth) {
@@ -6707,8 +6736,8 @@ public final class CadWorkbench extends BorderPane {
                 "",
                 currentSurfaceLayerName(),
                 currentSurfaceLayerThickness(),
-                currentSurfaceTileWidth(),
-                currentSurfaceTileHeight(),
+                currentStoredSurfaceTileWidth(),
+                currentStoredSurfaceTileHeight(),
                 currentSurfaceLayoutMode(),
                 currentSurfaceLayoutOffset(),
                 currentSurfaceMinimumOffset(),
@@ -6716,7 +6745,7 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceMinimumStartEndMargin(),
                 currentSurfaceFreeMargins(),
                 currentSurfaceLayoutAnchor(),
-                false,
+                currentSurfaceLayoutRotatedQuarterTurn(),
                 Length.zero(),
                 Length.zero(),
                 currentSurfaceJointWidth(),
@@ -6792,7 +6821,9 @@ public final class CadWorkbench extends BorderPane {
         setLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, preset.thickness(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, displayTileWidth(preset.tileWidth(), preset.tileHeight(), preset.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
         setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, displayTileHeight(preset.tileWidth(), preset.tileHeight(), preset.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
-        applySurfaceLayoutAnchorSelection(normalizedSurfaceLayoutAnchor(preset.layoutAnchor(), preset.layoutDirection()));
+        SurfaceLayoutAnchor normalizedAnchor = normalizedSurfaceLayoutAnchor(preset.layoutAnchor());
+        applySurfaceLayoutAnchorSelection(normalizedAnchor);
+        surfaceLayoutDirectionSelector.setValue(surfaceLayoutSelectionDirection(normalizedAnchor, preset.layoutRotatedQuarterTurn()));
         surfaceLayoutModeSelector.setValue(preset.layoutMode());
         setLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, preset.offset(), LengthUnit.CENTIMETER);
         setLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, preset.minimumOffset(), LengthUnit.CENTIMETER);
@@ -7383,7 +7414,7 @@ public final class CadWorkbench extends BorderPane {
                 + " | "
                 + formatSurfaceLayoutCorner(layer.layoutAnchor())
                 + " | "
-                + layer.layoutDirection().label()
+                + formatSurfaceLayoutDirection(layer.layoutAnchor(), layer.layoutRotatedQuarterTurn())
                 + " | "
                 + tileCount
                 + " Elemente | "
@@ -7421,7 +7452,9 @@ public final class CadWorkbench extends BorderPane {
         syncLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, selectedLayer.thickness(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, displayTileWidth(selectedLayer.tileWidth(), selectedLayer.tileHeight(), selectedLayer.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, displayTileHeight(selectedLayer.tileWidth(), selectedLayer.tileHeight(), selectedLayer.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
-        applySurfaceLayoutAnchorSelection(normalizedSurfaceLayoutAnchor(selectedLayer.layoutAnchor(), selectedLayer.layoutDirection()));
+        SurfaceLayoutAnchor normalizedAnchor = normalizedSurfaceLayoutAnchor(selectedLayer.layoutAnchor());
+        applySurfaceLayoutAnchorSelection(normalizedAnchor);
+        surfaceLayoutDirectionSelector.setValue(surfaceLayoutSelectionDirection(normalizedAnchor, selectedLayer.layoutRotatedQuarterTurn()));
         surfaceLayoutModeSelector.setValue(selectedLayer.layoutMode());
         syncLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, selectedLayer.layoutOffset(), LengthUnit.CENTIMETER);
         syncLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, selectedLayer.minimumOffset(), LengthUnit.CENTIMETER);
@@ -7474,8 +7507,8 @@ public final class CadWorkbench extends BorderPane {
                     currentSurfaceLayerName(),
                     currentSurfaceLayerThickness(),
                     selectedLayer.visible(),
-                    currentSurfaceTileWidth(),
-                    currentSurfaceTileHeight(),
+                    currentStoredSurfaceTileWidth(),
+                    currentStoredSurfaceTileHeight(),
                     currentSurfaceLayoutMode(),
                     currentSurfaceLayoutOffset(),
                     currentSurfaceMinimumOffset(),
@@ -7488,7 +7521,7 @@ public final class CadWorkbench extends BorderPane {
                     currentSurfaceJointWidth(),
                     currentSurfaceCutRestriction(),
                     currentSurfaceCoveringSource(),
-                    false
+                    currentSurfaceLayoutRotatedQuarterTurn()
             ));
         }
         afterSurfaceLayerMutation("Ebene aktualisiert.");
@@ -7622,8 +7655,8 @@ public final class CadWorkbench extends BorderPane {
         return SurfaceLayer.create(
                 currentSurfaceLayerName(),
                 currentSurfaceLayerThickness(),
-                currentSurfaceTileWidth(),
-                currentSurfaceTileHeight(),
+                currentStoredSurfaceTileWidth(),
+                currentStoredSurfaceTileHeight(),
                 currentSurfaceLayoutMode(),
                 currentSurfaceLayoutOffset(),
                 currentSurfaceMinimumOffset(),
@@ -7632,7 +7665,9 @@ public final class CadWorkbench extends BorderPane {
                 currentSurfaceJointWidth(),
                 currentSurfaceCutRestriction(),
                 currentSurfaceCoveringSource()
-        ).withFreeMargins(currentSurfaceFreeMargins()).withLayoutAnchor(currentSurfaceLayoutAnchor());
+        ).withFreeMargins(currentSurfaceFreeMargins())
+                .withLayoutAnchor(currentSurfaceLayoutAnchor())
+                .withLayoutRotatedQuarterTurn(currentSurfaceLayoutRotatedQuarterTurn());
     }
 
     private String currentSurfaceLayerName() {
@@ -7652,6 +7687,18 @@ public final class CadWorkbench extends BorderPane {
         return parseLength(surfaceTileHeightField, surfaceTileHeightUnit.getValue()).orElse(Length.of(30, LengthUnit.CENTIMETER));
     }
 
+    private Length currentStoredSurfaceTileWidth() {
+        return currentSurfaceLayoutRotatedQuarterTurn()
+                ? currentSurfaceTileHeight()
+                : currentSurfaceTileWidth();
+    }
+
+    private Length currentStoredSurfaceTileHeight() {
+        return currentSurfaceLayoutRotatedQuarterTurn()
+                ? currentSurfaceTileWidth()
+                : currentSurfaceTileHeight();
+    }
+
     private Length displayTileWidth(Length tileWidth, Length tileHeight, boolean rotatedQuarterTurn) {
         return rotatedQuarterTurn ? tileHeight : tileWidth;
     }
@@ -7669,37 +7716,19 @@ public final class CadWorkbench extends BorderPane {
         if (direction == null) {
             return;
         }
-        SurfaceLayoutAnchor currentAnchor = currentSurfaceLayoutAnchor();
-        if (startsAtMaximumX(currentAnchor) == (direction == SurfaceLayoutDirection.RIGHT_TO_LEFT)) {
-            updateSurfaceLayoutCornerLabel();
-            return;
-        }
-        applySurfaceLayoutAnchorSelection(direction == SurfaceLayoutDirection.RIGHT_TO_LEFT
-                ? (startsAtMaximumY(currentAnchor) ? SurfaceLayoutAnchor.MAX_X_MAX_Y : SurfaceLayoutAnchor.MAX_X_MIN_Y)
-                : (startsAtMaximumY(currentAnchor) ? SurfaceLayoutAnchor.MIN_X_MAX_Y : SurfaceLayoutAnchor.MIN_X_MIN_Y));
-    }
-
-    private void applySurfaceLayoutAnchorSelection(SurfaceLayoutAnchor anchor) {
-        SurfaceLayoutAnchor manualAnchor = anchor == null || anchor == SurfaceLayoutAnchor.AUTO
-                ? SurfaceLayoutAnchor.MIN_X_MIN_Y
-                : anchor;
-        surfaceLayoutAnchorSelection.set(manualAnchor);
-        SurfaceLayoutDirection direction = startsAtMaximumX(manualAnchor)
-                ? SurfaceLayoutDirection.RIGHT_TO_LEFT
-                : SurfaceLayoutDirection.LEFT_TO_RIGHT;
-        if (surfaceLayoutDirectionSelector.getValue() != direction) {
-            surfaceLayoutDirectionSelector.setValue(direction);
-        }
         updateSurfaceLayoutCornerLabel();
     }
 
-    private SurfaceLayoutAnchor normalizedSurfaceLayoutAnchor(SurfaceLayoutAnchor anchor, SurfaceLayoutDirection direction) {
+    private void applySurfaceLayoutAnchorSelection(SurfaceLayoutAnchor anchor) {
+        surfaceLayoutAnchorSelection.set(normalizedSurfaceLayoutAnchor(anchor));
+        updateSurfaceLayoutCornerLabel();
+    }
+
+    private SurfaceLayoutAnchor normalizedSurfaceLayoutAnchor(SurfaceLayoutAnchor anchor) {
         if (anchor != null && anchor != SurfaceLayoutAnchor.AUTO) {
             return anchor;
         }
-        return direction == SurfaceLayoutDirection.RIGHT_TO_LEFT
-                ? SurfaceLayoutAnchor.MAX_X_MIN_Y
-                : SurfaceLayoutAnchor.MIN_X_MIN_Y;
+        return SurfaceLayoutAnchor.MIN_X_MIN_Y;
     }
 
     private void updateSurfaceLayoutCornerLabel() {
@@ -7721,13 +7750,37 @@ public final class CadWorkbench extends BorderPane {
         if (selection != null) {
             return selection;
         }
-        return startsAtMaximumX(currentSurfaceLayoutAnchor())
-                ? SurfaceLayoutDirection.RIGHT_TO_LEFT
-                : SurfaceLayoutDirection.LEFT_TO_RIGHT;
+        return SurfaceLayoutDirection.LEFT_TO_RIGHT;
+    }
+
+    private boolean currentSurfaceLayoutRotatedQuarterTurn() {
+        return surfaceLayoutRotatedQuarterTurn(currentSurfaceLayoutAnchor(), currentSurfaceLayoutDirection());
     }
 
     private de.schrell.cadas.domain.model.SurfaceLayoutAnchor currentSurfaceLayoutAnchor() {
         return Optional.ofNullable(surfaceLayoutAnchorSelection.get()).orElse(SurfaceLayoutAnchor.MIN_X_MIN_Y);
+    }
+
+    private SurfaceLayoutDirection surfaceLayoutSelectionDirection(SurfaceLayoutAnchor anchor, boolean rotatedQuarterTurn) {
+        return rotatedQuarterTurn == surfaceLayoutCornerParity(anchor)
+                ? SurfaceLayoutDirection.LEFT_TO_RIGHT
+                : SurfaceLayoutDirection.RIGHT_TO_LEFT;
+    }
+
+    private boolean surfaceLayoutRotatedQuarterTurn(SurfaceLayoutAnchor anchor, SurfaceLayoutDirection direction) {
+        boolean clockwiseDirection = direction != SurfaceLayoutDirection.RIGHT_TO_LEFT;
+        return clockwiseDirection
+                ? surfaceLayoutCornerParity(anchor)
+                : !surfaceLayoutCornerParity(anchor);
+    }
+
+    private boolean surfaceLayoutCornerParity(SurfaceLayoutAnchor anchor) {
+        SurfaceLayoutAnchor manualAnchor = normalizedSurfaceLayoutAnchor(anchor);
+        return startsAtMaximumX(manualAnchor) ^ startsAtMaximumY(manualAnchor);
+    }
+
+    private String formatSurfaceLayoutDirection(SurfaceLayoutAnchor anchor, boolean rotatedQuarterTurn) {
+        return surfaceLayoutSelectionDirection(anchor, rotatedQuarterTurn).label();
     }
 
     private SurfaceLayoutMode currentSurfaceLayoutMode() {
@@ -9970,6 +10023,12 @@ public final class CadWorkbench extends BorderPane {
         SurfaceLayoutDirection direction = SurfaceLayoutDirection.valueOf(directionName.trim().toUpperCase(Locale.ROOT));
         surfaceLayoutDirectionSelector.setValue(direction);
         render();
+    }
+
+    public String automationSurfaceLayoutDirection() {
+        return Optional.ofNullable(surfaceLayoutDirectionSelector.getValue())
+                .map(Enum::name)
+                .orElse("");
     }
 
     public String automationSurfaceLayoutCornerLabel() {
