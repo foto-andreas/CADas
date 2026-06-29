@@ -4066,13 +4066,13 @@ public final class CadWorkbench extends BorderPane {
         double tileY = toScreenY(firstTile.y());
         double tileWidth = firstTile.width() * scale();
         double tileHeight = firstTile.height() * scale();
-        if (tileWidth < 18.0 || tileHeight < 12.0) {
+        if (tileWidth < 6.0 || tileHeight < 5.0) {
             return;
         }
-        double padding = Math.max(6.0, Math.min(tileWidth * 0.22, tileHeight * 0.35));
+        double padding = Math.max(1.5, Math.min(tileWidth * 0.16, tileHeight * 0.22));
         double leftX = tileX + padding;
         double rightX = tileX + tileWidth - padding;
-        if (rightX - leftX < 12.0) {
+        if (rightX - leftX < 4.0) {
             return;
         }
         double centerY = tileY + tileHeight / 2.0;
@@ -4082,8 +4082,13 @@ public final class CadWorkbench extends BorderPane {
         Point2D end = layer.layoutDirection() == SurfaceLayoutDirection.RIGHT_TO_LEFT
                 ? new Point2D(leftX, centerY)
                 : new Point2D(rightX, centerY);
-        strokeSurfaceLayerDirectionArrow(graphics, start, end, Color.color(0.98, 0.97, 0.93, 0.90), 4.2);
-        strokeSurfaceLayerDirectionArrow(graphics, start, end, Color.color(0.15, 0.12, 0.10, 0.95), 2.2);
+        double bubbleWidth = Math.max(8.0, Math.min(tileWidth - 1.0, Math.abs(end.getX() - start.getX()) + 2.0 * padding));
+        double bubbleHeight = Math.max(6.0, Math.min(tileHeight - 1.0, 12.0));
+        double bubbleX = Math.max(tileX + 0.5, Math.min(start.getX(), end.getX()) - padding);
+        double bubbleY = centerY - bubbleHeight / 2.0;
+        graphics.setFill(Color.color(0.98, 0.97, 0.93, 0.82));
+        graphics.fillRoundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, bubbleHeight, bubbleHeight);
+        strokeSurfaceLayerDirectionArrow(graphics, start, end, Color.color(0.15, 0.12, 0.10, 0.95), Math.max(1.2, Math.min(2.2, bubbleHeight * 0.18)));
     }
 
     private SurfaceRectangleTileLayoutService.PlacedSurfaceTile firstSurfaceTileForDirectionArrow(
@@ -4110,7 +4115,7 @@ public final class CadWorkbench extends BorderPane {
         }
         Point2D unit = delta.normalize();
         Point2D normal = new Point2D(-unit.getY(), unit.getX());
-        double headLength = Math.min(10.0, Math.max(6.0, length * 0.18));
+        double headLength = Math.min(10.0, Math.max(3.5, length * 0.20));
         double headWidth = headLength * 0.55;
         Point2D headBase = end.subtract(unit.multiply(headLength));
         graphics.setStroke(color);

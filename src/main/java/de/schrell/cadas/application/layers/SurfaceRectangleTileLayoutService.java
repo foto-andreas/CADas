@@ -4,6 +4,7 @@ import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService.C
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
 import java.util.ArrayList;
@@ -31,14 +32,24 @@ public final class SurfaceRectangleTileLayoutService {
         if (effectiveRectangles.isEmpty()) {
             return List.of();
         }
+        if (layer.layoutAnchor() == SurfaceLayoutAnchor.AUTO) {
+            return tilesForRectanglesInCanonicalSpace(effectiveRectangles, layer);
+        }
+        SurfaceBounds originalBounds = bounds(effectiveRectangles);
+        LayoutTransform transform = LayoutTransform.forAnchor(originalBounds, layer.layoutAnchor());
+        List<PlacedSurfaceTile> transformedTiles = tilesForRectanglesInCanonicalSpace(transform.transformRectangles(effectiveRectangles), layer);
+        return sortTiles(transform.restoreTiles(transformedTiles));
+    }
+
+    private List<PlacedSurfaceTile> tilesForRectanglesInCanonicalSpace(List<CellRectangle> rectangles, SurfaceLayer layer) {
         double tileWidth = layer.effectiveTileWidth().toMillimeters();
         double tileHeight = layer.effectiveTileHeight().toMillimeters();
         if (tileWidth <= EPSILON || tileHeight <= EPSILON) {
             return List.of();
         }
-        SurfaceBounds bounds = bounds(effectiveRectangles);
-        AnchorPair anchors = bestAnchors(effectiveRectangles, layer, bounds);
-        return clipTilesToRectangles(effectiveRectangles, layer, bounds, anchors.anchorX(), anchors.anchorY());
+        SurfaceBounds bounds = bounds(rectangles);
+        AnchorPair anchors = bestAnchors(rectangles, layer, bounds);
+        return clipTilesToRectangles(rectangles, layer, bounds, anchors.anchorX(), anchors.anchorY());
     }
 
     private AnchorPair bestAnchors(List<CellRectangle> rectangles, SurfaceLayer layer, SurfaceBounds bounds) {
@@ -260,11 +271,16 @@ public final class SurfaceRectangleTileLayoutService {
         for (List<PlacedSurfaceTile> pieces : piecesByTile.values()) {
             mergedTiles.addAll(mergeTouchingPieces(pieces));
         }
-        mergedTiles.sort(Comparator.comparingInt(PlacedSurfaceTile::row)
+        return sortTiles(mergedTiles);
+    }
+
+    private List<PlacedSurfaceTile> sortTiles(List<PlacedSurfaceTile> tiles) {
+        List<PlacedSurfaceTile> sortedTiles = new ArrayList<>(tiles);
+        sortedTiles.sort(Comparator.comparingInt(PlacedSurfaceTile::row)
                 .thenComparingInt(PlacedSurfaceTile::column)
                 .thenComparingDouble(PlacedSurfaceTile::y)
                 .thenComparingDouble(PlacedSurfaceTile::x));
-        return List.copyOf(mergedTiles);
+        return List.copyOf(sortedTiles);
     }
 
     private List<PlacedSurfaceTile> mergeTouchingPieces(List<PlacedSurfaceTile> pieces) {
@@ -444,6 +460,56 @@ public final class SurfaceRectangleTileLayoutService {
     }
 
     private record AnchorPair(double anchorX, double anchorY) {
+    }
+
+    private record LayoutTransform(
+            double minX,
+            double maxX,
+            double minY,
+            double maxY,
+            boolean mirrorX,
+            boolean mirrorY
+    ) {
+
+        static LayoutTransform forAnchor(SurfaceBounds bounds, SurfaceLayoutAnchor anchor) {
+            return new LayoutTransform(
+                    bounds.minX(),
+                    bounds.maxX(),
+                    bounds.minY(),
+                    bounds.maxY(),
+                    anchor == SurfaceLayoutAnchor.MAX_X_MIN_Y || anchor == SurfaceLayoutAnchor.MAX_X_MAX_Y,
+                    anchor == SurfaceLayoutAnchor.MIN_X_MAX_Y || anchor == SurfaceLayoutAnchor.MAX_X_MAX_Y
+            );
+        }
+
+        List<CellRectangle> transformRectangles(List<CellRectangle> rectangles) {
+            if (!mirrorX && !mirrorY) {
+                return rectangles;
+            }
+            List<CellRectangle> transformed = new ArrayList<>(rectangles.size());
+            for (CellRectangle rectangle : rectangles) {
+                transformed.add(new CellRectangle(
+                        mirrorX ? minX + maxX - rectangle.maxX() : rectangle.minX(),
+                        mirrorX ? minX + maxX - rectangle.minX() : rectangle.maxX(),
+                        mirrorY ? minY + maxY - rectangle.maxY() : rectangle.minY(),
+                        mirrorY ? minY + maxY - rectangle.minY() : rectangle.maxY()
+                ));
+            }
+            return List.copyOf(transformed);
+        }
+
+        List<PlacedSurfaceTile> restoreTiles(List<PlacedSurfaceTile> tiles) {
+            if (!mirrorX && !mirrorY) {
+                return tiles;
+            }
+            List<PlacedSurfaceTile> restored = new ArrayList<>(tiles.size());
+            for (PlacedSurfaceTile tile : tiles) {
+                double restoredX = mirrorX ? minX + maxX - tile.x() - tile.width() : tile.x();
+                double restoredY = mirrorY ? minY + maxY - tile.y() - tile.height() : tile.y();
+                restored.add(new PlacedSurfaceTile(tile.column(), tile.row(), restoredX, restoredY, tile.width(), tile.height()));
+            }
+            return List.copyOf(restored);
+        }
     }
 
     private record LayoutScore(

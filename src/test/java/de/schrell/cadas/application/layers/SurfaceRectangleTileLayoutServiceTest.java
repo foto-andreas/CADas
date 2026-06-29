@@ -12,7 +12,9 @@ import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
+import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
 
@@ -88,6 +90,46 @@ class SurfaceRectangleTileLayoutServiceTest {
         );
 
         assertTrue(full.equals(split), "Eine reine Teilung des Raums darf das Belagsraster nicht neu starten.");
+    }
+
+    @Test
+    void beachtetDieGewaehlteStarteckeBeiRechteckigenBelaegen() {
+        List<CellRectangle> rectangles = List.of(new CellRectangle(100.0, 950.0, 100.0, 1_100.0));
+        SurfaceLayer leftToRight = SurfaceLayer.create(
+                "Variotherm",
+                Length.ofMillimeters(18),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(1_000),
+                SurfaceLayoutMode.FIXED,
+                Length.zero(),
+                Length.zero(),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(100),
+                Length.zero(),
+                SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
+                "Test"
+        ).withLayoutOrientation(SurfaceLayoutRotation.DEGREES_0, SurfaceLayoutDirection.LEFT_TO_RIGHT);
+        SurfaceLayer rightToLeft = leftToRight.withLayoutOrientation(SurfaceLayoutRotation.DEGREES_0, SurfaceLayoutDirection.RIGHT_TO_LEFT);
+
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> leftTiles = service.tilesForRectangles(rectangles, leftToRight);
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> rightTiles = service.tilesForRectangles(rectangles, rightToLeft);
+
+        assertTrue(leftTiles.stream().anyMatch(tile ->
+                        Math.abs(tile.x() - 100.0) < 0.001
+                                && Math.abs(tile.width() - 600.0) < 0.001),
+                "Links-nach-rechts muss mit einer vollen Platte an Xmin beginnen.");
+        assertTrue(leftTiles.stream().anyMatch(tile ->
+                        Math.abs(tile.x() - 700.0) < 0.001
+                                && Math.abs(tile.width() - 250.0) < 0.001),
+                "Links-nach-rechts muss den Zuschnitt an Xmax lassen.");
+        assertTrue(rightTiles.stream().anyMatch(tile ->
+                        Math.abs(tile.x() - 100.0) < 0.001
+                                && Math.abs(tile.width() - 250.0) < 0.001),
+                "Rechts-nach-links muss den Zuschnitt an Xmin lassen.");
+        assertTrue(rightTiles.stream().anyMatch(tile ->
+                        Math.abs(tile.x() - 350.0) < 0.001
+                                && Math.abs(tile.width() - 600.0) < 0.001),
+                "Rechts-nach-links muss mit einer vollen Platte an Xmax beginnen.");
     }
 
     @Test

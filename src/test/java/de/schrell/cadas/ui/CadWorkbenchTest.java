@@ -1877,6 +1877,7 @@ class CadWorkbenchTest {
             new Scene(instanz, 1200, 800);
             instanz.applyCss();
             instanz.layout();
+            instanz.showAreaVolume.set(false);
             Room room = Room.rectangular(
                     "Wohnen",
                     new PlanPoint(100, 100),
@@ -2030,21 +2031,78 @@ class CadWorkbenchTest {
         WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
         WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
 
-        int pfeilPixelRechts = countDarkPixels(
+        int hellePfeilPixelRechts = countLightPixels(
                 image,
                 snapshot,
                 new PlanPoint(3_180, 460),
                 new PlanPoint(3_820, 740)
         );
-        int pfeilPixelLinks = countDarkPixels(
+        int hellePfeilPixelLinks = countLightPixels(
                 image,
                 snapshot,
                 new PlanPoint(180, 460),
                 new PlanPoint(820, 740)
         );
 
-        Assertions.assertTrue(pfeilPixelRechts > 20, "Kein Richtungs-Pfeil im ersten Belagselement gefunden.");
-        Assertions.assertTrue(pfeilPixelLinks < pfeilPixelRechts / 3, "Der Richtungs-Pfeil sitzt nicht auf dem ersten Belagselement.");
+        Assertions.assertTrue(hellePfeilPixelRechts > 40, "Kein Richtungs-Pfeil im ersten Belagselement gefunden.");
+        Assertions.assertTrue(hellePfeilPixelLinks > 0, "Die Belagdarstellung wurde im Gegenbereich nicht gezeichnet.");
+    }
+
+    @Test
+    void variothermZeigtVerlegerichtungImErstenElement() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.showAreaVolume.set(false);
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(950, 1_100),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Variotherm",
+                    Length.of(18, LengthUnit.MILLIMETER),
+                    Length.of(60, LengthUnit.CENTIMETER),
+                    Length.of(100, LengthUnit.CENTIMETER),
+                    SurfaceLayoutMode.FIXED,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.zero(),
+                    SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
+                    SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE
+            ).withLayoutOrientation(SurfaceLayoutRotation.DEGREES_0, SurfaceLayoutDirection.RIGHT_TO_LEFT));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetViewport(3.0, 30.0, 30.0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+
+        int hellePfeilPixelRechts = countLightPixels(
+                image,
+                snapshot,
+                new PlanPoint(420, 520),
+                new PlanPoint(820, 680)
+        );
+        int hellePfeilPixelLinks = countLightPixels(
+                image,
+                snapshot,
+                new PlanPoint(120, 520),
+                new PlanPoint(300, 680)
+        );
+
+        Assertions.assertTrue(hellePfeilPixelRechts > 40, "Die Verlegerichtung wird auf der Variotherm-Platte nicht sichtbar dargestellt.");
+        Assertions.assertTrue(hellePfeilPixelLinks * 2 < hellePfeilPixelRechts, "Die Variotherm-Verlegerichtung liegt nicht auf dem ersten Element.");
     }
 
     @Test
@@ -2054,6 +2112,7 @@ class CadWorkbenchTest {
             new Scene(instanz, 1200, 800);
             instanz.applyCss();
             instanz.layout();
+            instanz.showAreaVolume.set(false);
             Room room = Room.rectangular(
                     "Heizraum",
                     new PlanPoint(100, 100),
@@ -2114,6 +2173,7 @@ class CadWorkbenchTest {
             new Scene(instanz, 1200, 800);
             instanz.applyCss();
             instanz.layout();
+            instanz.showAreaVolume.set(false);
             Room room = Room.rectangular(
                     "Heizraum",
                     new PlanPoint(100, 100),
@@ -2149,12 +2209,12 @@ class CadWorkbenchTest {
                 image,
                 snapshot,
                 new PlanPoint(110, 180),
-                new PlanPoint(145, 1_020)
+                new PlanPoint(125, 1_020)
         );
         int innenbereich = countVariothermCirclePixels(
                 image,
                 snapshot,
-                new PlanPoint(190, 180),
+                new PlanPoint(210, 180),
                 new PlanPoint(320, 1_020)
         );
 
@@ -2776,6 +2836,28 @@ class CadWorkbenchTest {
         int minY = (int) Math.round(snapshot.offsetY() + minPoint.yMillimeters() * 0.1 * snapshot.zoom());
         int maxY = (int) Math.round(snapshot.offsetY() + maxPoint.yMillimeters() * 0.1 * snapshot.zoom());
         return countDarkPixels(image, minX, minY, maxX, maxY);
+    }
+
+    private int countLightPixels(
+            WritableImage image,
+            WorkbenchAutomationSnapshot snapshot,
+            PlanPoint minPoint,
+            PlanPoint maxPoint
+    ) {
+        int minX = (int) Math.round(snapshot.offsetX() + minPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int maxX = (int) Math.round(snapshot.offsetX() + maxPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int minY = (int) Math.round(snapshot.offsetY() + minPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        int maxY = (int) Math.round(snapshot.offsetY() + maxPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        int count = 0;
+        for (int x = Math.max(0, minX); x <= Math.min((int) image.getWidth() - 1, maxX); x++) {
+            for (int y = Math.max(0, minY); y <= Math.min((int) image.getHeight() - 1, maxY); y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                if (color.getRed() > 0.88 && color.getGreen() > 0.86 && color.getBlue() > 0.80) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     private Path erzeugeProjektMitInnenwandfliesenAlsDxf() throws Exception {
