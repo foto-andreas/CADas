@@ -67,16 +67,18 @@ public final class SurfaceMaterialReportPdfService {
     public record ExportAssets(
             HeatingPlanGraphicVariant heatingPlanGraphicVariant,
             Map<String, BufferedImage> levelPlanImages,
-            Map<String, BufferedImage> heatingPlanImages
+            Map<String, BufferedImage> heatingPlanImages,
+            Map<String, BufferedImage> materialRoomImages
     ) {
         public ExportAssets {
             Objects.requireNonNull(heatingPlanGraphicVariant, "heatingPlanGraphicVariant darf nicht null sein.");
             levelPlanImages = Map.copyOf(levelPlanImages);
             heatingPlanImages = Map.copyOf(heatingPlanImages);
+            materialRoomImages = Map.copyOf(materialRoomImages);
         }
 
         public static ExportAssets empty() {
-            return new ExportAssets(HeatingPlanGraphicVariant.SVG, Map.of(), Map.of());
+            return new ExportAssets(HeatingPlanGraphicVariant.SVG, Map.of(), Map.of(), Map.of());
         }
     }
 
@@ -104,7 +106,7 @@ public final class SurfaceMaterialReportPdfService {
                 appendMaterialSummary(writer, report.materials());
                 appendHeatingPlans(writer, report.heatingPlans(), exportAssets);
                 appendHeatingElements(writer, report.heatingElements());
-                appendMaterialDetails(writer, report.materials());
+                appendMaterialDetails(writer, report.materials(), exportAssets.materialRoomImages());
                 appendRoomComplexities(writer, report.roomComplexities());
             }
             saveAtomically(document, exportPath);
@@ -217,6 +219,7 @@ public final class SurfaceMaterialReportPdfService {
         if (splitMaterials.isEmpty()) {
             return;
         }
+        writer.gap(6.0f);
         writer.subsection("Trennmerkmale bei mehrfachen Materialnamen");
         writer.table(
                 new TableDefinition(
@@ -286,7 +289,6 @@ public final class SurfaceMaterialReportPdfService {
         );
         writer.subsection("Heizplan-Grafiken");
         Map<String, List<SurfaceMaterialListService.HeatingPlanSummary>> groupedPlans = heatingPlans.stream()
-                .filter(plan -> !plan.objectBased())
                 .collect(java.util.stream.Collectors.groupingBy(
                         plan -> plan.levelName() + "\u0000" + plan.roomName() + "\u0000" + plan.surfacePosition(),
                         LinkedHashMap::new,
@@ -298,8 +300,10 @@ public final class SurfaceMaterialReportPdfService {
             BufferedImage heatingPlanImage = exportAssets.heatingPlanImages().get(heatingPlanImageKey(first));
             if (exportAssets.heatingPlanGraphicVariant() == HeatingPlanGraphicVariant.RASTERGRAFIK && heatingPlanImage != null) {
                 writer.imageBlock(title, heatingPlanImage, HEATING_PLAN_MAX_HEIGHT);
-            } else {
+            } else if (!first.svg().isBlank()) {
                 writer.svgBlock(title, first.svg(), HEATING_PLAN_MAX_HEIGHT);
+            } else {
+                writer.paragraph(title + ": Keine Raumgrafik verfügbar.");
             }
         }
     }
@@ -345,7 +349,11 @@ public final class SurfaceMaterialReportPdfService {
         );
     }
 
-    private void appendMaterialDetails(PdfWriter writer, List<SurfaceMaterialListService.MaterialSummary> materials) throws IOException {
+    private void appendMaterialDetails(
+            PdfWriter writer,
+            List<SurfaceMaterialListService.MaterialSummary> materials,
+            Map<String, BufferedImage> materialRoomImages
+    ) throws IOException {
         writer.section("Beläge");
         if (materials.isEmpty()) {
             writer.paragraph("Keine Beläge vorhanden.");
@@ -379,6 +387,7 @@ public final class SurfaceMaterialReportPdfService {
                 )
         );
         for (SurfaceMaterialListService.MaterialSummary material : materials) {
+            writer.gap(8.0f);
             writer.subsection(material.name());
             writer.table(
                     factTable,
@@ -410,6 +419,7 @@ public final class SurfaceMaterialReportPdfService {
                                 .toList()
                 );
             }
+            appendMaterialRoomImages(writer, material, materialRoomImages);
             writer.caption("Belegte Flächen");
             writer.table(
                     roomEntryTable,
@@ -425,6 +435,30 @@ public final class SurfaceMaterialReportPdfService {
                             .toList()
             );
         }
+    }
+
+    private void appendMaterialRoomImages(
+            PdfWriter writer,
+            SurfaceMaterialListService.MaterialSummary material,
+            Map<String, BufferedImage> materialRoomImages
+    ) throws IOException {
+        if (material.surfaceType() != de.schrell.cadas.domain.model.SurfaceType.FLOOR) {
+            return;
+        }
+        for (SurfaceMaterialListService.MaterialRoomEntry entry : material.roomEntries()) {
+            BufferedImage image = materialRoomImages.get(materialRoomImageKey(material, entry));
+            if (image == null) {
+                continue;
+            }
+            writer.imageBlock("2D-Ansicht " + entry.levelName() + " / " + entry.roomName(), image, LEVEL_PLAN_MAX_HEIGHT);
+        }
+    }
+
+    public static String materialRoomImageKey(
+            SurfaceMaterialListService.MaterialSummary material,
+            SurfaceMaterialListService.MaterialRoomEntry entry
+    ) {
+        return material.lookupKey() + "\u0000" + entry.levelName() + "\u0000" + entry.roomName() + "\u0000" + entry.surfaceDescription();
     }
 
     private void appendRoomComplexities(PdfWriter writer, List<SurfaceMaterialListService.RoomComplexitySummary> roomComplexities) throws IOException {

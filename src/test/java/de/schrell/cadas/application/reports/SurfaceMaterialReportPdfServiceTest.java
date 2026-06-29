@@ -65,7 +65,8 @@ class SurfaceMaterialReportPdfServiceTest {
                 new SurfaceMaterialReportPdfService.ExportAssets(
                         SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK,
                         Map.of("Erdgeschoss", levelImage),
-                        Map.of("Erdgeschoss\u0000Wohnen\u0000Fußboden", heatingImage)
+                        Map.of("Erdgeschoss\u0000Wohnen\u0000Fußboden", heatingImage),
+                        Map.of()
                 )
         );
 

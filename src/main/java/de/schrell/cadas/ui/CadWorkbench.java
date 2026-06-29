@@ -607,6 +607,9 @@ public final class CadWorkbench extends BorderPane {
     private UiErrorDialogs.ErrorPresentation lastErrorDialog = UiErrorDialogs.ErrorPresentation.empty();
     private WarningPresentation lastWarningDialog = WarningPresentation.empty();
     private int rememberedWarningCount;
+    private boolean reportSnapshotRestrictSurfaceLayers;
+    private Set<UUID> reportSnapshotVisibleSurfaceLayerIds = Set.of();
+    private boolean reportSnapshotHideHydronicHeatings;
     private Level.RoomReplacementImpact pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
 
     public CadWorkbench() {
@@ -3803,6 +3806,9 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawHydronicHeatings(GraphicsContext graphics) {
+        if (reportSnapshotHideHydronicHeatings) {
+            return;
+        }
         if (!projectionService.isPlanView(activeView.get())) {
             return;
         }
@@ -3983,11 +3989,24 @@ public final class CadWorkbench extends BorderPane {
         if (stack == null || stack.layers().isEmpty()) {
             return;
         }
+        List<SurfaceLayer> visibleLayers = visiblePlanSurfaceLayers(stack);
+        if (visibleLayers.isEmpty()) {
+            return;
+        }
+        if (reportSnapshotRestrictSurfaceLayers) {
+            for (SurfaceLayer layer : visibleLayers) {
+                drawRoomTileLayer(graphics, room, layer, false);
+            }
+            return;
+        }
         SurfaceLayer highlightedLayer = stack.layers().stream()
                 .filter(candidate -> isSelectedSurfaceLayer(stack, candidate))
                 .findFirst()
                 .orElse(null);
-        SurfaceLayer baseLayer = firstVisibleSurfaceLayer(stack).orElse(highlightedLayer);
+        SurfaceLayer baseLayer = visibleLayers.getFirst();
+        if (baseLayer == null) {
+            baseLayer = highlightedLayer;
+        }
         if (baseLayer == null) {
             return;
         }
@@ -3999,9 +4018,14 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private Optional<SurfaceLayer> firstVisibleSurfaceLayer(SurfaceLayerStack stack) {
+        return visiblePlanSurfaceLayers(stack).stream().findFirst();
+    }
+
+    private List<SurfaceLayer> visiblePlanSurfaceLayers(SurfaceLayerStack stack) {
         return stack.layers().stream()
                 .filter(this::isVisibleSurfaceLayer)
-                .findFirst();
+                .filter(layer -> !reportSnapshotRestrictSurfaceLayers || reportSnapshotVisibleSurfaceLayerIds.contains(layer.id()))
+                .toList();
     }
 
     private void drawRoomTileLayer(GraphicsContext graphics, Room room, SurfaceLayer layer, boolean highlighted) {
@@ -9732,14 +9756,37 @@ public final class CadWorkbench extends BorderPane {
     }
 
     WritableImage reportLevelSnapshot(String levelName) {
-        return reportSnapshot(levelName, null, 0.0);
+        return reportSnapshot(levelName, null, 0.0, ReportSnapshotOptions.defaults());
+    }
+
+    WritableImage reportLevelSnapshot(String levelName, Set<UUID> visibleSurfaceLayerIds, boolean includeHydronicHeating) {
+        return reportSnapshot(levelName, null, 0.0, new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating));
     }
 
     WritableImage reportRoomSnapshot(String levelName, List<PlanPoint> focusPoints) {
-        return reportSnapshot(levelName, List.copyOf(focusPoints), 280.0);
+        return reportSnapshot(levelName, List.copyOf(focusPoints), 280.0, ReportSnapshotOptions.defaults());
     }
 
-    private WritableImage reportSnapshot(String levelName, List<PlanPoint> focusPoints, double paddingMillimeters) {
+    WritableImage reportRoomSnapshot(
+            String levelName,
+            List<PlanPoint> focusPoints,
+            Set<UUID> visibleSurfaceLayerIds,
+            boolean includeHydronicHeating
+    ) {
+        return reportSnapshot(
+                levelName,
+                List.copyOf(focusPoints),
+                280.0,
+                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating)
+        );
+    }
+
+    private WritableImage reportSnapshot(
+            String levelName,
+            List<PlanPoint> focusPoints,
+            double paddingMillimeters,
+            ReportSnapshotOptions options
+    ) {
         WorkspaceMode previousWorkspace = activeWorkspaceMode.get();
         ViewOrientation previousView = activeView.get();
         Level previousLevel = activeLevel.get();
@@ -9748,7 +9795,13 @@ public final class CadWorkbench extends BorderPane {
         double previousOffsetY = offsetY;
         SelectionKey previousPrimarySelection = selectedSelection.get();
         List<SelectionKey> previousSelections = List.copyOf(selectedSelections);
+        boolean previousRestrictSurfaceLayers = reportSnapshotRestrictSurfaceLayers;
+        Set<UUID> previousVisibleSurfaceLayerIds = reportSnapshotVisibleSurfaceLayerIds;
+        boolean previousHideHydronicHeatings = reportSnapshotHideHydronicHeatings;
         try {
+            reportSnapshotRestrictSurfaceLayers = options.restrictSurfaceLayers();
+            reportSnapshotVisibleSurfaceLayerIds = Set.copyOf(options.visibleSurfaceLayerIds());
+            reportSnapshotHideHydronicHeatings = !options.includeHydronicHeating();
             activeWorkspaceMode.set(WorkspaceMode.TWO_D);
             updateWorkspaceMode();
             activeView.set(ViewOrientation.TOP);
@@ -9771,8 +9824,22 @@ public final class CadWorkbench extends BorderPane {
             selectedSelections.clear();
             selectedSelections.addAll(previousSelections);
             selectedSelection.set(previousPrimarySelection);
+            reportSnapshotRestrictSurfaceLayers = previousRestrictSurfaceLayers;
+            reportSnapshotVisibleSurfaceLayerIds = previousVisibleSurfaceLayerIds;
+            reportSnapshotHideHydronicHeatings = previousHideHydronicHeatings;
             updateWorkspaceMode();
             render();
+        }
+    }
+
+    private record ReportSnapshotOptions(boolean restrictSurfaceLayers, Set<UUID> visibleSurfaceLayerIds, boolean includeHydronicHeating) {
+
+        private ReportSnapshotOptions {
+            visibleSurfaceLayerIds = Set.copyOf(visibleSurfaceLayerIds);
+        }
+
+        private static ReportSnapshotOptions defaults() {
+            return new ReportSnapshotOptions(false, Set.of(), true);
         }
     }
 

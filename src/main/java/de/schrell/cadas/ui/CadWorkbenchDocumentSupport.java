@@ -6,14 +6,18 @@ import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService.SurfaceMaterialReport;
 import de.schrell.cadas.application.reports.SurfaceMaterialReportPdfService;
+import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.SurfaceType;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -303,20 +307,31 @@ final class CadWorkbenchDocumentSupport {
         for (Level level : owner.project.levels()) {
             levelPlanImages.put(level.name(), SwingFXUtils.fromFXImage(owner.reportLevelSnapshot(level.name()), null));
         }
-        if (variant != SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK) {
-            return new SurfaceMaterialReportPdfService.ExportAssets(variant, levelPlanImages, Map.of());
-        }
         Map<String, BufferedImage> heatingPlanImages = new LinkedHashMap<>();
-        report.heatingPlans().stream()
-                .filter(plan -> !plan.objectBased())
-                .forEach(plan -> heatingPlanImages.computeIfAbsent(
-                        heatingPlanImageKey(plan),
-                        ignored -> captureHeatingPlanImage(plan.levelName(), plan.roomName())
-                ));
-        return new SurfaceMaterialReportPdfService.ExportAssets(variant, levelPlanImages, heatingPlanImages);
+        Map<String, BufferedImage> materialRoomImages = new LinkedHashMap<>();
+        report.materials().stream()
+                .filter(material -> material.surfaceType() == SurfaceType.FLOOR)
+                .forEach(material -> material.roomEntries().forEach(entry -> {
+                    BufferedImage image = captureMaterialRoomImage(material, entry);
+                    if (image != null) {
+                        materialRoomImages.put(
+                                SurfaceMaterialReportPdfService.materialRoomImageKey(material, entry),
+                                image
+                        );
+                    }
+                }));
+        if (variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK) {
+            report.heatingPlans().forEach(plan -> heatingPlanImages.computeIfAbsent(
+                    heatingPlanImageKey(plan),
+                    ignored -> captureHeatingPlanImage(plan)
+            ));
+        }
+        return new SurfaceMaterialReportPdfService.ExportAssets(variant, levelPlanImages, heatingPlanImages, materialRoomImages);
     }
 
-    private BufferedImage captureHeatingPlanImage(String levelName, String roomName) {
+    private BufferedImage captureHeatingPlanImage(SurfaceMaterialListService.HeatingPlanSummary plan) {
+        String levelName = plan.levelName();
+        String roomName = plan.roomName();
         Level level = owner.project.levels().stream()
                 .filter(candidate -> candidate.name().equals(levelName))
                 .findFirst()
@@ -325,7 +340,62 @@ final class CadWorkbenchDocumentSupport {
                 .filter(candidate -> candidate.name().equals(roomName))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Raum `" + roomName + "` ist unbekannt."));
-        return SwingFXUtils.fromFXImage(owner.reportRoomSnapshot(level.name(), room.outline()), null);
+        Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, room, plan.surfacePosition());
+        return SwingFXUtils.fromFXImage(
+                owner.reportRoomSnapshot(level.name(), room.outline(), visibleLayerIds, !plan.objectBased()),
+                null
+        );
+    }
+
+    private BufferedImage captureMaterialRoomImage(
+            SurfaceMaterialListService.MaterialSummary material,
+            SurfaceMaterialListService.MaterialRoomEntry entry
+    ) {
+        Level level = owner.project.levels().stream()
+                .filter(candidate -> candidate.name().equals(entry.levelName()))
+                .findFirst()
+                .orElse(null);
+        if (level == null) {
+            return null;
+        }
+        Room room = level.rooms().stream()
+                .filter(candidate -> candidate.name().equals(entry.roomName()))
+                .findFirst()
+                .orElse(null);
+        if (room == null) {
+            return null;
+        }
+        Set<java.util.UUID> visibleLayerIds = materialLayerIds(level, room, material);
+        if (visibleLayerIds.isEmpty()) {
+            return null;
+        }
+        return SwingFXUtils.fromFXImage(
+                owner.reportRoomSnapshot(level.name(), room.outline(), visibleLayerIds, false),
+                null
+        );
+    }
+
+    private Set<java.util.UUID> variothermLayerIds(Level level, Room room, String surfacePosition) {
+        SurfaceType surfaceType = "Decke".equals(surfacePosition) ? SurfaceType.CEILING : SurfaceType.FLOOR;
+        var stack = level.findSurfaceLayerStack(surfaceType, room.id().toString());
+        if (stack == null) {
+            return Set.of();
+        }
+        return stack.layers().stream()
+                .filter(layer -> SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource()))
+                .map(de.schrell.cadas.domain.model.SurfaceLayer::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<java.util.UUID> materialLayerIds(Level level, Room room, SurfaceMaterialListService.MaterialSummary material) {
+        var stack = level.findSurfaceLayerStack(material.surfaceType(), room.id().toString());
+        if (stack == null) {
+            return Set.of();
+        }
+        return stack.layers().stream()
+                .filter(layer -> SurfaceMaterialListService.materialLookupKey(material.surfaceType(), layer).equals(material.lookupKey()))
+                .map(de.schrell.cadas.domain.model.SurfaceLayer::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
     private String heatingPlanImageKey(SurfaceMaterialListService.HeatingPlanSummary plan) {

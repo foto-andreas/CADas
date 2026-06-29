@@ -57,6 +57,10 @@ public final class SurfaceMaterialListService {
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
 
+    public static String materialLookupKey(SurfaceType surfaceType, SurfaceLayer layer) {
+        return layer.name() + "|" + MaterialProperties.from(surfaceType, layer).key();
+    }
+
     public SurfaceMaterialReport create(ProjectModel project) {
         Map<String, MaterialAccumulator> materials = new LinkedHashMap<>();
         for (int levelIndex = 0; levelIndex < project.levels().size(); levelIndex++) {
@@ -105,7 +109,6 @@ public final class SurfaceMaterialListService {
                                 summaries, level, room, heating, roomHeatTotals
                         ));
                 roomHeatingOutputService.heatingElements(level, room).stream()
-                        .filter(element -> !element.heatingType().countsAsHeatingElement())
                         .forEach(element -> summaries.add(new HeatingPlanSummary(
                                 level.name(),
                                 room.name(),
@@ -123,7 +126,7 @@ public final class SurfaceMaterialListService {
                                 roomHeatTotals.surfaceHeatingWatts(),
                                 roomHeatTotals.heatingElementWatts(),
                                 roomHeatTotals.totalHeatOutputWatts(),
-                                "",
+                                roomHeatingObjectsSvg(level, room, element.heatingType()),
                                 true
                         )));
             }
@@ -176,8 +179,63 @@ public final class SurfaceMaterialListService {
             case FLOOR_HEATING -> HeatingSurfacePosition.FLOOR.toString();
             case CEILING_HEATING -> HeatingSurfacePosition.CEILING.toString();
             case SURFACE_HEATING -> "Fläche";
+            case HEATING_ELEMENT -> "Heizelement";
             default -> "";
         };
+    }
+
+    private String roomHeatingObjectsSvg(Level level, Room room, RoomObjectHeatingType heatingType) {
+        List<RoomObject> heatingObjects = level.roomObjects().stream()
+                .filter(roomObject -> roomObject.visible())
+                .filter(roomObject -> roomObject.heatOutputWatts() > 0.0)
+                .filter(roomObject -> roomObject.heatingType() == heatingType)
+                .filter(roomObject -> containsPoint(room, roomObject.center()))
+                .toList();
+        if (heatingObjects.isEmpty()) {
+            return "";
+        }
+        double minX = room.outline().stream().mapToDouble(PlanPoint::xMillimeters).min().orElse(0.0);
+        double minY = room.outline().stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0);
+        double maxX = room.outline().stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(1_000.0);
+        double maxY = room.outline().stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(1_000.0);
+        double padding = 120.0;
+        double width = Math.max(1.0, maxX - minX + padding * 2.0);
+        double height = Math.max(1.0, maxY - minY + padding * 2.0);
+        StringBuilder svg = new StringBuilder();
+        svg.append("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"")
+                .append(decimal(minX - padding, 1)).append(' ')
+                .append(decimal(minY - padding, 1)).append(' ')
+                .append(decimal(width, 1)).append(' ')
+                .append(decimal(height, 1))
+                .append("\" width=\"100%\" height=\"100%\">");
+        svg.append("<rect x=\"").append(decimal(minX - padding, 1))
+                .append("\" y=\"").append(decimal(minY - padding, 1))
+                .append("\" width=\"").append(decimal(width, 1))
+                .append("\" height=\"").append(decimal(height, 1))
+                .append("\" fill=\"#fcfcfa\"/>");
+        svg.append("<polygon points=\"")
+                .append(room.outline().stream()
+                        .map(point -> decimal(point.xMillimeters(), 1) + "," + decimal(point.yMillimeters(), 1))
+                        .collect(java.util.stream.Collectors.joining(" ")))
+                .append("\" fill=\"#f7f7f4\" stroke=\"#6f6559\" stroke-width=\"18\"/>");
+        for (RoomObject roomObject : heatingObjects) {
+            double objectMinX = roomObject.minXMillimeters();
+            double objectMinY = roomObject.minYMillimeters();
+            svg.append("<rect x=\"").append(decimal(objectMinX, 1))
+                    .append("\" y=\"").append(decimal(objectMinY, 1))
+                    .append("\" width=\"").append(decimal(roomObject.footprintWidthMillimeters(), 1))
+                    .append("\" height=\"").append(decimal(roomObject.footprintDepthMillimeters(), 1))
+                    .append("\" fill=\"#fff0e8\" stroke=\"#b65224\" stroke-width=\"12\" rx=\"10\" ry=\"10\"/>");
+            svg.append("<text x=\"").append(decimal(roomObject.center().xMillimeters(), 1))
+                    .append("\" y=\"").append(decimal(roomObject.center().yMillimeters(), 1))
+                    .append("\" text-anchor=\"middle\" font-family=\"Menlo, monospace\" font-size=\"96\" fill=\"#6b2f18\">")
+                    .append(roomObject.name())
+                    .append(" ")
+                    .append(decimal(roomObject.heatOutputWatts(), 0))
+                    .append(" W</text>");
+        }
+        svg.append("</svg>");
+        return svg.toString();
     }
 
     private List<HeatingElementSummary> heatingElements(ProjectModel project) {
@@ -1044,6 +1102,7 @@ public final class SurfaceMaterialListService {
             }
             int requiredPieces = fullPieceCount + optimization.requiredCutSheets();
             return new MaterialSummary(
+                    materialName + "|" + materialProperties.key(),
                     materialName,
                     materialProperties.surfaceType(),
                     materialProperties.description(),
@@ -1545,6 +1604,7 @@ public final class SurfaceMaterialListService {
     }
 
     public record MaterialSummary(
+            String lookupKey,
             String name,
             SurfaceType surfaceType,
             String description,

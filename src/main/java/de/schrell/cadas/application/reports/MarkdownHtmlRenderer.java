@@ -37,9 +37,9 @@ public final class MarkdownHtmlRenderer {
                 <style>
                 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #26231f; margin: 28px; line-height: 1.5; max-width: 920px; }
                 h1 { font-size: 28px; margin: 0 0 22px; color: #3a3026; }
-                h2 { font-size: 20px; margin: 32px 0 12px; border-bottom: 2px solid #d6c9b5; padding-bottom: 4px; color: #3a3026; }
-                h3 { font-size: 16px; margin: 24px 0 8px; color: #4a3f33; }
-                h4 { font-size: 14px; margin: 18px 0 6px; color: #5c5146; }
+                h2 { font-size: 20px; margin: 42px 0 12px; border-bottom: 2px solid #d6c9b5; padding-bottom: 4px; color: #3a3026; }
+                h3 { font-size: 16px; margin: 30px 0 8px; color: #4a3f33; }
+                h4 { font-size: 14px; margin: 24px 0 6px; color: #5c5146; }
                 p, ul, ol { margin: 8px 0 14px; }
                 ul, ol { padding-left: 24px; }
                 li { margin: 4px 0; }
