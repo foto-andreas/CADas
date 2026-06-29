@@ -1201,7 +1201,6 @@ public final class CadWorkbench extends BorderPane {
                 menuItem("Etage laden", this::importLevel, null),
                 menuItem("Etage sichern", this::saveCurrentLevel, null),
                 menuItem("Etage sichern als ...", this::saveCurrentLevelAs, null),
-                menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
                 menuItem("3D-Objekt aus DXF/IFC/RFA laden", this::importThreeDObject, null),
                 menuItem("Beenden", this::requestApplicationExit, shortcutKey(KeyCode.Q))
@@ -1276,6 +1275,7 @@ public final class CadWorkbench extends BorderPane {
 
         Menu berichteMenu = new Menu("Berichte");
         berichteMenu.getItems().addAll(
+                menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Räume und Materialien anzeigen", this::showSurfaceMaterialReportWindow, null),
                 menuItem("Räume und Materialien als PDF exportieren", this::exportSurfaceMaterialReportPdf, null),
                 menuItem("Räume und Materialien als MD exportieren", this::exportSurfaceMaterialReportMarkdown, null)

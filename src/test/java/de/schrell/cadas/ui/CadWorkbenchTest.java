@@ -1070,6 +1070,36 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void berichteMenueEnthaeltBauzeichnungsExportStattDateimenue() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        Assertions.assertTrue(aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            return menuBar.getMenus().stream()
+                    .filter(menu -> "Berichte".equals(menu.getText()))
+                    .flatMap(menu -> menu.getItems().stream())
+                    .map(MenuItem::getText)
+                    .anyMatch("Bauzeichnung als PDF exportieren"::equals);
+        }));
+        Assertions.assertFalse(aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            return menuBar.getMenus().stream()
+                    .filter(menu -> "Datei".equals(menu.getText()))
+                    .flatMap(menu -> menu.getItems().stream())
+                    .map(MenuItem::getText)
+                    .anyMatch("Bauzeichnung als PDF exportieren"::equals);
+        }));
+    }
+
+    @Test
     void rueckgaengigShortcutGreiftAuchVomTextfeldAus() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
