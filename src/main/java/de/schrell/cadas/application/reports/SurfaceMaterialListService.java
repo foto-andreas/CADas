@@ -229,9 +229,6 @@ public final class SurfaceMaterialListService {
     private void collectLevel(Level level, List<FloorOpening> openingsAbove, Map<String, MaterialAccumulator> materials) {
         for (SurfaceLayerStack stack : level.surfaceLayerStacks()) {
             for (SurfaceLayer layer : stack.layers()) {
-                if (!layer.visible()) {
-                    continue;
-                }
                 for (SurfaceCoverage coverage : coverages(level, stack, openingsAbove)) {
                     CoverageEstimate estimate = estimateCoverage(layer, coverage);
                     if (estimate.placedPieceCount() == 0) {
@@ -1242,7 +1239,7 @@ public final class SurfaceMaterialListService {
             if (materials.isEmpty()) {
                 appendHeatingPlans(markdown, includeHeatingPlanSvg);
                 appendHeatingElements(markdown);
-                markdown.append("## Beläge\n\nKeine sichtbaren Beläge vorhanden.\n");
+                markdown.append("## Beläge\n\nKeine Beläge vorhanden.\n");
                 return markdown.toString();
             }
             appendMaterialSummary(markdown);

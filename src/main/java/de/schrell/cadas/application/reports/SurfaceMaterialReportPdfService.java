@@ -130,7 +130,7 @@ public final class SurfaceMaterialReportPdfService {
     private void appendMaterialSummary(PdfWriter writer, List<SurfaceMaterialListService.MaterialSummary> materials) throws IOException {
         writer.section("Zusammenfassung");
         if (materials.isEmpty()) {
-            writer.paragraph("Keine sichtbaren Beläge vorhanden.");
+            writer.paragraph("Keine Beläge vorhanden.");
             return;
         }
         writer.table(
@@ -292,7 +292,7 @@ public final class SurfaceMaterialReportPdfService {
     private void appendMaterialDetails(PdfWriter writer, List<SurfaceMaterialListService.MaterialSummary> materials) throws IOException {
         writer.section("Beläge");
         if (materials.isEmpty()) {
-            writer.paragraph("Keine sichtbaren Beläge vorhanden.");
+            writer.paragraph("Keine Beläge vorhanden.");
             return;
         }
         TableDefinition factTable = new TableDefinition(

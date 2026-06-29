@@ -66,6 +66,31 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
+    void listetAuchUnsichtbareEbenenInDerMaterialliste() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Wohnen",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 3_000),
+                Length.of(2.6, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER)
+        );
+        project.primaryLevel().addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        SurfaceLayer hiddenLayer = layer("Verdecktes Parkett", Length.of(120, LengthUnit.CENTIMETER), Length.of(20, LengthUnit.CENTIMETER));
+        stack.addLayer(hiddenLayer);
+        stack.setVisibility(hiddenLayer.id(), false);
+        project.primaryLevel().addSurfaceLayerStack(stack);
+
+        SurfaceMaterialReport report = service.create(project);
+
+        assertEquals(1, report.materials().size());
+        assertEquals("Verdecktes Parkett", report.materials().getFirst().name());
+        assertTrue(report.toMarkdown().contains("Verdecktes Parkett"));
+    }
+
+    @Test
     void blendetHeizplanSvgNurImExportEin() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         project.primaryLevel().addWall(Wall.create(
