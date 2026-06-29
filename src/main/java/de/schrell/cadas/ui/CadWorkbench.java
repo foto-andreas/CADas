@@ -7715,6 +7715,10 @@ public final class CadWorkbench extends BorderPane {
     private void cycleSurfaceLayoutCorner(boolean forward) {
         SurfaceLayoutAnchor currentAnchor = currentSurfaceLayoutAnchor();
         applySurfaceLayoutAnchorSelection(forward ? currentAnchor.nextManual() : currentAnchor.previousManual());
+        if (applySurfaceLayoutOrientationToSelectedLayers()) {
+            return;
+        }
+        render();
     }
 
     private void syncSurfaceLayoutAnchorForDirection(SurfaceLayoutDirection direction) {
@@ -7738,6 +7742,43 @@ public final class CadWorkbench extends BorderPane {
 
     private void updateSurfaceLayoutCornerLabel() {
         surfaceLayoutCornerLabel.setText(formatSurfaceLayoutCorner(currentSurfaceLayoutAnchor()));
+    }
+
+    private boolean applySurfaceLayoutOrientationToSelectedLayers() {
+        List<SurfaceLayerStack> stacks = currentSurfaceLayerStacks();
+        int selectedIndex = surfaceLayerList.getSelectionModel().getSelectedIndex();
+        if (stacks.isEmpty() || selectedIndex < 0) {
+            return false;
+        }
+        rememberStateForUndo();
+        for (SurfaceLayerStack stack : stacks) {
+            SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
+            replaceSurfaceLayer(
+                    stack,
+                    selectedLayer.id(),
+                    selectedLayer.reconfigure(
+                            selectedLayer.name(),
+                            selectedLayer.thickness(),
+                            selectedLayer.tileWidth(),
+                            selectedLayer.tileHeight(),
+                            selectedLayer.layoutMode(),
+                            selectedLayer.layoutOffset(),
+                            selectedLayer.minimumOffset(),
+                            selectedLayer.minimumEdgeWidth(),
+                            selectedLayer.minimumStartEndMargin(),
+                            selectedLayer.freeMargins(),
+                            currentSurfaceLayoutAnchor(),
+                            Length.zero(),
+                            Length.zero(),
+                            selectedLayer.jointWidth(),
+                            selectedLayer.cutRestriction(),
+                            selectedLayer.coveringSource(),
+                            currentSurfaceLayoutRotatedQuarterTurn()
+                    )
+            );
+        }
+        afterSurfaceLayerMutation("Belag-Startecke angepasst.");
+        return true;
     }
 
     private String formatSurfaceLayoutCorner(SurfaceLayoutAnchor anchor) {

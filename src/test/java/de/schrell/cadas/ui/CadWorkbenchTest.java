@@ -761,6 +761,60 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void belagStarteckeDrehtMarkierteEbeneSofortUmNeunzigGradWeiter() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Arbeiten",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Platte",
+                    Length.ofMillimeters(18),
+                    Length.ofMillimeters(600),
+                    Length.ofMillimeters(1_000),
+                    SurfaceLayoutMode.AUTOMATIC,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    SurfaceCutRestriction.FREE,
+                    "Test"
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetSurfaceType("FLOOR");
+            instanz.automationSelectSurfaceLayer(0);
+            return instanz;
+        });
+
+        Assertions.assertEquals("Unten links", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        aufFxThread(() -> {
+            workbench.automationInvoke("surfaceLayoutCornerNext", null);
+            return null;
+        });
+
+        Assertions.assertEquals("Unten rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        SurfaceLayer gedreht = aufFxThread(() -> workbench.project.primaryLevel()
+                .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
+                .layers()
+                .getFirst());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, gedreht.layoutAnchor());
+        Assertions.assertTrue(gedreht.layoutRotatedQuarterTurn());
+    }
+
+    @Test
     void gedrehteBelagsebeneWirdBeimAktualisierenAufSichtbareModulmaßeNormalisiert() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
