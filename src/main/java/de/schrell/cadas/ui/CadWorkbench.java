@@ -4045,11 +4045,89 @@ public final class CadWorkbench extends BorderPane {
                         toScreenX(tile.x()),
                         toScreenY(tile.y()),
                         tile.width() * scale(),
-                        tile.height() * scale()
+                    tile.height() * scale()
                 );
             }
         }
+        drawSurfaceLayerDirectionArrow(graphics, layer, tiles);
         graphics.restore();
+    }
+
+    private void drawSurfaceLayerDirectionArrow(
+            GraphicsContext graphics,
+            SurfaceLayer layer,
+            List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles
+    ) {
+        SurfaceRectangleTileLayoutService.PlacedSurfaceTile firstTile = firstSurfaceTileForDirectionArrow(layer, tiles);
+        if (firstTile == null) {
+            return;
+        }
+        double tileX = toScreenX(firstTile.x());
+        double tileY = toScreenY(firstTile.y());
+        double tileWidth = firstTile.width() * scale();
+        double tileHeight = firstTile.height() * scale();
+        if (tileWidth < 18.0 || tileHeight < 12.0) {
+            return;
+        }
+        double padding = Math.max(6.0, Math.min(tileWidth * 0.22, tileHeight * 0.35));
+        double leftX = tileX + padding;
+        double rightX = tileX + tileWidth - padding;
+        if (rightX - leftX < 12.0) {
+            return;
+        }
+        double centerY = tileY + tileHeight / 2.0;
+        Point2D start = layer.layoutDirection() == SurfaceLayoutDirection.RIGHT_TO_LEFT
+                ? new Point2D(rightX, centerY)
+                : new Point2D(leftX, centerY);
+        Point2D end = layer.layoutDirection() == SurfaceLayoutDirection.RIGHT_TO_LEFT
+                ? new Point2D(leftX, centerY)
+                : new Point2D(rightX, centerY);
+        strokeSurfaceLayerDirectionArrow(graphics, start, end, Color.color(0.98, 0.97, 0.93, 0.90), 4.2);
+        strokeSurfaceLayerDirectionArrow(graphics, start, end, Color.color(0.15, 0.12, 0.10, 0.95), 2.2);
+    }
+
+    private SurfaceRectangleTileLayoutService.PlacedSurfaceTile firstSurfaceTileForDirectionArrow(
+            SurfaceLayer layer,
+            List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles
+    ) {
+        Comparator<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> rowComparator = Comparator.comparingDouble(tile ->
+                layer.layoutRotation().maximumYStart() ? -(tile.y() + tile.height()) : tile.y());
+        Comparator<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> columnComparator = Comparator.comparingDouble(tile ->
+                layer.layoutDirection() == SurfaceLayoutDirection.RIGHT_TO_LEFT ? -(tile.x() + tile.width()) : tile.x());
+        return tiles.stream()
+                .min(rowComparator
+                        .thenComparing(columnComparator)
+                        .thenComparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::y)
+                        .thenComparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::x))
+                .orElse(null);
+    }
+
+    private void strokeSurfaceLayerDirectionArrow(GraphicsContext graphics, Point2D start, Point2D end, Color color, double lineWidth) {
+        Point2D delta = end.subtract(start);
+        double length = delta.magnitude();
+        if (length < 1.0) {
+            return;
+        }
+        Point2D unit = delta.normalize();
+        Point2D normal = new Point2D(-unit.getY(), unit.getX());
+        double headLength = Math.min(10.0, Math.max(6.0, length * 0.18));
+        double headWidth = headLength * 0.55;
+        Point2D headBase = end.subtract(unit.multiply(headLength));
+        graphics.setStroke(color);
+        graphics.setLineWidth(lineWidth);
+        graphics.strokeLine(start.getX(), start.getY(), end.getX(), end.getY());
+        graphics.strokeLine(
+                end.getX(),
+                end.getY(),
+                headBase.getX() + normal.getX() * headWidth,
+                headBase.getY() + normal.getY() * headWidth
+        );
+        graphics.strokeLine(
+                end.getX(),
+                end.getY(),
+                headBase.getX() - normal.getX() * headWidth,
+                headBase.getY() - normal.getY() * headWidth
+        );
     }
 
     private void drawVariothermPanelGrooves(GraphicsContext graphics, SurfaceLayer layer, double tileX, double tileY, double tileWidth, double tileHeight) {

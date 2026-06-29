@@ -1993,6 +1993,61 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void bodenebeneZeigtVerlegerichtungImErstenElement() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3900, 2900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Belag",
+                    Length.of(1.8, LengthUnit.CENTIMETER),
+                    Length.ofMillimeters(1_000),
+                    Length.ofMillimeters(1_000),
+                    SurfaceLayoutMode.NONE,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.zero(),
+                    Length.ofMillimeters(120),
+                    ""
+            ).withLayoutOrientation(SurfaceLayoutRotation.DEGREES_0, SurfaceLayoutDirection.RIGHT_TO_LEFT));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetViewport(2.5, 20.0, 20.0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+
+        int pfeilPixelRechts = countDarkPixels(
+                image,
+                snapshot,
+                new PlanPoint(3_180, 460),
+                new PlanPoint(3_820, 740)
+        );
+        int pfeilPixelLinks = countDarkPixels(
+                image,
+                snapshot,
+                new PlanPoint(180, 460),
+                new PlanPoint(820, 740)
+        );
+
+        Assertions.assertTrue(pfeilPixelRechts > 20, "Kein Richtungs-Pfeil im ersten Belagselement gefunden.");
+        Assertions.assertTrue(pfeilPixelLinks < pfeilPixelRechts / 3, "Der Richtungs-Pfeil sitzt nicht auf dem ersten Belagselement.");
+    }
+
+    @Test
     void variothermKreiseLassenSichGlobalAusblenden() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -2708,6 +2763,19 @@ class CadWorkbenchTest {
             }
         }
         return count;
+    }
+
+    private int countDarkPixels(
+            WritableImage image,
+            WorkbenchAutomationSnapshot snapshot,
+            PlanPoint minPoint,
+            PlanPoint maxPoint
+    ) {
+        int minX = (int) Math.round(snapshot.offsetX() + minPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int maxX = (int) Math.round(snapshot.offsetX() + maxPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int minY = (int) Math.round(snapshot.offsetY() + minPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        int maxY = (int) Math.round(snapshot.offsetY() + maxPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        return countDarkPixels(image, minX, minY, maxX, maxY);
     }
 
     private Path erzeugeProjektMitInnenwandfliesenAlsDxf() throws Exception {
