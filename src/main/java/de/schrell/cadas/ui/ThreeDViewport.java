@@ -114,6 +114,7 @@ public final class ThreeDViewport extends BorderPane {
     private final Label cameraStatusLabel = new Label();
     private final Label sceneStatsLabel = new Label("3D-Szene: 0 Körper");
     private final Label sceneHintLabel = new Label("Die 3D-Ansicht wird gefüllt, sobald auf der aktiven Etage Wände, Räume oder Treppen vorhanden sind.");
+    private final StackPane sceneHolder = new StackPane(subScene, sceneHintLabel);
     private final Map<String, BooleanProperty> levelVisibility = new LinkedHashMap<>();
     private final Consumer<SelectionKey> selectionConsumer;
     private final Runnable orbitViewActivationConsumer;
@@ -220,6 +221,47 @@ public final class ThreeDViewport extends BorderPane {
         this.roomObjectsVisible = roomObjectsVisible;
         if (currentProject != null) {
             refresh(currentProject);
+        }
+    }
+
+    public void setVisibleLevels(Set<String> visibleLevelNames) {
+        Set<String> visibleNames = Set.copyOf(visibleLevelNames);
+        levelVisibility.forEach((levelName, visibility) -> visibility.set(visibleNames.contains(levelName)));
+        if (currentProject != null) {
+            refresh(currentProject);
+        }
+    }
+
+    public void setSurfaceLayersVisible(boolean visible) {
+        surfaceLayersCheckBox.setSelected(visible);
+    }
+
+    public void setSurfaceRenderingEnabled(boolean enabled) {
+        surfaceRenderingCheckBox.setSelected(enabled);
+    }
+
+    public WritableImage snapshotSceneOnly(Color backgroundColor) {
+        Color originalFill = (Color) subScene.getFill();
+        Node topNode = getTop();
+        Node bottomNode = getBottom();
+        Insets originalPadding = getPadding();
+        if (backgroundColor != null) {
+            subScene.setFill(backgroundColor);
+        }
+        try {
+            setTop(null);
+            setBottom(null);
+            setPadding(Insets.EMPTY);
+            applyCss();
+            layout();
+            sceneHolder.applyCss();
+            sceneHolder.layout();
+            return sceneHolder.snapshot(null, null);
+        } finally {
+            setTop(topNode);
+            setBottom(bottomNode);
+            setPadding(originalPadding);
+            subScene.setFill(originalFill);
         }
     }
 
@@ -486,7 +528,6 @@ public final class ThreeDViewport extends BorderPane {
         sceneHintLabel.setWrapText(true);
         sceneHintLabel.setMaxWidth(280);
         sceneHintLabel.setStyle("-fx-background-color: rgba(255,255,255,0.85); -fx-padding: 12; -fx-background-radius: 12; -fx-text-fill: #5f5548;");
-        StackPane sceneHolder = new StackPane(subScene, sceneHintLabel);
         sceneHolder.setMinSize(200, 200);
         BorderPane.setMargin(sceneHolder, new Insets(6, 0, 6, 0));
         subScene.widthProperty().bind(sceneHolder.widthProperty());

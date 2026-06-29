@@ -10,6 +10,7 @@ import de.schrell.cadas.application.drawing.WallDimensionService;
 import de.schrell.cadas.application.heating.RoomHeatingOutputService;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
+import de.schrell.cadas.application.view.ProjectionMode;
 import de.schrell.cadas.application.terrain.TerrainContourService;
 import de.schrell.cadas.application.terrain.TerrainProfileService;
 import de.schrell.cadas.application.view.WallPlanOutlineService;
@@ -29,23 +30,36 @@ import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
+import de.schrell.cadas.ui.ThreeDViewPreset;
+import de.schrell.cadas.ui.ThreeDViewport;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 
 import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javafx.application.Platform;
+import javafx.embed.swing.SwingFXUtils;
+import javafx.scene.Scene;
 
 public final class ConstructionDrawingPdfService {
 
@@ -62,8 +76,11 @@ public final class ConstructionDrawingPdfService {
     private static final double PDF_TEXT_AWAY_DISTANCE = 4.0;
     private static final double PDF_PARALLEL_TEXT_AWAY_DISTANCE = 8.0;
     private static final double PDF_DIMENSION_LINE_BLOCKING_PADDING = 2.0;
+    private static final double SPATIAL_VIEW_RENDER_FACTOR = 1.8;
+    private static final double SPATIAL_VIEW_MINIMUM_PIXELS = 320.0;
     private static final double STANDARD_SPATIAL_DEPTH_FACTOR = 0.45;
     private static final double MAXIMUM_SAME_LEVEL_DEPTH_SHIFT_RATIO = 0.55;
+    private static final AtomicBoolean JAVA_FX_STARTED = new AtomicBoolean();
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
     private final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
@@ -432,13 +449,20 @@ public final class ConstructionDrawingPdfService {
 
     private void drawSpatialView(PageCanvas canvas, ProjectModel project, double angleDegrees, boolean isometric,
                                  double x, double y, double width, double height) throws IOException {
+        BufferedImage renderedImage = renderSpatialViewImage(project, angleDegrees, isometric, width, height).orElse(null);
+        if (renderedImage != null) {
+            canvas.text(x + 4, y + height - 12, 8.5f, spatialViewGraphicLabel(angleDegrees, isometric));
+            canvas.image(renderedImage, x + 6, y + 18, width - 12, height - 38);
+            drawOverallDimension(canvas, x + 12, y + 8, x + width - 12, y + 8, "grafische 3D-Ansicht");
+            return;
+        }
         List<SpatialLine> lines = spatialLines(project, angleDegrees, isometric);
         Bounds projected = lineBounds(lines).expanded(200.0);
         int scale = chooseScale(projected.width(), projected.height(), width, height - 20.0);
         double factor = POINTS_PER_MILLIMETER / scale;
         double centerX = x + width / 2.0;
         double centerY = y + height / 2.0;
-        canvas.text(x + 4, y + height - 12, 8.5f, spatialViewLabel(angleDegrees, isometric, scale));
+        canvas.text(x + 4, y + height - 12, 8.5f, spatialViewFallbackLabel(angleDegrees, isometric, scale));
         for (SpatialLine line : lines) {
             canvas.line(centerX + (line.x1() - projected.centerX()) * factor,
                     centerY + (line.y1() - projected.centerY()) * factor,
@@ -450,7 +474,21 @@ public final class ConstructionDrawingPdfService {
         drawOverallDimension(canvas, x + 12, y + 8, x + width - 12, y + 8, "maßstabgerechte Ansicht");
     }
 
-    private String spatialViewLabel(double angleDegrees, boolean isometric, int scale) {
+    private String spatialViewGraphicLabel(double angleDegrees, boolean isometric) {
+        if (isometric) {
+            return String.format(Locale.GERMAN, "3D-Grafik %.0f°", angleDegrees);
+        }
+        String direction = switch ((int) Math.round(angleDegrees)) {
+            case 0 -> "Nord";
+            case 90 -> "Ost";
+            case 180 -> "Süd";
+            case 270 -> "West";
+            default -> String.format(Locale.GERMAN, "Blick %.0f°", angleDegrees);
+        };
+        return direction + " – Grafik";
+    }
+
+    private String spatialViewFallbackLabel(double angleDegrees, boolean isometric, int scale) {
         if (isometric) {
             return String.format(Locale.GERMAN, "Blick %.0f° – M 1:%d", angleDegrees, scale);
         }
@@ -462,6 +500,116 @@ public final class ConstructionDrawingPdfService {
             default -> String.format(Locale.GERMAN, "Blick %.0f°", angleDegrees);
         };
         return direction + " – M 1:" + scale;
+    }
+
+    private java.util.Optional<BufferedImage> renderSpatialViewImage(
+            ProjectModel project,
+            double angleDegrees,
+            boolean isometric,
+            double widthPoints,
+            double heightPoints
+    ) {
+        try {
+            return java.util.Optional.of(runOnFxThread(() -> createSpatialViewImage(project, angleDegrees, isometric, widthPoints, heightPoints)));
+        } catch (Exception ignored) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    private BufferedImage createSpatialViewImage(
+            ProjectModel project,
+            double angleDegrees,
+            boolean isometric,
+            double widthPoints,
+            double heightPoints
+    ) {
+        double widthPixels = Math.max(SPATIAL_VIEW_MINIMUM_PIXELS, widthPoints * SPATIAL_VIEW_RENDER_FACTOR);
+        double heightPixels = Math.max(SPATIAL_VIEW_MINIMUM_PIXELS, heightPoints * SPATIAL_VIEW_RENDER_FACTOR);
+        ThreeDViewport viewport = new ThreeDViewport(ignored -> { }, () -> { });
+        viewport.setPrefSize(widthPixels, heightPixels);
+        viewport.resize(widthPixels, heightPixels);
+        viewport.setRoomObjectsVisible(false);
+        viewport.setSurfaceLayersVisible(false);
+        viewport.setSurfaceRenderingEnabled(true);
+        viewport.syncLevels(project.levels(), project.primaryLevel().name());
+        viewport.setVisibleLevels(project.levels().stream()
+                .map(Level::name)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)));
+        configureSpatialViewport(viewport, angleDegrees, isometric);
+        viewport.refresh(project);
+        Scene scene = new Scene(viewport, widthPixels, heightPixels);
+        scene.getRoot().applyCss();
+        scene.getRoot().layout();
+        viewport.centerCurrentView();
+        scene.getRoot().applyCss();
+        scene.getRoot().layout();
+        return SwingFXUtils.fromFXImage(viewport.snapshotSceneOnly(javafx.scene.paint.Color.WHITE), null);
+    }
+
+    private void configureSpatialViewport(ThreeDViewport viewport, double angleDegrees, boolean isometric) {
+        if (isometric) {
+            viewport.applyViewPreset(ThreeDViewPreset.FRONT);
+            viewport.setProjectionMode(ProjectionMode.PERSPECTIVE);
+            viewport.automationOrbit(angleDegrees, 24.0);
+            return;
+        }
+        viewport.applyViewPreset(sideViewPreset(angleDegrees));
+        viewport.setProjectionMode(ProjectionMode.ORTHOGRAPHIC);
+    }
+
+    private ThreeDViewPreset sideViewPreset(double angleDegrees) {
+        return switch ((int) Math.round(angleDegrees)) {
+            case 90 -> ThreeDViewPreset.RIGHT;
+            case 180 -> ThreeDViewPreset.BACK;
+            case 270 -> ThreeDViewPreset.LEFT;
+            default -> ThreeDViewPreset.FRONT;
+        };
+    }
+
+    private static void ensureJavaFxStarted() {
+        if (Platform.isFxApplicationThread()) {
+            return;
+        }
+        if (!JAVA_FX_STARTED.compareAndSet(false, true)) {
+            return;
+        }
+        CountDownLatch latch = new CountDownLatch(1);
+        try {
+            Platform.startup(latch::countDown);
+            latch.await();
+        } catch (IllegalStateException ignored) {
+            latch.countDown();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("JavaFX-Toolkit konnte nicht initialisiert werden.", exception);
+        } catch (RuntimeException exception) {
+            JAVA_FX_STARTED.set(false);
+            throw exception;
+        }
+    }
+
+    private <T> T runOnFxThread(FxSupplier<T> supplier) throws Exception {
+        if (Platform.isFxApplicationThread()) {
+            return supplier.get();
+        }
+        ensureJavaFxStarted();
+        CountDownLatch latch = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<T> result = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<Exception> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        Platform.runLater(() -> {
+            try {
+                result.set(supplier.get());
+            } catch (Exception exception) {
+                failure.set(exception);
+            } finally {
+                latch.countDown();
+            }
+        });
+        latch.await();
+        if (failure.get() != null) {
+            throw failure.get();
+        }
+        return result.get();
     }
 
     private List<SpatialLine> spatialLines(ProjectModel project, double angleDegrees, boolean isometric) {
@@ -1030,10 +1178,17 @@ public final class ConstructionDrawingPdfService {
         }
     }
 
+    @FunctionalInterface
+    private interface FxSupplier<T> {
+        T get() throws Exception;
+    }
+
     private static final class PageCanvas implements AutoCloseable {
+        private final PDDocument document;
         private final PDPageContentStream stream;
 
         private PageCanvas(PDDocument document, PDPage page) throws IOException {
+            this.document = document;
             stream = new PDPageContentStream(document, page);
             stream.setStrokingColor(Color.BLACK);
         }
@@ -1123,6 +1278,11 @@ public final class ConstructionDrawingPdfService {
 
         void boldText(double x, double y, float size, String text) throws IOException {
             drawText(FONT_BOLD, x, y, size, text);
+        }
+
+        void image(BufferedImage image, double x, double y, double width, double height) throws IOException {
+            PDImageXObject imageObject = LosslessFactory.createFromImage(document, image);
+            stream.drawImage(imageObject, (float) x, (float) y, (float) width, (float) height);
         }
 
         private void drawText(PDType1Font font, double x, double y, float size, String text) throws IOException {
