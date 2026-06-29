@@ -334,14 +334,28 @@ public final class ConstructionDrawingPdfService {
                 viewport.x(roomObject.center().xMillimeters()) + 5.0,
                 viewport.y(roomObject.center().yMillimeters()) - 5.0,
                 6.5f,
-                String.format(
-                        Locale.GERMAN,
-                        "%s | %s | %s | %.0f W",
-                        entry.room().name(),
-                        roomObject.name(),
-                        roomObject.heatingType(),
-                        roomObject.heatOutputWatts()
-                )
+                heatingElementLabel(entry)
+        );
+    }
+
+    private String heatingElementLabel(HeatingElementEntry entry) {
+        RoomObject roomObject = entry.roomObject();
+        if (roomObject.heatingType().countsAsCeilingHeating()) {
+            return String.format(
+                    Locale.GERMAN,
+                    "%s | %s | %.0f W",
+                    roomObject.name(),
+                    roomObject.heatingType(),
+                    roomObject.heatOutputWatts()
+            );
+        }
+        return String.format(
+                Locale.GERMAN,
+                "%s | %s | %s | %.0f W",
+                entry.room().name(),
+                roomObject.name(),
+                roomObject.heatingType(),
+                roomObject.heatOutputWatts()
         );
     }
 

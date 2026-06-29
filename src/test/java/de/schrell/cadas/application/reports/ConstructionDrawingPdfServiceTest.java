@@ -153,6 +153,32 @@ class ConstructionDrawingPdfServiceTest {
     }
 
     @Test
+    void stelltDachheizungenInDerBauzeichnungOhneRaumpraefixDar() throws Exception {
+        ProjectModel project = sampleProject();
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "dh-panel",
+                "DH Deckenpanel",
+                RoomObjectType.CUBOID,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(2_000, 2_000),
+                Length.of(120, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(8, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ).withHeatingType(RoomObjectHeatingType.CEILING_HEATING).withHeatOutputWatts(650.0));
+        Path target = tempDir.resolve("heizelemente-dh.pdf");
+
+        new ConstructionDrawingPdfService().export(project, target);
+
+        try (var document = Loader.loadPDF(target.toFile())) {
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("DH Deckenpanel | DH | 650 W"));
+            assertFalse(text.contains("Wohnen | DH Deckenpanel | DH | 650 W"));
+        }
+    }
+
+    @Test
     void zoomtHeizelementseiteAufRelevanteRäumeStattAufDenGesamtenGrundriss() throws Exception {
         ProjectModel project = sampleProject();
         project.primaryLevel().addWall(Wall.create(
