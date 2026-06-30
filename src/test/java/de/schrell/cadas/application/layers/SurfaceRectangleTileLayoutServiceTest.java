@@ -160,8 +160,8 @@ class SurfaceRectangleTileLayoutServiceTest {
     }
 
     @Test
-    void drehtDenFixenVersatzBeiNeunzigGradInDieNeueVerlegerichtungMit() {
-        SurfaceLayer layer = SurfaceLayer.create(
+    void fixerVersatzFolgtBeimWeiterdrehenImmerDerLangenKante() {
+        SurfaceLayer basis = SurfaceLayer.create(
                 "Fliese",
                 Length.ofMillimeters(10),
                 Length.ofMillimeters(600),
@@ -173,17 +173,29 @@ class SurfaceRectangleTileLayoutServiceTest {
                 Length.zero(),
                 Length.zero(),
                 "Test"
-        ).withLayoutRotatedQuarterTurn(true)
-                .withLayoutAnchor(SurfaceLayoutAnchor.MIN_X_MIN_Y);
+        );
+        SurfaceLayer obereWand = basis.withLayoutRotatedQuarterTurn(true)
+                .withLayoutAnchor(SurfaceLayoutAnchor.MIN_X_MAX_Y);
+        SurfaceLayer rechteWand = basis.withLayoutRotatedQuarterTurn(false)
+                .withLayoutAnchor(SurfaceLayoutAnchor.MAX_X_MAX_Y);
 
-        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = service.tilesForRectangles(
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> obereWandTiles = service.tilesForRectangles(
                 List.of(new CellRectangle(0.0, 2_500.0, 0.0, 2_300.0)),
-                layer
+                obereWand
+        );
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> rechteWandTiles = service.tilesForRectangles(
+                List.of(new CellRectangle(0.0, 2_500.0, 0.0, 2_300.0)),
+                rechteWand
         );
 
-        assertEquals(600.0, ersteSpaltenhoehe(tiles, 0), 0.001);
-        assertEquals(300.0, ersteSpaltenhoehe(tiles, 1), 0.001);
-        assertEquals(600.0, ersteSpaltenhoehe(tiles, 2), 0.001);
+        assertTrue(
+                Math.abs(ersteReihenbreite(obereWandTiles, 0) - ersteReihenbreite(obereWandTiles, 1)) > 0.001,
+                "An der oberen Startwand muss der feste Versatz zwischen den Reihen entlang der langen Kante sichtbar sein."
+        );
+        assertTrue(
+                Math.abs(ersteSpaltenhoehe(rechteWandTiles, 0) - ersteSpaltenhoehe(rechteWandTiles, 1)) > 0.001,
+                "Nach dem Weiterdrehen auf die rechte Wand muss derselbe feste Versatz zwischen den Spalten entlang der langen Kante sichtbar sein."
+        );
     }
 
     @Test
@@ -233,5 +245,20 @@ class SurfaceRectangleTileLayoutServiceTest {
                 .findFirst()
                 .orElseThrow()
                 .height();
+    }
+
+    private double ersteReihenbreite(List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles, int rowIndex) {
+        List<Double> startreihen = tiles.stream()
+                .map(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::y)
+                .distinct()
+                .sorted(java.util.Comparator.reverseOrder())
+                .toList();
+        double startY = startreihen.get(rowIndex);
+        return tiles.stream()
+                .filter(tile -> Math.abs(tile.y() - startY) < 0.001)
+                .sorted(java.util.Comparator.comparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::x))
+                .findFirst()
+                .orElseThrow()
+                .width();
     }
 }

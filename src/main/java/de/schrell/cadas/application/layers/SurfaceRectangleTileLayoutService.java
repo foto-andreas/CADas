@@ -6,7 +6,6 @@ import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
-import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -37,10 +36,10 @@ public final class SurfaceRectangleTileLayoutService {
     }
 
     private List<PlacedSurfaceTile> tilesForPreparedRectangles(List<CellRectangle> rectangles, SurfaceLayer layer) {
-        if (layer.layoutRotatedQuarterTurn()) {
-            QuarterTurnTransform transform = QuarterTurnTransform.forRotation(bounds(rectangles), layer.layoutRotation());
-            SurfaceLayer canonicalLayer = layer.withLayoutRotatedQuarterTurn(false)
-                    .withLayoutAnchor(rotatedAnchor(layer.layoutRotation(), layer.layoutAnchor()));
+        if (requiresLongSideAlignmentTransform(layer)) {
+            AxisSwapTransform transform = AxisSwapTransform.forBounds(bounds(rectangles));
+            SurfaceLayer canonicalLayer = layer.withLayoutRotatedQuarterTurn(!layer.layoutRotatedQuarterTurn())
+                    .withLayoutAnchor(transposedAnchor(layer.layoutAnchor()));
             List<PlacedSurfaceTile> transformedTiles = tilesForPreparedRectangles(transform.transformRectangles(rectangles), canonicalLayer);
             return sortTiles(transform.restoreTiles(transformedTiles));
         }
@@ -53,26 +52,17 @@ public final class SurfaceRectangleTileLayoutService {
         return sortTiles(transform.restoreTiles(transformedTiles));
     }
 
-    private SurfaceLayoutAnchor rotatedAnchor(SurfaceLayoutRotation rotation, SurfaceLayoutAnchor anchor) {
-        if (anchor == SurfaceLayoutAnchor.AUTO) {
-            return SurfaceLayoutAnchor.AUTO;
-        }
-        return switch (rotation) {
-            case DEGREES_90 -> switch (anchor) {
-                case MIN_X_MIN_Y -> SurfaceLayoutAnchor.MIN_X_MAX_Y;
-                case MAX_X_MIN_Y -> SurfaceLayoutAnchor.MIN_X_MIN_Y;
-                case MAX_X_MAX_Y -> SurfaceLayoutAnchor.MAX_X_MIN_Y;
-                case MIN_X_MAX_Y -> SurfaceLayoutAnchor.MAX_X_MAX_Y;
-                case AUTO -> SurfaceLayoutAnchor.AUTO;
-            };
-            case DEGREES_270 -> switch (anchor) {
-                case MIN_X_MIN_Y -> SurfaceLayoutAnchor.MAX_X_MIN_Y;
-                case MAX_X_MIN_Y -> SurfaceLayoutAnchor.MAX_X_MAX_Y;
-                case MAX_X_MAX_Y -> SurfaceLayoutAnchor.MIN_X_MAX_Y;
-                case MIN_X_MAX_Y -> SurfaceLayoutAnchor.MIN_X_MIN_Y;
-                case AUTO -> SurfaceLayoutAnchor.AUTO;
-            };
-            default -> anchor;
+    private boolean requiresLongSideAlignmentTransform(SurfaceLayer layer) {
+        return layer.effectiveTileWidth().toMillimeters() + EPSILON < layer.effectiveTileHeight().toMillimeters();
+    }
+
+    private SurfaceLayoutAnchor transposedAnchor(SurfaceLayoutAnchor anchor) {
+        return switch (anchor) {
+            case AUTO -> SurfaceLayoutAnchor.AUTO;
+            case MIN_X_MIN_Y -> SurfaceLayoutAnchor.MIN_X_MIN_Y;
+            case MAX_X_MIN_Y -> SurfaceLayoutAnchor.MIN_X_MAX_Y;
+            case MAX_X_MAX_Y -> SurfaceLayoutAnchor.MAX_X_MAX_Y;
+            case MIN_X_MAX_Y -> SurfaceLayoutAnchor.MAX_X_MIN_Y;
         };
     }
 
@@ -532,36 +522,24 @@ public final class SurfaceRectangleTileLayoutService {
         }
     }
 
-    private record QuarterTurnTransform(
+    private record AxisSwapTransform(
             double minX,
-            double minY,
-            double maxX,
-            double maxY,
-            SurfaceLayoutRotation rotation
+            double minY
     ) {
 
-        static QuarterTurnTransform forRotation(SurfaceBounds bounds, SurfaceLayoutRotation rotation) {
-            return new QuarterTurnTransform(bounds.minX(), bounds.minY(), bounds.maxX(), bounds.maxY(), rotation);
+        static AxisSwapTransform forBounds(SurfaceBounds bounds) {
+            return new AxisSwapTransform(bounds.minX(), bounds.minY());
         }
 
         List<CellRectangle> transformRectangles(List<CellRectangle> rectangles) {
             List<CellRectangle> transformed = new ArrayList<>(rectangles.size());
             for (CellRectangle rectangle : rectangles) {
-                transformed.add(switch (rotation) {
-                    case DEGREES_90 -> new CellRectangle(
-                            minX + (rectangle.minY() - minY),
-                            minX + (rectangle.maxY() - minY),
-                            minY + (maxX - rectangle.maxX()),
-                            minY + (maxX - rectangle.minX())
-                    );
-                    case DEGREES_270 -> new CellRectangle(
-                            minX + (maxY - rectangle.maxY()),
-                            minX + (maxY - rectangle.minY()),
-                            minY + (rectangle.minX() - minX),
-                            minY + (rectangle.maxX() - minX)
-                    );
-                    default -> throw new IllegalStateException("Nur Vierteldrehungen sind für QuarterTurnTransform zulässig.");
-                });
+                transformed.add(new CellRectangle(
+                        minX + (rectangle.minY() - minY),
+                        minX + (rectangle.maxY() - minY),
+                        minY + (rectangle.minX() - minX),
+                        minY + (rectangle.maxX() - minX)
+                ));
             }
             return List.copyOf(transformed);
         }
@@ -569,25 +547,14 @@ public final class SurfaceRectangleTileLayoutService {
         List<PlacedSurfaceTile> restoreTiles(List<PlacedSurfaceTile> tiles) {
             List<PlacedSurfaceTile> restored = new ArrayList<>(tiles.size());
             for (PlacedSurfaceTile tile : tiles) {
-                restored.add(switch (rotation) {
-                    case DEGREES_90 -> new PlacedSurfaceTile(
-                            tile.column(),
-                            tile.row(),
-                            maxX - (tile.y() - minY) - tile.height(),
-                            minY + (tile.x() - minX),
-                            tile.height(),
-                            tile.width()
-                    );
-                    case DEGREES_270 -> new PlacedSurfaceTile(
-                            tile.column(),
-                            tile.row(),
-                            minX + (tile.y() - minY),
-                            maxY - (tile.x() - minX) - tile.width(),
-                            tile.height(),
-                            tile.width()
-                    );
-                    default -> throw new IllegalStateException("Nur Vierteldrehungen sind für QuarterTurnTransform zulässig.");
-                });
+                restored.add(new PlacedSurfaceTile(
+                        tile.column(),
+                        tile.row(),
+                        minX + (tile.y() - minY),
+                        minY + (tile.x() - minX),
+                        tile.height(),
+                        tile.width()
+                ));
             }
             return List.copyOf(restored);
         }
