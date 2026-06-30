@@ -812,6 +812,10 @@ class CadWorkbenchTest {
                 .getFirst());
         Assertions.assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, gedreht.layoutAnchor());
         Assertions.assertTrue(gedreht.layoutRotatedQuarterTurn());
+        Assertions.assertEquals(600.0, gedreht.tileWidth().toMillimeters(), 0.001);
+        Assertions.assertEquals(1_000.0, gedreht.tileHeight().toMillimeters(), 0.001);
+        Assertions.assertEquals(1_000.0, gedreht.effectiveTileWidth().toMillimeters(), 0.001);
+        Assertions.assertEquals(600.0, gedreht.effectiveTileHeight().toMillimeters(), 0.001);
     }
 
     @Test
@@ -848,6 +852,10 @@ class CadWorkbenchTest {
                 .getFirst());
         Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, weitergeschaltet.layoutAnchor());
         Assertions.assertFalse(weitergeschaltet.layoutRotatedQuarterTurn());
+        Assertions.assertEquals(600.0, weitergeschaltet.tileWidth().toMillimeters(), 0.001);
+        Assertions.assertEquals(1_000.0, weitergeschaltet.tileHeight().toMillimeters(), 0.001);
+        Assertions.assertEquals(600.0, weitergeschaltet.effectiveTileWidth().toMillimeters(), 0.001);
+        Assertions.assertEquals(1_000.0, weitergeschaltet.effectiveTileHeight().toMillimeters(), 0.001);
     }
 
     @Test
