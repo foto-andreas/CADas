@@ -8326,6 +8326,13 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void fitCurrentViewToContent() {
+        fitCurrentViewToContent(
+                projectionService.isPlanView(activeView.get()) ? 80.0 : 64.0,
+                projectionService.isPlanView(activeView.get()) ? 96.0 : 72.0
+        );
+    }
+
+    private void fitCurrentViewToContent(double horizontalPadding, double verticalPadding) {
         double viewportWidth = Math.max(drawingPane.getWidth(), 640.0);
         double viewportHeight = Math.max(drawingPane.getHeight(), 420.0);
         projectedBoundsService.bounds(activeLevel.get(), activeView.get()).ifPresentOrElse(bounds -> {
@@ -8336,14 +8343,22 @@ public final class CadWorkbench extends BorderPane {
                     bounds.heightMillimeters(),
                     bounds.centerHorizontalMillimeters(),
                     bounds.centerVerticalMillimeters(),
-                    projectionService.isPlanView(activeView.get()) ? 80.0 : 64.0,
-                    projectionService.isPlanView(activeView.get()) ? 96.0 : 72.0
+                    horizontalPadding,
+                    verticalPadding
             );
         }, () -> {
             zoom = 1.0;
             offsetX = viewportWidth / 2.0;
             offsetY = viewportHeight / 2.0;
         });
+    }
+
+    private void fitCurrentReportViewToContent() {
+        if (projectionService.isPlanView(activeView.get()) && showDimensions.get()) {
+            fitCurrentViewToContent(220.0, 240.0);
+            return;
+        }
+        fitCurrentViewToContent();
     }
 
     private void fitPlanViewToPoints(List<PlanPoint> points, double paddingMillimeters) {
@@ -9907,7 +9922,7 @@ public final class CadWorkbench extends BorderPane {
             activeLevel.set(resolveLevelForReport(levelName));
             clearSelection();
             if (focusPoints == null || focusPoints.isEmpty()) {
-                fitCurrentViewToContent();
+                fitCurrentReportViewToContent();
             } else {
                 fitPlanViewToPoints(focusPoints, paddingMillimeters);
             }

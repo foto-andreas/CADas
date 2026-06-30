@@ -1892,6 +1892,32 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void rasterBauzeichnungLaesstGenugRandFuerIsoBemassung() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationAddRoom(Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(6_000, 4_000),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            ));
+            setBooleanProperty(instanz, "showGrid", false);
+            setBooleanProperty(instanz, "showCompass", false);
+            return instanz;
+        });
+
+        WritableImage image = aufFxThread(() -> workbench.reportLevelSnapshot("Erdgeschoss"));
+
+        Assertions.assertEquals(0, countBorderContentPixels(image, 16),
+                "Die Raster-Bauzeichnung zeichnet ISO-Bemaßung noch bis an den Bildrand.");
+    }
+
+    @Test
     void innenansichtOhneRaumBleibtImAktivenArbeitsbereichUndMeldetDenGrund() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -3159,6 +3185,27 @@ class CadWorkbenchTest {
         return count;
     }
 
+    private int countBorderContentPixels(WritableImage image, int frameWidth) {
+        int width = (int) image.getWidth();
+        int height = (int) image.getHeight();
+        int count = 0;
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                boolean inBorder = x < frameWidth || y < frameWidth || x >= width - frameWidth || y >= height - frameWidth;
+                if (!inBorder) {
+                    continue;
+                }
+                var color = image.getPixelReader().getColor(x, y);
+                if (Math.abs(color.getRed() - 0.988) > 0.03
+                        || Math.abs(color.getGreen() - 0.980) > 0.03
+                        || Math.abs(color.getBlue() - 0.961) > 0.03) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     private Path erzeugeProjektMitInnenwandfliesenAlsDxf() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Fliesentest", "Erdgeschoss");
         var level = project.primaryLevel();
@@ -3217,6 +3264,16 @@ class CadWorkbenchTest {
             return (TextArea) field.get(workbench);
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Heizkreis-Textfeld konnte nicht gefunden werden.", exception);
+        }
+    }
+
+    private static void setBooleanProperty(CadWorkbench workbench, String fieldName, boolean value) {
+        try {
+            Field field = CadWorkbench.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            ((javafx.beans.property.BooleanProperty) field.get(workbench)).set(value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Boolesche Eigenschaft `" + fieldName + "` konnte nicht gefunden werden.", exception);
         }
     }
 
