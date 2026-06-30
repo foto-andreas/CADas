@@ -6824,8 +6824,8 @@ public final class CadWorkbench extends BorderPane {
         }
         surfaceLayerNameField.setText(preset.name().replace("DWG-Referenz: ", "").replace("DWG-Block: ", ""));
         setLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, preset.thickness(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, displayTileWidth(preset.tileWidth(), preset.tileHeight(), preset.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, displayTileHeight(preset.tileWidth(), preset.tileHeight(), preset.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, preset.tileWidth(), LengthUnit.CENTIMETER);
+        setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, preset.tileHeight(), LengthUnit.CENTIMETER);
         SurfaceLayoutAnchor normalizedAnchor = normalizedSurfaceLayoutAnchor(preset.layoutAnchor());
         applySurfaceLayoutAnchorSelection(normalizedAnchor);
         surfaceLayoutDirectionSelector.setValue(surfaceLayoutSelectionDirection(normalizedAnchor, preset.layoutRotatedQuarterTurn()));
@@ -7455,8 +7455,8 @@ public final class CadWorkbench extends BorderPane {
         }
         surfaceLayerNameField.setText(selectedLayer.name());
         syncLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, selectedLayer.thickness(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, displayTileWidth(selectedLayer.tileWidth(), selectedLayer.tileHeight(), selectedLayer.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, displayTileHeight(selectedLayer.tileWidth(), selectedLayer.tileHeight(), selectedLayer.layoutRotatedQuarterTurn()), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, selectedLayer.tileWidth(), LengthUnit.CENTIMETER);
+        syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, selectedLayer.tileHeight(), LengthUnit.CENTIMETER);
         SurfaceLayoutAnchor normalizedAnchor = normalizedSurfaceLayoutAnchor(selectedLayer.layoutAnchor());
         applySurfaceLayoutAnchorSelection(normalizedAnchor);
         surfaceLayoutDirectionSelector.setValue(surfaceLayoutSelectionDirection(normalizedAnchor, selectedLayer.layoutRotatedQuarterTurn()));
@@ -7693,23 +7693,11 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private Length currentStoredSurfaceTileWidth() {
-        return currentSurfaceLayoutRotatedQuarterTurn()
-                ? currentSurfaceTileHeight()
-                : currentSurfaceTileWidth();
+        return currentSurfaceTileWidth();
     }
 
     private Length currentStoredSurfaceTileHeight() {
-        return currentSurfaceLayoutRotatedQuarterTurn()
-                ? currentSurfaceTileWidth()
-                : currentSurfaceTileHeight();
-    }
-
-    private Length displayTileWidth(Length tileWidth, Length tileHeight, boolean rotatedQuarterTurn) {
-        return rotatedQuarterTurn ? tileHeight : tileWidth;
-    }
-
-    private Length displayTileHeight(Length tileWidth, Length tileHeight, boolean rotatedQuarterTurn) {
-        return rotatedQuarterTurn ? tileWidth : tileHeight;
+        return currentSurfaceTileHeight();
     }
 
     private void cycleSurfaceLayoutCorner(boolean forward) {
@@ -7759,20 +7747,20 @@ public final class CadWorkbench extends BorderPane {
                     selectedLayer.reconfigure(
                             selectedLayer.name(),
                             selectedLayer.thickness(),
-                            currentStoredSurfaceTileWidth(),
-                            currentStoredSurfaceTileHeight(),
-                            currentSurfaceLayoutMode(),
-                            currentSurfaceLayoutOffset(),
-                            currentSurfaceMinimumOffset(),
-                            currentSurfaceMinimumEdgeWidth(),
-                            currentSurfaceMinimumStartEndMargin(),
-                            currentSurfaceFreeMargins(),
+                            selectedLayer.tileWidth(),
+                            selectedLayer.tileHeight(),
+                            selectedLayer.layoutMode(),
+                            selectedLayer.layoutOffset(),
+                            selectedLayer.minimumOffset(),
+                            selectedLayer.minimumEdgeWidth(),
+                            selectedLayer.minimumStartEndMargin(),
+                            selectedLayer.freeMargins(),
                             currentSurfaceLayoutAnchor(),
-                            Length.zero(),
-                            Length.zero(),
-                            currentSurfaceJointWidth(),
-                            currentSurfaceCutRestriction(),
-                            currentSurfaceCoveringSource(),
+                            selectedLayer.startRowTrim(),
+                            selectedLayer.startRowWidth(),
+                            selectedLayer.jointWidth(),
+                            selectedLayer.cutRestriction(),
+                            selectedLayer.coveringSource(),
                             currentSurfaceLayoutRotatedQuarterTurn()
                     )
             );

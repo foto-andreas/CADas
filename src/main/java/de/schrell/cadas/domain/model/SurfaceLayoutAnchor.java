@@ -23,19 +23,19 @@ public enum SurfaceLayoutAnchor {
 
     public SurfaceLayoutAnchor nextManual() {
         return switch (this) {
-            case AUTO, MIN_X_MIN_Y -> MAX_X_MIN_Y;
-            case MAX_X_MIN_Y -> MAX_X_MAX_Y;
-            case MAX_X_MAX_Y -> MIN_X_MAX_Y;
-            case MIN_X_MAX_Y -> MIN_X_MIN_Y;
+            case AUTO, MIN_X_MIN_Y -> MIN_X_MAX_Y;
+            case MIN_X_MAX_Y -> MAX_X_MAX_Y;
+            case MAX_X_MAX_Y -> MAX_X_MIN_Y;
+            case MAX_X_MIN_Y -> MIN_X_MIN_Y;
         };
     }
 
     public SurfaceLayoutAnchor previousManual() {
         return switch (this) {
-            case AUTO, MIN_X_MIN_Y -> MIN_X_MAX_Y;
-            case MIN_X_MAX_Y -> MAX_X_MAX_Y;
-            case MAX_X_MAX_Y -> MAX_X_MIN_Y;
-            case MAX_X_MIN_Y -> MIN_X_MIN_Y;
+            case AUTO, MIN_X_MIN_Y -> MAX_X_MIN_Y;
+            case MAX_X_MIN_Y -> MAX_X_MAX_Y;
+            case MAX_X_MAX_Y -> MIN_X_MAX_Y;
+            case MIN_X_MAX_Y -> MIN_X_MIN_Y;
         };
     }
 }

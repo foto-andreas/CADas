@@ -714,7 +714,7 @@ class CadWorkbenchTest {
             workbench.automationInvoke("surfaceLayoutCornerNext", null);
             return null;
         });
-        Assertions.assertEquals("Unten rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        Assertions.assertEquals("Oben links", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
         Assertions.assertEquals("LEFT_TO_RIGHT", aufFxThread(workbench::automationSurfaceLayoutDirection));
         aufFxThread(() -> {
             workbench.automationInvoke("addSurfaceLayer", null);
@@ -725,7 +725,7 @@ class CadWorkbenchTest {
                 .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
                 .layers()
                 .getFirst());
-        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, angelegt.layoutAnchor());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, angelegt.layoutAnchor());
         Assertions.assertTrue(angelegt.layoutRotatedQuarterTurn());
 
         aufFxThread(() -> {
@@ -735,13 +735,13 @@ class CadWorkbenchTest {
             return null;
         });
 
-        Assertions.assertEquals("Unten rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        Assertions.assertEquals("Oben links", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
         Assertions.assertEquals("RIGHT_TO_LEFT", aufFxThread(workbench::automationSurfaceLayoutDirection));
         SurfaceLayer ohneVierteldrehung = aufFxThread(() -> workbench.project.primaryLevel()
                 .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
                 .layers()
                 .getFirst());
-        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, ohneVierteldrehung.layoutAnchor());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, ohneVierteldrehung.layoutAnchor());
         Assertions.assertFalse(ohneVierteldrehung.layoutRotatedQuarterTurn());
 
         aufFxThread(() -> {
@@ -805,13 +805,49 @@ class CadWorkbenchTest {
             return null;
         });
 
-        Assertions.assertEquals("Unten rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        Assertions.assertEquals("Oben links", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
         SurfaceLayer gedreht = aufFxThread(() -> workbench.project.primaryLevel()
                 .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
                 .layers()
                 .getFirst());
-        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MIN_Y, gedreht.layoutAnchor());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MIN_X_MAX_Y, gedreht.layoutAnchor());
         Assertions.assertTrue(gedreht.layoutRotatedQuarterTurn());
+    }
+
+    @Test
+    void belagStarteckeSchaltetVonObenLinksAufDieRechteWandWeiter() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Arbeiten",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetSurfaceType("FLOOR");
+            instanz.automationInvoke("surfaceLayoutCornerNext", null);
+            instanz.automationInvoke("addSurfaceLayer", null);
+            instanz.automationSelectSurfaceLayer(0);
+            instanz.automationInvoke("surfaceLayoutCornerNext", null);
+            return instanz;
+        });
+
+        Assertions.assertEquals("Oben rechts", aufFxThread(workbench::automationSurfaceLayoutCornerLabel));
+        Assertions.assertEquals("LEFT_TO_RIGHT", aufFxThread(workbench::automationSurfaceLayoutDirection));
+        SurfaceLayer weitergeschaltet = aufFxThread(() -> workbench.project.primaryLevel()
+                .findSurfaceLayerStack(SurfaceType.FLOOR, workbench.automationRoom(0).id().toString())
+                .layers()
+                .getFirst());
+        Assertions.assertEquals(SurfaceLayoutAnchor.MAX_X_MAX_Y, weitergeschaltet.layoutAnchor());
+        Assertions.assertFalse(weitergeschaltet.layoutRotatedQuarterTurn());
     }
 
     @Test

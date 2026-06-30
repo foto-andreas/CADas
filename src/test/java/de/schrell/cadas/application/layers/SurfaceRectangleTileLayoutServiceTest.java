@@ -174,28 +174,43 @@ class SurfaceRectangleTileLayoutServiceTest {
                 Length.zero(),
                 "Test"
         );
-        SurfaceLayer obereWand = basis.withLayoutRotatedQuarterTurn(true)
-                .withLayoutAnchor(SurfaceLayoutAnchor.MIN_X_MAX_Y);
-        SurfaceLayer rechteWand = basis.withLayoutRotatedQuarterTurn(false)
-                .withLayoutAnchor(SurfaceLayoutAnchor.MAX_X_MAX_Y);
+        List<CellRectangle> rechteckigerRaum = List.of(new CellRectangle(0.0, 2_500.0, 0.0, 2_300.0));
 
-        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> obereWandTiles = service.tilesForRectangles(
-                List.of(new CellRectangle(0.0, 2_500.0, 0.0, 2_300.0)),
-                obereWand
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> obenLinks = service.tilesForRectangles(
+                rechteckigerRaum,
+                basis.withLayoutRotatedQuarterTurn(true).withLayoutAnchor(SurfaceLayoutAnchor.MIN_X_MAX_Y)
         );
-        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> rechteWandTiles = service.tilesForRectangles(
-                List.of(new CellRectangle(0.0, 2_500.0, 0.0, 2_300.0)),
-                rechteWand
-        );
+        assertTile(obenLinks, 0.0, 1_700.0, 1_000.0, 600.0,
+                "Oben links muss die erste volle lange Kante an der oberen Wand beginnen.");
+        assertTile(obenLinks, 700.0, 1_100.0, 1_000.0, 600.0,
+                "Die zweite Reihe muss entlang der langen Kante versetzt sein.");
 
-        assertTrue(
-                Math.abs(ersteReihenbreite(obereWandTiles, 0) - ersteReihenbreite(obereWandTiles, 1)) > 0.001,
-                "An der oberen Startwand muss der feste Versatz zwischen den Reihen entlang der langen Kante sichtbar sein."
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> obenRechts = service.tilesForRectangles(
+                rechteckigerRaum,
+                basis.withLayoutRotatedQuarterTurn(false).withLayoutAnchor(SurfaceLayoutAnchor.MAX_X_MAX_Y)
         );
-        assertTrue(
-                Math.abs(ersteSpaltenhoehe(rechteWandTiles, 0) - ersteSpaltenhoehe(rechteWandTiles, 1)) > 0.001,
-                "Nach dem Weiterdrehen auf die rechte Wand muss derselbe feste Versatz zwischen den Spalten entlang der langen Kante sichtbar sein."
+        assertTile(obenRechts, 1_900.0, 1_300.0, 600.0, 1_000.0,
+                "Oben rechts muss die erste volle lange Kante an der rechten Wand beginnen.");
+        assertTile(obenRechts, 1_300.0, 1_600.0, 600.0, 700.0,
+                "Die nächste Spalte muss entlang der langen Kante versetzt sein.");
+
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> untenRechts = service.tilesForRectangles(
+                rechteckigerRaum,
+                basis.withLayoutRotatedQuarterTurn(true).withLayoutAnchor(SurfaceLayoutAnchor.MAX_X_MIN_Y)
         );
+        assertTile(untenRechts, 1_500.0, 0.0, 1_000.0, 600.0,
+                "Unten rechts muss die erste volle lange Kante an der unteren Wand beginnen.");
+        assertTile(untenRechts, 800.0, 600.0, 1_000.0, 600.0,
+                "Die zweite Reihe muss entlang der langen Kante versetzt sein.");
+
+        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> untenLinks = service.tilesForRectangles(
+                rechteckigerRaum,
+                basis.withLayoutRotatedQuarterTurn(false).withLayoutAnchor(SurfaceLayoutAnchor.MIN_X_MIN_Y)
+        );
+        assertTile(untenLinks, 0.0, 0.0, 600.0, 1_000.0,
+                "Unten links muss die erste volle lange Kante an der linken Wand beginnen.");
+        assertTile(untenLinks, 600.0, 700.0, 600.0, 1_000.0,
+                "Die nächste Spalte muss entlang der langen Kante versetzt sein.");
     }
 
     @Test
@@ -232,33 +247,19 @@ class SurfaceRectangleTileLayoutServiceTest {
                 "Bei Außenschnitt-Regeln darf keine Grundplatte in mehrere, nicht zusammenhängende Teilstücke zerfallen.");
     }
 
-    private double ersteSpaltenhoehe(List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles, int columnIndex) {
-        List<Double> startspalten = tiles.stream()
-                .map(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::x)
-                .distinct()
-                .sorted()
-                .toList();
-        double startX = startspalten.get(columnIndex);
-        return tiles.stream()
-                .filter(tile -> Math.abs(tile.x() - startX) < 0.001)
-                .sorted(java.util.Comparator.comparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::y))
-                .findFirst()
-                .orElseThrow()
-                .height();
-    }
-
-    private double ersteReihenbreite(List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles, int rowIndex) {
-        List<Double> startreihen = tiles.stream()
-                .map(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::y)
-                .distinct()
-                .sorted(java.util.Comparator.reverseOrder())
-                .toList();
-        double startY = startreihen.get(rowIndex);
-        return tiles.stream()
-                .filter(tile -> Math.abs(tile.y() - startY) < 0.001)
-                .sorted(java.util.Comparator.comparingDouble(SurfaceRectangleTileLayoutService.PlacedSurfaceTile::x))
-                .findFirst()
-                .orElseThrow()
-                .width();
+    private void assertTile(
+            List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles,
+            double x,
+            double y,
+            double width,
+            double height,
+            String message
+    ) {
+        assertTrue(tiles.stream().anyMatch(tile ->
+                        Math.abs(tile.x() - x) < 0.001
+                                && Math.abs(tile.y() - y) < 0.001
+                                && Math.abs(tile.width() - width) < 0.001
+                                && Math.abs(tile.height() - height) < 0.001),
+                message + " Platten: " + tiles);
     }
 }

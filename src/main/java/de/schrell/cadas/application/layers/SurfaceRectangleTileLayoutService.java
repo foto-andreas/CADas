@@ -48,7 +48,7 @@ public final class SurfaceRectangleTileLayoutService {
         }
         SurfaceBounds originalBounds = bounds(rectangles);
         LayoutTransform transform = LayoutTransform.forAnchor(originalBounds, layer.layoutAnchor());
-        List<PlacedSurfaceTile> transformedTiles = tilesForRectanglesInCanonicalSpace(transform.transformRectangles(rectangles), layer);
+        List<PlacedSurfaceTile> transformedTiles = tilesForRectanglesFromManualAnchor(transform.transformRectangles(rectangles), layer);
         return sortTiles(transform.restoreTiles(transformedTiles));
     }
 
@@ -75,6 +75,16 @@ public final class SurfaceRectangleTileLayoutService {
         SurfaceBounds bounds = bounds(rectangles);
         AnchorPair anchors = bestAnchors(rectangles, layer, bounds);
         return clipTilesToRectangles(rectangles, layer, bounds, anchors.anchorX(), anchors.anchorY());
+    }
+
+    private List<PlacedSurfaceTile> tilesForRectanglesFromManualAnchor(List<CellRectangle> rectangles, SurfaceLayer layer) {
+        double tileWidth = layer.effectiveTileWidth().toMillimeters();
+        double tileHeight = layer.effectiveTileHeight().toMillimeters();
+        if (tileWidth <= EPSILON || tileHeight <= EPSILON) {
+            return List.of();
+        }
+        SurfaceBounds bounds = bounds(rectangles);
+        return clipTilesToRectangles(rectangles, layer, bounds, bounds.minX(), bounds.minY());
     }
 
     private AnchorPair bestAnchors(List<CellRectangle> rectangles, SurfaceLayer layer, SurfaceBounds bounds) {
