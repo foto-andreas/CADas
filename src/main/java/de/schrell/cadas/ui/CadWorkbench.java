@@ -737,8 +737,9 @@ public final class CadWorkbench extends BorderPane {
             menuBar.setVisible(false);
         }
         ToolBar settingsBar = buildSettingsBar();
+        ToolBar viewOptionsBar = buildViewOptionsBar();
         HBox viewBar = buildViewBar();
-        VBox topArea = new VBox(8.0, menuBar, settingsBar, viewBar);
+        VBox topArea = new VBox(8.0, menuBar, settingsBar, viewOptionsBar, viewBar);
         topArea.setPadding(new Insets(0, 0, 12, 0));
         setTop(topArea);
 
@@ -765,57 +766,6 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private ToolBar buildSettingsBar() {
-        CheckBox gridBox = new CheckBox("Raster");
-        gridBox.selectedProperty().bindBidirectional(showGrid);
-        applyTooltip(gridBox, "Blendet das sichtbare Raster der 2D-Zeichenfläche ein oder aus, ohne den Raster-Snap zu verändern.");
-
-        CheckBox snapRasterBox = new CheckBox("Raster-Snap");
-        snapRasterBox.selectedProperty().bindBidirectional(snapToGrid);
-        applyTooltip(snapRasterBox, "Aktiviert das magnetische Einrasten auf das konfigurierte Raster.");
-
-        CheckBox snapPointsBox = new CheckBox("Punkt-Snap");
-        snapPointsBox.selectedProperty().bindBidirectional(snapToEndpoints);
-        applyTooltip(snapPointsBox, "Aktiviert das magnetische Einrasten auf vorhandene Linien-Endpunkte.");
-
-        CheckBox guideDistancesBox = new CheckBox("Hilfslinienabstände");
-        guideDistancesBox.selectedProperty().bindBidirectional(showGuideDistances);
-        applyTooltip(guideDistancesBox, "Zeigt beim Herausziehen einer Hilfslinie die Abstände zu allen vorhandenen parallelen Hilfslinien an.");
-
-        CheckBox snapGuidesBox = new CheckBox("Hilfslinien-Snap");
-        snapGuidesBox.selectedProperty().bindBidirectional(snapToGuides);
-        applyTooltip(snapGuidesBox, "Lässt Wände, Türen und Fenster mit Kanten oder Mittellinie magnetisch an sichtbaren Hilfslinien einrasten.");
-
-        CheckBox snapWallsBox = new CheckBox("Wand-Snap");
-        snapWallsBox.selectedProperty().bindBidirectional(snapToWalls);
-        applyTooltip(snapWallsBox, "Lässt neue oder verschobene Wände an Achsen, Außenkanten und Endkanten anderer Wände einrasten.");
-
-        CheckBox dimensionsBox = new CheckBox("ISO-Bemaßung");
-        dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
-        applyTooltip(dimensionsBox, "Blendet die ISO-Bemaßung nach DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien ein oder aus.");
-
-        CheckBox dimensionTextPartsBox = new CheckBox("Erweiterte Maßtexte");
-        dimensionTextPartsBox.setSelected(dimensionTextStyle.get() == DimensionTextStyle.FULL);
-        dimensionTextPartsBox.selectedProperty().addListener((obs, wasFull, isFull) ->
-                dimensionTextStyle.set(Boolean.TRUE.equals(isFull) ? DimensionTextStyle.FULL : DimensionTextStyle.LENGTH_ONLY));
-        dimensionTextStyle.addListener((obs, oldStyle, newStyle) ->
-                dimensionTextPartsBox.setSelected(newStyle == DimensionTextStyle.FULL));
-        applyTooltip(dimensionTextPartsBox,
-                "Bestimmt den Textanteil der Maßangaben in 2D-Ansicht und Bauzeichnung-PDF. " +
-                "Aktiviert: vollständige Texte mit Raumname, Raummaß und Außenmaß-Vorsatz. " +
-                "Deaktiviert: ausschließlich die nackte Länge, z. B. \"4,20 m\".");
-
-        CheckBox objectsBox = new CheckBox("Objekte");
-        objectsBox.selectedProperty().bindBidirectional(showRoomObjects);
-        applyTooltip(objectsBox, "Blendet platzierte Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.");
-
-        CheckBox terrainPlanBox = new CheckBox("Gelände 2D");
-        terrainPlanBox.selectedProperty().bindBidirectional(showTerrainInPlan);
-        applyTooltip(terrainPlanBox, "Blendet das Gelände in der 2D-Ansicht als Band außerhalb des Gebäudes ein oder aus. Seitenansichten und 3D bleiben davon unberührt.");
-
-        CheckBox variothermCirclesBox = new CheckBox("Variotherm-Kreise");
-        variothermCirclesBox.selectedProperty().bindBidirectional(showVariothermCircles);
-        applyTooltip(variothermCirclesBox, "Blendet die Kreis-Markierungen der Variotherm-Trockenbauplatten global in der 2D-Ansicht ein oder aus. Die Belagsgeometrie und Mengenberechnung bleiben unverändert.");
-
         Button addLevelButton = createActionButton(
                 "Etage hinzufügen",
                 null,
@@ -869,8 +819,63 @@ public final class CadWorkbench extends BorderPane {
                 undoButton,
                 redoButton,
                 deleteSelectionButton,
-                clearSelectionButton,
-                new Separator(Orientation.VERTICAL),
+                clearSelectionButton
+        );
+    }
+
+    private ToolBar buildViewOptionsBar() {
+        CheckBox gridBox = new CheckBox("Raster");
+        gridBox.selectedProperty().bindBidirectional(showGrid);
+        applyTooltip(gridBox, "Blendet das sichtbare Raster der 2D-Zeichenfläche ein oder aus, ohne den Raster-Snap zu verändern.");
+
+        CheckBox snapRasterBox = new CheckBox("Raster-Snap");
+        snapRasterBox.selectedProperty().bindBidirectional(snapToGrid);
+        applyTooltip(snapRasterBox, "Aktiviert das magnetische Einrasten auf das konfigurierte Raster.");
+
+        CheckBox snapPointsBox = new CheckBox("Punkt-Snap");
+        snapPointsBox.selectedProperty().bindBidirectional(snapToEndpoints);
+        applyTooltip(snapPointsBox, "Aktiviert das magnetische Einrasten auf vorhandene Linien-Endpunkte.");
+
+        CheckBox guideDistancesBox = new CheckBox("Hilfslinienabstände");
+        guideDistancesBox.selectedProperty().bindBidirectional(showGuideDistances);
+        applyTooltip(guideDistancesBox, "Zeigt beim Herausziehen einer Hilfslinie die Abstände zu allen vorhandenen parallelen Hilfslinien an.");
+
+        CheckBox snapGuidesBox = new CheckBox("Hilfslinien-Snap");
+        snapGuidesBox.selectedProperty().bindBidirectional(snapToGuides);
+        applyTooltip(snapGuidesBox, "Lässt Wände, Türen und Fenster mit Kanten oder Mittellinie magnetisch an sichtbaren Hilfslinien einrasten.");
+
+        CheckBox snapWallsBox = new CheckBox("Wand-Snap");
+        snapWallsBox.selectedProperty().bindBidirectional(snapToWalls);
+        applyTooltip(snapWallsBox, "Lässt neue oder verschobene Wände an Achsen, Außenkanten und Endkanten anderer Wände einrasten.");
+
+        CheckBox dimensionsBox = new CheckBox("ISO-Bemaßung");
+        dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
+        applyTooltip(dimensionsBox, "Blendet die ISO-Bemaßung nach DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien ein oder aus.");
+
+        CheckBox dimensionTextPartsBox = new CheckBox("Erweiterte Maßtexte");
+        dimensionTextPartsBox.setSelected(dimensionTextStyle.get() == DimensionTextStyle.FULL);
+        dimensionTextPartsBox.selectedProperty().addListener((obs, wasFull, isFull) ->
+                dimensionTextStyle.set(Boolean.TRUE.equals(isFull) ? DimensionTextStyle.FULL : DimensionTextStyle.LENGTH_ONLY));
+        dimensionTextStyle.addListener((obs, oldStyle, newStyle) ->
+                dimensionTextPartsBox.setSelected(newStyle == DimensionTextStyle.FULL));
+        applyTooltip(dimensionTextPartsBox,
+                "Bestimmt den Textanteil der Maßangaben in 2D-Ansicht und Bauzeichnung-PDF. " +
+                "Aktiviert: vollständige Texte mit Raumname, Raummaß und Außenmaß-Vorsatz. " +
+                "Deaktiviert: ausschließlich die nackte Länge, z. B. \"4,20 m\".");
+
+        CheckBox objectsBox = new CheckBox("Objekte");
+        objectsBox.selectedProperty().bindBidirectional(showRoomObjects);
+        applyTooltip(objectsBox, "Blendet platzierte Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.");
+
+        CheckBox terrainPlanBox = new CheckBox("Gelände 2D");
+        terrainPlanBox.selectedProperty().bindBidirectional(showTerrainInPlan);
+        applyTooltip(terrainPlanBox, "Blendet das Gelände in der 2D-Ansicht als Band außerhalb des Gebäudes ein oder aus. Seitenansichten und 3D bleiben davon unberührt.");
+
+        CheckBox variothermCirclesBox = new CheckBox("Variotherm-Kreise");
+        variothermCirclesBox.selectedProperty().bindBidirectional(showVariothermCircles);
+        applyTooltip(variothermCirclesBox, "Blendet die Kreis-Markierungen der Variotherm-Trockenbauplatten global in der 2D-Ansicht ein oder aus. Die Belagsgeometrie und Mengenberechnung bleiben unverändert.");
+
+        return new ToolBar(
                 gridBox,
                 snapRasterBox,
                 snapPointsBox,

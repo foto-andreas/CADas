@@ -2811,13 +2811,16 @@ class CadWorkbenchTest {
             VBox topArea = (VBox) workbench.getTop();
             MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
             ToolBar settingsBar = (ToolBar) topArea.getChildren().get(1);
+            ToolBar viewOptionsBar = (ToolBar) topArea.getChildren().get(2);
 
-            Assertions.assertTrue(settingsBar.getItems().stream()
+            Assertions.assertFalse(settingsBar.getItems().stream()
+                    .anyMatch(CheckBox.class::isInstance));
+            Assertions.assertTrue(viewOptionsBar.getItems().stream()
                     .filter(CheckBox.class::isInstance)
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
                     .anyMatch("ISO-Bemaßung"::equals));
-            Assertions.assertFalse(settingsBar.getItems().stream()
+            Assertions.assertFalse(viewOptionsBar.getItems().stream()
                     .filter(CheckBox.class::isInstance)
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
@@ -2855,18 +2858,18 @@ class CadWorkbenchTest {
         aufFxThread(() -> {
             VBox topArea = (VBox) workbench.getTop();
             MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
-            ToolBar settingsBar = (ToolBar) topArea.getChildren().get(1);
-            Assertions.assertTrue(settingsBar.getItems().stream()
+            ToolBar viewOptionsBar = (ToolBar) topArea.getChildren().get(2);
+            Assertions.assertTrue(viewOptionsBar.getItems().stream()
                     .filter(CheckBox.class::isInstance)
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
                     .anyMatch("Raster"::equals));
-            Assertions.assertTrue(settingsBar.getItems().stream()
+            Assertions.assertTrue(viewOptionsBar.getItems().stream()
                     .filter(CheckBox.class::isInstance)
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
                     .anyMatch("Raster-Snap"::equals));
-            Assertions.assertTrue(settingsBar.getItems().stream()
+            Assertions.assertTrue(viewOptionsBar.getItems().stream()
                     .filter(CheckBox.class::isInstance)
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
