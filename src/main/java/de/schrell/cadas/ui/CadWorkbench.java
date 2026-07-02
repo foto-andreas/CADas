@@ -615,6 +615,8 @@ public final class CadWorkbench extends BorderPane {
     private boolean reportSnapshotRestrictSurfaceLayers;
     private Set<UUID> reportSnapshotVisibleSurfaceLayerIds = Set.of();
     private boolean reportSnapshotHideHydronicHeatings;
+    private boolean reportSnapshotInteriorRoomDimensionsOnly;
+    private double reportSnapshotRenderScale = 1.0;
     private ScreenBounds lastPlanDimensionScreenBounds;
     private Level.RoomReplacementImpact pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
 
@@ -3304,6 +3306,10 @@ public final class CadWorkbench extends BorderPane {
         if (!showDimensions.get() || !projectionService.isPlanView(activeView.get())) {
             return;
         }
+        if (reportSnapshotInteriorRoomDimensionsOnly) {
+            drawReportInteriorRoomDimensions(graphics, seedBlockers);
+            return;
+        }
         DimensionLabelOptions options = currentDimensionLabelOptions();
         List<PendingWallDimensionLabel> pendingLabels = new ArrayList<>();
         for (Wall wall : activeLevel.get().walls()) {
@@ -3323,6 +3329,108 @@ public final class CadWorkbench extends BorderPane {
             graphics.fillText(rendered.pending().text(), rendered.textX(), rendered.baselineY());
         }
         lastPlanDimensionScreenBounds = dimensionBounds;
+    }
+
+    private void drawReportInteriorRoomDimensions(GraphicsContext graphics, List<TextBlockingBox> seedBlockers) {
+        List<TextBlockingBox> blockers = new ArrayList<>(seedBlockers);
+        ScreenBounds dimensionBounds = null;
+        graphics.save();
+        graphics.setFill(CadColorPalette.DIMENSION_TEXT);
+        graphics.setStroke(CadColorPalette.DIMENSION_TEXT);
+        graphics.setLineWidth(1.0);
+        graphics.setFont(DIMENSION_LABEL_FONT);
+        for (Room room : activeLevel.get().rooms()) {
+            List<PlanPoint> outline = room.outline();
+            for (int index = 0; index < outline.size(); index++) {
+                PlanSegment segment = new PlanSegment(outline.get(index), outline.get((index + 1) % outline.size()));
+                Optional<RenderedInteriorRoomDimension> rendered = layoutReportInteriorRoomDimension(room, segment, blockers);
+                if (rendered.isEmpty()) {
+                    continue;
+                }
+                RenderedInteriorRoomDimension dimension = rendered.orElseThrow();
+                graphics.strokeLine(dimension.lineStartX(), dimension.lineStartY(), dimension.lineEndX(), dimension.lineEndY());
+                graphics.fillText(dimension.text(), dimension.textX(), dimension.baselineY());
+                blockers.add(dimension.blockingBox());
+                dimensionBounds = ScreenBounds.union(dimensionBounds, ScreenBounds.from(dimension.blockingBox()));
+            }
+        }
+        graphics.restore();
+        lastPlanDimensionScreenBounds = dimensionBounds;
+    }
+
+    private Optional<RenderedInteriorRoomDimension> layoutReportInteriorRoomDimension(
+            Room room,
+            PlanSegment segment,
+            List<TextBlockingBox> blockers
+    ) {
+        double lengthMillimeters = segment.length().toMillimeters();
+        if (lengthMillimeters < 500.0) {
+            return Optional.empty();
+        }
+        double directionX = (segment.end().xMillimeters() - segment.start().xMillimeters()) / lengthMillimeters;
+        double directionY = (segment.end().yMillimeters() - segment.start().yMillimeters()) / lengthMillimeters;
+        double normalX = -directionY;
+        double normalY = directionX;
+        PlanPoint midpoint = new PlanPoint(
+                (segment.start().xMillimeters() + segment.end().xMillimeters()) / 2.0,
+                (segment.start().yMillimeters() + segment.end().yMillimeters()) / 2.0
+        );
+        double sideSign = de.schrell.cadas.domain.geometry.PlanPolygonSupport.containsPoint(room.outline(), offsetPoint(midpoint, normalX, normalY, 120.0))
+                ? 1.0
+                : -1.0;
+        String text = String.format(Locale.GERMAN, "%.2f m", lengthMillimeters / 1000.0);
+        Text textMeasure = new Text(text);
+        textMeasure.setFont(DIMENSION_LABEL_FONT);
+        double lineLengthPixels = lengthMillimeters * scale();
+        if (textMeasure.getLayoutBounds().getWidth() > lineLengthPixels - 10.0) {
+            return Optional.empty();
+        }
+        for (double offsetMillimeters : new double[]{140.0, 260.0, 380.0}) {
+            PlanPoint labelCenter = offsetPoint(midpoint, normalX, normalY, sideSign * offsetMillimeters);
+            if (!de.schrell.cadas.domain.geometry.PlanPolygonSupport.containsPoint(room.outline(), labelCenter)) {
+                continue;
+            }
+            RenderedInteriorRoomDimension rendered = renderInteriorRoomDimension(segment, normalX, normalY, sideSign, offsetMillimeters, text, textMeasure);
+            if (!TextBlockingBox.overlapsAny(rendered.blockingBox(), blockers)) {
+                return Optional.of(rendered);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private RenderedInteriorRoomDimension renderInteriorRoomDimension(
+            PlanSegment segment,
+            double normalX,
+            double normalY,
+            double sideSign,
+            double offsetMillimeters,
+            String text,
+            Text textMeasure
+    ) {
+        PlanPoint lineStart = offsetPoint(segment.start(), normalX, normalY, sideSign * offsetMillimeters);
+        PlanPoint lineEnd = offsetPoint(segment.end(), normalX, normalY, sideSign * offsetMillimeters);
+        double lineStartX = toScreenProjectedX(lineStart, 0.0);
+        double lineStartY = toScreenProjectedY(lineStart, 0.0);
+        double lineEndX = toScreenProjectedX(lineEnd, 0.0);
+        double lineEndY = toScreenProjectedY(lineEnd, 0.0);
+        double centerX = (lineStartX + lineEndX) / 2.0;
+        double centerY = (lineStartY + lineEndY) / 2.0;
+        double textX = centerX - textMeasure.getLayoutBounds().getWidth() / 2.0;
+        double baselineY = centerY - 3.0;
+        TextBlockingBox blockingBox = new TextBlockingBox(
+                textX + textMeasure.getLayoutBounds().getMinX() - DIMENSION_TEXT_PADDING,
+                baselineY + textMeasure.getLayoutBounds().getMinY() - DIMENSION_TEXT_PADDING,
+                textMeasure.getLayoutBounds().getWidth() + DIMENSION_TEXT_PADDING * 2.0,
+                textMeasure.getLayoutBounds().getHeight() + DIMENSION_TEXT_PADDING * 2.0
+        );
+        return new RenderedInteriorRoomDimension(text, lineStartX, lineStartY, lineEndX, lineEndY, textX, baselineY, blockingBox);
+    }
+
+    private PlanPoint offsetPoint(PlanPoint point, double unitX, double unitY, double offsetMillimeters) {
+        return new PlanPoint(
+                point.xMillimeters() + unitX * offsetMillimeters,
+                point.yMillimeters() + unitY * offsetMillimeters
+        );
     }
 
     DimensionLabelOptions currentDimensionLabelOptions() {
@@ -8401,8 +8509,8 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void fitCurrentViewToContent(double horizontalPadding, double verticalPadding) {
-        double viewportWidth = Math.max(drawingPane.getWidth(), 640.0);
-        double viewportHeight = Math.max(drawingPane.getHeight(), 420.0);
+        double viewportWidth = reportAwareViewportWidth();
+        double viewportHeight = reportAwareViewportHeight();
         projectedBoundsService.bounds(activeLevel.get(), activeView.get()).ifPresentOrElse(bounds -> {
             fitViewportToBounds(
                     viewportWidth,
@@ -8503,8 +8611,8 @@ public final class CadWorkbench extends BorderPane {
         double maxX = points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0) + paddingMillimeters;
         double minY = points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0) - paddingMillimeters;
         double maxY = points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0) + paddingMillimeters;
-        double viewportWidth = Math.max(drawingPane.getWidth(), 640.0);
-        double viewportHeight = Math.max(drawingPane.getHeight(), 420.0);
+        double viewportWidth = reportAwareViewportWidth();
+        double viewportHeight = reportAwareViewportHeight();
         fitViewportToBounds(
                 viewportWidth,
                 viewportHeight,
@@ -8515,6 +8623,18 @@ public final class CadWorkbench extends BorderPane {
                 80.0,
                 96.0
         );
+    }
+
+    private double reportAwareViewportWidth() {
+        return reportSnapshotRenderScale > 1.0
+                ? Math.max(drawingCanvas.getWidth(), 640.0)
+                : Math.max(drawingPane.getWidth(), 640.0);
+    }
+
+    private double reportAwareViewportHeight() {
+        return reportSnapshotRenderScale > 1.0
+                ? Math.max(drawingCanvas.getHeight(), 420.0)
+                : Math.max(drawingPane.getHeight(), 420.0);
     }
 
     private void fitViewportToBounds(
@@ -10003,15 +10123,29 @@ public final class CadWorkbench extends BorderPane {
     }
 
     WritableImage reportLevelSnapshot(String levelName) {
-        return reportSnapshot(levelName, null, 0.0, ReportSnapshotOptions.defaults());
+        return reportSnapshot(levelName, null, 0.0, ReportSnapshotOptions.defaults().withRenderScale(2.0));
+    }
+
+    WritableImage reportMaterialOverviewSnapshot(String levelName) {
+        return reportSnapshot(
+                levelName,
+                null,
+                0.0,
+                new ReportSnapshotOptions(true, Set.of(), false, true, true, true, 2.0)
+        );
     }
 
     WritableImage reportLevelSnapshot(String levelName, Set<UUID> visibleSurfaceLayerIds, boolean includeHydronicHeating) {
-        return reportSnapshot(levelName, null, 0.0, new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating));
+        return reportSnapshot(
+                levelName,
+                null,
+                0.0,
+                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, false, true, false, 2.0)
+        );
     }
 
     WritableImage reportRoomSnapshot(String levelName, List<PlanPoint> focusPoints) {
-        return reportSnapshot(levelName, List.copyOf(focusPoints), 280.0, ReportSnapshotOptions.defaults());
+        return reportSnapshot(levelName, List.copyOf(focusPoints), 280.0, ReportSnapshotOptions.defaults().withRenderScale(2.0));
     }
 
     WritableImage reportRoomSnapshot(
@@ -10024,7 +10158,7 @@ public final class CadWorkbench extends BorderPane {
                 levelName,
                 List.copyOf(focusPoints),
                 280.0,
-                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating)
+                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, false, true, false, 2.0)
         );
     }
 
@@ -10045,10 +10179,34 @@ public final class CadWorkbench extends BorderPane {
         boolean previousRestrictSurfaceLayers = reportSnapshotRestrictSurfaceLayers;
         Set<UUID> previousVisibleSurfaceLayerIds = reportSnapshotVisibleSurfaceLayerIds;
         boolean previousHideHydronicHeatings = reportSnapshotHideHydronicHeatings;
+        boolean previousInteriorRoomDimensionsOnly = reportSnapshotInteriorRoomDimensionsOnly;
+        double previousReportSnapshotRenderScale = reportSnapshotRenderScale;
+        boolean previousShowDimensions = showDimensions.get();
+        boolean previousShowAreaVolume = showAreaVolume.get();
+        boolean previousShowHeatingCircuits = showHeatingCircuits.get();
+        boolean previousShowVariothermCircles = showVariothermCircles.get();
+        ensureCanvasReady();
+        double previousCanvasWidth = drawingCanvas.getWidth();
+        double previousCanvasHeight = drawingCanvas.getHeight();
+        double previousHorizontalRulerWidth = horizontalRuler.getWidth();
+        double previousVerticalRulerHeight = verticalRuler.getHeight();
         try {
+            double renderScale = Math.max(1.0, options.renderScale());
+            reportSnapshotRenderScale = renderScale;
+            if (renderScale > 1.0) {
+                drawingCanvas.setWidth(Math.max(previousCanvasWidth, 640.0) * renderScale);
+                drawingCanvas.setHeight(Math.max(previousCanvasHeight, 420.0) * renderScale);
+                horizontalRuler.setWidth(drawingCanvas.getWidth());
+                verticalRuler.setHeight(drawingCanvas.getHeight());
+            }
             reportSnapshotRestrictSurfaceLayers = options.restrictSurfaceLayers();
             reportSnapshotVisibleSurfaceLayerIds = Set.copyOf(options.visibleSurfaceLayerIds());
             reportSnapshotHideHydronicHeatings = !options.includeHydronicHeating();
+            reportSnapshotInteriorRoomDimensionsOnly = options.interiorRoomDimensionsOnly();
+            showDimensions.set(options.includeDimensions());
+            showAreaVolume.set(options.includeAreaVolume());
+            showHeatingCircuits.set(options.includeHydronicHeating());
+            showVariothermCircles.set(true);
             activeWorkspaceMode.set(WorkspaceMode.TWO_D);
             updateWorkspaceMode();
             activeView.set(ViewOrientation.TOP);
@@ -10074,19 +10232,52 @@ public final class CadWorkbench extends BorderPane {
             reportSnapshotRestrictSurfaceLayers = previousRestrictSurfaceLayers;
             reportSnapshotVisibleSurfaceLayerIds = previousVisibleSurfaceLayerIds;
             reportSnapshotHideHydronicHeatings = previousHideHydronicHeatings;
+            reportSnapshotInteriorRoomDimensionsOnly = previousInteriorRoomDimensionsOnly;
+            reportSnapshotRenderScale = previousReportSnapshotRenderScale;
+            showDimensions.set(previousShowDimensions);
+            showAreaVolume.set(previousShowAreaVolume);
+            showHeatingCircuits.set(previousShowHeatingCircuits);
+            showVariothermCircles.set(previousShowVariothermCircles);
+            drawingCanvas.setWidth(previousCanvasWidth);
+            drawingCanvas.setHeight(previousCanvasHeight);
+            horizontalRuler.setWidth(previousHorizontalRulerWidth);
+            verticalRuler.setHeight(previousVerticalRulerHeight);
             updateWorkspaceMode();
             render();
         }
     }
 
-    private record ReportSnapshotOptions(boolean restrictSurfaceLayers, Set<UUID> visibleSurfaceLayerIds, boolean includeHydronicHeating) {
+    private record ReportSnapshotOptions(
+            boolean restrictSurfaceLayers,
+            Set<UUID> visibleSurfaceLayerIds,
+            boolean includeHydronicHeating,
+            boolean includeDimensions,
+            boolean includeAreaVolume,
+            boolean interiorRoomDimensionsOnly,
+            double renderScale
+    ) {
 
         private ReportSnapshotOptions {
             visibleSurfaceLayerIds = Set.copyOf(visibleSurfaceLayerIds);
+            if (renderScale < 1.0) {
+                throw new IllegalArgumentException("renderScale muss mindestens 1 sein.");
+            }
         }
 
         private static ReportSnapshotOptions defaults() {
-            return new ReportSnapshotOptions(false, Set.of(), true);
+            return new ReportSnapshotOptions(false, Set.of(), true, true, true, false, 1.0);
+        }
+
+        private ReportSnapshotOptions withRenderScale(double newRenderScale) {
+            return new ReportSnapshotOptions(
+                    restrictSurfaceLayers,
+                    visibleSurfaceLayerIds,
+                    includeHydronicHeating,
+                    includeDimensions,
+                    includeAreaVolume,
+                    interiorRoomDimensionsOnly,
+                    newRenderScale
+            );
         }
     }
 
@@ -10723,6 +10914,18 @@ public final class CadWorkbench extends BorderPane {
                     )
             );
         }
+    }
+
+    private record RenderedInteriorRoomDimension(
+            String text,
+            double lineStartX,
+            double lineStartY,
+            double lineEndX,
+            double lineEndY,
+            double textX,
+            double baselineY,
+            TextBlockingBox blockingBox
+    ) {
     }
 
     private record ScreenBounds(double minX, double maxX, double minY, double maxY) {

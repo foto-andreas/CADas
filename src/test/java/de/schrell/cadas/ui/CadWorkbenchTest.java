@@ -1978,6 +1978,34 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void materiallistenRasterUebersichtNutztDoppelteAufloesungUndStelltCanvasWiederHer() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.project.primaryLevel().addRoom(Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(4_100, 3_100),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            ));
+            return instanz;
+        });
+
+        WritableImage vorher = aufFxThread(workbench::automationDrawingSnapshot);
+        WritableImage report = aufFxThread(() -> workbench.reportMaterialOverviewSnapshot("Erdgeschoss"));
+        WritableImage nachher = aufFxThread(workbench::automationDrawingSnapshot);
+
+        Assertions.assertEquals(vorher.getWidth() * 2.0, report.getWidth(), 0.1);
+        Assertions.assertEquals(vorher.getHeight() * 2.0, report.getHeight(), 0.1);
+        Assertions.assertTrue(nachher.getWidth() < report.getWidth());
+        Assertions.assertTrue(nachher.getHeight() < report.getHeight());
+    }
+
+    @Test
     void innenansichtOhneRaumBleibtImAktivenArbeitsbereichUndMeldetDenGrund() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

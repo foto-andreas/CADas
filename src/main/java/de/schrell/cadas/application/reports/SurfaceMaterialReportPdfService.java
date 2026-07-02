@@ -29,6 +29,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,17 +69,21 @@ public final class SurfaceMaterialReportPdfService {
             HeatingPlanGraphicVariant heatingPlanGraphicVariant,
             Map<String, BufferedImage> levelPlanImages,
             Map<String, BufferedImage> heatingPlanImages,
+            Map<String, BufferedImage> materialLevelImages,
+            Map<String, BufferedImage> heatingLevelImages,
             Map<String, BufferedImage> materialRoomImages
     ) {
         public ExportAssets {
             Objects.requireNonNull(heatingPlanGraphicVariant, "heatingPlanGraphicVariant darf nicht null sein.");
             levelPlanImages = Map.copyOf(levelPlanImages);
             heatingPlanImages = Map.copyOf(heatingPlanImages);
+            materialLevelImages = Map.copyOf(materialLevelImages);
+            heatingLevelImages = Map.copyOf(heatingLevelImages);
             materialRoomImages = Map.copyOf(materialRoomImages);
         }
 
         public static ExportAssets empty() {
-            return new ExportAssets(HeatingPlanGraphicVariant.SVG, Map.of(), Map.of(), Map.of());
+            return new ExportAssets(HeatingPlanGraphicVariant.SVG, Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
         }
     }
 
@@ -102,7 +107,14 @@ public final class SurfaceMaterialReportPdfService {
         try (PDDocument document = new PDDocument()) {
             try (PdfWriter writer = new PdfWriter(document)) {
                 writer.title("Räume und Materialien - " + report.projectName());
-                appendRooms(writer, report.rooms(), exportAssets.levelPlanImages());
+                appendRooms(
+                        writer,
+                        report.rooms(),
+                        exportAssets.heatingPlanGraphicVariant() == HeatingPlanGraphicVariant.RASTERGRAFIK
+                                ? Map.of()
+                                : exportAssets.levelPlanImages()
+                );
+                appendRasterGraphicPages(writer, report, exportAssets);
                 appendMaterialSummary(writer, report.materials());
                 appendHeatingPlans(writer, report.heatingPlans(), exportAssets);
                 appendHeatingElements(writer, report.heatingElements());
@@ -172,6 +184,43 @@ public final class SurfaceMaterialReportPdfService {
             writer.table(roomTable, rows);
         }
         writer.paragraph("Mietflächen nach WoFlV: ab 2 m volle Anrechnung, zwischen 1 m und 2 m halbe Anrechnung, darunter keine Anrechnung.");
+    }
+
+    private void appendRasterGraphicPages(
+            PdfWriter writer,
+            SurfaceMaterialListService.SurfaceMaterialReport report,
+            ExportAssets exportAssets
+    ) throws IOException {
+        if (exportAssets.heatingPlanGraphicVariant() != HeatingPlanGraphicVariant.RASTERGRAFIK) {
+            return;
+        }
+        LinkedHashSet<String> levelNames = new LinkedHashSet<>();
+        report.rooms().stream().map(SurfaceMaterialListService.RoomSummary::levelName).forEach(levelNames::add);
+        levelNames.addAll(exportAssets.levelPlanImages().keySet());
+        levelNames.addAll(exportAssets.heatingLevelImages().keySet());
+        if (levelNames.isEmpty()) {
+            return;
+        }
+        writer.section("Rasterzeichnungen");
+        for (String levelName : levelNames) {
+            BufferedImage levelPlanImage = exportAssets.levelPlanImages().get(levelName);
+            if (levelPlanImage != null) {
+                writer.imagePage("Etagenübersicht " + levelName, levelPlanImage);
+            }
+            for (SurfaceMaterialListService.MaterialSummary material : report.materials()) {
+                if (material.surfaceType() != de.schrell.cadas.domain.model.SurfaceType.FLOOR) {
+                    continue;
+                }
+                BufferedImage materialImage = exportAssets.materialLevelImages().get(materialLevelImageKey(material, levelName));
+                if (materialImage != null) {
+                    writer.imagePage("Belag " + levelName + " / " + material.name(), materialImage);
+                }
+            }
+            BufferedImage heatingImage = exportAssets.heatingLevelImages().get(heatingLevelImageKey(levelName));
+            if (heatingImage != null) {
+                writer.imagePage("Heizkreise " + levelName, heatingImage);
+            }
+        }
     }
 
     private void appendMaterialSummary(PdfWriter writer, List<SurfaceMaterialListService.MaterialSummary> materials) throws IOException {
@@ -287,6 +336,9 @@ public final class SurfaceMaterialReportPdfService {
                         ))
                         .toList()
         );
+        if (exportAssets.heatingPlanGraphicVariant() == HeatingPlanGraphicVariant.RASTERGRAFIK) {
+            return;
+        }
         writer.subsection("Heizplan-Grafiken");
         Map<String, List<SurfaceMaterialListService.HeatingPlanSummary>> groupedPlans = heatingPlans.stream()
                 .collect(java.util.stream.Collectors.groupingBy(
@@ -459,6 +511,14 @@ public final class SurfaceMaterialReportPdfService {
             SurfaceMaterialListService.MaterialRoomEntry entry
     ) {
         return material.lookupKey() + "\u0000" + entry.levelName() + "\u0000" + entry.roomName() + "\u0000" + entry.surfaceDescription();
+    }
+
+    public static String materialLevelImageKey(SurfaceMaterialListService.MaterialSummary material, String levelName) {
+        return material.lookupKey() + "\u0000" + levelName;
+    }
+
+    public static String heatingLevelImageKey(String levelName) {
+        return levelName;
     }
 
     private void appendRoomComplexities(PdfWriter writer, List<SurfaceMaterialListService.RoomComplexitySummary> roomComplexities) throws IOException {
@@ -689,6 +749,25 @@ public final class SurfaceMaterialReportPdfService {
             float imageX = PAGE_MARGIN + SVG_INNER_PADDING + (innerWidth - imageWidth) / 2.0f;
             canvas.image(image, imageX, top - SVG_INNER_PADDING - imageHeight, imageWidth, imageHeight);
             y = top - frameHeight - 6.0f;
+        }
+
+        private void imagePage(String title, BufferedImage image) throws IOException {
+            newPage();
+            writeWrappedText(normalize(title), FONT_BOLD, SECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 6.0f);
+            float frameWidth = availableWidth();
+            float frameHeight = Math.max(80.0f, y - PAGE_MARGIN);
+            float innerPadding = 4.0f;
+            float innerWidth = frameWidth - innerPadding * 2.0f;
+            float innerHeight = frameHeight - innerPadding * 2.0f;
+            float scale = Math.min(innerWidth / Math.max(1.0f, image.getWidth()), innerHeight / Math.max(1.0f, image.getHeight()));
+            float imageWidth = (float) (image.getWidth() * scale);
+            float imageHeight = (float) (image.getHeight() * scale);
+            float frameBottom = PAGE_MARGIN;
+            canvas.rectangle(PAGE_MARGIN, frameBottom, frameWidth, frameHeight, 0.65f, SVG_FRAME_STROKE, SVG_FRAME_FILL);
+            float imageX = PAGE_MARGIN + innerPadding + (innerWidth - imageWidth) / 2.0f;
+            float imageY = frameBottom + innerPadding + (innerHeight - imageHeight) / 2.0f;
+            canvas.image(image, imageX, imageY, imageWidth, imageHeight);
+            y = PAGE_MARGIN;
         }
 
         private PreparedRow prepareRow(TableDefinition definition, List<String> values, PDType1Font font) throws IOException {

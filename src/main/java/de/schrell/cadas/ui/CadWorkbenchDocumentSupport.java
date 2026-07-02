@@ -383,23 +383,42 @@ final class CadWorkbenchDocumentSupport {
             SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant,
             ProgressCallback progress
     ) throws Exception {
-        List<MaterialRoomCapture> materialCaptures = report.materials().stream()
+        boolean raster = variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK;
+        List<MaterialRoomCapture> materialCaptures = raster
+                ? List.of()
+                : report.materials().stream()
                 .filter(material -> material.surfaceType() == SurfaceType.FLOOR)
                 .flatMap(material -> material.roomEntries().stream()
                         .map(entry -> new MaterialRoomCapture(material, entry)))
                 .toList();
-        List<SurfaceMaterialListService.HeatingPlanSummary> heatingPlans = variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK
-                ? report.heatingPlans()
+        List<MaterialLevelCapture> materialLevelCaptures = raster
+                ? report.materials().stream()
+                .filter(material -> material.surfaceType() == SurfaceType.FLOOR)
+                .flatMap(material -> material.roomEntries().stream()
+                        .map(SurfaceMaterialListService.MaterialRoomEntry::levelName)
+                        .distinct()
+                        .map(levelName -> new MaterialLevelCapture(material, levelName)))
+                .toList()
                 : List.of();
-        int totalSteps = Math.max(1, owner.project.levels().size() + materialCaptures.size() + heatingPlans.size());
+        List<String> heatingLevelCaptures = raster
+                ? owner.project.levels().stream()
+                .filter(level -> !level.hydronicHeatings().isEmpty())
+                .map(Level::name)
+                .toList()
+                : List.of();
+        int totalSteps = Math.max(1, owner.project.levels().size() + materialCaptures.size() + materialLevelCaptures.size() + heatingLevelCaptures.size());
         int completedSteps = 0;
         Map<String, BufferedImage> levelPlanImages = new LinkedHashMap<>();
         for (Level level : owner.project.levels()) {
             progress.update(completedSteps / (double) totalSteps, "2D-Ansicht " + level.name() + " wird erstellt");
-            levelPlanImages.put(level.name(), captureLevelPlanImage(level.name()));
+            levelPlanImages.put(level.name(), raster
+                    ? captureMaterialOverviewImage(level.name())
+                    : captureLevelPlanImage(level.name()));
             completedSteps++;
         }
         Map<String, BufferedImage> heatingPlanImages = new LinkedHashMap<>();
+        Map<String, BufferedImage> materialLevelImages = new LinkedHashMap<>();
+        Map<String, BufferedImage> heatingLevelImages = new LinkedHashMap<>();
         Map<String, BufferedImage> materialRoomImages = new LinkedHashMap<>();
         for (MaterialRoomCapture capture : materialCaptures) {
             progress.update(completedSteps / (double) totalSteps, "Raumgrafik " + capture.entry().roomName() + " wird erstellt");
@@ -412,22 +431,39 @@ final class CadWorkbenchDocumentSupport {
             }
             completedSteps++;
         }
-        if (variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK) {
-            for (SurfaceMaterialListService.HeatingPlanSummary plan : heatingPlans) {
-                progress.update(completedSteps / (double) totalSteps, "Heizplan " + plan.roomName() + " wird erstellt");
-                String imageKey = heatingPlanImageKey(plan);
-                if (!heatingPlanImages.containsKey(imageKey)) {
-                    heatingPlanImages.put(imageKey, captureHeatingPlanImage(plan));
-                }
-                completedSteps++;
+        for (MaterialLevelCapture capture : materialLevelCaptures) {
+            progress.update(completedSteps / (double) totalSteps, "Belag " + capture.material().name() + " – " + capture.levelName() + " wird gerastert");
+            BufferedImage image = captureMaterialLevelImage(capture.material(), capture.levelName());
+            if (image != null) {
+                materialLevelImages.put(
+                        SurfaceMaterialReportPdfService.materialLevelImageKey(capture.material(), capture.levelName()),
+                        image
+                );
             }
+            completedSteps++;
+        }
+        for (String levelName : heatingLevelCaptures) {
+            progress.update(completedSteps / (double) totalSteps, "Heizkreise " + levelName + " werden gerastert");
+            heatingLevelImages.put(SurfaceMaterialReportPdfService.heatingLevelImageKey(levelName), captureHeatingLevelImage(levelName));
+            completedSteps++;
         }
         progress.update(1.0, "Materialgrafiken abgeschlossen");
-        return new SurfaceMaterialReportPdfService.ExportAssets(variant, levelPlanImages, heatingPlanImages, materialRoomImages);
+        return new SurfaceMaterialReportPdfService.ExportAssets(
+                variant,
+                levelPlanImages,
+                heatingPlanImages,
+                materialLevelImages,
+                heatingLevelImages,
+                materialRoomImages
+        );
     }
 
     private BufferedImage captureLevelPlanImage(String levelName) throws Exception {
         return runOnFxThread(() -> SwingFXUtils.fromFXImage(owner.reportLevelSnapshot(levelName), null));
+    }
+
+    private BufferedImage captureMaterialOverviewImage(String levelName) throws Exception {
+        return runOnFxThread(() -> SwingFXUtils.fromFXImage(owner.reportMaterialOverviewSnapshot(levelName), null));
     }
 
     private BufferedImage captureFilteredLevelPlanImage(
@@ -441,22 +477,40 @@ final class CadWorkbenchDocumentSupport {
         ));
     }
 
-    private BufferedImage captureHeatingPlanImage(SurfaceMaterialListService.HeatingPlanSummary plan) throws Exception {
-        String levelName = plan.levelName();
-        String roomName = plan.roomName();
+    private BufferedImage captureHeatingLevelImage(String levelName) throws Exception {
         Level level = owner.project.levels().stream()
                 .filter(candidate -> candidate.name().equals(levelName))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Etage `" + levelName + "` ist unbekannt."));
-        Room room = level.rooms().stream()
-                .filter(candidate -> candidate.name().equals(roomName))
+        Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, SurfaceType.FLOOR);
+        return captureFilteredLevelPlanImage(level.name(), visibleLayerIds, true);
+    }
+
+    private BufferedImage captureMaterialLevelImage(
+            SurfaceMaterialListService.MaterialSummary material,
+            String levelName
+    ) throws Exception {
+        Level level = owner.project.levels().stream()
+                .filter(candidate -> candidate.name().equals(levelName))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Raum `" + roomName + "` ist unbekannt."));
-        Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, room, plan.surfacePosition());
-        return runOnFxThread(() -> SwingFXUtils.fromFXImage(
-                owner.reportRoomSnapshot(level.name(), room.outline(), visibleLayerIds, !plan.objectBased()),
-                null
-        ));
+                .orElse(null);
+        if (level == null) {
+            return null;
+        }
+        Set<java.util.UUID> visibleLayerIds = material.roomEntries().stream()
+                .filter(entry -> entry.levelName().equals(levelName))
+                .map(SurfaceMaterialListService.MaterialRoomEntry::roomName)
+                .map(roomName -> level.rooms().stream()
+                        .filter(room -> room.name().equals(roomName))
+                        .findFirst()
+                        .orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .flatMap(room -> materialLayerIds(level, room, material).stream())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (visibleLayerIds.isEmpty()) {
+            return null;
+        }
+        return captureFilteredLevelPlanImage(level.name(), visibleLayerIds, false);
     }
 
     private BufferedImage captureMaterialRoomImage(
@@ -527,18 +581,6 @@ final class CadWorkbenchDocumentSupport {
         );
     }
 
-    private Set<java.util.UUID> variothermLayerIds(Level level, Room room, String surfacePosition) {
-        SurfaceType surfaceType = "Decke".equals(surfacePosition) ? SurfaceType.CEILING : SurfaceType.FLOOR;
-        var stack = level.findSurfaceLayerStack(surfaceType, room.id().toString());
-        if (stack == null) {
-            return Set.of();
-        }
-        return stack.layers().stream()
-                .filter(layer -> SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource()))
-                .map(de.schrell.cadas.domain.model.SurfaceLayer::id)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-    }
-
     private Set<java.util.UUID> variothermLayerIds(Level level, SurfaceType surfaceType) {
         return level.surfaceLayerStacks().stream()
                 .filter(stack -> stack.surfaceType() == surfaceType)
@@ -557,10 +599,6 @@ final class CadWorkbenchDocumentSupport {
                 .filter(layer -> SurfaceMaterialListService.materialLookupKey(material.surfaceType(), layer).equals(material.lookupKey()))
                 .map(de.schrell.cadas.domain.model.SurfaceLayer::id)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    private String heatingPlanImageKey(SurfaceMaterialListService.HeatingPlanSummary plan) {
-        return plan.levelName() + "\u0000" + plan.roomName() + "\u0000" + plan.surfacePosition();
     }
 
     private String constructionDrawingHeatingImageKey(String levelName, de.schrell.cadas.domain.model.HeatingSurfacePosition surfacePosition) {
@@ -653,6 +691,12 @@ final class CadWorkbenchDocumentSupport {
     private record MaterialRoomCapture(
             SurfaceMaterialListService.MaterialSummary material,
             SurfaceMaterialListService.MaterialRoomEntry entry
+    ) {
+    }
+
+    private record MaterialLevelCapture(
+            SurfaceMaterialListService.MaterialSummary material,
+            String levelName
     ) {
     }
 

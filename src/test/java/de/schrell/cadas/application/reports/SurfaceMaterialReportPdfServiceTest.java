@@ -66,15 +66,19 @@ class SurfaceMaterialReportPdfServiceTest {
                         SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK,
                         Map.of("Erdgeschoss", levelImage),
                         Map.of("Erdgeschoss\u0000Wohnen\u0000Fußboden", heatingImage),
+                        Map.of(SurfaceMaterialReportPdfService.materialLevelImageKey(report.materials().getFirst(), "Erdgeschoss"), levelImage),
+                        Map.of(SurfaceMaterialReportPdfService.heatingLevelImageKey("Erdgeschoss"), heatingImage),
                         Map.of()
                 )
         );
 
         assertStandardInhalt(targetFile, false);
         try (var document = Loader.loadPDF(targetFile.toFile())) {
+            assertTrue(document.getNumberOfPages() >= 4);
             String text = new PDFTextStripper().getText(document);
-            assertTrue(text.contains("2D-Ansicht Erdgeschoss"));
-            assertTrue(text.contains("Heizplan Erdgeschoss / Wohnen / Fußboden"));
+            assertTrue(text.contains("Etagenübersicht Erdgeschoss"));
+            assertTrue(text.contains("Belag Erdgeschoss / Parkett"));
+            assertTrue(text.contains("Heizkreise Erdgeschoss"));
         }
 
         Files.deleteIfExists(targetFile);
@@ -136,8 +140,8 @@ class SurfaceMaterialReportPdfServiceTest {
             assertTrue(text.contains("14,00 m"));
             assertTrue(text.contains("Zusammenfassung"));
             assertTrue(text.contains("Flächenheizungen"));
-            assertTrue(text.contains("Heizplan Erdgeschoss / Wohnen"));
             if (expectSvgText) {
+                assertTrue(text.contains("Heizplan Erdgeschoss / Wohnen"));
                 assertTrue(text.contains("V1"));
                 assertTrue(text.contains("R1"));
             }
