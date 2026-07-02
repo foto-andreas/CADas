@@ -47,8 +47,11 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TitledPane;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.Scene;
@@ -2889,6 +2892,34 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void eigenschaftsbereicheMerkenKlappzustandProWerkzeug() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            propertySection(workbench, "Zeichnen").setExpanded(false);
+            workbench.automationSetTool("WALL");
+
+            Assertions.assertTrue(propertySection(workbench, "Zeichnen").isExpanded());
+            propertySection(workbench, "Wand").setExpanded(false);
+            workbench.automationSetTool("EDIT");
+
+            Assertions.assertFalse(propertySection(workbench, "Zeichnen").isExpanded());
+            Assertions.assertTrue(propertySection(workbench, "Wand").isExpanded());
+            workbench.automationSetTool("WALL");
+
+            Assertions.assertTrue(propertySection(workbench, "Zeichnen").isExpanded());
+            Assertions.assertFalse(propertySection(workbench, "Wand").isExpanded());
+            return null;
+        });
+    }
+
+    @Test
     void geländeBearbeitenFälltNachDateiladenAufGespeichertesGeländeZurück() throws Exception {
         Path projektDatei = Files.createTempFile("cadas-gelaende-fallback", ".cadas");
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
@@ -3148,6 +3179,19 @@ class CadWorkbenchTest {
             }
         }
         Assertions.assertTrue(darkOutlineFound, "Kein Pickkreis bei " + point + " gefunden.");
+    }
+
+    private TitledPane propertySection(CadWorkbench workbench, String title) {
+        SplitPane splitPane = (SplitPane) workbench.getCenter();
+        ScrollPane propertyPane = (ScrollPane) splitPane.getItems().getFirst();
+        VBox container = (VBox) propertyPane.getContent();
+        VBox sections = (VBox) container.getChildren().get(1);
+        return sections.getChildren().stream()
+                .filter(TitledPane.class::isInstance)
+                .map(TitledPane.class::cast)
+                .filter(section -> title.equals(section.getText()))
+                .findFirst()
+                .orElseThrow();
     }
 
     private void assertHervorgehobenerBelagImRaum(

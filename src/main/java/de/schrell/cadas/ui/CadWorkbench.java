@@ -128,6 +128,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -177,6 +178,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TitledPane;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.WritableImage;
@@ -501,6 +503,8 @@ public final class CadWorkbench extends BorderPane {
     private final ProjectedModelBoundsService projectedBoundsService = new ProjectedModelBoundsService();
     private final UndoRedoStack<WorkbenchSnapshot> history = new UndoRedoStack<>();
     private final VBox propertySections = new VBox(12.0);
+    private final Map<DrawingTool, Map<String, Boolean>> propertySectionExpandedByTool = new EnumMap<>(DrawingTool.class);
+    private boolean applyingPropertySectionExpansionState;
     private final Label selectionSummaryLabel = new Label("Keine Auswahl");
     private final Button undoButton = new Button("Rückgängig");
     private final Button redoButton = new Button("Wiederherstellen");
@@ -715,6 +719,8 @@ public final class CadWorkbench extends BorderPane {
             render();
         });
         toolSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
+            storePropertySectionExpansionState(oldValue);
+            restorePropertySectionExpansionState(newValue);
             updatePropertySectionVisibility();
             updateActionButtons();
             updateStatus();
@@ -1459,6 +1465,7 @@ public final class CadWorkbench extends BorderPane {
                 )
         );
         propertySections.setPadding(new Insets(4, 0, 4, 0));
+        restorePropertySectionExpansionState(currentTool());
 
         VBox container = new VBox(10.0, new Label("Eigenschaften"), propertySections);
         container.setPadding(new Insets(12));
@@ -1472,14 +1479,60 @@ public final class CadWorkbench extends BorderPane {
         return scrollPane;
     }
 
-    private VBox createPropertySection(String title, Node... nodes) {
-        Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold;");
-        VBox section = new VBox(8.0, titleLabel);
-        section.getChildren().addAll(nodes);
-        section.setPadding(new Insets(10));
-        section.setStyle("-fx-background-color: rgba(242,236,226,0.92); -fx-background-radius: 12;");
-        return section;
+    private TitledPane createPropertySection(String title, Node... nodes) {
+        VBox content = new VBox(8.0, nodes);
+        content.setPadding(new Insets(10));
+        content.setStyle("-fx-background-color: rgba(242,236,226,0.92); -fx-background-radius: 0 0 12 12;");
+        TitledPane pane = new TitledPane(title, content);
+        pane.setAnimated(false);
+        pane.setExpanded(propertySectionExpandedState(currentTool(), title));
+        pane.setStyle("-fx-font-size: 13px;");
+        pane.expandedProperty().addListener((ignored, oldExpanded, expanded) -> {
+            if (!applyingPropertySectionExpansionState) {
+                propertySectionExpandedByTool
+                        .computeIfAbsent(currentTool(), ignoredTool -> new LinkedHashMap<>())
+                        .put(title, expanded);
+            }
+        });
+        applyTooltip(pane, "Klappt den Einstellungsbereich `" + title + "` ein oder aus. Der Zustand wird getrennt für jedes aktive Werkzeug gemerkt.");
+        return pane;
+    }
+
+    private boolean propertySectionExpandedState(DrawingTool tool, String title) {
+        if (tool == null) {
+            return true;
+        }
+        return propertySectionExpandedByTool
+                .getOrDefault(tool, Map.of())
+                .getOrDefault(title, true);
+    }
+
+    private void storePropertySectionExpansionState(DrawingTool tool) {
+        if (tool == null || propertySections.getChildren().isEmpty()) {
+            return;
+        }
+        Map<String, Boolean> state = propertySectionExpandedByTool.computeIfAbsent(tool, ignored -> new LinkedHashMap<>());
+        for (Node node : propertySections.getChildren()) {
+            if (node instanceof TitledPane pane) {
+                state.put(pane.getText(), pane.isExpanded());
+            }
+        }
+    }
+
+    private void restorePropertySectionExpansionState(DrawingTool tool) {
+        if (tool == null || propertySections.getChildren().isEmpty()) {
+            return;
+        }
+        applyingPropertySectionExpansionState = true;
+        try {
+            for (Node node : propertySections.getChildren()) {
+                if (node instanceof TitledPane pane) {
+                    pane.setExpanded(propertySectionExpandedState(tool, pane.getText()));
+                }
+            }
+        } finally {
+            applyingPropertySectionExpansionState = false;
+        }
     }
 
     private VBox propertyRow(String label, Node... controls) {
