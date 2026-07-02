@@ -335,6 +335,7 @@ public final class CadWorkbench extends BorderPane {
     final BooleanProperty showAreaVolume = new SimpleBooleanProperty(true);
     private final BooleanProperty showRoomObjects = new SimpleBooleanProperty(true);
     private final BooleanProperty showTerrainInPlan = new SimpleBooleanProperty(true);
+    private final BooleanProperty showHeatingCircuits = new SimpleBooleanProperty(true);
     private final BooleanProperty showVariothermCircles = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuides = new SimpleBooleanProperty(true);
     private final BooleanProperty showGuideDistances = new SimpleBooleanProperty(true);
@@ -690,6 +691,7 @@ public final class CadWorkbench extends BorderPane {
         registerRenderListener(dimensionTextStyle);
         registerRenderListener(showAreaVolume);
         registerRenderListener(showTerrainInPlan);
+        registerRenderListener(showHeatingCircuits);
         registerRenderListener(showVariothermCircles);
         registerRenderListener(showGuides);
         registerRenderListener(showGuideDistances);
@@ -877,6 +879,10 @@ public final class CadWorkbench extends BorderPane {
         terrainPlanBox.selectedProperty().bindBidirectional(showTerrainInPlan);
         applyTooltip(terrainPlanBox, "Blendet das Gelände in der 2D-Ansicht als Band außerhalb des Gebäudes ein oder aus. Seitenansichten und 3D bleiben davon unberührt.");
 
+        CheckBox heatingCircuitsBox = new CheckBox("Heizkreise");
+        heatingCircuitsBox.selectedProperty().bindBidirectional(showHeatingCircuits);
+        applyTooltip(heatingCircuitsBox, "Blendet Heizkreisflächen, Vorlauf, Rücklauf, Anschlussmarker und Startpunkte global in der 2D-Ansicht ein oder aus. Planung, Auswahl und Materialauswertung bleiben unverändert.");
+
         CheckBox variothermCirclesBox = new CheckBox("Variotherm-Kreise");
         variothermCirclesBox.selectedProperty().bindBidirectional(showVariothermCircles);
         applyTooltip(variothermCirclesBox, "Blendet die Kreis-Markierungen der Variotherm-Trockenbauplatten global in der 2D-Ansicht ein oder aus. Die Belagsgeometrie und Mengenberechnung bleiben unverändert.");
@@ -893,6 +899,7 @@ public final class CadWorkbench extends BorderPane {
                 dimensionTextPartsBox,
                 objectsBox,
                 terrainPlanBox,
+                heatingCircuitsBox,
                 variothermCirclesBox
         );
     }
@@ -1288,6 +1295,7 @@ public final class CadWorkbench extends BorderPane {
                 checkMenuItem("Erweiterte Maßtexte anzeigen", dimensionTextStyle, DimensionTextStyle.FULL, DimensionTextStyle.LENGTH_ONLY),
                 checkMenuItem("Objekte anzeigen", showRoomObjects),
                 checkMenuItem("Gelände in 2D anzeigen", showTerrainInPlan),
+                checkMenuItem("Heizkreise anzeigen", showHeatingCircuits),
                 checkMenuItem("Variotherm-Kreise anzeigen", showVariothermCircles),
                 checkMenuItem("Fläche und Volumen anzeigen", showAreaVolume),
                 checkMenuItem("Nordpfeil anzeigen", showCompass)
@@ -3879,7 +3887,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawHydronicHeatings(GraphicsContext graphics) {
-        if (reportSnapshotHideHydronicHeatings) {
+        if (reportSnapshotHideHydronicHeatings || !showHeatingCircuits.get()) {
             return;
         }
         if (!projectionService.isPlanView(activeView.get())) {
@@ -10118,6 +10126,10 @@ public final class CadWorkbench extends BorderPane {
 
     public void automationSetShowVariothermCircles(boolean visible) {
         showVariothermCircles.set(visible);
+    }
+
+    public void automationSetShowHeatingCircuits(boolean visible) {
+        showHeatingCircuits.set(visible);
     }
 
     public int automationFloorExtensionCount() {

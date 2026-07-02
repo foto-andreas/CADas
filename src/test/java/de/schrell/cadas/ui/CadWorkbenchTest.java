@@ -2552,6 +2552,70 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void heizkreiseLassenSichGlobalAusblenden() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.showAreaVolume.set(false);
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3_900, 2_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            HeatingZone zone = HeatingZone.create("Heizkreis 1", List.of(
+                    new PlanPoint(600, 600),
+                    new PlanPoint(3_400, 600),
+                    new PlanPoint(3_400, 2_400),
+                    new PlanPoint(600, 2_400)
+            ), HeatingLayoutPattern.MEANDER);
+            HydronicHeating heating = HydronicHeating.create(
+                    room.id(),
+                    HeatingSurfacePosition.FLOOR,
+                    HeatingLayoutPattern.MEANDER,
+                    Length.ofMillimeters(250),
+                    Length.ofMillimeters(16),
+                    Length.ofMillimeters(80_000),
+                    Length.ofMillimeters(100),
+                    new PlanPoint(900, 700),
+                    new PlanPoint(1_150, 700)
+            ).withZones(List.of(zone));
+            instanz.project.primaryLevel().addHydronicHeating(heating);
+            instanz.automationSetViewport(2.0, 20.0, 20.0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage mitHeizkreis = aufFxThread(workbench::automationDrawingSnapshot);
+        int sichtbareHeizkreisPixel = countHeatingCircuitPixels(
+                mitHeizkreis,
+                snapshot,
+                new PlanPoint(500, 500),
+                new PlanPoint(3_500, 2_500)
+        );
+
+        aufFxThread(() -> {
+            workbench.automationSetShowHeatingCircuits(false);
+            return null;
+        });
+        WritableImage ohneHeizkreis = aufFxThread(workbench::automationDrawingSnapshot);
+        int ausgeblendeteHeizkreisPixel = countHeatingCircuitPixels(
+                ohneHeizkreis,
+                snapshot,
+                new PlanPoint(500, 500),
+                new PlanPoint(3_500, 2_500)
+        );
+
+        Assertions.assertTrue(sichtbareHeizkreisPixel > 80, "Heizkreise wurden nicht sichtbar gezeichnet.");
+        Assertions.assertTrue(ausgeblendeteHeizkreisPixel < sichtbareHeizkreisPixel / 10, "Heizkreise bleiben trotz globalem Abschalten sichtbar.");
+    }
+
+    @Test
     void variothermAussenschnittZeigtVolleKreiseAufDerInnenseite() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -2877,6 +2941,11 @@ class CadWorkbenchTest {
                     .map(CheckBox.class::cast)
                     .map(CheckBox::getText)
                     .anyMatch("Gelände 2D"::equals));
+            Assertions.assertTrue(viewOptionsBar.getItems().stream()
+                    .filter(CheckBox.class::isInstance)
+                    .map(CheckBox.class::cast)
+                    .map(CheckBox::getText)
+                    .anyMatch("Heizkreise"::equals));
             Menu optionenMenu = menuBar.getMenus().stream()
                     .filter(menu -> "Optionen".equals(menu.getText()))
                     .findFirst()
@@ -2887,6 +2956,9 @@ class CadWorkbenchTest {
             Assertions.assertTrue(optionenMenu.getItems().stream()
                     .map(MenuItem::getText)
                     .anyMatch("Gelände in 2D anzeigen"::equals));
+            Assertions.assertTrue(optionenMenu.getItems().stream()
+                    .map(MenuItem::getText)
+                    .anyMatch("Heizkreise anzeigen"::equals));
             return null;
         });
     }
@@ -3234,6 +3306,32 @@ class CadWorkbenchTest {
                 if (color.getBlue() > color.getRed() + 0.04
                         && color.getGreen() > color.getRed() + 0.02
                         && color.getBlue() > 0.32) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private int countHeatingCircuitPixels(
+            WritableImage image,
+            WorkbenchAutomationSnapshot snapshot,
+            PlanPoint minPoint,
+            PlanPoint maxPoint
+    ) {
+        int minX = (int) Math.round(snapshot.offsetX() + minPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int maxX = (int) Math.round(snapshot.offsetX() + maxPoint.xMillimeters() * 0.1 * snapshot.zoom());
+        int minY = (int) Math.round(snapshot.offsetY() + minPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        int maxY = (int) Math.round(snapshot.offsetY() + maxPoint.yMillimeters() * 0.1 * snapshot.zoom());
+        int count = 0;
+        for (int x = Math.max(0, minX); x <= Math.min((int) image.getWidth() - 1, maxX); x++) {
+            for (int y = Math.max(0, minY); y <= Math.min((int) image.getHeight() - 1, maxY); y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                boolean heatingRed = color.getRed() > color.getGreen() + 0.08
+                        && color.getRed() > color.getBlue() + 0.08;
+                boolean heatingBlue = color.getBlue() > color.getRed() + 0.08
+                        && color.getBlue() > color.getGreen() + 0.08;
+                if (heatingRed || heatingBlue) {
                     count++;
                 }
             }
