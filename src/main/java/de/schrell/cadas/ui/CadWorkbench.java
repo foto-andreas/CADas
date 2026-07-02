@@ -610,6 +610,7 @@ public final class CadWorkbench extends BorderPane {
     private boolean reportSnapshotRestrictSurfaceLayers;
     private Set<UUID> reportSnapshotVisibleSurfaceLayerIds = Set.of();
     private boolean reportSnapshotHideHydronicHeatings;
+    private ScreenBounds lastPlanDimensionScreenBounds;
     private Level.RoomReplacementImpact pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
 
     public CadWorkbench() {
@@ -3233,6 +3234,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void drawWallDimensions(GraphicsContext graphics, List<TextBlockingBox> seedBlockers) {
+        lastPlanDimensionScreenBounds = null;
         if (!showDimensions.get() || !projectionService.isPlanView(activeView.get())) {
             return;
         }
@@ -3246,12 +3248,15 @@ public final class CadWorkbench extends BorderPane {
                 seedBlockers,
                 this::layoutWallDimensionLabel
         );
+        ScreenBounds dimensionBounds = null;
         for (RenderedWallDimensionLabel rendered : placed) {
+            dimensionBounds = ScreenBounds.union(dimensionBounds, dimensionScreenBounds(rendered));
             drawIsoDimensionLines(graphics, rendered.layout(), rendered.directionX(), rendered.directionY());
             graphics.setFill(CadColorPalette.DIMENSION_TEXT);
             graphics.setFont(DIMENSION_LABEL_FONT);
             graphics.fillText(rendered.pending().text(), rendered.textX(), rendered.baselineY());
         }
+        lastPlanDimensionScreenBounds = dimensionBounds;
     }
 
     DimensionLabelOptions currentDimensionLabelOptions() {
@@ -3344,6 +3349,15 @@ public final class CadWorkbench extends BorderPane {
                 baselineY,
                 blockingBox
         );
+    }
+
+    private ScreenBounds dimensionScreenBounds(RenderedWallDimensionLabel rendered) {
+        DimensionLineLayoutService.DimensionLineLayout layout = rendered.layout();
+        ScreenBounds bounds = ScreenBounds.from(rendered.blockingBox());
+        bounds = bounds.includeLine(layout.firstExtensionStartX(), layout.firstExtensionStartY(), layout.firstExtensionEndX(), layout.firstExtensionEndY(), 8.0);
+        bounds = bounds.includeLine(layout.secondExtensionStartX(), layout.secondExtensionStartY(), layout.secondExtensionEndX(), layout.secondExtensionEndY(), 8.0);
+        bounds = bounds.includeLine(layout.lineStartX(), layout.lineStartY(), layout.lineEndX(), layout.lineEndY(), 8.0);
+        return bounds;
     }
 
     private void drawWallSurfaceLayers(GraphicsContext graphics) {
@@ -8344,9 +8358,74 @@ public final class CadWorkbench extends BorderPane {
     private void fitCurrentReportViewToContent() {
         if (projectionService.isPlanView(activeView.get()) && showDimensions.get()) {
             fitCurrentViewToContent(220.0, 240.0);
+            fitRenderedReportBoundsIntoView();
             return;
         }
         fitCurrentViewToContent();
+    }
+
+    private void fitRenderedReportBoundsIntoView() {
+        double targetPadding = 42.0;
+        for (int iteration = 0; iteration < 6; iteration++) {
+            render();
+            Optional<ScreenBounds> bounds = currentReportScreenBounds();
+            if (bounds.isEmpty()) {
+                return;
+            }
+            double viewportWidth = Math.max(drawingCanvas.getWidth(), 640.0);
+            double viewportHeight = Math.max(drawingCanvas.getHeight(), 420.0);
+            ScreenBounds visibleBounds = bounds.orElseThrow();
+            double availableWidth = Math.max(220.0, viewportWidth - targetPadding * 2.0);
+            double availableHeight = Math.max(180.0, viewportHeight - targetPadding * 2.0);
+            double fitFactor = Math.min(availableWidth / Math.max(1.0, visibleBounds.width()), availableHeight / Math.max(1.0, visibleBounds.height()));
+            if (fitFactor < 0.995) {
+                scaleViewAroundViewportCenter(fitFactor, viewportWidth, viewportHeight);
+                continue;
+            }
+            double shiftX = viewportShift(visibleBounds.minX(), visibleBounds.maxX(), targetPadding, viewportWidth - targetPadding);
+            double shiftY = viewportShift(visibleBounds.minY(), visibleBounds.maxY(), targetPadding, viewportHeight - targetPadding);
+            if (Math.abs(shiftX) <= 0.5 && Math.abs(shiftY) <= 0.5) {
+                return;
+            }
+            offsetX += shiftX;
+            offsetY += shiftY;
+        }
+    }
+
+    private Optional<ScreenBounds> currentReportScreenBounds() {
+        Optional<ScreenBounds> contentBounds = projectedBoundsService.bounds(activeLevel.get(), activeView.get())
+                .map(bounds -> new ScreenBounds(
+                        toScreenHorizontal(bounds.minHorizontalMillimeters()),
+                        toScreenHorizontal(bounds.maxHorizontalMillimeters()),
+                        toScreenVertical(bounds.minVerticalMillimeters()),
+                        toScreenVertical(bounds.maxVerticalMillimeters())
+                ));
+        return Optional.ofNullable(ScreenBounds.union(contentBounds.orElse(null), lastPlanDimensionScreenBounds));
+    }
+
+    private void scaleViewAroundViewportCenter(double factor, double viewportWidth, double viewportHeight) {
+        if (factor <= 0.0 || Math.abs(zoom) <= 0.001) {
+            return;
+        }
+        double oldZoom = zoom;
+        double newZoom = twoDZoomRange.clamp(zoom * factor);
+        double effectiveFactor = newZoom / oldZoom;
+        double centerX = viewportWidth / 2.0;
+        double centerY = viewportHeight / 2.0;
+        zoom = newZoom;
+        offsetX = centerX + (offsetX - centerX) * effectiveFactor;
+        offsetY = centerY + (offsetY - centerY) * effectiveFactor;
+    }
+
+    private double viewportShift(double min, double max, double visibleMin, double visibleMax) {
+        double shift = 0.0;
+        if (min < visibleMin) {
+            shift += visibleMin - min;
+        }
+        if (max + shift > visibleMax) {
+            shift -= max + shift - visibleMax;
+        }
+        return shift;
     }
 
     private void fitPlanViewToPoints(List<PlanPoint> points, double paddingMillimeters) {
@@ -10573,6 +10652,45 @@ public final class CadWorkbench extends BorderPane {
                             DIMENSION_LINE_BLOCKING_PADDING
                     )
             );
+        }
+    }
+
+    private record ScreenBounds(double minX, double maxX, double minY, double maxY) {
+
+        static ScreenBounds from(TextBlockingBox box) {
+            return new ScreenBounds(box.minX(), box.maxX(), box.minY(), box.maxY());
+        }
+
+        static ScreenBounds union(ScreenBounds first, ScreenBounds second) {
+            if (first == null) {
+                return second;
+            }
+            if (second == null) {
+                return first;
+            }
+            return new ScreenBounds(
+                    Math.min(first.minX(), second.minX()),
+                    Math.max(first.maxX(), second.maxX()),
+                    Math.min(first.minY(), second.minY()),
+                    Math.max(first.maxY(), second.maxY())
+            );
+        }
+
+        ScreenBounds includeLine(double startX, double startY, double endX, double endY, double padding) {
+            return union(this, new ScreenBounds(
+                    Math.min(startX, endX) - padding,
+                    Math.max(startX, endX) + padding,
+                    Math.min(startY, endY) - padding,
+                    Math.max(startY, endY) + padding
+            ));
+        }
+
+        double width() {
+            return maxX - minX;
+        }
+
+        double height() {
+            return maxY - minY;
         }
     }
 

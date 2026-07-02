@@ -1942,10 +1942,15 @@ class CadWorkbenchTest {
             new Scene(instanz, 1200, 800);
             instanz.applyCss();
             instanz.layout();
-            instanz.automationAddRoom(Room.rectangular(
+            var level = instanz.project.primaryLevel();
+            level.addWall(Wall.create(new PlanSegment(new PlanPoint(0, 0), new PlanPoint(15_000, 0)), Length.ofMillimeters(200), Length.ofMillimeters(2_800)));
+            level.addWall(Wall.create(new PlanSegment(new PlanPoint(15_000, 0), new PlanPoint(15_000, 3_500)), Length.ofMillimeters(200), Length.ofMillimeters(2_800)));
+            level.addWall(Wall.create(new PlanSegment(new PlanPoint(15_000, 3_500), new PlanPoint(0, 3_500)), Length.ofMillimeters(200), Length.ofMillimeters(2_800)));
+            level.addWall(Wall.create(new PlanSegment(new PlanPoint(0, 3_500), new PlanPoint(0, 0)), Length.ofMillimeters(200), Length.ofMillimeters(2_800)));
+            level.addRoom(Room.rectangular(
                     "Wohnen",
-                    new PlanPoint(0, 0),
-                    new PlanPoint(6_000, 4_000),
+                    new PlanPoint(100, 100),
+                    new PlanPoint(14_900, 3_400),
                     Length.ofMillimeters(2_600),
                     Length.ofMillimeters(180),
                     Length.ofMillimeters(200)
@@ -1957,8 +1962,16 @@ class CadWorkbenchTest {
 
         WritableImage image = aufFxThread(() -> workbench.reportLevelSnapshot("Erdgeschoss"));
 
-        Assertions.assertEquals(0, countBorderContentPixels(image, 16),
-                "Die Raster-Bauzeichnung zeichnet ISO-Bemaßung noch bis an den Bildrand.");
+        Assertions.assertTrue(countDarkPixels(image, 0, 0, (int) image.getWidth() - 1, (int) image.getHeight() - 1) > 100,
+                "Die Raster-Bauzeichnung muss den bemaßten Grundriss enthalten.");
+        int imageWidth = (int) image.getWidth();
+        int imageHeight = (int) image.getHeight();
+        Assertions.assertEquals(0, countNonBackgroundPixels(image, 0, 80, 15, imageHeight - 1),
+                "Die Raster-Bauzeichnung schneidet links weiterhin Inhalt an.");
+        Assertions.assertEquals(0, countNonBackgroundPixels(image, imageWidth - 16, 0, imageWidth - 1, imageHeight - 1),
+                "Die Raster-Bauzeichnung schneidet rechts weiterhin Inhalt an.");
+        Assertions.assertEquals(0, countNonBackgroundPixels(image, 0, imageHeight - 16, imageWidth - 1, imageHeight - 1),
+                "Die Raster-Bauzeichnung schneidet unten weiterhin Inhalt an.");
     }
 
     @Test
@@ -3229,25 +3242,23 @@ class CadWorkbenchTest {
         return count;
     }
 
-    private int countBorderContentPixels(WritableImage image, int frameWidth) {
-        int width = (int) image.getWidth();
-        int height = (int) image.getHeight();
+    private int countNonBackgroundPixels(WritableImage image, int minX, int minY, int maxX, int maxY) {
         int count = 0;
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                boolean inBorder = x < frameWidth || y < frameWidth || x >= width - frameWidth || y >= height - frameWidth;
-                if (!inBorder) {
-                    continue;
-                }
+        for (int x = Math.max(0, minX); x <= Math.min((int) image.getWidth() - 1, maxX); x++) {
+            for (int y = Math.max(0, minY); y <= Math.min((int) image.getHeight() - 1, maxY); y++) {
                 var color = image.getPixelReader().getColor(x, y);
-                if (Math.abs(color.getRed() - 0.988) > 0.03
-                        || Math.abs(color.getGreen() - 0.980) > 0.03
-                        || Math.abs(color.getBlue() - 0.961) > 0.03) {
+                if (!isCanvasBackground(color)) {
                     count++;
                 }
             }
         }
         return count;
+    }
+
+    private boolean isCanvasBackground(javafx.scene.paint.Color color) {
+        return Math.abs(color.getRed() - 0.988) <= 0.03
+                && Math.abs(color.getGreen() - 0.980) <= 0.03
+                && Math.abs(color.getBlue() - 0.961) <= 0.03;
     }
 
     private Path erzeugeProjektMitInnenwandfliesenAlsDxf() throws Exception {
