@@ -604,6 +604,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     WarningPresentation lastWarningDialog = WarningPresentation.empty();
     int rememberedWarningCount;
     boolean reportSnapshotRestrictSurfaceLayers;
+    boolean reportSnapshotActive;
     Set<UUID> reportSnapshotVisibleSurfaceLayerIds = Set.of();
     boolean reportSnapshotHideHydronicHeatings;
     Set<HeatingSurfacePosition> reportSnapshotVisibleHydronicSurfacePositions = Set.of();

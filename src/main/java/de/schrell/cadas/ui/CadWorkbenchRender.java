@@ -1240,6 +1240,9 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
         if (reportSnapshotHideHydronicHeatings || !showHeatingCircuits.get()) {
             return;
         }
+        if (!reportSnapshotActive && zoom < 1.0) {
+            return;
+        }
         if (!projectionService.isPlanView(activeView.get())) {
             return;
         }

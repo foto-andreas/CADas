@@ -406,6 +406,7 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
         SelectionKey previousPrimarySelection = selectedSelection.get();
         List<SelectionKey> previousSelections = List.copyOf(selectedSelections);
         boolean previousRestrictSurfaceLayers = reportSnapshotRestrictSurfaceLayers;
+        boolean previousReportSnapshotActive = reportSnapshotActive;
         Set<UUID> previousVisibleSurfaceLayerIds = reportSnapshotVisibleSurfaceLayerIds;
         boolean previousHideHydronicHeatings = reportSnapshotHideHydronicHeatings;
         Set<HeatingSurfacePosition> previousVisibleHydronicSurfacePositions = reportSnapshotVisibleHydronicSurfacePositions;
@@ -419,6 +420,7 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
         ensureCanvasReady();
         try {
             double renderScale = Math.max(1.0, options.renderScale());
+            reportSnapshotActive = true;
             reportSnapshotRestrictSurfaceLayers = options.restrictSurfaceLayers();
             reportSnapshotVisibleSurfaceLayerIds = Set.copyOf(options.visibleSurfaceLayerIds());
             reportSnapshotHideHydronicHeatings = !options.includeHydronicHeating();
@@ -452,6 +454,7 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
             selectedSelections.clear();
             selectedSelections.addAll(previousSelections);
             selectedSelection.set(previousPrimarySelection);
+            reportSnapshotActive = previousReportSnapshotActive;
             reportSnapshotRestrictSurfaceLayers = previousRestrictSurfaceLayers;
             reportSnapshotVisibleSurfaceLayerIds = previousVisibleSurfaceLayerIds;
             reportSnapshotHideHydronicHeatings = previousHideHydronicHeatings;
