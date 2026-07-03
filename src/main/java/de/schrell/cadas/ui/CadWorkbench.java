@@ -1,5 +1,13 @@
 package de.schrell.cadas.ui;
 
+import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.formatSurfaceLayoutCorner;
+import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.formatSurfaceLayoutDirection;
+import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.normalizedSurfaceLayoutAnchor;
+import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.startsAtMaximumX;
+import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.startsAtMaximumY;
+import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.surfaceLayoutRotatedQuarterTurn;
+import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.surfaceLayoutSelectionDirection;
+
 import de.schrell.cadas.application.drawing.DraftingConstraints;
 import de.schrell.cadas.application.drawing.DraftingService;
 import de.schrell.cadas.application.drawing.DimensionLabelOptions;
@@ -4397,14 +4405,6 @@ public final class CadWorkbench extends BorderPane {
         );
     }
 
-    private boolean startsAtMaximumX(SurfaceLayoutAnchor anchor) {
-        return anchor == SurfaceLayoutAnchor.MAX_X_MIN_Y || anchor == SurfaceLayoutAnchor.MAX_X_MAX_Y;
-    }
-
-    private boolean startsAtMaximumY(SurfaceLayoutAnchor anchor) {
-        return anchor == SurfaceLayoutAnchor.MAX_X_MAX_Y || anchor == SurfaceLayoutAnchor.MIN_X_MAX_Y;
-    }
-
     private double modulo(double value, double modulus) {
         if (Math.abs(modulus) <= 0.001) {
             return 0.0;
@@ -7806,13 +7806,6 @@ public final class CadWorkbench extends BorderPane {
         updateSurfaceLayoutCornerLabel();
     }
 
-    private SurfaceLayoutAnchor normalizedSurfaceLayoutAnchor(SurfaceLayoutAnchor anchor) {
-        if (anchor != null && anchor != SurfaceLayoutAnchor.AUTO) {
-            return anchor;
-        }
-        return SurfaceLayoutAnchor.MIN_X_MIN_Y;
-    }
-
     private void updateSurfaceLayoutCornerLabel() {
         surfaceLayoutCornerLabel.setText(formatSurfaceLayoutCorner(currentSurfaceLayoutAnchor()));
     }
@@ -7854,16 +7847,6 @@ public final class CadWorkbench extends BorderPane {
         return true;
     }
 
-    private String formatSurfaceLayoutCorner(SurfaceLayoutAnchor anchor) {
-        return switch (anchor == null ? SurfaceLayoutAnchor.MIN_X_MIN_Y : anchor) {
-            case AUTO -> "Automatisch";
-            case MIN_X_MIN_Y -> "Unten links";
-            case MAX_X_MIN_Y -> "Unten rechts";
-            case MAX_X_MAX_Y -> "Oben rechts";
-            case MIN_X_MAX_Y -> "Oben links";
-        };
-    }
-
     private SurfaceLayoutDirection currentSurfaceLayoutDirection() {
         SurfaceLayoutDirection selection = surfaceLayoutDirectionSelector.getValue();
         if (selection != null) {
@@ -7878,28 +7861,6 @@ public final class CadWorkbench extends BorderPane {
 
     private de.schrell.cadas.domain.model.SurfaceLayoutAnchor currentSurfaceLayoutAnchor() {
         return Optional.ofNullable(surfaceLayoutAnchorSelection.get()).orElse(SurfaceLayoutAnchor.MIN_X_MIN_Y);
-    }
-
-    private SurfaceLayoutDirection surfaceLayoutSelectionDirection(SurfaceLayoutAnchor anchor, boolean rotatedQuarterTurn) {
-        return rotatedQuarterTurn == surfaceLayoutCornerParity(anchor)
-                ? SurfaceLayoutDirection.LEFT_TO_RIGHT
-                : SurfaceLayoutDirection.RIGHT_TO_LEFT;
-    }
-
-    private boolean surfaceLayoutRotatedQuarterTurn(SurfaceLayoutAnchor anchor, SurfaceLayoutDirection direction) {
-        boolean clockwiseDirection = direction != SurfaceLayoutDirection.RIGHT_TO_LEFT;
-        return clockwiseDirection
-                ? surfaceLayoutCornerParity(anchor)
-                : !surfaceLayoutCornerParity(anchor);
-    }
-
-    private boolean surfaceLayoutCornerParity(SurfaceLayoutAnchor anchor) {
-        SurfaceLayoutAnchor manualAnchor = normalizedSurfaceLayoutAnchor(anchor);
-        return startsAtMaximumX(manualAnchor) ^ startsAtMaximumY(manualAnchor);
-    }
-
-    private String formatSurfaceLayoutDirection(SurfaceLayoutAnchor anchor, boolean rotatedQuarterTurn) {
-        return surfaceLayoutSelectionDirection(anchor, rotatedQuarterTurn).label();
     }
 
     private SurfaceLayoutMode currentSurfaceLayoutMode() {
