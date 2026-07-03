@@ -181,6 +181,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
@@ -203,6 +204,7 @@ import javafx.scene.paint.ImagePattern;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
+import javafx.scene.transform.Transform;
 import javafx.scene.web.WebView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -615,8 +617,9 @@ public final class CadWorkbench extends BorderPane {
     private boolean reportSnapshotRestrictSurfaceLayers;
     private Set<UUID> reportSnapshotVisibleSurfaceLayerIds = Set.of();
     private boolean reportSnapshotHideHydronicHeatings;
+    private boolean reportSnapshotFilterHeatingRoomObjects;
+    private Set<RoomObjectHeatingType> reportSnapshotVisibleHeatingObjectTypes = Set.of();
     private boolean reportSnapshotInteriorRoomDimensionsOnly;
-    private double reportSnapshotRenderScale = 1.0;
     private ScreenBounds lastPlanDimensionScreenBounds;
     private Level.RoomReplacementImpact pendingRoomSynchronizationImpact = emptyRoomSynchronizationImpact();
 
@@ -4256,7 +4259,7 @@ public final class CadWorkbench extends BorderPane {
                 graphics.fillRect(screenX, screenY, jointPx, th * scale());
             }
             if (showVariothermCircles.get()
-                    && SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource())
+                    && SurfaceCoveringPresetService.isVariothermDryPanelLayer(layer)
                     && scale() * SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS
                     >= VARIOTHERM_DETAIL_MIN_SCREEN_SPACING) {
                 drawVariothermPanelGrooves(graphics, layer, tx, ty, tw, th);
@@ -4804,6 +4807,9 @@ public final class CadWorkbench extends BorderPane {
             if (!roomObject.visible()) {
                 continue;
             }
+            if (!shouldDrawRoomObject(roomObject)) {
+                continue;
+            }
             boolean selected = isSelected(RenderableKind.ROOM_OBJECT, roomObject.id().toString());
             graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#356f62"));
             graphics.setFill(selected ? Color.color(0.85, 0.50, 0.18, 0.30) : Color.color(0.22, 0.44, 0.39, 0.22));
@@ -4818,6 +4824,17 @@ public final class CadWorkbench extends BorderPane {
                 graphics.strokeRect(x, y, width * scale(), roomObject.height().toMillimeters() * scale());
             }
         }
+    }
+
+    private boolean shouldDrawRoomObject(RoomObject roomObject) {
+        if (!reportSnapshotFilterHeatingRoomObjects || !isHeatingRoomObject(roomObject)) {
+            return true;
+        }
+        return reportSnapshotVisibleHeatingObjectTypes.contains(roomObject.heatingType());
+    }
+
+    private boolean isHeatingRoomObject(RoomObject roomObject) {
+        return roomObject.heatOutputWatts() > 0.0 && roomObject.heatingType().isHeated();
     }
 
     private void drawRoomObjectPlan(GraphicsContext graphics, RoomObject roomObject) {
@@ -8509,8 +8526,8 @@ public final class CadWorkbench extends BorderPane {
     }
 
     private void fitCurrentViewToContent(double horizontalPadding, double verticalPadding) {
-        double viewportWidth = reportAwareViewportWidth();
-        double viewportHeight = reportAwareViewportHeight();
+        double viewportWidth = Math.max(drawingPane.getWidth(), 640.0);
+        double viewportHeight = Math.max(drawingPane.getHeight(), 420.0);
         projectedBoundsService.bounds(activeLevel.get(), activeView.get()).ifPresentOrElse(bounds -> {
             fitViewportToBounds(
                     viewportWidth,
@@ -8611,8 +8628,8 @@ public final class CadWorkbench extends BorderPane {
         double maxX = points.stream().mapToDouble(PlanPoint::xMillimeters).max().orElse(0.0) + paddingMillimeters;
         double minY = points.stream().mapToDouble(PlanPoint::yMillimeters).min().orElse(0.0) - paddingMillimeters;
         double maxY = points.stream().mapToDouble(PlanPoint::yMillimeters).max().orElse(0.0) + paddingMillimeters;
-        double viewportWidth = reportAwareViewportWidth();
-        double viewportHeight = reportAwareViewportHeight();
+        double viewportWidth = Math.max(drawingPane.getWidth(), 640.0);
+        double viewportHeight = Math.max(drawingPane.getHeight(), 420.0);
         fitViewportToBounds(
                 viewportWidth,
                 viewportHeight,
@@ -8623,18 +8640,6 @@ public final class CadWorkbench extends BorderPane {
                 80.0,
                 96.0
         );
-    }
-
-    private double reportAwareViewportWidth() {
-        return reportSnapshotRenderScale > 1.0
-                ? Math.max(drawingCanvas.getWidth(), 640.0)
-                : Math.max(drawingPane.getWidth(), 640.0);
-    }
-
-    private double reportAwareViewportHeight() {
-        return reportSnapshotRenderScale > 1.0
-                ? Math.max(drawingCanvas.getHeight(), 420.0)
-                : Math.max(drawingPane.getHeight(), 420.0);
     }
 
     private void fitViewportToBounds(
@@ -10123,7 +10128,7 @@ public final class CadWorkbench extends BorderPane {
     }
 
     WritableImage reportLevelSnapshot(String levelName) {
-        return reportSnapshot(levelName, null, 0.0, ReportSnapshotOptions.defaults().withRenderScale(2.0));
+        return reportSnapshot(levelName, null, 0.0, ReportSnapshotOptions.defaults().hideHeatingRoomObjects().withRenderScale(2.0));
     }
 
     WritableImage reportMaterialOverviewSnapshot(String levelName) {
@@ -10131,21 +10136,30 @@ public final class CadWorkbench extends BorderPane {
                 levelName,
                 null,
                 0.0,
-                new ReportSnapshotOptions(true, Set.of(), false, true, true, true, 2.0)
+                new ReportSnapshotOptions(true, Set.of(), false, true, true, true, true, Set.of(), 2.0)
         );
     }
 
     WritableImage reportLevelSnapshot(String levelName, Set<UUID> visibleSurfaceLayerIds, boolean includeHydronicHeating) {
+        return reportLevelSnapshot(levelName, visibleSurfaceLayerIds, includeHydronicHeating, Set.of());
+    }
+
+    WritableImage reportLevelSnapshot(
+            String levelName,
+            Set<UUID> visibleSurfaceLayerIds,
+            boolean includeHydronicHeating,
+            Set<RoomObjectHeatingType> visibleHeatingObjectTypes
+    ) {
         return reportSnapshot(
                 levelName,
                 null,
                 0.0,
-                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, false, true, false, 2.0)
+                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, false, true, false, true, visibleHeatingObjectTypes, 2.0)
         );
     }
 
     WritableImage reportRoomSnapshot(String levelName, List<PlanPoint> focusPoints) {
-        return reportSnapshot(levelName, List.copyOf(focusPoints), 280.0, ReportSnapshotOptions.defaults().withRenderScale(2.0));
+        return reportSnapshot(levelName, List.copyOf(focusPoints), 280.0, ReportSnapshotOptions.defaults().hideHeatingRoomObjects().withRenderScale(2.0));
     }
 
     WritableImage reportRoomSnapshot(
@@ -10158,7 +10172,7 @@ public final class CadWorkbench extends BorderPane {
                 levelName,
                 List.copyOf(focusPoints),
                 280.0,
-                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, false, true, false, 2.0)
+                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, false, true, false, true, Set.of(), 2.0)
         );
     }
 
@@ -10174,34 +10188,27 @@ public final class CadWorkbench extends BorderPane {
         double previousZoom = zoom;
         double previousOffsetX = offsetX;
         double previousOffsetY = offsetY;
+        double[] previousDividerPositions = currentCenterDividerPositions();
         SelectionKey previousPrimarySelection = selectedSelection.get();
         List<SelectionKey> previousSelections = List.copyOf(selectedSelections);
         boolean previousRestrictSurfaceLayers = reportSnapshotRestrictSurfaceLayers;
         Set<UUID> previousVisibleSurfaceLayerIds = reportSnapshotVisibleSurfaceLayerIds;
         boolean previousHideHydronicHeatings = reportSnapshotHideHydronicHeatings;
+        boolean previousFilterHeatingRoomObjects = reportSnapshotFilterHeatingRoomObjects;
+        Set<RoomObjectHeatingType> previousVisibleHeatingObjectTypes = reportSnapshotVisibleHeatingObjectTypes;
         boolean previousInteriorRoomDimensionsOnly = reportSnapshotInteriorRoomDimensionsOnly;
-        double previousReportSnapshotRenderScale = reportSnapshotRenderScale;
         boolean previousShowDimensions = showDimensions.get();
         boolean previousShowAreaVolume = showAreaVolume.get();
         boolean previousShowHeatingCircuits = showHeatingCircuits.get();
         boolean previousShowVariothermCircles = showVariothermCircles.get();
         ensureCanvasReady();
-        double previousCanvasWidth = drawingCanvas.getWidth();
-        double previousCanvasHeight = drawingCanvas.getHeight();
-        double previousHorizontalRulerWidth = horizontalRuler.getWidth();
-        double previousVerticalRulerHeight = verticalRuler.getHeight();
         try {
             double renderScale = Math.max(1.0, options.renderScale());
-            reportSnapshotRenderScale = renderScale;
-            if (renderScale > 1.0) {
-                drawingCanvas.setWidth(Math.max(previousCanvasWidth, 640.0) * renderScale);
-                drawingCanvas.setHeight(Math.max(previousCanvasHeight, 420.0) * renderScale);
-                horizontalRuler.setWidth(drawingCanvas.getWidth());
-                verticalRuler.setHeight(drawingCanvas.getHeight());
-            }
             reportSnapshotRestrictSurfaceLayers = options.restrictSurfaceLayers();
             reportSnapshotVisibleSurfaceLayerIds = Set.copyOf(options.visibleSurfaceLayerIds());
             reportSnapshotHideHydronicHeatings = !options.includeHydronicHeating();
+            reportSnapshotFilterHeatingRoomObjects = options.filterHeatingRoomObjects();
+            reportSnapshotVisibleHeatingObjectTypes = Set.copyOf(options.visibleHeatingObjectTypes());
             reportSnapshotInteriorRoomDimensionsOnly = options.interiorRoomDimensionsOnly();
             showDimensions.set(options.includeDimensions());
             showAreaVolume.set(options.includeAreaVolume());
@@ -10218,7 +10225,7 @@ public final class CadWorkbench extends BorderPane {
                 fitPlanViewToPoints(focusPoints, paddingMillimeters);
             }
             render();
-            return automationDrawingSnapshot();
+            return reportCanvasSnapshot(renderScale);
         } finally {
             activeLevel.set(previousLevel);
             activeView.set(previousView);
@@ -10232,19 +10239,39 @@ public final class CadWorkbench extends BorderPane {
             reportSnapshotRestrictSurfaceLayers = previousRestrictSurfaceLayers;
             reportSnapshotVisibleSurfaceLayerIds = previousVisibleSurfaceLayerIds;
             reportSnapshotHideHydronicHeatings = previousHideHydronicHeatings;
+            reportSnapshotFilterHeatingRoomObjects = previousFilterHeatingRoomObjects;
+            reportSnapshotVisibleHeatingObjectTypes = previousVisibleHeatingObjectTypes;
             reportSnapshotInteriorRoomDimensionsOnly = previousInteriorRoomDimensionsOnly;
-            reportSnapshotRenderScale = previousReportSnapshotRenderScale;
             showDimensions.set(previousShowDimensions);
             showAreaVolume.set(previousShowAreaVolume);
             showHeatingCircuits.set(previousShowHeatingCircuits);
             showVariothermCircles.set(previousShowVariothermCircles);
-            drawingCanvas.setWidth(previousCanvasWidth);
-            drawingCanvas.setHeight(previousCanvasHeight);
-            horizontalRuler.setWidth(previousHorizontalRulerWidth);
-            verticalRuler.setHeight(previousVerticalRulerHeight);
             updateWorkspaceMode();
+            restoreCenterDividerPositions(previousDividerPositions);
             render();
         }
+    }
+
+    private double[] currentCenterDividerPositions() {
+        return getCenter() instanceof SplitPane splitPane
+                ? splitPane.getDividerPositions()
+                : new double[0];
+    }
+
+    private void restoreCenterDividerPositions(double[] dividerPositions) {
+        if (dividerPositions.length == 0 || !(getCenter() instanceof SplitPane splitPane)) {
+            return;
+        }
+        splitPane.setDividerPositions(dividerPositions);
+    }
+
+    private WritableImage reportCanvasSnapshot(double renderScale) {
+        if (renderScale <= 1.0) {
+            return automationDrawingSnapshot();
+        }
+        SnapshotParameters parameters = new SnapshotParameters();
+        parameters.setTransform(Transform.scale(renderScale, renderScale));
+        return drawingCanvas.snapshot(parameters, null);
     }
 
     private record ReportSnapshotOptions(
@@ -10254,18 +10281,39 @@ public final class CadWorkbench extends BorderPane {
             boolean includeDimensions,
             boolean includeAreaVolume,
             boolean interiorRoomDimensionsOnly,
+            boolean filterHeatingRoomObjects,
+            Set<RoomObjectHeatingType> visibleHeatingObjectTypes,
             double renderScale
     ) {
 
         private ReportSnapshotOptions {
             visibleSurfaceLayerIds = Set.copyOf(visibleSurfaceLayerIds);
+            visibleHeatingObjectTypes = Set.copyOf(visibleHeatingObjectTypes);
             if (renderScale < 1.0) {
                 throw new IllegalArgumentException("renderScale muss mindestens 1 sein.");
             }
         }
 
         private static ReportSnapshotOptions defaults() {
-            return new ReportSnapshotOptions(false, Set.of(), true, true, true, false, 1.0);
+            return new ReportSnapshotOptions(false, Set.of(), true, true, true, false, false, Set.of(), 1.0);
+        }
+
+        private ReportSnapshotOptions hideHeatingRoomObjects() {
+            return withVisibleHeatingObjectTypes(Set.of());
+        }
+
+        private ReportSnapshotOptions withVisibleHeatingObjectTypes(Set<RoomObjectHeatingType> newVisibleHeatingObjectTypes) {
+            return new ReportSnapshotOptions(
+                    restrictSurfaceLayers,
+                    visibleSurfaceLayerIds,
+                    includeHydronicHeating,
+                    includeDimensions,
+                    includeAreaVolume,
+                    interiorRoomDimensionsOnly,
+                    true,
+                    newVisibleHeatingObjectTypes,
+                    renderScale
+            );
         }
 
         private ReportSnapshotOptions withRenderScale(double newRenderScale) {
@@ -10276,6 +10324,8 @@ public final class CadWorkbench extends BorderPane {
                     includeDimensions,
                     includeAreaVolume,
                     interiorRoomDimensionsOnly,
+                    filterHeatingRoomObjects,
+                    visibleHeatingObjectTypes,
                     newRenderScale
             );
         }

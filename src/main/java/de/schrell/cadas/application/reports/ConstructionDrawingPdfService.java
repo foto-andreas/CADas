@@ -27,6 +27,7 @@ import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
@@ -183,7 +184,7 @@ public final class ConstructionDrawingPdfService {
                 }
                 completedSteps++;
                 for (HeatingSurfacePosition surfacePosition : HeatingSurfacePosition.values()) {
-                    if (level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == surfacePosition)) {
+                    if (hasHeatingSurfacePage(level, surfacePosition)) {
                         reportProgress(progressListener, completedSteps, totalSteps, heatingPageTitle(level, surfacePosition));
                         BufferedImage heatingPlanImage = exportAssets.graphicVariant() == GraphicVariant.RASTERGRAFIK
                                 ? exportAssets.heatingPlanImages().get(heatingPageKey(level.name(), surfacePosition))
@@ -219,7 +220,7 @@ public final class ConstructionDrawingPdfService {
         for (Level level : project.levels()) {
             totalSteps++;
             for (HeatingSurfacePosition surfacePosition : HeatingSurfacePosition.values()) {
-                if (level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == surfacePosition)) {
+                if (hasHeatingSurfacePage(level, surfacePosition)) {
                     totalSteps++;
                 }
             }
@@ -228,6 +229,34 @@ public final class ConstructionDrawingPdfService {
             }
         }
         return totalSteps;
+    }
+
+    private boolean hasHeatingSurfacePage(Level level, HeatingSurfacePosition surfacePosition) {
+        return level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == surfacePosition)
+                || !heatingSurfaceObjectEntries(level, surfacePosition).isEmpty();
+    }
+
+    private List<HeatingElementEntry> heatingSurfaceObjectEntries(Level level, HeatingSurfacePosition surfacePosition) {
+        RoomObjectHeatingType heatingType = surfacePosition == HeatingSurfacePosition.CEILING
+                ? RoomObjectHeatingType.CEILING_HEATING
+                : RoomObjectHeatingType.FLOOR_HEATING;
+        return heatingObjectEntries(level, heatingType);
+    }
+
+    private List<HeatingElementEntry> heatingObjectEntries(Level level, RoomObjectHeatingType heatingType) {
+        List<HeatingElementEntry> entries = new ArrayList<>();
+        for (Room room : level.rooms()) {
+            for (RoomHeatingOutputService.HeatingElementSummary summary : roomHeatingOutputService.heatingElements(level, room)) {
+                if (summary.heatingType() != heatingType) {
+                    continue;
+                }
+                level.roomObjects().stream()
+                        .filter(roomObject -> roomObject.id().toString().equals(summary.objectId()))
+                        .findFirst()
+                        .ifPresent(roomObject -> entries.add(new HeatingElementEntry(room, roomObject)));
+            }
+        }
+        return List.copyOf(entries);
     }
 
     private void reportProgress(ProgressListener progressListener, int completedSteps, int totalSteps, String section) {
@@ -347,6 +376,7 @@ public final class ConstructionDrawingPdfService {
         List<HydronicHeating> heatings = level.hydronicHeatings().stream()
                 .filter(heating -> heating.surfacePosition() == surfacePosition)
                 .toList();
+        List<HeatingElementEntry> heatingObjects = heatingSurfaceObjectEntries(level, surfacePosition);
         Viewport viewport = heatingViewport(level, heatings);
         String title = heatingPageTitle(level, surfacePosition);
         try (PageCanvas canvas = addPage(document, project.name(), title, "M 1:" + viewport.scale())) {
@@ -376,6 +406,9 @@ public final class ConstructionDrawingPdfService {
                     drawHeatingPath(canvas, viewport, heating, circuit.fieldSupplyPath().reversed(), circuit, supplyColor);
                     drawHeatingPath(canvas, viewport, heating, circuit.fieldReturnPath(), circuit, returnColor);
                 }
+            }
+            for (HeatingElementEntry entry : heatingObjects) {
+                drawHeatingElement(canvas, viewport, entry);
             }
         }
     }
@@ -533,6 +566,9 @@ public final class ConstructionDrawingPdfService {
         List<HeatingElementEntry> entries = new ArrayList<>();
         for (Room room : level.rooms()) {
             for (RoomHeatingOutputService.HeatingElementSummary summary : roomHeatingOutputService.heatingElements(level, room)) {
+                if (summary.heatingType().countsAsFloorHeating() || summary.heatingType().countsAsCeilingHeating()) {
+                    continue;
+                }
                 level.roomObjects().stream()
                         .filter(roomObject -> roomObject.id().toString().equals(summary.objectId()))
                         .findFirst()

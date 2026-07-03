@@ -67,7 +67,10 @@ class SurfaceMaterialReportPdfServiceTest {
                         Map.of("Erdgeschoss", levelImage),
                         Map.of("Erdgeschoss\u0000Wohnen\u0000Fußboden", heatingImage),
                         Map.of(SurfaceMaterialReportPdfService.materialLevelImageKey(report.materials().getFirst(), "Erdgeschoss"), levelImage),
-                        Map.of(SurfaceMaterialReportPdfService.heatingLevelImageKey("Erdgeschoss"), heatingImage),
+                        Map.of(
+                                SurfaceMaterialReportPdfService.heatingLevelImageKey("Erdgeschoss", "Fußboden"), heatingImage,
+                                SurfaceMaterialReportPdfService.heatingLevelImageKey("Erdgeschoss", "Decke"), heatingImage
+                        ),
                         Map.of()
                 )
         );
@@ -78,7 +81,8 @@ class SurfaceMaterialReportPdfServiceTest {
             String text = new PDFTextStripper().getText(document);
             assertTrue(text.contains("Etagenübersicht Erdgeschoss"));
             assertTrue(text.contains("Belag Erdgeschoss / Parkett"));
-            assertTrue(text.contains("Heizkreise Erdgeschoss"));
+            assertTrue(text.contains("Heizkreise Erdgeschoss / Fußboden"));
+            assertTrue(text.contains("Heizkreise Erdgeschoss / Decke"));
         }
 
         Files.deleteIfExists(targetFile);

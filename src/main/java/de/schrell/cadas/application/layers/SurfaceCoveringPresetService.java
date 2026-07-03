@@ -4,6 +4,7 @@ import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
+import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
 import java.nio.file.Path;
@@ -15,6 +16,22 @@ public final class SurfaceCoveringPresetService {
     public static final String VARIOTHERM_DRY_PANEL_SOURCE = "Standard: Variotherm Trockenbau-FBH-Platte";
     public static final double VARIOTHERM_GROOVE_PITCH_MILLIMETERS = 100.0;
     public static final double VARIOTHERM_PIPE_DIAMETER_MILLIMETERS = 11.6;
+
+    public static boolean isVariothermDryPanelLayer(SurfaceLayer layer) {
+        if (layer == null) {
+            return false;
+        }
+        return isVariothermReference(layer.coveringSource()) || isVariothermReference(layer.name());
+    }
+
+    private static boolean isVariothermReference(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String normalizedValue = value.toLowerCase(Locale.ROOT);
+        String normalizedSource = VARIOTHERM_DRY_PANEL_SOURCE.toLowerCase(Locale.ROOT);
+        return normalizedValue.contains(normalizedSource) || normalizedValue.contains("variotherm");
+    }
 
     public List<SurfaceCoveringPreset> defaults() {
         return List.of(

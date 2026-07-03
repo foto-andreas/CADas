@@ -2,14 +2,16 @@ package de.schrell.cadas.ui;
 
 import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
+import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
 import de.schrell.cadas.application.reports.ConstructionDrawingPdfService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService;
 import de.schrell.cadas.application.reports.SurfaceMaterialListService.SurfaceMaterialReport;
 import de.schrell.cadas.application.reports.SurfaceMaterialReportPdfService;
-import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
+import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.SurfaceType;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -400,11 +402,8 @@ final class CadWorkbenchDocumentSupport {
                         .map(levelName -> new MaterialLevelCapture(material, levelName)))
                 .toList()
                 : List.of();
-        List<String> heatingLevelCaptures = raster
-                ? owner.project.levels().stream()
-                .filter(level -> !level.hydronicHeatings().isEmpty())
-                .map(Level::name)
-                .toList()
+        List<HeatingPlanCapture> heatingLevelCaptures = raster
+                ? materialHeatingLevelCaptures(report)
                 : List.of();
         int totalSteps = Math.max(1, owner.project.levels().size() + materialCaptures.size() + materialLevelCaptures.size() + heatingLevelCaptures.size());
         int completedSteps = 0;
@@ -442,9 +441,12 @@ final class CadWorkbenchDocumentSupport {
             }
             completedSteps++;
         }
-        for (String levelName : heatingLevelCaptures) {
-            progress.update(completedSteps / (double) totalSteps, "Heizkreise " + levelName + " werden gerastert");
-            heatingLevelImages.put(SurfaceMaterialReportPdfService.heatingLevelImageKey(levelName), captureHeatingLevelImage(levelName));
+        for (HeatingPlanCapture capture : heatingLevelCaptures) {
+            progress.update(completedSteps / (double) totalSteps, "Heizkreise " + capture.surfacePosition() + " – " + capture.levelName() + " werden gerastert");
+            heatingLevelImages.put(
+                    SurfaceMaterialReportPdfService.heatingLevelImageKey(capture.levelName(), capture.surfacePosition().toString()),
+                    captureHeatingLevelImage(capture)
+            );
             completedSteps++;
         }
         progress.update(1.0, "Materialgrafiken abgeschlossen");
@@ -466,24 +468,62 @@ final class CadWorkbenchDocumentSupport {
         return runOnFxThread(() -> SwingFXUtils.fromFXImage(owner.reportMaterialOverviewSnapshot(levelName), null));
     }
 
+    private List<HeatingPlanCapture> materialHeatingLevelCaptures(SurfaceMaterialReport report) {
+        LinkedHashMap<String, HeatingPlanCapture> captures = new LinkedHashMap<>();
+        for (SurfaceMaterialListService.HeatingPlanSummary plan : report.heatingPlans()) {
+            Optional<HeatingSurfacePosition> surfacePosition = heatingSurfacePosition(plan.surfacePosition());
+            if (surfacePosition.isEmpty()) {
+                continue;
+            }
+            Level level = owner.project.levels().stream()
+                    .filter(candidate -> candidate.name().equals(plan.levelName()))
+                    .findFirst()
+                    .orElse(null);
+            if (level == null) {
+                continue;
+            }
+            HeatingSurfacePosition position = surfacePosition.orElseThrow();
+            Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, surfaceType(position));
+            Set<RoomObjectHeatingType> visibleObjectTypes = heatingObjectTypes(position);
+            boolean hasHydronicHeating = level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == position);
+            if (visibleLayerIds.isEmpty() && !hasHydronicHeating && !hasHeatingObjects(level, visibleObjectTypes)) {
+                continue;
+            }
+            captures.putIfAbsent(
+                    constructionDrawingHeatingImageKey(level.name(), position),
+                    new HeatingPlanCapture(level.name(), position, visibleLayerIds, visibleObjectTypes)
+            );
+        }
+        return List.copyOf(captures.values());
+    }
+
     private BufferedImage captureFilteredLevelPlanImage(
             String levelName,
             Set<java.util.UUID> visibleLayerIds,
             boolean includeHydronicHeating
     ) throws Exception {
+        return captureFilteredLevelPlanImage(levelName, visibleLayerIds, includeHydronicHeating, Set.of());
+    }
+
+    private BufferedImage captureFilteredLevelPlanImage(
+            String levelName,
+            Set<java.util.UUID> visibleLayerIds,
+            boolean includeHydronicHeating,
+            Set<RoomObjectHeatingType> visibleHeatingObjectTypes
+    ) throws Exception {
         return runOnFxThread(() -> SwingFXUtils.fromFXImage(
-                owner.reportLevelSnapshot(levelName, visibleLayerIds, includeHydronicHeating),
+                owner.reportLevelSnapshot(levelName, visibleLayerIds, includeHydronicHeating, visibleHeatingObjectTypes),
                 null
         ));
     }
 
-    private BufferedImage captureHeatingLevelImage(String levelName) throws Exception {
-        Level level = owner.project.levels().stream()
-                .filter(candidate -> candidate.name().equals(levelName))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Etage `" + levelName + "` ist unbekannt."));
-        Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, SurfaceType.FLOOR);
-        return captureFilteredLevelPlanImage(level.name(), visibleLayerIds, true);
+    private BufferedImage captureHeatingLevelImage(HeatingPlanCapture capture) throws Exception {
+        return captureFilteredLevelPlanImage(
+                capture.levelName(),
+                capture.visibleLayerIds(),
+                true,
+                capture.visibleHeatingObjectTypes()
+        );
     }
 
     private BufferedImage captureMaterialLevelImage(
@@ -544,16 +584,14 @@ final class CadWorkbenchDocumentSupport {
     private ConstructionDrawingPdfService.ExportAssets createConstructionDrawingExportAssets(ProgressCallback progress) throws Exception {
         List<HeatingPlanCapture> heatingCaptures = new ArrayList<>();
         for (Level level : owner.project.levels()) {
-            for (var surfacePosition : de.schrell.cadas.domain.model.HeatingSurfacePosition.values()) {
-                if (level.hydronicHeatings().stream().noneMatch(heating -> heating.surfacePosition() == surfacePosition)) {
+            for (HeatingSurfacePosition surfacePosition : HeatingSurfacePosition.values()) {
+                Set<RoomObjectHeatingType> visibleObjectTypes = heatingObjectTypes(surfacePosition);
+                boolean hasHydronicHeating = level.hydronicHeatings().stream().anyMatch(heating -> heating.surfacePosition() == surfacePosition);
+                if (!hasHydronicHeating && !hasHeatingObjects(level, visibleObjectTypes)) {
                     continue;
                 }
-                Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, surfacePosition == de.schrell.cadas.domain.model.HeatingSurfacePosition.CEILING
-                        ? SurfaceType.CEILING
-                        : SurfaceType.FLOOR);
-                if (!visibleLayerIds.isEmpty()) {
-                    heatingCaptures.add(new HeatingPlanCapture(level.name(), surfacePosition, visibleLayerIds));
-                }
+                Set<java.util.UUID> visibleLayerIds = variothermLayerIds(level, surfaceType(surfacePosition));
+                heatingCaptures.add(new HeatingPlanCapture(level.name(), surfacePosition, visibleLayerIds, visibleObjectTypes));
             }
         }
         int totalSteps = Math.max(1, owner.project.levels().size() + heatingCaptures.size());
@@ -569,7 +607,7 @@ final class CadWorkbenchDocumentSupport {
             progress.update(completedSteps / (double) totalSteps, "Heizflächen " + capture.surfacePosition() + " – " + capture.levelName() + " werden gerastert");
             heatingPlanImages.put(
                     constructionDrawingHeatingImageKey(capture.levelName(), capture.surfacePosition()),
-                    captureFilteredLevelPlanImage(capture.levelName(), capture.visibleLayerIds(), false)
+                    captureFilteredLevelPlanImage(capture.levelName(), capture.visibleLayerIds(), false, capture.visibleHeatingObjectTypes())
             );
             completedSteps++;
         }
@@ -585,9 +623,38 @@ final class CadWorkbenchDocumentSupport {
         return level.surfaceLayerStacks().stream()
                 .filter(stack -> stack.surfaceType() == surfaceType)
                 .flatMap(stack -> stack.layers().stream())
-                .filter(layer -> SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE.equals(layer.coveringSource()))
+                .filter(SurfaceCoveringPresetService::isVariothermDryPanelLayer)
                 .map(de.schrell.cadas.domain.model.SurfaceLayer::id)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Optional<HeatingSurfacePosition> heatingSurfacePosition(String label) {
+        if (HeatingSurfacePosition.FLOOR.toString().equals(label)) {
+            return Optional.of(HeatingSurfacePosition.FLOOR);
+        }
+        if (HeatingSurfacePosition.CEILING.toString().equals(label)) {
+            return Optional.of(HeatingSurfacePosition.CEILING);
+        }
+        return Optional.empty();
+    }
+
+    private SurfaceType surfaceType(HeatingSurfacePosition surfacePosition) {
+        return surfacePosition == HeatingSurfacePosition.CEILING
+                ? SurfaceType.CEILING
+                : SurfaceType.FLOOR;
+    }
+
+    private Set<RoomObjectHeatingType> heatingObjectTypes(HeatingSurfacePosition surfacePosition) {
+        return surfacePosition == HeatingSurfacePosition.CEILING
+                ? Set.of(RoomObjectHeatingType.CEILING_HEATING)
+                : Set.of(RoomObjectHeatingType.FLOOR_HEATING);
+    }
+
+    private boolean hasHeatingObjects(Level level, Set<RoomObjectHeatingType> heatingTypes) {
+        return level.roomObjects().stream()
+                .anyMatch(roomObject -> roomObject.visible()
+                        && roomObject.heatOutputWatts() > 0.0
+                        && heatingTypes.contains(roomObject.heatingType()));
     }
 
     private Set<java.util.UUID> materialLayerIds(Level level, Room room, SurfaceMaterialListService.MaterialSummary material) {
@@ -601,7 +668,7 @@ final class CadWorkbenchDocumentSupport {
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private String constructionDrawingHeatingImageKey(String levelName, de.schrell.cadas.domain.model.HeatingSurfacePosition surfacePosition) {
+    private String constructionDrawingHeatingImageKey(String levelName, HeatingSurfacePosition surfacePosition) {
         return levelName + "\u0000" + surfacePosition.name();
     }
 
@@ -702,8 +769,9 @@ final class CadWorkbenchDocumentSupport {
 
     private record HeatingPlanCapture(
             String levelName,
-            de.schrell.cadas.domain.model.HeatingSurfacePosition surfacePosition,
-            Set<java.util.UUID> visibleLayerIds
+            HeatingSurfacePosition surfacePosition,
+            Set<java.util.UUID> visibleLayerIds,
+            Set<RoomObjectHeatingType> visibleHeatingObjectTypes
     ) {
     }
 

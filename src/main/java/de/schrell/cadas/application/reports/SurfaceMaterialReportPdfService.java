@@ -197,7 +197,9 @@ public final class SurfaceMaterialReportPdfService {
         LinkedHashSet<String> levelNames = new LinkedHashSet<>();
         report.rooms().stream().map(SurfaceMaterialListService.RoomSummary::levelName).forEach(levelNames::add);
         levelNames.addAll(exportAssets.levelPlanImages().keySet());
-        levelNames.addAll(exportAssets.heatingLevelImages().keySet());
+        exportAssets.heatingLevelImages().keySet().stream()
+                .map(SurfaceMaterialReportPdfService::heatingLevelName)
+                .forEach(levelNames::add);
         if (levelNames.isEmpty()) {
             return;
         }
@@ -216,11 +218,32 @@ public final class SurfaceMaterialReportPdfService {
                     writer.imagePage("Belag " + levelName + " / " + material.name(), materialImage);
                 }
             }
-            BufferedImage heatingImage = exportAssets.heatingLevelImages().get(heatingLevelImageKey(levelName));
-            if (heatingImage != null) {
-                writer.imagePage("Heizkreise " + levelName, heatingImage);
+            for (String surfacePosition : heatingSurfacePositions(report, exportAssets, levelName)) {
+                BufferedImage heatingImage = exportAssets.heatingLevelImages().get(heatingLevelImageKey(levelName, surfacePosition));
+                if (heatingImage != null) {
+                    writer.imagePage("Heizkreise " + levelName + " / " + surfacePosition, heatingImage);
+                }
             }
         }
+    }
+
+    private List<String> heatingSurfacePositions(
+            SurfaceMaterialListService.SurfaceMaterialReport report,
+            ExportAssets exportAssets,
+            String levelName
+    ) {
+        LinkedHashSet<String> surfacePositions = new LinkedHashSet<>();
+        report.heatingPlans().stream()
+                .filter(plan -> plan.levelName().equals(levelName))
+                .map(SurfaceMaterialListService.HeatingPlanSummary::surfacePosition)
+                .filter(surfacePosition -> exportAssets.heatingLevelImages().containsKey(heatingLevelImageKey(levelName, surfacePosition)))
+                .forEach(surfacePositions::add);
+        exportAssets.heatingLevelImages().keySet().stream()
+                .filter(key -> heatingLevelName(key).equals(levelName))
+                .map(SurfaceMaterialReportPdfService::heatingSurfacePosition)
+                .filter(surfacePosition -> !surfacePosition.isBlank())
+                .forEach(surfacePositions::add);
+        return List.copyOf(surfacePositions);
     }
 
     private void appendMaterialSummary(PdfWriter writer, List<SurfaceMaterialListService.MaterialSummary> materials) throws IOException {
@@ -517,8 +540,18 @@ public final class SurfaceMaterialReportPdfService {
         return material.lookupKey() + "\u0000" + levelName;
     }
 
-    public static String heatingLevelImageKey(String levelName) {
-        return levelName;
+    public static String heatingLevelImageKey(String levelName, String surfacePosition) {
+        return levelName + "\u0000" + surfacePosition;
+    }
+
+    private static String heatingLevelName(String heatingLevelImageKey) {
+        int separatorIndex = heatingLevelImageKey.indexOf('\u0000');
+        return separatorIndex < 0 ? heatingLevelImageKey : heatingLevelImageKey.substring(0, separatorIndex);
+    }
+
+    private static String heatingSurfacePosition(String heatingLevelImageKey) {
+        int separatorIndex = heatingLevelImageKey.indexOf('\u0000');
+        return separatorIndex < 0 ? "" : heatingLevelImageKey.substring(separatorIndex + 1);
     }
 
     private void appendRoomComplexities(PdfWriter writer, List<SurfaceMaterialListService.RoomComplexitySummary> roomComplexities) throws IOException {

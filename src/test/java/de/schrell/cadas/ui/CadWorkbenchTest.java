@@ -2006,6 +2006,36 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void materiallistenRasterUebersichtVeraendertEigenschaftenBreiteNicht() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.project.primaryLevel().addRoom(Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(4_100, 3_100),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            ));
+            return instanz;
+        });
+        double[] vorher = aufFxThread(() -> {
+            SplitPane splitPane = (SplitPane) workbench.getCenter();
+            splitPane.setDividerPositions(0.34);
+            workbench.layout();
+            return splitPane.getDividerPositions();
+        });
+
+        aufFxThread(() -> workbench.reportMaterialOverviewSnapshot("Erdgeschoss"));
+        double[] nachher = aufFxThread(() -> ((SplitPane) workbench.getCenter()).getDividerPositions());
+
+        Assertions.assertArrayEquals(vorher, nachher, 0.001);
+    }
+
+    @Test
     void innenansichtOhneRaumBleibtImAktivenArbeitsbereichUndMeldetDenGrund() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
