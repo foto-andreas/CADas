@@ -1474,7 +1474,10 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         surfaceCutRestrictionSelector.setValue(SurfaceCutRestriction.fallback());
         updateSurfaceLayoutCornerLabel();
         surfaceLayerList.setPrefHeight(120);
-        surfaceLayerList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> syncInputsFromSelectedSurfaceLayer());
+        surfaceLayerList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> {
+            syncInputsFromSelectedSurfaceLayer();
+            render();
+        });
         surfaceTypeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue == SurfaceType.FLOOR || newValue == SurfaceType.CEILING) {
                 preferredRoomSurfaceType = newValue;

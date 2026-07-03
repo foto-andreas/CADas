@@ -777,7 +777,16 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
 
     SelectionKey contextSelectionAt(MouseEvent event) {
         PlanPoint editPoint = screenToWorld(event.getX(), event.getY());
-        return selectionQueryService.findSelection(activeLevel.get(), editPoint, pointerSelectionTolerance()).orElse(null);
+        return contextSelectionAt(editPoint);
+    }
+
+    SelectionKey contextSelectionAt(PlanPoint editPoint) {
+        List<SelectionKey> candidates = selectionQueryService.findSelections(activeLevel.get(), editPoint, pointerSelectionTolerance());
+        SelectionKey currentSelection = selectedSelection.get();
+        if (currentSelection != null && candidates.contains(currentSelection)) {
+            return currentSelection;
+        }
+        return candidates.stream().findFirst().orElse(null);
     }
 
     void updateModifierState(KeyEvent event) {

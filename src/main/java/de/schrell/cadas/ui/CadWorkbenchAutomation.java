@@ -356,11 +356,7 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
 
     public void automationPrepareSelectionContextMenu(double screenX, double screenY) {
         contextMenuWorldPoint = screenToWorld(screenX, screenY);
-        contextMenuSelection = selectionQueryService.findSelection(
-                activeLevel.get(),
-                contextMenuWorldPoint,
-                pointerSelectionTolerance()
-        ).orElse(null);
+        contextMenuSelection = contextSelectionAt(contextMenuWorldPoint);
         if (contextMenuSelection != null) {
             selectSingle(contextMenuSelection);
         } else {

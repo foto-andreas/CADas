@@ -17,6 +17,7 @@ import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectHeatingType;
+import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
@@ -563,5 +564,102 @@ abstract class CadWorkbenchTestPart3 extends CadWorkbenchTestPart2 {
 
         WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
         Assertions.assertEquals(1, snapshot.selectionCount());
+    }
+
+    @Test
+    void rechtsklickNutztBereitsAusgewähltesElementUnterAnderenElementen() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3_900, 2_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            instanz.project.primaryLevel().addRoomObject(RoomObject.create(
+                    "test-tisch",
+                    "Tisch",
+                    RoomObjectType.TABLE,
+                    RoomObjectShape.RECTANGLE,
+                    new PlanPoint(2_000, 1_500),
+                    Length.ofMillimeters(800),
+                    Length.ofMillimeters(600),
+                    Length.ofMillimeters(750),
+                    false,
+                    "Test"
+            ));
+            instanz.automationSetTool("EDIT");
+            instanz.automationSetViewport(1.0, 0.0, 0.0);
+            instanz.automationSelect("ROOM", 0, false);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.automationPrepareSelectionContextMenu(200.0, 150.0);
+            return null;
+        });
+
+        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems).contains("Raum umbenennen …"));
+    }
+
+    @Test
+    void belagEbenenauswahlRendertSofortDieGewählteEbene() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            Room room = Room.rectangular(
+                    "Bad",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3_900, 2_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Oben",
+                    Length.ofMillimeters(12),
+                    Length.ofMillimeters(800),
+                    Length.ofMillimeters(800),
+                    Length.ofMillimeters(50)
+            ));
+            stack.addLayer(SurfaceLayer.create(
+                    "Darunter",
+                    Length.ofMillimeters(18),
+                    Length.ofMillimeters(600),
+                    Length.ofMillimeters(600),
+                    Length.ofMillimeters(50)
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetTool("EDIT");
+            instanz.automationSetViewport(3.0, 20.0, 20.0);
+            instanz.automationSelect("ROOM", 0, false);
+            instanz.automationSetSurfaceType("FLOOR");
+            instanz.automationSelectSurfaceLayer(0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        aufFxThread(() -> {
+            workbench.surfaceLayerList.getSelectionModel().select(1);
+            return null;
+        });
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+
+        assertHervorgehobenerBelagImRaum(
+                image,
+                snapshot,
+                new PlanPoint(300, 300),
+                new PlanPoint(3_600, 2_600)
+        );
     }
 }
