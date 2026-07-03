@@ -177,6 +177,27 @@ final class CadWorkbenchHeatingSupport {
         );
     }
 
+    static PlanPoint nearestPointOnHeatingZoneBoundary(HeatingZone zone, PlanPoint point) {
+        if (point == null) {
+            throw new IllegalStateException("Kein Kontextpunkt vorhanden.");
+        }
+        PlanPoint nearest = zone.outline().getFirst();
+        double nearestDistance = Double.POSITIVE_INFINITY;
+        for (int index = 0; index < zone.outline().size(); index++) {
+            PlanPoint candidate = nearestPointOnSegment(
+                    point,
+                    zone.outline().get(index),
+                    zone.outline().get((index + 1) % zone.outline().size())
+            );
+            double distance = candidate.distanceTo(point).toMillimeters();
+            if (distance < nearestDistance) {
+                nearest = candidate;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
     static List<PlanPoint> parseHeatingZonePoints(String text) {
         List<PlanPoint> points = new ArrayList<>();
         for (String line : Optional.ofNullable(text).orElse("").lines().toList()) {
@@ -235,6 +256,22 @@ final class CadWorkbenchHeatingSupport {
 
     private static boolean sameCoordinate(double first, double second) {
         return Math.abs(first - second) <= EPSILON;
+    }
+
+    private static PlanPoint nearestPointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end) {
+        double dx = end.xMillimeters() - start.xMillimeters();
+        double dy = end.yMillimeters() - start.yMillimeters();
+        double lengthSquared = dx * dx + dy * dy;
+        if (lengthSquared <= EPSILON) {
+            return start;
+        }
+        double ratio = ((point.xMillimeters() - start.xMillimeters()) * dx
+                + (point.yMillimeters() - start.yMillimeters()) * dy) / lengthSquared;
+        double clampedRatio = Math.max(0.0, Math.min(1.0, ratio));
+        return new PlanPoint(
+                start.xMillimeters() + dx * clampedRatio,
+                start.yMillimeters() + dy * clampedRatio
+        );
     }
 
     record HydronicManifoldDefaults(PlanPoint supplyPoint, PlanPoint returnPoint) {

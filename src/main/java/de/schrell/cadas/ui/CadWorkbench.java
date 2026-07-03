@@ -8890,7 +8890,7 @@ public final class CadWorkbench extends BorderPane {
                 .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
         replaceHeatingZone(
                 context,
-                context.zone().withSupplyConnectionPoint(nearestPointOnHeatingZoneBoundary(context.zone(), contextMenuWorldPoint)),
+                context.zone().withSupplyConnectionPoint(CadWorkbenchHeatingSupport.nearestPointOnHeatingZoneBoundary(context.zone(), contextMenuWorldPoint)),
                 "Vorlaufanschluss am Heizkreis gesetzt."
         );
     }
@@ -8900,45 +8900,8 @@ public final class CadWorkbench extends BorderPane {
                 .orElseThrow(() -> new IllegalStateException("Kein Heizkreis ausgewählt."));
         replaceHeatingZone(
                 context,
-                context.zone().withReturnConnectionPoint(nearestPointOnHeatingZoneBoundary(context.zone(), contextMenuWorldPoint)),
+                context.zone().withReturnConnectionPoint(CadWorkbenchHeatingSupport.nearestPointOnHeatingZoneBoundary(context.zone(), contextMenuWorldPoint)),
                 "Rücklaufanschluss am Heizkreis gesetzt."
-        );
-    }
-
-    private PlanPoint nearestPointOnHeatingZoneBoundary(HeatingZone zone, PlanPoint point) {
-        if (point == null) {
-            throw new IllegalStateException("Kein Kontextpunkt vorhanden.");
-        }
-        PlanPoint nearest = zone.outline().getFirst();
-        double nearestDistance = Double.POSITIVE_INFINITY;
-        for (int index = 0; index < zone.outline().size(); index++) {
-            PlanPoint candidate = nearestPointOnSegment(
-                    point,
-                    zone.outline().get(index),
-                    zone.outline().get((index + 1) % zone.outline().size())
-            );
-            double distance = candidate.distanceTo(point).toMillimeters();
-            if (distance < nearestDistance) {
-                nearest = candidate;
-                nearestDistance = distance;
-            }
-        }
-        return nearest;
-    }
-
-    private PlanPoint nearestPointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end) {
-        double dx = end.xMillimeters() - start.xMillimeters();
-        double dy = end.yMillimeters() - start.yMillimeters();
-        double lengthSquared = dx * dx + dy * dy;
-        if (lengthSquared <= 0.001) {
-            return start;
-        }
-        double ratio = ((point.xMillimeters() - start.xMillimeters()) * dx
-                + (point.yMillimeters() - start.yMillimeters()) * dy) / lengthSquared;
-        double clampedRatio = Math.max(0.0, Math.min(1.0, ratio));
-        return new PlanPoint(
-                start.xMillimeters() + dx * clampedRatio,
-                start.yMillimeters() + dy * clampedRatio
         );
     }
 
