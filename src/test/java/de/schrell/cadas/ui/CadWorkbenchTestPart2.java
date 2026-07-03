@@ -549,6 +549,52 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
+    void nordwinkelAktualisiertKompassSofort() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            setBooleanProperty(instanz, "showGrid", false);
+            instanz.showAreaVolume.set(false);
+            instanz.render();
+            return instanz;
+        });
+
+        WritableImage startImage = aufFxThread(workbench::automationDrawingSnapshot);
+        int startRechts = countCompassPixels(startImage, 5, -12, 25, 12);
+        int startOben = countCompassPixels(startImage, -12, -25, 12, -5);
+        Assertions.assertTrue(startOben > startRechts, "Nordwinkel 0° richtet den Kompass nicht nach oben aus.");
+
+        aufFxThread(() -> {
+            workbench.northAngleField.setText("90");
+            return null;
+        });
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+        int rechts = countCompassPixels(image, 5, -12, 25, 12);
+        int oben = countCompassPixels(image, -12, -25, 12, -5);
+
+        Assertions.assertTrue(rechts > oben, "Nordwinkel 90° richtet den Kompass nicht sofort nach rechts aus.");
+    }
+
+    private int countCompassPixels(WritableImage image, int minDx, int minDy, int maxDx, int maxDy) {
+        int centerX = (int) Math.round(image.getWidth() - 78.0);
+        int centerY = 34;
+        int count = 0;
+        for (int x = centerX + minDx; x <= centerX + maxDx; x++) {
+            for (int y = centerY + minDy; y <= centerY + maxDy; y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                if (color.getRed() > 0.20 && color.getRed() < 0.40
+                        && color.getGreen() > 0.32 && color.getGreen() < 0.50
+                        && color.getBlue() > 0.45 && color.getBlue() < 0.65) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    @Test
     void rasterBauzeichnungLaesstGenugRandFuerIsoBemassung() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

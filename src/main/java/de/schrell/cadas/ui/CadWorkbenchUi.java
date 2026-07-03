@@ -259,6 +259,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         registerRenderListener(showGuideDistances);
         registerRenderListener(snapToGuides);
         registerRenderListener(snapToWalls);
+        northAngleField.textProperty().addListener((ignored, oldValue, newValue) -> render());
         showRoomObjects.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.setRoomObjectsVisible(newValue);
             markThreeDDirty();
