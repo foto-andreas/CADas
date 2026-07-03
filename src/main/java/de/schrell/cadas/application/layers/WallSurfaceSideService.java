@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.layers;
 
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
@@ -79,22 +80,7 @@ public final class WallSurfaceSideService {
     }
 
     private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
-        boolean inside = false;
-        int previousIndex = outline.size() - 1;
-        for (int index = 0; index < outline.size(); index++) {
-            PlanPoint current = outline.get(index);
-            PlanPoint previous = outline.get(previousIndex);
-            boolean intersects = ((current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters()))
-                    && (point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / ((previous.yMillimeters() - current.yMillimeters()) == 0.0 ? 1.0 : (previous.yMillimeters() - current.yMillimeters()))
-                    + current.xMillimeters());
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside;
+        return PlanPolygonSupport.containsPoint(outline, point);
     }
 
     public record WallLayerSides(boolean positiveSide, boolean negativeSide) {

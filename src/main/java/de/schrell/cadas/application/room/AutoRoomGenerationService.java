@@ -2,6 +2,7 @@ package de.schrell.cadas.application.room;
 
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.domain.geometry.Length;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
@@ -653,22 +654,7 @@ public final class AutoRoomGenerationService {
     }
 
     private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
-        boolean inside = false;
-        int lastIndex = outline.size() - 1;
-        for (int currentIndex = 0; currentIndex < outline.size(); currentIndex++) {
-            PlanPoint current = outline.get(currentIndex);
-            PlanPoint previous = outline.get(lastIndex);
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            lastIndex = currentIndex;
-        }
-        return inside;
+        return PlanPolygonSupport.containsPoint(outline, point);
     }
 
     private boolean samePoint(PlanPoint first, PlanPoint second) {

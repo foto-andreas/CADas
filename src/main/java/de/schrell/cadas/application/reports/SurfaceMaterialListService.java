@@ -591,22 +591,7 @@ public final class SurfaceMaterialListService {
     }
 
     private boolean containsPoint(Room room, PlanPoint point) {
-        boolean inside = false;
-        int lastIndex = room.outline().size() - 1;
-        for (int currentIndex = 0; currentIndex < room.outline().size(); currentIndex++) {
-            PlanPoint current = room.outline().get(currentIndex);
-            PlanPoint previous = room.outline().get(lastIndex);
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            lastIndex = currentIndex;
-        }
-        return inside;
+        return PlanPolygonSupport.containsPoint(room.outline(), point);
     }
 
     private record SurfaceRectangle(double minXMillimeters, double minYMillimeters, double widthMillimeters, double heightMillimeters) {
