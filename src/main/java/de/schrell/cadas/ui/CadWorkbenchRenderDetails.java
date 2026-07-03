@@ -613,7 +613,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     PlanPoint roomLabelCenter(Room room) {
-        PlanPoint center = room.centerPoint();
+        PlanPoint center = room.areaCentroid();
         if (de.schrell.cadas.domain.geometry.PlanPolygonSupport.containsPoint(room.outline(), center)) {
             return center;
         }

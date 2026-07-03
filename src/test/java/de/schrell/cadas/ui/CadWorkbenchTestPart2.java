@@ -549,6 +549,31 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
+    void raumtextNutztFlaechenschwerpunktVorPunktmittel() throws Exception {
+        Room room = new Room(
+                java.util.UUID.randomUUID(),
+                "Schrägraum",
+                List.of(
+                        new PlanPoint(0, 0),
+                        new PlanPoint(4_000, 0),
+                        new PlanPoint(4_000, 1_000),
+                        new PlanPoint(0, 3_000)
+                ),
+                Length.ofMillimeters(2_600),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200),
+                (de.schrell.cadas.domain.model.SlopedCeilingProfile) null,
+                null
+        );
+        CadWorkbench workbench = aufFxThread(CadWorkbench::new);
+
+        PlanPoint labelCenter = aufFxThread(() -> workbench.roomLabelCenter(room));
+
+        Assertions.assertEquals(room.areaCentroid().xMillimeters(), labelCenter.xMillimeters(), 0.001);
+        Assertions.assertEquals(room.areaCentroid().yMillimeters(), labelCenter.yMillimeters(), 0.001);
+    }
+
+    @Test
     void nordwinkelAktualisiertKompassSofort() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

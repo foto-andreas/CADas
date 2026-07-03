@@ -237,7 +237,7 @@ public final class Room {
         return areaSquareMeters() * averageHeight / 1000.0;
     }
 
-    private PlanPoint areaCentroid() {
+    public PlanPoint areaCentroid() {
         double crossSum = 0.0;
         double weightedX = 0.0;
         double weightedY = 0.0;
