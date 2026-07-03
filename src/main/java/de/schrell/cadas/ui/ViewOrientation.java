@@ -47,4 +47,38 @@ public enum ViewOrientation {
     public double cameraElevationDegrees() {
         return cameraElevationDegrees;
     }
+
+    public ViewOrientation rotateLeft() {
+        return switch (this) {
+            case TOP, BOTTOM, NORTH -> WEST;
+            case SOUTH -> EAST;
+            case EAST -> NORTH;
+            case WEST -> SOUTH;
+        };
+    }
+
+    public ViewOrientation rotateRight() {
+        return switch (this) {
+            case TOP, BOTTOM, NORTH -> EAST;
+            case SOUTH -> WEST;
+            case EAST -> SOUTH;
+            case WEST -> NORTH;
+        };
+    }
+
+    public ViewOrientation rotateUp() {
+        return switch (this) {
+            case TOP -> NORTH;
+            case BOTTOM -> SOUTH;
+            case NORTH, SOUTH, EAST, WEST -> TOP;
+        };
+    }
+
+    public ViewOrientation rotateDown() {
+        return switch (this) {
+            case TOP -> SOUTH;
+            case BOTTOM -> NORTH;
+            case NORTH, SOUTH, EAST, WEST -> BOTTOM;
+        };
+    }
 }

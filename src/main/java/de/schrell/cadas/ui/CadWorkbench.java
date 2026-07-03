@@ -927,10 +927,10 @@ public final class CadWorkbench extends BorderPane {
         box.getChildren().add(new Label("2D-Ansichten:"));
         box.getChildren().add(viewButton("⤒ Oben", () -> activeView.set(ViewOrientation.TOP), "Schaltet auf die feste Draufsicht um."));
         box.getChildren().add(viewButton("⤓ Unten", () -> activeView.set(ViewOrientation.BOTTOM), "Schaltet auf die feste Untersicht um."));
-        box.getChildren().add(viewButton("↑", this::rotateViewUp, "Dreht das Modell aus der aktuellen 2D-Ansicht nach oben."));
-        box.getChildren().add(viewButton("↓", this::rotateViewDown, "Dreht das Modell aus der aktuellen 2D-Ansicht nach unten."));
-        box.getChildren().add(viewButton("←", this::rotateViewLeft, "Dreht das Modell aus der aktuellen 2D-Ansicht nach links."));
-        box.getChildren().add(viewButton("→", this::rotateViewRight, "Dreht das Modell aus der aktuellen 2D-Ansicht nach rechts."));
+        box.getChildren().add(viewButton("↑", () -> activeView.set(activeView.get().rotateUp()), "Dreht das Modell aus der aktuellen 2D-Ansicht nach oben."));
+        box.getChildren().add(viewButton("↓", () -> activeView.set(activeView.get().rotateDown()), "Dreht das Modell aus der aktuellen 2D-Ansicht nach unten."));
+        box.getChildren().add(viewButton("←", () -> activeView.set(activeView.get().rotateLeft()), "Dreht das Modell aus der aktuellen 2D-Ansicht nach links."));
+        box.getChildren().add(viewButton("→", () -> activeView.set(activeView.get().rotateRight()), "Dreht das Modell aus der aktuellen 2D-Ansicht nach rechts."));
         box.getChildren().add(viewButton(
                 "2D zentrieren",
                 this::resetTwoDView,
@@ -945,44 +945,6 @@ public final class CadWorkbench extends BorderPane {
         button.setStyle("-fx-background-radius: 999; -fx-padding: 8 14 8 14;");
         applyTooltip(button, tooltipText);
         return button;
-    }
-
-    private void rotateViewLeft() {
-        activeView.set(switch (activeView.get()) {
-            case TOP -> ViewOrientation.WEST;
-            case BOTTOM -> ViewOrientation.WEST;
-            case NORTH -> ViewOrientation.WEST;
-            case SOUTH -> ViewOrientation.EAST;
-            case EAST -> ViewOrientation.NORTH;
-            case WEST -> ViewOrientation.SOUTH;
-        });
-    }
-
-    private void rotateViewRight() {
-        activeView.set(switch (activeView.get()) {
-            case TOP -> ViewOrientation.EAST;
-            case BOTTOM -> ViewOrientation.EAST;
-            case NORTH -> ViewOrientation.EAST;
-            case SOUTH -> ViewOrientation.WEST;
-            case EAST -> ViewOrientation.SOUTH;
-            case WEST -> ViewOrientation.NORTH;
-        });
-    }
-
-    private void rotateViewUp() {
-        activeView.set(switch (activeView.get()) {
-            case TOP -> ViewOrientation.NORTH;
-            case BOTTOM -> ViewOrientation.SOUTH;
-            case NORTH, SOUTH, EAST, WEST -> ViewOrientation.TOP;
-        });
-    }
-
-    private void rotateViewDown() {
-        activeView.set(switch (activeView.get()) {
-            case TOP -> ViewOrientation.SOUTH;
-            case BOTTOM -> ViewOrientation.NORTH;
-            case NORTH, SOUTH, EAST, WEST -> ViewOrientation.BOTTOM;
-        });
     }
 
     private Button workspaceModeButton(WorkspaceMode workspaceMode) {
