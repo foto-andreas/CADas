@@ -827,11 +827,11 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
 
         Menu berichteMenu = new Menu("Berichte");
         berichteMenu.getItems().addAll(
-                menuItem("Bauzeichnung als PDF exportieren", documentSupport::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Bauzeichnung als PDF exportieren (Rastergrafik)", documentSupport::exportConstructionDrawingPdfRaster, null),
+                menuItem("Räume und Materialien als PDF exportieren (Rastergrafik)", documentSupport::exportSurfaceMaterialReportPdfRaster, null),
+                menuItem("Bauzeichnung als PDF exportieren", documentSupport::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Räume und Materialien anzeigen", documentSupport::showSurfaceMaterialReportWindow, null),
                 menuItem("Räume und Materialien als PDF exportieren (SVG-Heizpläne)", documentSupport::exportSurfaceMaterialReportPdf, null),
-                menuItem("Räume und Materialien als PDF exportieren (Rastergrafik)", documentSupport::exportSurfaceMaterialReportPdfRaster, null),
                 menuItem("Räume und Materialien als MD exportieren", documentSupport::exportSurfaceMaterialReportMarkdown, null)
         );
 

@@ -140,6 +140,36 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
+    void berichteMenueSortiertRasterExporteVorNichtRasterExporte() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        List<String> berichte = aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            return menuBar.getMenus().stream()
+                    .filter(menu -> "Berichte".equals(menu.getText()))
+                    .flatMap(menu -> menu.getItems().stream())
+                    .map(MenuItem::getText)
+                    .toList();
+        });
+
+        Assertions.assertTrue(
+                berichte.indexOf("Bauzeichnung als PDF exportieren (Rastergrafik)")
+                        < berichte.indexOf("Bauzeichnung als PDF exportieren")
+        );
+        Assertions.assertTrue(
+                berichte.indexOf("Räume und Materialien als PDF exportieren (Rastergrafik)")
+                        < berichte.indexOf("Räume und Materialien als PDF exportieren (SVG-Heizpläne)")
+        );
+    }
+
+    @Test
     void rueckgaengigShortcutGreiftAuchVomTextfeldAus() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
