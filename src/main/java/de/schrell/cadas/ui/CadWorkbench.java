@@ -183,7 +183,6 @@ import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.image.WritableImage;
-import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -200,7 +199,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.Node;
 import javafx.scene.Cursor;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.ImagePattern;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
@@ -322,6 +320,7 @@ public final class CadWorkbench extends BorderPane {
     private final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
     private final DwgLibraryAnalyzer dwgLibraryAnalyzer = new DwgLibraryAnalyzer();
     private final CadWorkbenchDocumentSupport documentSupport = new CadWorkbenchDocumentSupport(this);
+    private final CadWorkbenchVariothermGrooveRenderer variothermGrooveRenderer = new CadWorkbenchVariothermGrooveRenderer();
     private SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
 
@@ -590,8 +589,6 @@ public final class CadWorkbench extends BorderPane {
     private EdgeResizeService.EdgeHandle activeEdgeHandle;
     private List<Wall> edgeResizeBaseWalls = List.of();
     private List<Door> edgeResizeBaseDoors = List.of();
-    private Image variothermGroovePatternImage;
-    private double variothermGroovePatternPitchPixels = -1.0;
     private List<WindowElement> edgeResizeBaseWindows = List.of();
     private List<Staircase> edgeResizeBaseStaircases = List.of();
     private List<FloorOpening> edgeResizeBaseFloorOpenings = List.of();
@@ -4271,7 +4268,7 @@ public final class CadWorkbench extends BorderPane {
                     && SurfaceCoveringPresetService.isVariothermDryPanelLayer(layer)
                     && scale() * SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS
                     >= VARIOTHERM_DETAIL_MIN_SCREEN_SPACING) {
-                drawVariothermPanelGrooves(graphics, tile);
+                variothermGrooveRenderer.drawPanelGrooves(graphics, tile, scale(), this::toScreenX, this::toScreenY);
             }
         }
         if (highlighted) {
@@ -4401,19 +4398,6 @@ public final class CadWorkbench extends BorderPane {
         );
     }
 
-    private void drawVariothermPanelGrooves(GraphicsContext graphics, SurfaceRectangleTileLayoutService.PlacedSurfaceTile tile) {
-        double pitch = SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS;
-        double radius = Math.max(1.0, (pitch - SurfaceCoveringPresetService.VARIOTHERM_PIPE_DIAMETER_MILLIMETERS) / 2.0);
-        double pitchPixels = pitch * scale();
-        double radiusPixels = radius * scale();
-        double screenX = toScreenX(tile.x());
-        double screenY = toScreenY(tile.y());
-        graphics.save();
-        graphics.setFill(variothermGroovePattern(toScreenX(tile.fullX()), toScreenY(tile.fullY()), pitchPixels, radiusPixels));
-        graphics.fillRect(screenX, screenY, tile.width() * scale(), tile.height() * scale());
-        graphics.restore();
-    }
-
     private boolean startsAtMaximumX(SurfaceLayoutAnchor anchor) {
         return anchor == SurfaceLayoutAnchor.MAX_X_MIN_Y || anchor == SurfaceLayoutAnchor.MAX_X_MAX_Y;
     }
@@ -4428,30 +4412,6 @@ public final class CadWorkbench extends BorderPane {
         }
         double result = value % modulus;
         return result < 0.0 ? result + modulus : result;
-    }
-
-    private ImagePattern variothermGroovePattern(double tileScreenX, double tileScreenY, double pitchPixels, double radiusPixels) {
-        return new ImagePattern(variothermGroovePatternImage(pitchPixels, radiusPixels), tileScreenX, tileScreenY, pitchPixels, pitchPixels, false);
-    }
-
-    private Image variothermGroovePatternImage(double pitchPixels, double radiusPixels) {
-        if (variothermGroovePatternImage != null && Math.abs(variothermGroovePatternPitchPixels - pitchPixels) <= 0.01) {
-            return variothermGroovePatternImage;
-        }
-        double canvasSize = Math.max(2.0, pitchPixels);
-        Canvas patternCanvas = new Canvas(canvasSize, canvasSize);
-        GraphicsContext patternGraphics = patternCanvas.getGraphicsContext2D();
-        patternGraphics.setStroke(Color.color(0.18, 0.36, 0.44, 0.48));
-        patternGraphics.setLineWidth(Math.max(0.45, 1.2 * scale()));
-        patternGraphics.strokeOval(
-                (canvasSize - radiusPixels * 2.0) / 2.0,
-                (canvasSize - radiusPixels * 2.0) / 2.0,
-                radiusPixels * 2.0,
-                radiusPixels * 2.0
-        );
-        variothermGroovePatternImage = patternCanvas.snapshot(null, null);
-        variothermGroovePatternPitchPixels = pitchPixels;
-        return variothermGroovePatternImage;
     }
 
     private List<TextBlockingBox> drawRoomLabel(GraphicsContext graphics, Room room, PlanPoint center) {
