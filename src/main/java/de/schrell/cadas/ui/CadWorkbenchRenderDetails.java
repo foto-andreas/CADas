@@ -332,6 +332,62 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         }
     }
 
+    void drawSelectedHeatingVarioBackground(GraphicsContext graphics, Room room) {
+        if (!projectionService.isPlanView(activeView.get()) || selectedSelections.isEmpty()) {
+            return;
+        }
+        Set<UUID> drawnLayerIds = new HashSet<>();
+        activeLevel.get().hydronicHeatings().stream()
+                .filter(heating -> heating.roomId().equals(room.id()))
+                .filter(this::hasSelectedHeatingZone)
+                .forEach(heating -> drawSelectedHeatingVarioBackground(graphics, room, heating, drawnLayerIds));
+    }
+
+    private boolean hasSelectedHeatingZone(HydronicHeating heating) {
+        return heating.zones().stream()
+                .anyMatch(zone -> selectedSelections.contains(new SelectionKey(
+                        RenderableKind.HEATING_ZONE,
+                        activeLevel.get().name(),
+                        zone.id().toString()
+                )));
+    }
+
+    private void drawSelectedHeatingVarioBackground(
+            GraphicsContext graphics,
+            Room room,
+            HydronicHeating heating,
+            Set<UUID> drawnLayerIds
+    ) {
+        SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(surfaceType(heating.surfacePosition()), room.id().toString());
+        if (stack == null) {
+            return;
+        }
+        SurfaceLayer baseLayer = firstVisibleSurfaceLayer(stack).orElse(null);
+        SurfaceLayer selectedLayer = stack.layers().stream()
+                .filter(layer -> isSelectedSurfaceLayer(stack, layer))
+                .findFirst()
+                .orElse(null);
+        stack.layers().stream()
+                .filter(this::isVisibleSurfaceLayer)
+                .filter(SurfaceCoveringPresetService::isVariothermDryPanelLayer)
+                .filter(layer -> drawnLayerIds.add(layer.id()))
+                .filter(layer -> !alreadyDrawnWithCircles(layer, baseLayer, selectedLayer))
+                .forEach(layer -> drawRoomTileLayer(graphics, room, layer, false, true));
+    }
+
+    private boolean alreadyDrawnWithCircles(SurfaceLayer layer, SurfaceLayer baseLayer, SurfaceLayer selectedLayer) {
+        return showVariothermCircles.get()
+                && (sameLayer(layer, baseLayer) || sameLayer(layer, selectedLayer));
+    }
+
+    private boolean sameLayer(SurfaceLayer first, SurfaceLayer second) {
+        return first != null && second != null && first.id().equals(second.id());
+    }
+
+    private SurfaceType surfaceType(HeatingSurfacePosition surfacePosition) {
+        return surfacePosition == HeatingSurfacePosition.CEILING ? SurfaceType.CEILING : SurfaceType.FLOOR;
+    }
+
     Optional<SurfaceLayer> firstVisibleSurfaceLayer(SurfaceLayerStack stack) {
         return visiblePlanSurfaceLayers(stack).stream().findFirst();
     }
@@ -344,6 +400,10 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawRoomTileLayer(GraphicsContext graphics, Room room, SurfaceLayer layer, boolean highlighted) {
+        drawRoomTileLayer(graphics, room, layer, highlighted, false);
+    }
+
+    void drawRoomTileLayer(GraphicsContext graphics, Room room, SurfaceLayer layer, boolean highlighted, boolean forceVariothermCircles) {
         List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = surfaceRectangleTileLayoutService.tilesForRectangles(
                 floorOpeningGeometryService.floorRectangles(activeLevel.get(), room),
                 layer
@@ -381,7 +441,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
                 double screenY = toScreenY(ty);
                 graphics.fillRect(screenX, screenY, jointPx, th * scale());
             }
-            if (showVariothermCircles.get()
+            if ((showVariothermCircles.get() || forceVariothermCircles)
                     && SurfaceCoveringPresetService.isVariothermDryPanelLayer(layer)
                     && scale() * SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS
                     >= VARIOTHERM_DETAIL_MIN_SCREEN_SPACING) {

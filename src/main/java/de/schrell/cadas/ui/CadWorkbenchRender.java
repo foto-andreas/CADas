@@ -1168,6 +1168,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
             graphics.strokePolygon(xPoints, yPoints, xPoints.length);
             drawRoomSlopeMarker(graphics, room);
             drawRoomTileGrid(graphics, room);
+            drawSelectedHeatingVarioBackground(graphics, room);
             drawFloorOpenings(graphics, room);
             drawHeatingExclusionAreas(graphics, room);
         }

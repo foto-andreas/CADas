@@ -187,6 +187,21 @@ abstract class CadWorkbenchTestBase {
         return count;
     }
 
+    int countVariothermCirclePixels(WritableImage image) {
+        int count = 0;
+        for (int x = 0; x < image.getWidth(); x++) {
+            for (int y = 0; y < image.getHeight(); y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                if (color.getBlue() > color.getRed() + 0.04
+                        && color.getGreen() > color.getRed() + 0.02
+                        && color.getBlue() > 0.32) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     HydronicHeating hydronicHeatingForReportTest(
             Room room,
             HeatingSurfacePosition surfacePosition,

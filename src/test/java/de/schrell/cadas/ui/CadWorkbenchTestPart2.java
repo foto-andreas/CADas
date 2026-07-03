@@ -1190,6 +1190,75 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
+    void selektierterHeizkreisZeigtDarunterliegendeVariothermKreise() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.showAreaVolume.set(false);
+            instanz.showVariothermCircles.set(false);
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3_900, 2_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Oberbelag",
+                    Length.ofMillimeters(12),
+                    Length.ofMillimeters(800),
+                    Length.ofMillimeters(800),
+                    Length.ofMillimeters(50)
+            ));
+            stack.addLayer(SurfaceLayer.create(
+                    "Variotherm",
+                    Length.of(18, LengthUnit.MILLIMETER),
+                    Length.of(60, LengthUnit.CENTIMETER),
+                    Length.of(100, LengthUnit.CENTIMETER),
+                    SurfaceLayoutMode.FIXED,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.zero(),
+                    SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            HydronicHeating heating = hydronicHeatingForReportTest(
+                    room,
+                    HeatingSurfacePosition.FLOOR,
+                    "FBH 1",
+                    new PlanPoint(600, 600),
+                    new PlanPoint(3_400, 2_400)
+            );
+            instanz.project.primaryLevel().addHydronicHeating(heating);
+            instanz.updateSelection(new de.schrell.cadas.application.view.SelectionKey(
+                    RenderableKind.HEATING_ZONE,
+                    instanz.activeLevel.get().name(),
+                    heating.zones().getFirst().id().toString()
+            ), false);
+            instanz.automationSetViewport(3.0, 20.0, 20.0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+        int kreisPixel = countVariothermCirclePixels(
+                image,
+                snapshot,
+                new PlanPoint(200, 200),
+                new PlanPoint(3_600, 2_500)
+        );
+
+        Assertions.assertTrue(kreisPixel > 120, "Selektierter Heizkreis zeigt die darunterliegenden Variotherm-Kreise nicht.");
+    }
+
+    @Test
     void heizkreiseLassenSichGlobalAusblenden() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -1357,6 +1426,74 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
         Assertions.assertTrue(dhPixel > 200, "DH-Seite enthält keine sichtbaren Heizkreise.");
         Assertions.assertTrue(allePixel > fbhPixel + 200 && allePixel > dhPixel + 200,
                 "Gefilterte Heizflächen-Seiten enthalten weiterhin fremde Heizkreise: " + allePixel + " / " + fbhPixel + " / " + dhPixel);
+    }
+
+    @Test
+    void rasterHeizflaecheZeigtVariothermKreiseUnterOberbelag() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.showAreaVolume.set(false);
+            instanz.showVariothermCircles.set(false);
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3_900, 2_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Oberbelag",
+                    Length.ofMillimeters(12),
+                    Length.ofMillimeters(800),
+                    Length.ofMillimeters(800),
+                    Length.ofMillimeters(50)
+            ));
+            stack.addLayer(SurfaceLayer.create(
+                    "Variotherm",
+                    Length.of(18, LengthUnit.MILLIMETER),
+                    Length.of(60, LengthUnit.CENTIMETER),
+                    Length.of(100, LengthUnit.CENTIMETER),
+                    SurfaceLayoutMode.FIXED,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.zero(),
+                    SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.project.primaryLevel().addHydronicHeating(hydronicHeatingForReportTest(
+                    room,
+                    HeatingSurfacePosition.FLOOR,
+                    "FBH 1",
+                    new PlanPoint(600, 600),
+                    new PlanPoint(3_400, 2_400)
+            ));
+            return instanz;
+        });
+
+        UUID variothermLayerId = aufFxThread(() -> workbench.project.primaryLevel()
+                .surfaceLayerStacks()
+                .getFirst()
+                .layers()
+                .get(1)
+                .id());
+        WritableImage image = aufFxThread(() -> workbench.reportLevelSnapshot(
+                "Erdgeschoss",
+                Set.of(variothermLayerId),
+                true,
+                Set.of(),
+                Set.of(HeatingSurfacePosition.FLOOR)
+        ));
+        int kreisPixel = countVariothermCirclePixels(image);
+
+        Assertions.assertTrue(kreisPixel > 120, "Raster-Heizflächenbild zeigt die Variotherm-Kreise unter dem Oberbelag nicht.");
     }
 
     @Test

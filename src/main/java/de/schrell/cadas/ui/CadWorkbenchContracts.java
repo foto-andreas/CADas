@@ -564,11 +564,15 @@ abstract class CadWorkbenchContracts extends BorderPane {
 
     abstract void drawRoomTileGrid(GraphicsContext graphics, Room room);
 
+    abstract void drawSelectedHeatingVarioBackground(GraphicsContext graphics, Room room);
+
     abstract Optional<SurfaceLayer> firstVisibleSurfaceLayer(SurfaceLayerStack stack);
 
     abstract List<SurfaceLayer> visiblePlanSurfaceLayers(SurfaceLayerStack stack);
 
     abstract void drawRoomTileLayer(GraphicsContext graphics, Room room, SurfaceLayer layer, boolean highlighted);
+
+    abstract void drawRoomTileLayer(GraphicsContext graphics, Room room, SurfaceLayer layer, boolean highlighted, boolean forceVariothermCircles);
 
     abstract void drawSurfaceLayerDirectionArrow(
             GraphicsContext graphics,
