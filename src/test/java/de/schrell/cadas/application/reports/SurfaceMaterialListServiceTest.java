@@ -488,6 +488,59 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
+    void gruppiertGleichesMaterialTrotzAndererVerlegeEigenschaftenUndListetAbweichungen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room bad = Room.rectangular(
+                "Bad",
+                new PlanPoint(0, 0),
+                new PlanPoint(1000, 1000),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        Room flur = Room.rectangular(
+                "Flur",
+                new PlanPoint(1200, 0),
+                new PlanPoint(2200, 1000),
+                Length.of(2.5, LengthUnit.METER),
+                Length.of(18, LengthUnit.CENTIMETER),
+                Length.of(1, LengthUnit.MILLIMETER)
+        );
+        project.primaryLevel().addRoom(bad);
+        project.primaryLevel().addRoom(flur);
+        SurfaceLayerStack badStack = new SurfaceLayerStack(SurfaceType.FLOOR, bad.id().toString());
+        badStack.addLayer(layer("Fliese", Length.of(50, LengthUnit.CENTIMETER), Length.of(50, LengthUnit.CENTIMETER), SurfaceCutRestriction.FREE));
+        SurfaceLayerStack flurStack = new SurfaceLayerStack(SurfaceType.FLOOR, flur.id().toString());
+        flurStack.addLayer(SurfaceLayer.create(
+                "Fliese",
+                Length.of(10, LengthUnit.MILLIMETER),
+                Length.of(50, LengthUnit.CENTIMETER),
+                Length.of(50, LengthUnit.CENTIMETER),
+                SurfaceLayoutMode.FIXED,
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.of(4, LengthUnit.MILLIMETER),
+                SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
+                ""
+        ));
+        project.primaryLevel().addSurfaceLayerStack(badStack);
+        project.primaryLevel().addSurfaceLayerStack(flurStack);
+
+        SurfaceMaterialReport report = service.create(project);
+        MaterialSummary material = report.materials().getFirst();
+        String markdown = report.toMarkdown();
+
+        assertEquals(1, report.materials().size());
+        assertEquals(2, material.propertyUsages().size());
+        assertTrue(markdown.contains("| Name | Eigenschaften | Geschoss + Raum |"));
+        assertTrue(markdown.contains("Erdgeschoss / Bad"));
+        assertTrue(markdown.contains("Erdgeschoss / Flur"));
+        assertTrue(markdown.contains("Schnittbeschränkung"));
+    }
+
+    @Test
     void ordnetZusammenfassungNachNameUndListetTrennmerkmaleVorHeizungen() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Room a = Room.rectangular(

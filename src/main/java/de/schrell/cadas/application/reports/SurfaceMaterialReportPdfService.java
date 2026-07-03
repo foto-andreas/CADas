@@ -468,13 +468,12 @@ public final class SurfaceMaterialReportPdfService {
                         new TableColumn("Komplexität", 0.75f, TableAlignment.RIGHT)
                 )
         );
-        TableDefinition restPieceTable = new TableDefinition(
+        TableDefinition propertyUsageTable = new TableDefinition(
                 BODY_FONT_SIZE,
                 List.of(
-                        new TableColumn("Anzahl", 0.6f, TableAlignment.RIGHT),
-                        new TableColumn("Breite", 0.8f, TableAlignment.RIGHT),
-                        new TableColumn("Höhe", 0.8f, TableAlignment.RIGHT),
-                        new TableColumn("Gesamtfläche", 0.9f, TableAlignment.RIGHT)
+                        new TableColumn("Name", 0.9f, TableAlignment.LEFT),
+                        new TableColumn("Eigenschaften", 3.7f, TableAlignment.LEFT),
+                        new TableColumn("Geschoss + Raum", 1.4f, TableAlignment.LEFT)
                 )
         );
         for (SurfaceMaterialListService.MaterialSummary material : materials) {
@@ -494,18 +493,15 @@ public final class SurfaceMaterialReportPdfService {
                             List.of("Komplexität", decimal(material.complexityScore(), 1))
                     )
             );
-            writer.caption("Reststücke");
-            if (material.restPieces().isEmpty()) {
-                writer.paragraph("Keine Reststücke.");
-            } else {
+            if (!material.propertyUsages().isEmpty()) {
+                writer.caption("Abweichende Eigenschaften");
                 writer.table(
-                        restPieceTable,
-                        material.restPieces().stream()
-                                .map(restPiece -> List.of(
-                                        Integer.toString(restPiece.count()),
-                                        decimal(restPiece.widthMillimeters() / 10.0, 1) + " cm",
-                                        decimal(restPiece.heightMillimeters() / 10.0, 1) + " cm",
-                                        decimal(restPiece.totalAreaSquareMeters(), 2) + " m²"
+                        propertyUsageTable,
+                        material.propertyUsages().stream()
+                                .map(usage -> List.of(
+                                        usage.name(),
+                                        usage.properties(),
+                                        usage.location()
                                 ))
                                 .toList()
                 );
@@ -603,7 +599,9 @@ public final class SurfaceMaterialReportPdfService {
         List<String> descriptions = new ArrayList<>();
         LinkedHashMap<String, List<String>> valuesByLabel = new LinkedHashMap<>();
         for (SurfaceMaterialListService.MaterialSummary material : materialsWithSameName) {
-            material.labeledValues().forEach((label, value) -> valuesByLabel.computeIfAbsent(label, ignored -> new ArrayList<>()).add(value));
+            material.labeledValues().entrySet().stream()
+                    .filter(entry -> "Dicke".equals(entry.getKey()) || "Format".equals(entry.getKey()))
+                    .forEach(entry -> valuesByLabel.computeIfAbsent(entry.getKey(), ignored -> new ArrayList<>()).add(entry.getValue()));
         }
         for (Map.Entry<String, List<String>> entry : valuesByLabel.entrySet()) {
             List<String> distinctValues = entry.getValue().stream().distinct().toList();

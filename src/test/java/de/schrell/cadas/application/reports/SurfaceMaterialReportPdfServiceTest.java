@@ -147,6 +147,7 @@ class SurfaceMaterialReportPdfServiceTest {
             assertTrue(text.contains("14,00 m"));
             assertTrue(text.contains("Zusammenfassung"));
             assertTrue(text.contains("Flächenheizungen"));
+            assertFalse(text.contains("Reststücke"));
             if (expectSvgText) {
                 assertTrue(text.contains("Heizplan Erdgeschoss / Wohnen"));
                 assertTrue(text.contains("V1"));

@@ -58,7 +58,7 @@ public final class SurfaceMaterialListService {
     private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
 
     public static String materialLookupKey(SurfaceType surfaceType, SurfaceLayer layer) {
-        return layer.name() + "|" + MaterialProperties.from(surfaceType, layer).key();
+        return layer.name() + "|" + MaterialProperties.from(surfaceType, layer).materialKey();
     }
 
     public SurfaceMaterialReport create(ProjectModel project) {
@@ -304,6 +304,7 @@ public final class SurfaceMaterialListService {
                             coverage.levelName(),
                             coverage.roomName(),
                             coverage.surfaceDescription(),
+                            materialProperties,
                             estimate
                     );
                     material.add(entry);
@@ -529,7 +530,7 @@ public final class SurfaceMaterialListService {
     }
 
     private String materialKey(String name, MaterialProperties materialProperties) {
-        return name + "|" + materialProperties.key();
+        return name + "|" + materialProperties.materialKey();
     }
 
     private String shortId(String id) {
@@ -618,6 +619,7 @@ public final class SurfaceMaterialListService {
             String levelName,
             String roomName,
             String surfaceDescription,
+            MaterialProperties materialProperties,
             CoverageEstimate estimate
     ) {
     }
@@ -1087,7 +1089,7 @@ public final class SurfaceMaterialListService {
             }
             int requiredPieces = fullPieceCount + optimization.requiredCutSheets();
             return new MaterialSummary(
-                    materialName + "|" + materialProperties.key(),
+                    materialName + "|" + materialProperties.materialKey(),
                     materialName,
                     materialProperties.surfaceType(),
                     materialProperties.description(),
@@ -1101,24 +1103,60 @@ public final class SurfaceMaterialListService {
                     cutCount,
                     complexity(placedPieceCount, cutCount, cutPenaltySum),
                     List.copyOf(roomEntries),
-                    optimization.restPieces()
+                    optimization.restPieces(),
+                    materialPropertyUsages()
             );
         }
 
         private MaterialCutOptimization optimizeCutPieces() {
-            List<OwnedCutPiece> cutPieces = new ArrayList<>();
+            Map<String, List<Integer>> entryIndexesByProperties = new LinkedHashMap<>();
             for (int index = 0; index < pendingEntries.size(); index++) {
-                for (CutPiece cutPiece : pendingEntries.get(index).estimate().cutPieces()) {
-                    cutPieces.add(new OwnedCutPiece(index, cutPiece.widthMillimeters(), cutPiece.heightMillimeters()));
-                }
+                entryIndexesByProperties
+                        .computeIfAbsent(pendingEntries.get(index).materialProperties().key(), ignored -> new ArrayList<>())
+                        .add(index);
             }
-            return MaterialCuttingOptimizer.optimize(
-                    materialProperties.tileWidthMillimeters(),
-                    materialProperties.tileHeightMillimeters(),
-                    cutPieces,
-                    materialProperties.cutRestriction().allowsMaterialRotation(),
-                    pendingEntries.size()
-            );
+            int[] requiredCutSheetsByOwner = new int[pendingEntries.size()];
+            int requiredCutSheets = 0;
+            List<RestPieceSummary> restPieces = new ArrayList<>();
+            for (List<Integer> entryIndexes : entryIndexesByProperties.values()) {
+                List<OwnedCutPiece> cutPieces = new ArrayList<>();
+                for (int entryIndex : entryIndexes) {
+                    for (CutPiece cutPiece : pendingEntries.get(entryIndex).estimate().cutPieces()) {
+                        cutPieces.add(new OwnedCutPiece(entryIndex, cutPiece.widthMillimeters(), cutPiece.heightMillimeters()));
+                    }
+                }
+                MaterialProperties properties = pendingEntries.get(entryIndexes.getFirst()).materialProperties();
+                MaterialCutOptimization optimization = MaterialCuttingOptimizer.optimize(
+                        properties.tileWidthMillimeters(),
+                        properties.tileHeightMillimeters(),
+                        cutPieces,
+                        properties.cutRestriction().allowsMaterialRotation(),
+                        pendingEntries.size()
+                );
+                requiredCutSheets += optimization.requiredCutSheets();
+                for (int index = 0; index < requiredCutSheetsByOwner.length; index++) {
+                    requiredCutSheetsByOwner[index] += optimization.requiredCutSheetsByOwner()[index];
+                }
+                restPieces.addAll(optimization.restPieces());
+            }
+            return new MaterialCutOptimization(requiredCutSheets, requiredCutSheetsByOwner, List.copyOf(restPieces));
+        }
+
+        private List<MaterialPropertyUsage> materialPropertyUsages() {
+            boolean hasDifferences = pendingEntries.stream()
+                    .map(entry -> entry.materialProperties().key())
+                    .distinct()
+                    .count() > 1;
+            if (!hasDifferences) {
+                return List.of();
+            }
+            return pendingEntries.stream()
+                    .map(entry -> new MaterialPropertyUsage(
+                            materialName,
+                            entry.materialProperties().values(),
+                            entry.levelName() + " / " + entry.roomName()
+                    ))
+                    .toList();
         }
     }
 
@@ -1180,6 +1218,14 @@ public final class SurfaceMaterialListService {
                     Double.toString(jointWidthMillimeters),
                     cutRestriction.name(),
                     coveringSource
+            );
+        }
+
+        private String materialKey() {
+            return String.join("|",
+                    Double.toString(thicknessMillimeters),
+                    Double.toString(tileWidthMillimeters),
+                    Double.toString(tileHeightMillimeters)
             );
         }
 
@@ -1499,7 +1545,9 @@ public final class SurfaceMaterialListService {
             List<String> descriptions = new ArrayList<>();
             LinkedHashMap<String, List<String>> valuesByLabel = new LinkedHashMap<>();
             for (MaterialSummary material : materialsWithSameName) {
-                material.labeledValues().forEach((label, value) -> valuesByLabel.computeIfAbsent(label, ignored -> new ArrayList<>()).add(value));
+                material.labeledValues().entrySet().stream()
+                        .filter(entry -> "Dicke".equals(entry.getKey()) || "Format".equals(entry.getKey()))
+                        .forEach(entry -> valuesByLabel.computeIfAbsent(entry.getKey(), ignored -> new ArrayList<>()).add(entry.getValue()));
             }
             for (Map.Entry<String, List<String>> entry : valuesByLabel.entrySet()) {
                 List<String> distinctValues = entry.getValue().stream().distinct().toList();
@@ -1517,6 +1565,7 @@ public final class SurfaceMaterialListService {
                 markdown.append("### ").append(material.name()).append("\n\n");
                 markdown.append("* Beschreibung: ").append(material.description()).append('\n');
                 markdown.append("* Werte: ").append(material.values()).append('\n');
+                appendMaterialPropertyUsages(markdown, material.propertyUsages());
                 markdown.append("* Belegte Fläche: ").append(decimal(material.coveredAreaSquareMeters(), 2)).append(" m²\n");
                 markdown.append("* Benötigte Stückzahl: ").append(material.requiredPieces())
                         .append(" Stück, Materialfläche ")
@@ -1544,6 +1593,24 @@ public final class SurfaceMaterialListService {
                 }
                 markdown.append('\n');
             }
+        }
+
+        private void appendMaterialPropertyUsages(StringBuilder markdown, List<MaterialPropertyUsage> usages) {
+            if (usages.isEmpty()) {
+                return;
+            }
+            markdown.append("\n| Name | Eigenschaften | Geschoss + Raum |\n");
+            markdown.append("|---|---|---|\n");
+            for (MaterialPropertyUsage usage : usages) {
+                markdown.append("| ")
+                        .append(markdownCell(usage.name()))
+                        .append(" | ")
+                        .append(markdownCell(usage.properties()))
+                        .append(" | ")
+                        .append(markdownCell(usage.location()))
+                        .append(" |\n");
+            }
+            markdown.append('\n');
         }
 
         private void appendRestPieces(StringBuilder markdown, List<RestPieceSummary> restPieces) {
@@ -1588,6 +1655,13 @@ public final class SurfaceMaterialListService {
         }
     }
 
+    public record MaterialPropertyUsage(
+            String name,
+            String properties,
+            String location
+    ) {
+    }
+
     public record MaterialSummary(
             String lookupKey,
             String name,
@@ -1603,7 +1677,8 @@ public final class SurfaceMaterialListService {
             int cutCount,
             double complexityScore,
             List<MaterialRoomEntry> roomEntries,
-            List<RestPieceSummary> restPieces
+            List<RestPieceSummary> restPieces,
+            List<MaterialPropertyUsage> propertyUsages
     ) {
     }
 
