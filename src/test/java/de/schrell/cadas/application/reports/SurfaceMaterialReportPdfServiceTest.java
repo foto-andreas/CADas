@@ -1,6 +1,7 @@
 package de.schrell.cadas.application.reports;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.domain.geometry.Length;
@@ -81,8 +82,10 @@ class SurfaceMaterialReportPdfServiceTest {
             String text = new PDFTextStripper().getText(document);
             assertTrue(text.contains("Etagenübersicht Erdgeschoss"));
             assertTrue(text.contains("Belag Erdgeschoss / Parkett"));
-            assertTrue(text.contains("Heizkreise Erdgeschoss / Fußboden"));
-            assertTrue(text.contains("Heizkreise Erdgeschoss / Decke"));
+            assertFalse(text.contains("Heizkreise Erdgeschoss / Fußboden"));
+            assertTrue(text.contains("Heizflächen Fußboden - Erdgeschoss"));
+            assertTrue(text.contains("Heizflächen Decke - Erdgeschoss"));
+            assertTrue(text.indexOf("Heizflächen Fußboden - Erdgeschoss") > text.indexOf("Flächenheizungen"));
         }
 
         Files.deleteIfExists(targetFile);

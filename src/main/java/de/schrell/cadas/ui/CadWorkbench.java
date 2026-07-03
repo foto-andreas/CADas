@@ -617,6 +617,7 @@ public final class CadWorkbench extends BorderPane {
     private boolean reportSnapshotRestrictSurfaceLayers;
     private Set<UUID> reportSnapshotVisibleSurfaceLayerIds = Set.of();
     private boolean reportSnapshotHideHydronicHeatings;
+    private Set<HeatingSurfacePosition> reportSnapshotVisibleHydronicSurfacePositions = Set.of();
     private boolean reportSnapshotFilterHeatingRoomObjects;
     private Set<RoomObjectHeatingType> reportSnapshotVisibleHeatingObjectTypes = Set.of();
     private boolean reportSnapshotInteriorRoomDimensionsOnly;
@@ -4004,9 +4005,12 @@ public final class CadWorkbench extends BorderPane {
         if (!projectionService.isPlanView(activeView.get())) {
             return;
         }
+        List<HydronicHeating> visibleHeatings = activeLevel.get().hydronicHeatings().stream()
+                .filter(this::shouldDrawHydronicHeating)
+                .toList();
         CadWorkbenchHeatingRenderer.drawHydronicHeatings(
                 graphics,
-                activeLevel.get().hydronicHeatings(),
+                visibleHeatings,
                 activeLevel.get().name(),
                 selectedSelections,
                 this::isHeatingLayoutDirty,
@@ -4015,6 +4019,11 @@ public final class CadWorkbench extends BorderPane {
                 point -> toScreenProjectedY(point, 0.0),
                 this::scale
         );
+    }
+
+    private boolean shouldDrawHydronicHeating(HydronicHeating heating) {
+        return reportSnapshotVisibleHydronicSurfacePositions.isEmpty()
+                || reportSnapshotVisibleHydronicSurfacePositions.contains(heating.surfacePosition());
     }
 
     private void drawFloorOpenings(GraphicsContext graphics, Room room) {
@@ -10128,7 +10137,12 @@ public final class CadWorkbench extends BorderPane {
     }
 
     WritableImage reportLevelSnapshot(String levelName) {
-        return reportSnapshot(levelName, null, 0.0, ReportSnapshotOptions.defaults().hideHeatingRoomObjects().withRenderScale(2.0));
+        return reportSnapshot(
+                levelName,
+                null,
+                0.0,
+                new ReportSnapshotOptions(false, Set.of(), false, Set.of(), true, true, false, true, Set.of(), 2.0)
+        );
     }
 
     WritableImage reportMaterialOverviewSnapshot(String levelName) {
@@ -10136,7 +10150,7 @@ public final class CadWorkbench extends BorderPane {
                 levelName,
                 null,
                 0.0,
-                new ReportSnapshotOptions(true, Set.of(), false, true, true, true, true, Set.of(), 2.0)
+                new ReportSnapshotOptions(true, Set.of(), false, Set.of(), true, true, true, true, Set.of(), 2.0)
         );
     }
 
@@ -10150,11 +10164,21 @@ public final class CadWorkbench extends BorderPane {
             boolean includeHydronicHeating,
             Set<RoomObjectHeatingType> visibleHeatingObjectTypes
     ) {
+        return reportLevelSnapshot(levelName, visibleSurfaceLayerIds, includeHydronicHeating, visibleHeatingObjectTypes, Set.of());
+    }
+
+    WritableImage reportLevelSnapshot(
+            String levelName,
+            Set<UUID> visibleSurfaceLayerIds,
+            boolean includeHydronicHeating,
+            Set<RoomObjectHeatingType> visibleHeatingObjectTypes,
+            Set<HeatingSurfacePosition> visibleHydronicSurfacePositions
+    ) {
         return reportSnapshot(
                 levelName,
                 null,
                 0.0,
-                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, false, true, false, true, visibleHeatingObjectTypes, 2.0)
+                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, visibleHydronicSurfacePositions, false, true, false, true, visibleHeatingObjectTypes, 2.0)
         );
     }
 
@@ -10172,7 +10196,7 @@ public final class CadWorkbench extends BorderPane {
                 levelName,
                 List.copyOf(focusPoints),
                 280.0,
-                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, false, true, false, true, Set.of(), 2.0)
+                new ReportSnapshotOptions(true, visibleSurfaceLayerIds, includeHydronicHeating, Set.of(), false, true, false, true, Set.of(), 2.0)
         );
     }
 
@@ -10194,6 +10218,7 @@ public final class CadWorkbench extends BorderPane {
         boolean previousRestrictSurfaceLayers = reportSnapshotRestrictSurfaceLayers;
         Set<UUID> previousVisibleSurfaceLayerIds = reportSnapshotVisibleSurfaceLayerIds;
         boolean previousHideHydronicHeatings = reportSnapshotHideHydronicHeatings;
+        Set<HeatingSurfacePosition> previousVisibleHydronicSurfacePositions = reportSnapshotVisibleHydronicSurfacePositions;
         boolean previousFilterHeatingRoomObjects = reportSnapshotFilterHeatingRoomObjects;
         Set<RoomObjectHeatingType> previousVisibleHeatingObjectTypes = reportSnapshotVisibleHeatingObjectTypes;
         boolean previousInteriorRoomDimensionsOnly = reportSnapshotInteriorRoomDimensionsOnly;
@@ -10207,6 +10232,7 @@ public final class CadWorkbench extends BorderPane {
             reportSnapshotRestrictSurfaceLayers = options.restrictSurfaceLayers();
             reportSnapshotVisibleSurfaceLayerIds = Set.copyOf(options.visibleSurfaceLayerIds());
             reportSnapshotHideHydronicHeatings = !options.includeHydronicHeating();
+            reportSnapshotVisibleHydronicSurfacePositions = Set.copyOf(options.visibleHydronicSurfacePositions());
             reportSnapshotFilterHeatingRoomObjects = options.filterHeatingRoomObjects();
             reportSnapshotVisibleHeatingObjectTypes = Set.copyOf(options.visibleHeatingObjectTypes());
             reportSnapshotInteriorRoomDimensionsOnly = options.interiorRoomDimensionsOnly();
@@ -10239,6 +10265,7 @@ public final class CadWorkbench extends BorderPane {
             reportSnapshotRestrictSurfaceLayers = previousRestrictSurfaceLayers;
             reportSnapshotVisibleSurfaceLayerIds = previousVisibleSurfaceLayerIds;
             reportSnapshotHideHydronicHeatings = previousHideHydronicHeatings;
+            reportSnapshotVisibleHydronicSurfacePositions = previousVisibleHydronicSurfacePositions;
             reportSnapshotFilterHeatingRoomObjects = previousFilterHeatingRoomObjects;
             reportSnapshotVisibleHeatingObjectTypes = previousVisibleHeatingObjectTypes;
             reportSnapshotInteriorRoomDimensionsOnly = previousInteriorRoomDimensionsOnly;
@@ -10278,6 +10305,7 @@ public final class CadWorkbench extends BorderPane {
             boolean restrictSurfaceLayers,
             Set<UUID> visibleSurfaceLayerIds,
             boolean includeHydronicHeating,
+            Set<HeatingSurfacePosition> visibleHydronicSurfacePositions,
             boolean includeDimensions,
             boolean includeAreaVolume,
             boolean interiorRoomDimensionsOnly,
@@ -10288,6 +10316,7 @@ public final class CadWorkbench extends BorderPane {
 
         private ReportSnapshotOptions {
             visibleSurfaceLayerIds = Set.copyOf(visibleSurfaceLayerIds);
+            visibleHydronicSurfacePositions = Set.copyOf(visibleHydronicSurfacePositions);
             visibleHeatingObjectTypes = Set.copyOf(visibleHeatingObjectTypes);
             if (renderScale < 1.0) {
                 throw new IllegalArgumentException("renderScale muss mindestens 1 sein.");
@@ -10295,7 +10324,7 @@ public final class CadWorkbench extends BorderPane {
         }
 
         private static ReportSnapshotOptions defaults() {
-            return new ReportSnapshotOptions(false, Set.of(), true, true, true, false, false, Set.of(), 1.0);
+            return new ReportSnapshotOptions(false, Set.of(), true, Set.of(), true, true, false, false, Set.of(), 1.0);
         }
 
         private ReportSnapshotOptions hideHeatingRoomObjects() {
@@ -10307,6 +10336,7 @@ public final class CadWorkbench extends BorderPane {
                     restrictSurfaceLayers,
                     visibleSurfaceLayerIds,
                     includeHydronicHeating,
+                    visibleHydronicSurfacePositions,
                     includeDimensions,
                     includeAreaVolume,
                     interiorRoomDimensionsOnly,
@@ -10321,6 +10351,7 @@ public final class CadWorkbench extends BorderPane {
                     restrictSurfaceLayers,
                     visibleSurfaceLayerIds,
                     includeHydronicHeating,
+                    visibleHydronicSurfacePositions,
                     includeDimensions,
                     includeAreaVolume,
                     interiorRoomDimensionsOnly,

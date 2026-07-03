@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -2674,6 +2675,112 @@ class CadWorkbenchTest {
     }
 
     @Test
+    void reportGrundrissBlendetHeizkreiseAusUndHeizflaecheZeigtSie() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.showAreaVolume.set(false);
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3_900, 2_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            HeatingZone zone = HeatingZone.create("Heizkreis 1", List.of(
+                    new PlanPoint(600, 600),
+                    new PlanPoint(3_400, 600),
+                    new PlanPoint(3_400, 2_400),
+                    new PlanPoint(600, 2_400)
+            ), HeatingLayoutPattern.MEANDER);
+            HydronicHeating heating = HydronicHeating.create(
+                    room.id(),
+                    HeatingSurfacePosition.FLOOR,
+                    HeatingLayoutPattern.MEANDER,
+                    Length.ofMillimeters(250),
+                    Length.ofMillimeters(16),
+                    Length.ofMillimeters(80_000),
+                    Length.ofMillimeters(100),
+                    new PlanPoint(900, 700),
+                    new PlanPoint(1_150, 700)
+            ).withZones(List.of(zone));
+            instanz.project.primaryLevel().addHydronicHeating(heating);
+            return instanz;
+        });
+
+        WritableImage grundriss = aufFxThread(() -> workbench.reportLevelSnapshot("Erdgeschoss"));
+        WritableImage heizflaeche = aufFxThread(() -> workbench.reportLevelSnapshot("Erdgeschoss", Set.of(), true));
+
+        int grundrissHeizpixel = countHeatingColorPixels(grundriss);
+        int heizflaechenPixel = countHeatingColorPixels(heizflaeche);
+        Assertions.assertTrue(heizflaechenPixel > grundrissHeizpixel * 20,
+                "Die Heizflächen-Seite enthält keine sichtbaren Heizkreise: " + grundrissHeizpixel + " / " + heizflaechenPixel);
+    }
+
+    @Test
+    void reportHeizflaecheFiltertHydronischeHeizkreiseNachFlaeche() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.showAreaVolume.set(false);
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(5_900, 3_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            instanz.project.primaryLevel().addHydronicHeating(hydronicHeatingForReportTest(
+                    room,
+                    HeatingSurfacePosition.FLOOR,
+                    "FBH 1",
+                    new PlanPoint(600, 600),
+                    new PlanPoint(2_600, 1_800)
+            ));
+            instanz.project.primaryLevel().addHydronicHeating(hydronicHeatingForReportTest(
+                    room,
+                    HeatingSurfacePosition.CEILING,
+                    "DH 1",
+                    new PlanPoint(3_100, 1_800),
+                    new PlanPoint(5_400, 3_300)
+            ));
+            return instanz;
+        });
+
+        WritableImage alleHeizkreise = aufFxThread(() -> workbench.reportLevelSnapshot("Erdgeschoss", Set.of(), true));
+        WritableImage fbh = aufFxThread(() -> workbench.reportLevelSnapshot(
+                "Erdgeschoss",
+                Set.of(),
+                true,
+                Set.of(),
+                Set.of(HeatingSurfacePosition.FLOOR)
+        ));
+        WritableImage dh = aufFxThread(() -> workbench.reportLevelSnapshot(
+                "Erdgeschoss",
+                Set.of(),
+                true,
+                Set.of(),
+                Set.of(HeatingSurfacePosition.CEILING)
+        ));
+
+        int allePixel = countHeatingColorPixels(alleHeizkreise);
+        int fbhPixel = countHeatingColorPixels(fbh);
+        int dhPixel = countHeatingColorPixels(dh);
+        Assertions.assertTrue(fbhPixel > 200, "FBH-Seite enthält keine sichtbaren Heizkreise.");
+        Assertions.assertTrue(dhPixel > 200, "DH-Seite enthält keine sichtbaren Heizkreise.");
+        Assertions.assertTrue(allePixel > fbhPixel + 200 && allePixel > dhPixel + 200,
+                "Gefilterte Heizflächen-Seiten enthalten weiterhin fremde Heizkreise: " + allePixel + " / " + fbhPixel + " / " + dhPixel);
+    }
+
+    @Test
     void variothermAussenschnittZeigtVolleKreiseAufDerInnenseite() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
@@ -3371,6 +3478,32 @@ class CadWorkbenchTest {
         return count;
     }
 
+    private HydronicHeating hydronicHeatingForReportTest(
+            Room room,
+            HeatingSurfacePosition surfacePosition,
+            String zoneName,
+            PlanPoint minPoint,
+            PlanPoint maxPoint
+    ) {
+        HeatingZone zone = HeatingZone.create(zoneName, List.of(
+                minPoint,
+                new PlanPoint(maxPoint.xMillimeters(), minPoint.yMillimeters()),
+                maxPoint,
+                new PlanPoint(minPoint.xMillimeters(), maxPoint.yMillimeters())
+        ), HeatingLayoutPattern.MEANDER);
+        return HydronicHeating.create(
+                room.id(),
+                surfacePosition,
+                HeatingLayoutPattern.MEANDER,
+                Length.ofMillimeters(250),
+                Length.ofMillimeters(16),
+                Length.ofMillimeters(80_000),
+                Length.ofMillimeters(100),
+                minPoint,
+                new PlanPoint(minPoint.xMillimeters() + 250, minPoint.yMillimeters())
+        ).withZones(List.of(zone));
+    }
+
     private int countHeatingCircuitPixels(
             WritableImage image,
             WorkbenchAutomationSnapshot snapshot,
@@ -3385,10 +3518,23 @@ class CadWorkbenchTest {
         for (int x = Math.max(0, minX); x <= Math.min((int) image.getWidth() - 1, maxX); x++) {
             for (int y = Math.max(0, minY); y <= Math.min((int) image.getHeight() - 1, maxY); y++) {
                 var color = image.getPixelReader().getColor(x, y);
-                boolean heatingRed = color.getRed() > color.getGreen() + 0.08
-                        && color.getRed() > color.getBlue() + 0.08;
-                boolean heatingBlue = color.getBlue() > color.getRed() + 0.08
-                        && color.getBlue() > color.getGreen() + 0.08;
+                boolean heatingRed = color.getRed() > 0.70 && color.getGreen() < 0.35 && color.getBlue() < 0.35;
+                boolean heatingBlue = color.getBlue() > 0.60 && color.getRed() < 0.35 && color.getGreen() < 0.50;
+                if (heatingRed || heatingBlue) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private int countHeatingColorPixels(WritableImage image) {
+        int count = 0;
+        for (int x = 0; x < image.getWidth(); x++) {
+            for (int y = 0; y < image.getHeight(); y++) {
+                var color = image.getPixelReader().getColor(x, y);
+                boolean heatingRed = color.getRed() > 0.70 && color.getGreen() < 0.35 && color.getBlue() < 0.35;
+                boolean heatingBlue = color.getBlue() > 0.60 && color.getRed() < 0.35 && color.getGreen() < 0.50;
                 if (heatingRed || heatingBlue) {
                     count++;
                 }

@@ -511,8 +511,18 @@ final class CadWorkbenchDocumentSupport {
             boolean includeHydronicHeating,
             Set<RoomObjectHeatingType> visibleHeatingObjectTypes
     ) throws Exception {
+        return captureFilteredLevelPlanImage(levelName, visibleLayerIds, includeHydronicHeating, visibleHeatingObjectTypes, Set.of());
+    }
+
+    private BufferedImage captureFilteredLevelPlanImage(
+            String levelName,
+            Set<java.util.UUID> visibleLayerIds,
+            boolean includeHydronicHeating,
+            Set<RoomObjectHeatingType> visibleHeatingObjectTypes,
+            Set<HeatingSurfacePosition> visibleHydronicSurfacePositions
+    ) throws Exception {
         return runOnFxThread(() -> SwingFXUtils.fromFXImage(
-                owner.reportLevelSnapshot(levelName, visibleLayerIds, includeHydronicHeating, visibleHeatingObjectTypes),
+                owner.reportLevelSnapshot(levelName, visibleLayerIds, includeHydronicHeating, visibleHeatingObjectTypes, visibleHydronicSurfacePositions),
                 null
         ));
     }
@@ -522,7 +532,8 @@ final class CadWorkbenchDocumentSupport {
                 capture.levelName(),
                 capture.visibleLayerIds(),
                 true,
-                capture.visibleHeatingObjectTypes()
+                capture.visibleHeatingObjectTypes(),
+                Set.of(capture.surfacePosition())
         );
     }
 
@@ -607,7 +618,13 @@ final class CadWorkbenchDocumentSupport {
             progress.update(completedSteps / (double) totalSteps, "Heizflächen " + capture.surfacePosition() + " – " + capture.levelName() + " werden gerastert");
             heatingPlanImages.put(
                     constructionDrawingHeatingImageKey(capture.levelName(), capture.surfacePosition()),
-                    captureFilteredLevelPlanImage(capture.levelName(), capture.visibleLayerIds(), false, capture.visibleHeatingObjectTypes())
+                    captureFilteredLevelPlanImage(
+                            capture.levelName(),
+                            capture.visibleLayerIds(),
+                            true,
+                            capture.visibleHeatingObjectTypes(),
+                            Set.of(capture.surfacePosition())
+                    )
             );
             completedSteps++;
         }

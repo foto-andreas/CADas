@@ -114,7 +114,7 @@ public final class SurfaceMaterialReportPdfService {
                                 ? Map.of()
                                 : exportAssets.levelPlanImages()
                 );
-                appendRasterGraphicPages(writer, report, exportAssets);
+                appendRasterOverviewAndMaterialPages(writer, report, exportAssets);
                 appendMaterialSummary(writer, report.materials());
                 appendHeatingPlans(writer, report.heatingPlans(), exportAssets);
                 appendHeatingElements(writer, report.heatingElements());
@@ -186,7 +186,7 @@ public final class SurfaceMaterialReportPdfService {
         writer.paragraph("Mietflächen nach WoFlV: ab 2 m volle Anrechnung, zwischen 1 m und 2 m halbe Anrechnung, darunter keine Anrechnung.");
     }
 
-    private void appendRasterGraphicPages(
+    private void appendRasterOverviewAndMaterialPages(
             PdfWriter writer,
             SurfaceMaterialListService.SurfaceMaterialReport report,
             ExportAssets exportAssets
@@ -197,13 +197,10 @@ public final class SurfaceMaterialReportPdfService {
         LinkedHashSet<String> levelNames = new LinkedHashSet<>();
         report.rooms().stream().map(SurfaceMaterialListService.RoomSummary::levelName).forEach(levelNames::add);
         levelNames.addAll(exportAssets.levelPlanImages().keySet());
-        exportAssets.heatingLevelImages().keySet().stream()
-                .map(SurfaceMaterialReportPdfService::heatingLevelName)
-                .forEach(levelNames::add);
         if (levelNames.isEmpty()) {
             return;
         }
-        writer.section("Rasterzeichnungen");
+        writer.section("Rasterzeichnungen Räume und Beläge");
         for (String levelName : levelNames) {
             BufferedImage levelPlanImage = exportAssets.levelPlanImages().get(levelName);
             if (levelPlanImage != null) {
@@ -218,22 +215,16 @@ public final class SurfaceMaterialReportPdfService {
                     writer.imagePage("Belag " + levelName + " / " + material.name(), materialImage);
                 }
             }
-            for (String surfacePosition : heatingSurfacePositions(report, exportAssets, levelName)) {
-                BufferedImage heatingImage = exportAssets.heatingLevelImages().get(heatingLevelImageKey(levelName, surfacePosition));
-                if (heatingImage != null) {
-                    writer.imagePage("Heizkreise " + levelName + " / " + surfacePosition, heatingImage);
-                }
-            }
         }
     }
 
     private List<String> heatingSurfacePositions(
-            SurfaceMaterialListService.SurfaceMaterialReport report,
+            List<SurfaceMaterialListService.HeatingPlanSummary> heatingPlans,
             ExportAssets exportAssets,
             String levelName
     ) {
         LinkedHashSet<String> surfacePositions = new LinkedHashSet<>();
-        report.heatingPlans().stream()
+        heatingPlans.stream()
                 .filter(plan -> plan.levelName().equals(levelName))
                 .map(SurfaceMaterialListService.HeatingPlanSummary::surfacePosition)
                 .filter(surfacePosition -> exportAssets.heatingLevelImages().containsKey(heatingLevelImageKey(levelName, surfacePosition)))
@@ -360,6 +351,7 @@ public final class SurfaceMaterialReportPdfService {
                         .toList()
         );
         if (exportAssets.heatingPlanGraphicVariant() == HeatingPlanGraphicVariant.RASTERGRAFIK) {
+            appendRasterHeatingPlanPages(writer, heatingPlans, exportAssets);
             return;
         }
         writer.subsection("Heizplan-Grafiken");
@@ -379,6 +371,30 @@ public final class SurfaceMaterialReportPdfService {
                 writer.svgBlock(title, first.svg(), HEATING_PLAN_MAX_HEIGHT);
             } else {
                 writer.paragraph(title + ": Keine Raumgrafik verfügbar.");
+            }
+        }
+    }
+
+    private void appendRasterHeatingPlanPages(
+            PdfWriter writer,
+            List<SurfaceMaterialListService.HeatingPlanSummary> heatingPlans,
+            ExportAssets exportAssets
+    ) throws IOException {
+        LinkedHashSet<String> levelNames = new LinkedHashSet<>();
+        heatingPlans.stream().map(SurfaceMaterialListService.HeatingPlanSummary::levelName).forEach(levelNames::add);
+        exportAssets.heatingLevelImages().keySet().stream()
+                .map(SurfaceMaterialReportPdfService::heatingLevelName)
+                .forEach(levelNames::add);
+        if (levelNames.isEmpty()) {
+            return;
+        }
+        writer.subsection("Heizflächen-Grafiken");
+        for (String levelName : levelNames) {
+            for (String surfacePosition : heatingSurfacePositions(heatingPlans, exportAssets, levelName)) {
+                BufferedImage heatingImage = exportAssets.heatingLevelImages().get(heatingLevelImageKey(levelName, surfacePosition));
+                if (heatingImage != null) {
+                    writer.imagePage("Heizflächen " + surfacePosition + " - " + levelName, heatingImage);
+                }
             }
         }
     }

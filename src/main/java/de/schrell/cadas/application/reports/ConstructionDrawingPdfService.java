@@ -251,6 +251,7 @@ public final class ConstructionDrawingPdfService {
                     continue;
                 }
                 level.roomObjects().stream()
+                        .filter(RoomObject::visible)
                         .filter(roomObject -> roomObject.id().toString().equals(summary.objectId()))
                         .findFirst()
                         .ifPresent(roomObject -> entries.add(new HeatingElementEntry(room, roomObject)));
@@ -349,7 +350,7 @@ public final class ConstructionDrawingPdfService {
                 drawOpening(canvas, viewport, wall, window.offsetFromStart().toMillimeters(), window.width().toMillimeters(), new Color(30, 105, 155));
             }
             for (RoomObject roomObject : level.roomObjects()) {
-                if (roomObject.visible()) {
+                if (roomObject.visible() && !isHeatingRoomObject(roomObject)) {
                     drawRoomObject(canvas, viewport, roomObject);
                 }
             }
@@ -480,6 +481,10 @@ public final class ConstructionDrawingPdfService {
         canvas.text(x - 2.2, y - 2.3, 6.0f, label);
     }
 
+    private boolean isHeatingRoomObject(RoomObject roomObject) {
+        return roomObject.heatOutputWatts() > 0.0 && roomObject.heatingType().isHeated();
+    }
+
     private void addHeatingElementsPage(
             PDDocument document,
             ProjectModel project,
@@ -570,6 +575,7 @@ public final class ConstructionDrawingPdfService {
                     continue;
                 }
                 level.roomObjects().stream()
+                        .filter(RoomObject::visible)
                         .filter(roomObject -> roomObject.id().toString().equals(summary.objectId()))
                         .findFirst()
                         .ifPresent(roomObject -> entries.add(new HeatingElementEntry(room, roomObject)));
