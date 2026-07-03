@@ -53,10 +53,10 @@ import javafx.stage.Window;
  */
 final class CadWorkbenchDocumentSupport {
 
-    private final CadWorkbench owner;
+    private final CadWorkbenchBase owner;
     private final SurfaceMaterialReportPdfService surfaceMaterialReportPdfService = new SurfaceMaterialReportPdfService();
 
-    CadWorkbenchDocumentSupport(CadWorkbench owner) {
+    CadWorkbenchDocumentSupport(CadWorkbenchBase owner) {
         this.owner = owner;
     }
 
