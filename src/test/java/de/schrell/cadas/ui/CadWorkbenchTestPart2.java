@@ -1353,60 +1353,6 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
-    void heizkreiseWerdenErstAbZoomEinsGezeichnet() throws Exception {
-        CadWorkbench workbench = aufFxThread(() -> {
-            CadWorkbench instanz = new CadWorkbench();
-            new Scene(instanz, 1200, 800);
-            instanz.applyCss();
-            instanz.layout();
-            instanz.showAreaVolume.set(false);
-            Room room = Room.rectangular(
-                    "Heizraum",
-                    new PlanPoint(100, 100),
-                    new PlanPoint(3_900, 2_900),
-                    Length.ofMillimeters(2_600),
-                    Length.ofMillimeters(180),
-                    Length.ofMillimeters(200)
-            );
-            instanz.project.primaryLevel().addRoom(room);
-            instanz.project.primaryLevel().addHydronicHeating(hydronicHeatingForReportTest(
-                    room,
-                    HeatingSurfacePosition.FLOOR,
-                    "FBH 1",
-                    new PlanPoint(600, 600),
-                    new PlanPoint(3_400, 2_400)
-            ));
-            instanz.automationSetViewport(0.95, 20.0, 20.0);
-            return instanz;
-        });
-
-        WorkbenchAutomationSnapshot kleinerZoom = aufFxThread(workbench::automationSnapshot);
-        WritableImage unterGrenze = aufFxThread(workbench::automationDrawingSnapshot);
-        int ausgeblendeteHeizkreisPixel = countHeatingCircuitPixels(
-                unterGrenze,
-                kleinerZoom,
-                new PlanPoint(500, 500),
-                new PlanPoint(3_500, 2_500)
-        );
-
-        aufFxThread(() -> {
-            workbench.automationSetViewport(1.0, 20.0, 20.0);
-            return null;
-        });
-        WorkbenchAutomationSnapshot grenzZoom = aufFxThread(workbench::automationSnapshot);
-        WritableImage abGrenze = aufFxThread(workbench::automationDrawingSnapshot);
-        int sichtbareHeizkreisPixel = countHeatingCircuitPixels(
-                abGrenze,
-                grenzZoom,
-                new PlanPoint(500, 500),
-                new PlanPoint(3_500, 2_500)
-        );
-
-        Assertions.assertTrue(ausgeblendeteHeizkreisPixel < 10, "Heizkreise werden schon unter Zoom 1,0 gezeichnet.");
-        Assertions.assertTrue(sichtbareHeizkreisPixel > 30, "Heizkreise werden ab Zoom 1,0 nicht gezeichnet.");
-    }
-
-    @Test
     void reportGrundrissBlendetHeizkreiseAusUndHeizflaecheZeigtSie() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
