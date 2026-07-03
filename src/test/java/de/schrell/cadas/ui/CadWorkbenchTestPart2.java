@@ -1220,6 +1220,68 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
+    void variothermKreiseWerdenAbZoomEinsGezeichnet() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.showAreaVolume.set(false);
+            Room room = Room.rectangular(
+                    "Heizraum",
+                    new PlanPoint(100, 100),
+                    new PlanPoint(3_900, 2_900),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instanz.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Variotherm",
+                    Length.of(18, LengthUnit.MILLIMETER),
+                    Length.of(60, LengthUnit.CENTIMETER),
+                    Length.of(100, LengthUnit.CENTIMETER),
+                    SurfaceLayoutMode.FIXED,
+                    Length.zero(),
+                    Length.zero(),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.of(10, LengthUnit.CENTIMETER),
+                    Length.zero(),
+                    SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE
+            ));
+            instanz.project.primaryLevel().addSurfaceLayerStack(stack);
+            instanz.automationSetViewport(0.95, 20.0, 20.0);
+            return instanz;
+        });
+
+        WorkbenchAutomationSnapshot kleinerZoom = aufFxThread(workbench::automationSnapshot);
+        WritableImage unterGrenze = aufFxThread(workbench::automationDrawingSnapshot);
+        int ausgeblendeteKreisPixel = countVariothermCirclePixels(
+                unterGrenze,
+                kleinerZoom,
+                new PlanPoint(200, 200),
+                new PlanPoint(3_600, 2_500)
+        );
+
+        aufFxThread(() -> {
+            workbench.automationSetViewport(1.0, 20.0, 20.0);
+            return null;
+        });
+        WorkbenchAutomationSnapshot grenzZoom = aufFxThread(workbench::automationSnapshot);
+        WritableImage abGrenze = aufFxThread(workbench::automationDrawingSnapshot);
+        int sichtbareKreisPixel = countVariothermCirclePixels(
+                abGrenze,
+                grenzZoom,
+                new PlanPoint(200, 200),
+                new PlanPoint(3_600, 2_500)
+        );
+
+        Assertions.assertTrue(ausgeblendeteKreisPixel < 10, "Variotherm-Kreise werden schon unter Zoom 1,0 gezeichnet.");
+        Assertions.assertTrue(sichtbareKreisPixel > 40, "Variotherm-Kreise werden ab Zoom 1,0 nicht gezeichnet.");
+    }
+
+    @Test
     void selektierterHeizkreisZeigtDarunterliegendeVariothermKreise() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

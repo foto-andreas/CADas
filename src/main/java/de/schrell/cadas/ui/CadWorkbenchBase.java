@@ -238,7 +238,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     static final Length SNAP_TOLERANCE = Length.of(12, LengthUnit.CENTIMETER);
     static final double POINTER_SELECTION_TOLERANCE_PIXELS = 8.0;
     static final double DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS = 50.0;
-    static final double VARIOTHERM_DETAIL_MIN_SCREEN_SPACING = 28.0;
+    static final double VARIOTHERM_DETAIL_MIN_SCREEN_SPACING = 10.0;
     static final int LENGTH_INPUT_DECIMALS = 3;
     static final Font DIMENSION_LABEL_FONT = Font.font("Menlo", 12);
     static final Font ROUTING_COMMAND_FONT = Font.font("Serif", 14);
