@@ -7,6 +7,8 @@ import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.startsAtMaxim
 import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.startsAtMaximumY;
 import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.surfaceLayoutRotatedQuarterTurn;
 import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.surfaceLayoutSelectionDirection;
+import static de.schrell.cadas.ui.CadWorkbenchCoveringSourceSupport.extractDwgBlockName;
+import static de.schrell.cadas.ui.CadWorkbenchCoveringSourceSupport.formatCoveringSourceLabel;
 
 import de.schrell.cadas.application.drawing.DraftingConstraints;
 import de.schrell.cadas.application.drawing.DraftingService;
@@ -7911,49 +7913,11 @@ public final class CadWorkbench extends BorderPane {
                 .map(DwgBlockDefinition::sourceFile)
                 .or(() -> Optional.ofNullable(surfacePresetSelector.getValue())
                 .map(SurfaceCoveringPreset::coveringSource)
-                .flatMap(this::extractDwgLibraryPath))
+                .flatMap(CadWorkbenchCoveringSourceSupport::extractDwgLibraryPath))
                 .or(() -> cadLibraryReferences.stream()
                         .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".dwg"))
                         .findFirst())
                 .map(path -> path.toAbsolutePath().normalize());
-    }
-
-    private Optional<Path> extractDwgLibraryPath(String coveringSource) {
-        if (coveringSource == null || coveringSource.isBlank()) {
-            return Optional.empty();
-        }
-        String pathPart = coveringSource.contains("#")
-                ? coveringSource.substring(0, coveringSource.indexOf('#'))
-                : coveringSource;
-        if (!pathPart.toLowerCase(Locale.ROOT).endsWith(".dwg")) {
-            return Optional.empty();
-        }
-        return Optional.of(Path.of(pathPart));
-    }
-
-    private Optional<String> extractDwgBlockName(String coveringSource) {
-        if (coveringSource == null || !coveringSource.contains("#")) {
-            return Optional.empty();
-        }
-        return Optional.of(coveringSource.substring(coveringSource.indexOf('#') + 1));
-    }
-
-    private String formatCoveringSourceLabel(String coveringSource) {
-        if (coveringSource == null || coveringSource.isBlank()) {
-            return "";
-        }
-        Optional<Path> dwgPath = extractDwgLibraryPath(coveringSource);
-        if (dwgPath.isPresent()) {
-            String fileName = dwgPath.get().getFileName().toString();
-            return extractDwgBlockName(coveringSource)
-                    .map(blockName -> fileName + " → " + blockName)
-                    .orElse(fileName);
-        }
-        if (coveringSource.toLowerCase(Locale.ROOT).endsWith(".cadasbelag")) {
-            String fileName = Path.of(coveringSource).getFileName().toString();
-            return "Eigenes Preset: " + fileName.substring(0, fileName.length() - ".cadasbelag".length());
-        }
-        return coveringSource;
     }
 
     private Optional<SurfaceLayer> selectedSurfaceLayer() {
