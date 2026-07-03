@@ -203,7 +203,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.transform.Transform;
-import javafx.scene.web.WebView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -648,7 +647,7 @@ public final class CadWorkbench extends BorderPane {
                         new KeyCodeCombination(KeyCode.ESCAPE),
                         this::clearSelection
                 );
-                newScene.getAccelerators().put(new KeyCodeCombination(KeyCode.F1), this::showHelpWindow);
+                newScene.getAccelerators().put(new KeyCodeCombination(KeyCode.F1), documentSupport::showHelpWindow);
                 newScene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleGlobalShortcuts);
                 newScene.addEventFilter(KeyEvent.KEY_PRESSED, this::updateModifierState);
                 newScene.addEventFilter(KeyEvent.KEY_RELEASED, this::updateModifierState);
@@ -1306,21 +1305,21 @@ public final class CadWorkbench extends BorderPane {
 
         Menu berichteMenu = new Menu("Berichte");
         berichteMenu.getItems().addAll(
-                menuItem("Bauzeichnung als PDF exportieren", this::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
-                menuItem("Bauzeichnung als PDF exportieren (Rastergrafik)", this::exportConstructionDrawingPdfRaster, null),
-                menuItem("Räume und Materialien anzeigen", this::showSurfaceMaterialReportWindow, null),
-                menuItem("Räume und Materialien als PDF exportieren (SVG-Heizpläne)", this::exportSurfaceMaterialReportPdf, null),
-                menuItem("Räume und Materialien als PDF exportieren (Rastergrafik)", this::exportSurfaceMaterialReportPdfRaster, null),
-                menuItem("Räume und Materialien als MD exportieren", this::exportSurfaceMaterialReportMarkdown, null)
+                menuItem("Bauzeichnung als PDF exportieren", documentSupport::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
+                menuItem("Bauzeichnung als PDF exportieren (Rastergrafik)", documentSupport::exportConstructionDrawingPdfRaster, null),
+                menuItem("Räume und Materialien anzeigen", documentSupport::showSurfaceMaterialReportWindow, null),
+                menuItem("Räume und Materialien als PDF exportieren (SVG-Heizpläne)", documentSupport::exportSurfaceMaterialReportPdf, null),
+                menuItem("Räume und Materialien als PDF exportieren (Rastergrafik)", documentSupport::exportSurfaceMaterialReportPdfRaster, null),
+                menuItem("Räume und Materialien als MD exportieren", documentSupport::exportSurfaceMaterialReportMarkdown, null)
         );
 
         Menu hilfeMenu = new Menu("Hilfe");
         hilfeMenu.getItems().addAll(
                 menuItem("Über CADas", this::showAboutDialog, null),
                 new SeparatorMenuItem(),
-                menuItem("Benutzerdokumentation", this::showHelpWindow, new KeyCodeCombination(KeyCode.F1)),
-                menuItem("Keymap und Mausbedienung", this::showKeymapWindow, null),
-                menuItem("Drittanbieter-Lizenzen", this::showThirdPartyLicensesWindow, null)
+                menuItem("Benutzerdokumentation", documentSupport::showHelpWindow, new KeyCodeCombination(KeyCode.F1)),
+                menuItem("Keymap und Mausbedienung", documentSupport::showKeymapWindow, null),
+                menuItem("Drittanbieter-Lizenzen", documentSupport::showThirdPartyLicensesWindow, null)
         );
 
         MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu, berichteMenu, hilfeMenu);
@@ -6330,68 +6329,8 @@ public final class CadWorkbench extends BorderPane {
         }
     }
 
-    private void showSurfaceMaterialReportWindow() {
-        documentSupport.showSurfaceMaterialReportWindow();
-    }
-
-    private void exportConstructionDrawingPdf() {
-        documentSupport.exportConstructionDrawingPdf();
-    }
-
-    private void exportConstructionDrawingPdfRaster() {
-        documentSupport.exportConstructionDrawingPdfRaster();
-    }
-
-    private void showHelpWindow() {
-        documentSupport.showHelpWindow();
-    }
-
-    private void showKeymapWindow() {
-        documentSupport.showKeymapWindow();
-    }
-
-    private void showThirdPartyLicensesWindow() {
-        documentSupport.showThirdPartyLicensesWindow();
-    }
-
     public void showAboutDialog() {
         documentSupport.showAboutDialog();
-    }
-
-    private void showMarkdownWindow(String markdown, String windowTitle, String documentName, String printTooltip) {
-        documentSupport.showMarkdownWindow(markdown, windowTitle, documentName, printTooltip);
-    }
-
-    private void findInWebView(WebView view, String searchText, boolean backwards) {
-        documentSupport.findInWebView(view, searchText, backwards);
-    }
-
-    private void printSurfaceMaterialReport(WebView reportView) {
-        documentSupport.printSurfaceMaterialReport(reportView);
-    }
-
-    private void printWebView(WebView reportView, String documentName) {
-        documentSupport.printWebView(reportView, documentName);
-    }
-
-    private void exportSurfaceMaterialReportMarkdown() {
-        documentSupport.exportSurfaceMaterialReportMarkdown();
-    }
-
-    private void exportSurfaceMaterialReportMarkdown(Path targetFile) {
-        documentSupport.exportSurfaceMaterialReportMarkdown(targetFile);
-    }
-
-    private void exportSurfaceMaterialReportPdf() {
-        documentSupport.exportSurfaceMaterialReportPdf();
-    }
-
-    private void exportSurfaceMaterialReportPdfRaster() {
-        documentSupport.exportSurfaceMaterialReportPdfRaster();
-    }
-
-    private void exportSurfaceMaterialReportPdf(Path targetFile) {
-        documentSupport.exportSurfaceMaterialReportPdf(targetFile);
     }
 
     private void importLevel() {
@@ -10706,8 +10645,8 @@ public final class CadWorkbench extends BorderPane {
             case "importProjectDxf" -> importProjectFromDxf(requirePath(path, actionName));
             case "exportLevelDxf" -> exportCurrentLevel(requirePath(path, actionName));
             case "importLevelDxf" -> importLevel(requirePath(path, actionName));
-            case "exportSurfaceMaterialReportMarkdown" -> exportSurfaceMaterialReportMarkdown(requirePath(path, actionName));
-            case "exportSurfaceMaterialReportPdf" -> exportSurfaceMaterialReportPdf(requirePath(path, actionName));
+            case "exportSurfaceMaterialReportMarkdown" -> documentSupport.exportSurfaceMaterialReportMarkdown(requirePath(path, actionName));
+            case "exportSurfaceMaterialReportPdf" -> documentSupport.exportSurfaceMaterialReportPdf(requirePath(path, actionName));
             case "importPartLibrary" -> importPartLibrary(requirePath(path, actionName));
             case "exportWorkbenchSnapshot" -> exportWorkbenchSnapshot(requirePath(path, actionName));
             case "exportThreeDSnapshot" -> runPreparedThreeDAction(false, () -> threeDViewport.exportSnapshot(requirePath(path, actionName)));
