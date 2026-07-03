@@ -298,11 +298,92 @@ final class CadWorkbenchDocumentSupport {
     void exportSurfaceMaterialReportMarkdown(SurfaceMaterialReport report, Path targetFile) {
         try {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".md");
-            Files.writeString(exportPath, report.toMarkdown());
+            SurfaceMaterialReportPdfService.ExportAssets exportAssets = createExportAssets(
+                    report,
+                    SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK,
+                    (progress, message) -> {
+                    }
+            );
+            Path imageDirectory = exportPath.resolveSibling(markdownImageDirectoryName(exportPath));
+            Files.createDirectories(imageDirectory);
+            Files.writeString(exportPath, rasterMarkdown(report, exportAssets, imageDirectory));
             owner.draftLabel.setText("Materialliste exportiert: " + exportPath.getFileName());
         } catch (Exception exception) {
             owner.showOperationException("Materiallisten-Export fehlgeschlagen", exception);
         }
+    }
+
+    private String rasterMarkdown(
+            SurfaceMaterialReport report,
+            SurfaceMaterialReportPdfService.ExportAssets exportAssets,
+            Path imageDirectory
+    ) throws Exception {
+        StringBuilder markdown = new StringBuilder(report.toDisplayMarkdown());
+        String imageDirectoryName = imageDirectory.getFileName().toString();
+        markdown.append("\n## Rastergrafiken\n\n");
+        appendImageLinks(markdown, "Etagenübersichten", exportAssets.levelPlanImages(), imageDirectory, imageDirectoryName, "Etage");
+        appendMaterialLevelImageLinks(markdown, report, exportAssets, imageDirectory, imageDirectoryName);
+        appendImageLinks(markdown, "Heizflächen", exportAssets.heatingLevelImages(), imageDirectory, imageDirectoryName, "Heizfläche");
+        return markdown.toString();
+    }
+
+    private void appendMaterialLevelImageLinks(
+            StringBuilder markdown,
+            SurfaceMaterialReport report,
+            SurfaceMaterialReportPdfService.ExportAssets exportAssets,
+            Path imageDirectory,
+            String imageDirectoryName
+    ) throws Exception {
+        Map<String, BufferedImage> images = new LinkedHashMap<>();
+        for (SurfaceMaterialListService.MaterialSummary material : report.materials()) {
+            for (String levelName : exportAssets.levelPlanImages().keySet()) {
+                BufferedImage image = exportAssets.materialLevelImages().get(
+                        SurfaceMaterialReportPdfService.materialLevelImageKey(material, levelName)
+                );
+                if (image != null) {
+                    images.put(levelName + " / " + material.name(), image);
+                }
+            }
+        }
+        appendImageLinks(markdown, "Beläge", images, imageDirectory, imageDirectoryName, "Belag");
+    }
+
+    private void appendImageLinks(
+            StringBuilder markdown,
+            String title,
+            Map<String, BufferedImage> images,
+            Path imageDirectory,
+            String imageDirectoryName,
+            String filePrefix
+    ) throws Exception {
+        if (images.isEmpty()) {
+            return;
+        }
+        markdown.append("### ").append(title).append("\n\n");
+        int index = 1;
+        for (Map.Entry<String, BufferedImage> entry : images.entrySet()) {
+            String label = filePrefix + " " + entry.getKey();
+            String fileName = safeFileName(filePrefix + "_" + index + "_" + entry.getKey()) + ".png";
+            Path imagePath = imageDirectory.resolve(fileName);
+            javax.imageio.ImageIO.write(entry.getValue(), "png", imagePath.toFile());
+            markdown.append("![").append(label).append("](")
+                    .append(imageDirectoryName).append("/")
+                    .append(fileName)
+                    .append(")\n\n");
+            index++;
+        }
+    }
+
+    private String markdownImageDirectoryName(Path exportPath) {
+        String fileName = exportPath.getFileName().toString();
+        int extensionIndex = fileName.lastIndexOf('.');
+        String baseName = extensionIndex < 0 ? fileName : fileName.substring(0, extensionIndex);
+        return safeFileName(baseName) + "_Rasterbilder";
+    }
+
+    private String safeFileName(String rawName) {
+        String safeName = rawName.replaceAll("[^\\p{L}\\p{N}._-]+", "_");
+        return safeName.isBlank() ? "bild" : safeName;
     }
 
     void exportSurfaceMaterialReportPdf() {

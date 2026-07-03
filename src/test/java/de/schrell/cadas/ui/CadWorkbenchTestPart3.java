@@ -533,6 +533,14 @@ abstract class CadWorkbenchTestPart3 extends CadWorkbenchTestPart2 {
         Assertions.assertTrue(markdown.contains("Fliese"));
         Assertions.assertTrue(markdown.contains("Komplexität pro Raum und Fläche"));
         Assertions.assertTrue(markdown.contains("Schnitte"));
+        Assertions.assertTrue(markdown.contains("## Rastergrafiken"));
+        Assertions.assertTrue(markdown.contains("![Etage"));
+        Assertions.assertFalse(markdown.contains("<svg"));
+        Path rasterbilder = normalisierterPfad.getParent().resolve("material_Rasterbilder");
+        Assertions.assertTrue(Files.isDirectory(rasterbilder));
+        try (var bilder = Files.list(rasterbilder)) {
+            Assertions.assertTrue(bilder.anyMatch(path -> path.getFileName().toString().endsWith(".png")));
+        }
         Assertions.assertFalse(Files.exists(exportPfad));
     }
 
