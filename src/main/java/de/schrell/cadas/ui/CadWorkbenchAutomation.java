@@ -412,6 +412,8 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
         boolean previousFilterHeatingRoomObjects = reportSnapshotFilterHeatingRoomObjects;
         Set<RoomObjectHeatingType> previousVisibleHeatingObjectTypes = reportSnapshotVisibleHeatingObjectTypes;
         boolean previousInteriorRoomDimensionsOnly = reportSnapshotInteriorRoomDimensionsOnly;
+        boolean previousShowGrid = showGrid.get();
+        boolean previousShowGuides = showGuides.get();
         boolean previousShowDimensions = showDimensions.get();
         boolean previousShowAreaVolume = showAreaVolume.get();
         boolean previousShowHeatingCircuits = showHeatingCircuits.get();
@@ -426,6 +428,8 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
             reportSnapshotFilterHeatingRoomObjects = options.filterHeatingRoomObjects();
             reportSnapshotVisibleHeatingObjectTypes = Set.copyOf(options.visibleHeatingObjectTypes());
             reportSnapshotInteriorRoomDimensionsOnly = options.interiorRoomDimensionsOnly();
+            showGrid.set(false);
+            showGuides.set(false);
             showDimensions.set(options.includeDimensions());
             showAreaVolume.set(options.includeAreaVolume());
             showHeatingCircuits.set(options.includeHydronicHeating());
@@ -459,6 +463,8 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
             reportSnapshotFilterHeatingRoomObjects = previousFilterHeatingRoomObjects;
             reportSnapshotVisibleHeatingObjectTypes = previousVisibleHeatingObjectTypes;
             reportSnapshotInteriorRoomDimensionsOnly = previousInteriorRoomDimensionsOnly;
+            showGrid.set(previousShowGrid);
+            showGuides.set(previousShowGuides);
             showDimensions.set(previousShowDimensions);
             showAreaVolume.set(previousShowAreaVolume);
             showHeatingCircuits.set(previousShowHeatingCircuits);

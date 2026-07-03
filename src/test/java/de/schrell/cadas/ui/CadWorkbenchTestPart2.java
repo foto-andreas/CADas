@@ -659,6 +659,33 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
+    void pdfSnapshotsBlendenZeichenrasterUndHilfslinienAus() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            setBooleanProperty(instanz, "showCompass", false);
+            instanz.automationPlaceGuide("VERTICAL", 0);
+            instanz.automationPlaceGuide("HORIZONTAL", 0);
+            return instanz;
+        });
+
+        WritableImage normaleAnsicht = aufFxThread(workbench::automationDrawingSnapshot);
+        WritableImage pdfSnapshot = aufFxThread(() -> workbench.reportLevelSnapshot("Erdgeschoss"));
+
+        int normaleHilfspixel = countNonBackgroundPixels(normaleAnsicht, 0, 180, (int) normaleAnsicht.getWidth() - 1, (int) normaleAnsicht.getHeight() - 1);
+        int pdfHilfspixel = countNonBackgroundPixels(pdfSnapshot, 0, 180, (int) pdfSnapshot.getWidth() - 1, (int) pdfSnapshot.getHeight() - 1);
+
+        Assertions.assertTrue(normaleHilfspixel > 200,
+                "Die normale Ansicht muss Zeichen-Raster und Hilfslinien weiter anzeigen, Pixel: " + normaleHilfspixel);
+        Assertions.assertEquals(0, pdfHilfspixel,
+                "PDF-Snapshots dürfen kein Zeichen-Raster und keine Hilfslinien enthalten.");
+        Assertions.assertTrue(aufFxThread(() -> workbench.showGrid.get() && workbench.showGuides.get()),
+                "Die Anzeigeoptionen müssen nach dem PDF-Snapshot wiederhergestellt sein.");
+    }
+
+    @Test
     void materiallistenRasterUebersichtNutztDoppelteAufloesungUndStelltCanvasWiederHer() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
