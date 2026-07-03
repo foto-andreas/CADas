@@ -274,7 +274,11 @@ public final class SurfaceRectangleTileLayoutService {
                         clippedX,
                         clippedY,
                         remainingWidth,
-                        remainingHeight
+                        remainingHeight,
+                        x,
+                        y,
+                        tileWidth,
+                        tileHeight
                 ));
             }
         }
@@ -299,7 +303,18 @@ public final class SurfaceRectangleTileLayoutService {
                     continue;
                 }
                 piecesByTile.computeIfAbsent(new TileKey(tile.column(), tile.row()), ignored -> new ArrayList<>())
-                        .add(new PlacedSurfaceTile(tile.column(), tile.row(), clippedX, clippedY, clippedWidth, clippedHeight));
+                        .add(new PlacedSurfaceTile(
+                                tile.column(),
+                                tile.row(),
+                                clippedX,
+                                clippedY,
+                                clippedWidth,
+                                clippedHeight,
+                                tile.fullX(),
+                                tile.fullY(),
+                                tile.fullWidth(),
+                                tile.fullHeight()
+                        ));
             }
         }
         List<PlacedSurfaceTile> mergedTiles = new ArrayList<>();
@@ -347,7 +362,10 @@ public final class SurfaceRectangleTileLayoutService {
             if (sameValue(firstMaxY, second.y()) || sameValue(secondMaxY, first.y())) {
                 double minY = Math.min(first.y(), second.y());
                 double maxY = Math.max(firstMaxY, secondMaxY);
-                return new PlacedSurfaceTile(first.column(), first.row(), first.x(), minY, first.width(), maxY - minY);
+                return new PlacedSurfaceTile(
+                        first.column(), first.row(), first.x(), minY, first.width(), maxY - minY,
+                        first.fullX(), first.fullY(), first.fullWidth(), first.fullHeight()
+                );
             }
         }
         if (sameValue(first.y(), second.y()) && sameValue(first.height(), second.height())) {
@@ -356,7 +374,10 @@ public final class SurfaceRectangleTileLayoutService {
             if (sameValue(firstMaxX, second.x()) || sameValue(secondMaxX, first.x())) {
                 double minX = Math.min(first.x(), second.x());
                 double maxX = Math.max(firstMaxX, secondMaxX);
-                return new PlacedSurfaceTile(first.column(), first.row(), minX, first.y(), maxX - minX, first.height());
+                return new PlacedSurfaceTile(
+                        first.column(), first.row(), minX, first.y(), maxX - minX, first.height(),
+                        first.fullX(), first.fullY(), first.fullWidth(), first.fullHeight()
+                );
             }
         }
         return null;
@@ -472,8 +493,15 @@ public final class SurfaceRectangleTileLayoutService {
             double x,
             double y,
             double width,
-            double height
+            double height,
+            double fullX,
+            double fullY,
+            double fullWidth,
+            double fullHeight
     ) {
+        public PlacedSurfaceTile(int column, int row, double x, double y, double width, double height) {
+            this(column, row, x, y, width, height, x, y, width, height);
+        }
     }
 
     private record TileKey(int column, int row) {
@@ -526,7 +554,20 @@ public final class SurfaceRectangleTileLayoutService {
             for (PlacedSurfaceTile tile : tiles) {
                 double restoredX = mirrorX ? minX + maxX - tile.x() - tile.width() : tile.x();
                 double restoredY = mirrorY ? minY + maxY - tile.y() - tile.height() : tile.y();
-                restored.add(new PlacedSurfaceTile(tile.column(), tile.row(), restoredX, restoredY, tile.width(), tile.height()));
+                double restoredFullX = mirrorX ? minX + maxX - tile.fullX() - tile.fullWidth() : tile.fullX();
+                double restoredFullY = mirrorY ? minY + maxY - tile.fullY() - tile.fullHeight() : tile.fullY();
+                restored.add(new PlacedSurfaceTile(
+                        tile.column(),
+                        tile.row(),
+                        restoredX,
+                        restoredY,
+                        tile.width(),
+                        tile.height(),
+                        restoredFullX,
+                        restoredFullY,
+                        tile.fullWidth(),
+                        tile.fullHeight()
+                ));
             }
             return List.copyOf(restored);
         }
@@ -563,7 +604,11 @@ public final class SurfaceRectangleTileLayoutService {
                         minX + (tile.y() - minY),
                         minY + (tile.x() - minX),
                         tile.height(),
-                        tile.width()
+                        tile.width(),
+                        minX + (tile.fullY() - minY),
+                        minY + (tile.fullX() - minX),
+                        tile.fullHeight(),
+                        tile.fullWidth()
                 ));
             }
             return List.copyOf(restored);

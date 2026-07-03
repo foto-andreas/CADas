@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.heating;
 
+import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.FloorOpening;
@@ -9,9 +10,17 @@ import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
+import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.Staircase;
+import de.schrell.cadas.domain.model.SurfaceCutRestriction;
+import de.schrell.cadas.domain.model.SurfaceLayer;
+import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
+import de.schrell.cadas.domain.model.SurfaceLayoutMode;
+import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
+import de.schrell.cadas.domain.model.SurfaceType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -274,6 +283,44 @@ class HydronicHeatingLayoutServiceTest {
 
         assertTrue(svg.contains("patternUnits=\"userSpaceOnUse\" x=\"50.000\" y=\"50.000\""),
                 "Pattern-Offset muss das globale Raster erhalten: " + svg);
+    }
+
+    @Test
+    void verankertVariothermSvgAnVerlegtenPlatten() {
+        Room room = Room.rectangular(
+                "Bad",
+                new PlanPoint(100, 100),
+                new PlanPoint(950, 1_100),
+                Length.ofMillimeters(2_500),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200)
+        );
+        Level level = new Level("Erdgeschoss");
+        level.addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        stack.addLayer(SurfaceLayer.create(
+                "Variotherm",
+                Length.ofMillimeters(18),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(1_000),
+                SurfaceLayoutMode.FIXED,
+                Length.zero(),
+                Length.zero(),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(100),
+                Length.zero(),
+                SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
+                SurfaceCoveringPresetService.VARIOTHERM_DRY_PANEL_SOURCE
+        ).withLayoutOrientation(SurfaceLayoutRotation.DEGREES_0, SurfaceLayoutDirection.RIGHT_TO_LEFT));
+        level.addSurfaceLayerStack(stack);
+        HydronicHeating heating = heating(room, HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL, 300_000)
+                .withZones(List.of(HeatingZone.create("Heizkreis 1", room.outline(), HeatingLayoutPattern.SPIRAL)));
+
+        String svg = service.toSvg(level, room, heating, List.of(), List.of());
+
+        assertTrue(svg.contains("id=\"variotherm-rinne-"));
+        assertTrue(svg.contains("patternUnits=\"userSpaceOnUse\" x=\"-150.000\""),
+                "Rinnenmuster muss an der ganzen Grundplatte statt am sichtbaren Zuschnitt starten: " + svg);
     }
 
     @Test

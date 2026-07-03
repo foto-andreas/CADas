@@ -134,6 +134,36 @@ class SurfaceRectangleTileLayoutServiceTest {
     }
 
     @Test
+    void merktSichGrundplatteBeiZuschnitten() {
+        List<CellRectangle> rectangles = List.of(new CellRectangle(100.0, 950.0, 100.0, 1_100.0));
+        SurfaceLayer layer = SurfaceLayer.create(
+                "Variotherm",
+                Length.ofMillimeters(18),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(1_000),
+                SurfaceLayoutMode.FIXED,
+                Length.zero(),
+                Length.zero(),
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(100),
+                Length.zero(),
+                SurfaceCutRestriction.LAY_DIRECTION_OUTER_CUTS,
+                "Test"
+        ).withLayoutOrientation(SurfaceLayoutRotation.DEGREES_0, SurfaceLayoutDirection.RIGHT_TO_LEFT);
+
+        SurfaceRectangleTileLayoutService.PlacedSurfaceTile zuschnitt = service.tilesForRectangles(rectangles, layer).stream()
+                .filter(tile -> Math.abs(tile.x() - 100.0) < 0.001)
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(250.0, zuschnitt.width(), 0.001);
+        assertEquals(-250.0, zuschnitt.fullX(), 0.001);
+        assertEquals(0.0, Math.abs(zuschnitt.fullY() - zuschnitt.y()) % 100.0, 0.001);
+        assertEquals(600.0, zuschnitt.fullWidth(), 0.001);
+        assertEquals(1_000.0, zuschnitt.fullHeight(), 0.001);
+    }
+
+    @Test
     void richtetDenDachgeschossFlurAusKirepAmSchmalenFlurarmAus() throws Exception {
         Level level = new DxfProjectExchangeService()
                 .importProject(Path.of("KIREP.cadas"), "KIREP")
