@@ -600,6 +600,28 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
         int oben = countCompassPixels(image, -12, -25, 12, -5);
 
         Assertions.assertTrue(rechts > oben, "Nordwinkel 90° richtet den Kompass nicht sofort nach rechts aus.");
+        Assertions.assertEquals(90.0, workbench.project.northAngle().degrees(), 0.001);
+    }
+
+    @Test
+    void dateiladenÜbernimmtGespeicherteNordrichtungInsFeld() throws Exception {
+        Path projektDatei = Files.createTempFile("cadas-nordrichtung-", ".cadas");
+        ProjectModel project = ProjectModel.withDefaultLevel("Nordhaus", "Erdgeschoss");
+        project.defineNorthAngle(de.schrell.cadas.domain.geometry.Angle.ofDegrees(135));
+        new DxfProjectExchangeService().exportProject(project, projektDatei);
+
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetErrorDialogsEnabled(false);
+            instanz.automationInvoke("importProjectDxf", projektDatei);
+            return instanz;
+        });
+
+        Assertions.assertEquals(135.0, aufFxThread(workbench::currentNorthAngleDegrees), 0.001);
+        Assertions.assertEquals(135.0, aufFxThread(() -> workbench.project.northAngle().degrees()), 0.001);
     }
 
     private int countCompassPixels(WritableImage image, int minDx, int minDy, int maxDx, int maxDy) {

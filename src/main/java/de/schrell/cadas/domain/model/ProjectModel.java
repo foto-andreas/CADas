@@ -1,5 +1,7 @@
 package de.schrell.cadas.domain.model;
 
+import de.schrell.cadas.domain.geometry.Angle;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -10,6 +12,7 @@ public final class ProjectModel {
     private final List<Level> levels = new ArrayList<>();
     private Roof roof;
     private Terrain terrain = Terrain.empty();
+    private Angle northAngle = Angle.ofDegrees(0.0);
 
     private ProjectModel(String name, List<Level> initialLevels) {
         this.name = Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -97,6 +100,14 @@ public final class ProjectModel {
         this.terrain = Objects.requireNonNull(terrain, "terrain darf nicht null sein.");
     }
 
+    public Angle northAngle() {
+        return northAngle;
+    }
+
+    public void defineNorthAngle(Angle northAngle) {
+        this.northAngle = Objects.requireNonNull(northAngle, "northAngle darf nicht null sein.");
+    }
+
     public ProjectModel copy() {
         ProjectModel copy = new ProjectModel(name, List.of());
         levels.stream()
@@ -104,6 +115,7 @@ public final class ProjectModel {
                 .forEach(copy.levels::add);
         copy.roof = roof;
         copy.terrain = terrain;
+        copy.northAngle = northAngle;
         return copy;
     }
 
@@ -116,12 +128,14 @@ public final class ProjectModel {
                 .forEach(levels::add);
         roof = snapshot.roof;
         terrain = snapshot.terrain;
+        northAngle = snapshot.northAngle;
     }
 
     public Level resetToSingleLevel(String levelName) {
         levels.clear();
         roof = null;
         terrain = Terrain.empty();
+        northAngle = Angle.ofDegrees(0.0);
         Level level = new Level(levelName);
         levels.add(level);
         return level;

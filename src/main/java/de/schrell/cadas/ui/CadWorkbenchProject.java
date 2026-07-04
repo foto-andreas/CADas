@@ -440,7 +440,9 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     }
 
     double currentNorthAngleDegrees() {
-        return parseAngle(northAngleField).map(Angle::degrees).orElse(0.0);
+        return parseAngle(northAngleField)
+                .orElse(project.northAngle())
+                .degrees();
     }
 
     void updateStatus() {
@@ -1237,6 +1239,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             ProjectModel importedProject = projectExchangeService.importProject(sourceFile, projectName);
             importedProject.levels().forEach(level -> level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults())));
             project.replaceWith(importedProject);
+            syncNorthAngleFieldFromProject();
             availableLevels.setAll(project.levels());
             guideLines.clear();
             clearSelectionsInternal();

@@ -73,6 +73,11 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         );
         appendMetadataText(dxf, context, new PlanPoint(0, 0), DxfMetadataCodec.CURRENT_MARKER);
         appendMetadataText(dxf, context, new PlanPoint(0, 0), "PROJECT|" + DxfMetadataCodec.encode(project.name()));
+        appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
+                Locale.US,
+                "NORTH|%.3f",
+                project.northAngle().degrees()
+        ));
 
         for (Level level : project.levels()) {
             String layerPrefix = sanitizeLayerName(level.name());
@@ -129,6 +134,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         Roof importedRoof = null;
         List<TerrainVertex> importedTerrainVertices = new ArrayList<>();
         Length importedTerrainWidth = Terrain.defaultDisplayWidth();
+        Angle importedNorthAngle = Angle.ofDegrees(0.0);
         boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadata);
         boolean objectRotationDegrees = DxfMetadataCodec.usesObjectRotationDegrees(metadata);
         for (String entry : metadata) {
@@ -139,6 +145,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
             try {
                 switch (parts[0]) {
                     case "PROJECT" -> importedProjectName = stripDxfExtension(DxfMetadataCodec.decode(parts[1], encodedFields));
+                    case "NORTH" -> importedNorthAngle = Angle.ofDegrees(parseDouble(parts[1]));
                     case "LEVEL" -> levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
                     case "TERRAIN_SETTINGS" -> importedTerrainWidth = Length.ofMillimeters(parseDouble(parts[1]));
                     case "TERRAIN" -> importedTerrainVertices.add(new TerrainVertex(
@@ -319,10 +326,13 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         addHydronicHeatings(levels, pendingHeatingsByLevel, pendingHeatingZones);
 
         if (levels.isEmpty()) {
-            return ProjectModel.withDefaultLevel(importedProjectName, "Erdgeschoss");
+            ProjectModel project = ProjectModel.withDefaultLevel(importedProjectName, "Erdgeschoss");
+            project.defineNorthAngle(importedNorthAngle);
+            return project;
         }
         List<Level> importedLevels = new ArrayList<>(levels.values());
         ProjectModel project = ProjectModel.withDefaultLevel(importedProjectName, importedLevels.getFirst().name());
+        project.defineNorthAngle(importedNorthAngle);
         copyLevelContents(importedLevels.getFirst(), project.primaryLevel());
         for (int index = 1; index < importedLevels.size(); index++) {
             project.addLevel(importedLevels.get(index).copy());

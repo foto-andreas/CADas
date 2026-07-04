@@ -259,7 +259,10 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         registerRenderListener(showGuideDistances);
         registerRenderListener(snapToGuides);
         registerRenderListener(snapToWalls);
-        northAngleField.textProperty().addListener((ignored, oldValue, newValue) -> render());
+        northAngleField.textProperty().addListener((ignored, oldValue, newValue) -> {
+            applyNorthAngleField();
+            render();
+        });
         showRoomObjects.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.setRoomObjectsVisible(newValue);
             markThreeDDirty();
@@ -334,6 +337,28 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         statusBar.setAlignment(Pos.CENTER_LEFT);
         statusBar.setStyle("-fx-font-size: 12px; -fx-text-fill: #2f2a24;");
         setBottom(statusBar);
+    }
+
+    void applyNorthAngleField() {
+        String text = northAngleField.getText();
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        try {
+            Angle angle = Angle.ofDegrees(Double.parseDouble(text.replace(',', '.')));
+            if (Math.abs(angle.degrees() - project.northAngle().degrees()) <= 0.0001) {
+                return;
+            }
+            project.defineNorthAngle(angle);
+            currentChangeRevision = nextChangeRevision++;
+            applicationExitConfirmed = false;
+            updateActionButtons();
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    void syncNorthAngleFieldFromProject() {
+        northAngleField.setText(String.format(Locale.GERMAN, "%.2f", project.northAngle().degrees()));
     }
 
     ToolBar buildSettingsBar() {

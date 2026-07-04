@@ -637,27 +637,31 @@ public final class ConstructionDrawingPdfService {
                 double y = MARGIN + TITLE_HEIGHT + (1 - index / 2) * (PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT) / 2.0;
                 double width = (PAGE_WIDTH - 2 * MARGIN) / 2.0 - 12.0;
                 double height = (PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT) / 2.0 - 18.0;
-                drawSpatialView(canvas, project, angles[index], isometric, x, y, width, height);
+                drawSpatialView(canvas, project, viewAngleForNorth(project, angles[index]), angles[index], isometric, x, y, width, height);
             }
         }
     }
 
-    private void drawSpatialView(PageCanvas canvas, ProjectModel project, double angleDegrees, boolean isometric,
+    static double viewAngleForNorth(ProjectModel project, double angleDegrees) {
+        return normalizeAngle(angleDegrees + project.northAngle().degrees());
+    }
+
+    private void drawSpatialView(PageCanvas canvas, ProjectModel project, double viewAngleDegrees, double labelAngleDegrees, boolean isometric,
                                  double x, double y, double width, double height) throws IOException {
-        BufferedImage renderedImage = renderSpatialViewImage(project, angleDegrees, isometric, width, height).orElse(null);
+        BufferedImage renderedImage = renderSpatialViewImage(project, viewAngleDegrees, isometric, width, height).orElse(null);
         if (renderedImage != null) {
-            canvas.text(x + 4, y + height - 12, 8.5f, spatialViewGraphicLabel(angleDegrees, isometric));
+            canvas.text(x + 4, y + height - 12, 8.5f, spatialViewGraphicLabel(labelAngleDegrees, isometric));
             drawFittedImage(canvas, renderedImage, x + 2, y + 8, width - 4, height - 24);
             drawOverallDimension(canvas, x + 12, y + 8, x + width - 12, y + 8, "grafische 3D-Ansicht");
             return;
         }
-        List<SpatialLine> lines = spatialLines(project, angleDegrees, isometric);
+        List<SpatialLine> lines = spatialLines(project, viewAngleDegrees, isometric);
         Bounds projected = lineBounds(lines).expanded(200.0);
         int scale = chooseScale(projected.width(), projected.height(), width, height - 20.0);
         double factor = POINTS_PER_MILLIMETER / scale;
         double centerX = x + width / 2.0;
         double centerY = y + height / 2.0;
-        canvas.text(x + 4, y + height - 12, 8.5f, spatialViewFallbackLabel(angleDegrees, isometric, scale));
+        canvas.text(x + 4, y + height - 12, 8.5f, spatialViewFallbackLabel(labelAngleDegrees, isometric, scale));
         for (SpatialLine line : lines) {
             canvas.line(centerX + (line.x1() - projected.centerX()) * factor,
                     centerY + (line.y1() - projected.centerY()) * factor,
@@ -747,8 +751,14 @@ public final class ConstructionDrawingPdfService {
             viewport.automationOrbit(angleDegrees - 45.0, 0.0);
             return;
         }
-        viewport.applyViewPreset(sideViewPreset(angleDegrees));
+        viewport.applyViewPreset(ThreeDViewPreset.FRONT);
+        viewport.automationOrbit(-angleDegrees, 0.0);
         viewport.setProjectionMode(ProjectionMode.ORTHOGRAPHIC);
+    }
+
+    private static double normalizeAngle(double angleDegrees) {
+        double normalized = angleDegrees % 360.0;
+        return normalized < 0.0 ? normalized + 360.0 : normalized;
     }
 
     private void drawFittedImage(
@@ -803,15 +813,6 @@ public final class ConstructionDrawingPdfService {
             graphics.dispose();
         }
         return trimmed;
-    }
-
-    private ThreeDViewPreset sideViewPreset(double angleDegrees) {
-        return switch ((int) Math.round(angleDegrees)) {
-            case 90 -> ThreeDViewPreset.RIGHT;
-            case 180 -> ThreeDViewPreset.BACK;
-            case 270 -> ThreeDViewPreset.LEFT;
-            default -> ThreeDViewPreset.FRONT;
-        };
     }
 
     private static void ensureJavaFxStarted() {

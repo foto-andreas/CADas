@@ -394,6 +394,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
         }
         rememberStateForUndo();
         Level level = project.resetToSingleLevel("Erdgeschoss");
+        syncNorthAngleFieldFromProject();
         availableLevels.setAll(project.levels());
         guideLines.clear();
         clearSelectionsInternal();
@@ -451,6 +452,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
 
     void restoreSnapshot(WorkbenchSnapshot snapshot) {
         project.replaceWith(snapshot.project());
+        syncNorthAngleFieldFromProject();
         project.levels().forEach(level -> level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults())));
         availableLevels.setAll(project.levels());
         guideLines.setAll(snapshot.guideLines());

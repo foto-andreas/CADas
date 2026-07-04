@@ -1006,6 +1006,7 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
     void clearProjectWithoutDialog() {
         rememberStateForUndo();
         Level level = project.resetToSingleLevel("Erdgeschoss");
+        syncNorthAngleFieldFromProject();
         availableLevels.setAll(project.levels());
         guideLines.clear();
         clearSelectionsInternal();

@@ -360,6 +360,15 @@ class ConstructionDrawingPdfServiceTest {
     }
 
     @Test
+    void räumlichePdfAnsichtenBerücksichtigenNordrichtung() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Nordhaus", "Erdgeschoss");
+        project.defineNorthAngle(de.schrell.cadas.domain.geometry.Angle.ofDegrees(90));
+
+        assertEquals(90.0, ConstructionDrawingPdfService.viewAngleForNorth(project, 0), 0.001);
+        assertEquals(0.0, ConstructionDrawingPdfService.viewAngleForNorth(project, 270), 0.001);
+    }
+
+    @Test
     void meldetExportfortschrittMitAbschnittsbezeichnungen() throws Exception {
         ProjectModel project = sampleProject();
         Path target = tempDir.resolve("bauzeichnung_progress.pdf");
