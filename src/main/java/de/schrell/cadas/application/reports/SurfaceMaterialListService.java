@@ -673,6 +673,7 @@ public final class SurfaceMaterialListService {
     private static final class CoverageAccumulator {
 
         private final SurfaceLayer layer;
+        private final TileLayoutService tileLayoutService = new TileLayoutService();
         private final List<CutPiece> cutPieces = new ArrayList<>();
         private int placedPieceCount;
         private int fullPieceCount;
@@ -780,7 +781,7 @@ public final class SurfaceMaterialListService {
             if (rectangle.widthMillimeters() <= EPSILON || rectangle.heightMillimeters() <= EPSILON || tileWidth <= EPSILON || tileHeight <= EPSILON) {
                 return;
             }
-            List<TilePlacement> placements = new TileLayoutService().fillSurface(new TileLayoutRequest(
+            List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
                     Length.ofMillimeters(rectangle.widthMillimeters()),
                     Length.ofMillimeters(rectangle.heightMillimeters()),
                     layer.effectiveTileWidth(),
