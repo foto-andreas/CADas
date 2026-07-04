@@ -38,7 +38,9 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -76,6 +78,87 @@ final class CadWorkbenchDocumentSupport {
                 },
                 content -> showSurfaceMaterialReportWindow(content.report(), content.renderedHtml())
         );
+    }
+
+    void showHeatingLoadWindow() {
+        GridPane grid = new GridPane();
+        grid.setHgap(10.0);
+        grid.setVgap(8.0);
+        grid.addRow(0, new Label("Etage"), new Label("Raum"), new Label("Heizlast W"));
+        List<HeatingLoadField> fields = new ArrayList<>();
+        int rowIndex = 1;
+        for (Level level : owner.project.levels()) {
+            for (Room room : level.rooms()) {
+                TextField field = new TextField(formatWatts(room.heatLoadWatts()));
+                field.setPrefColumnCount(8);
+                owner.applyTooltip(field, "Legt die Heizlast dieses Raums in Watt fest. Leere Eingaben werden als 0 W gespeichert.");
+                grid.addRow(rowIndex, new Label(level.name()), new Label(room.name()), field);
+                fields.add(new HeatingLoadField(level, room, field));
+                rowIndex++;
+            }
+        }
+        if (fields.isEmpty()) {
+            grid.add(new Label("Keine Räume vorhanden."), 0, rowIndex, 3, 1);
+        }
+        ScrollPane scrollPane = new ScrollPane(grid);
+        scrollPane.setFitToWidth(true);
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+        Button saveButton = new Button("Speichern");
+        owner.applyTooltip(saveButton, "Speichert die eingetragenen Heizlasten in Watt im aktuellen Projekt.");
+        Button closeButton = new Button("Schließen");
+        owner.applyTooltip(closeButton, "Schließt das Fenster ohne weitere Änderungen.");
+        HBox actions = new HBox(8.0, saveButton, closeButton);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        VBox container = new VBox(10.0, scrollPane, actions);
+        container.setPadding(new Insets(12));
+        Stage stage = new Stage();
+        stage.setTitle("Heizlast");
+        Window ownerWindow = owner.currentWindow();
+        if (ownerWindow != null) {
+            stage.initOwner(ownerWindow);
+        }
+        saveButton.setOnAction(event -> saveHeatingLoads(fields, stage));
+        closeButton.setOnAction(event -> stage.close());
+        stage.setScene(new Scene(container, 620, 520));
+        stage.show();
+    }
+
+    private void saveHeatingLoads(List<HeatingLoadField> fields, Stage stage) {
+        Map<java.util.UUID, Double> loadsByRoomId = new LinkedHashMap<>();
+        for (HeatingLoadField field : fields) {
+            try {
+                double value = parseWatts(field.field().getText());
+                loadsByRoomId.put(field.room().id(), value);
+            } catch (IllegalArgumentException exception) {
+                owner.draftLabel.setText("Heizlast für " + field.room().name() + " ist ungültig.");
+                field.field().requestFocus();
+                return;
+            }
+        }
+        owner.rememberStateForUndo();
+        for (Level level : owner.project.levels()) {
+            level.replaceRooms(level.rooms().stream()
+                    .map(room -> room.withHeatLoadWatts(loadsByRoomId.getOrDefault(room.id(), room.heatLoadWatts())))
+                    .toList());
+        }
+        owner.render();
+        owner.draftLabel.setText("Heizlasten gespeichert.");
+        stage.close();
+    }
+
+    private double parseWatts(String text) {
+        if (text == null || text.isBlank()) {
+            return 0.0;
+        }
+        double value = Double.parseDouble(text.replace(',', '.').trim());
+        if (value < 0.0 || !Double.isFinite(value)) {
+            throw new IllegalArgumentException("Heizlast ungültig.");
+        }
+        return value;
+    }
+
+    private String formatWatts(double watts) {
+        return watts == 0.0 ? "" : String.format(java.util.Locale.GERMAN, "%.0f", watts);
     }
 
     private void showSurfaceMaterialReportWindow(SurfaceMaterialReport report, String renderedHtml) {
@@ -752,6 +835,9 @@ final class CadWorkbenchDocumentSupport {
     }
 
     private record MaterialReportWindowContent(SurfaceMaterialReport report, String renderedHtml) {
+    }
+
+    private record HeatingLoadField(Level level, Room room, TextField field) {
     }
 
     private record MaterialLevelCapture(
