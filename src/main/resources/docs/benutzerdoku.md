@@ -307,7 +307,7 @@ Die aktuelle Version besitzt einen Projektverlauf für fachliche Bearbeitungssch
 
 ### Bauzeichnung als PDF
 
-Die PDF-Bauzeichnung enthält für jede Etage einen eigenen 2D-Grundriss. Für jede beheizte Etage folgen zusätzliche Heizplanseiten; Fußboden und Decke werden dabei getrennt ausgegeben. Gemeinsame 3D- und orthogonale Seitenansichten zeigen jeweils das gesamte Gebäude mit allen Etagen. Bei langgestreckten oder diagonalen Grundrissen begrenzt CADas den Tiefenversatz der räumlichen Projektion automatisch relativ zur Geschosshöhe. Dadurch bleiben Bauteile derselben Etage als zusammengehörige Ebene erkennbar und werden nicht optisch zu zusätzlichen Geschossen verschoben.
+Die PDF-Bauzeichnung enthält für jede Etage einen eigenen 2D-Grundriss. Für jede beheizte Etage folgen zusätzliche Heizplanseiten; Fußboden und Decke werden dabei getrennt ausgegeben. Gemeinsame 3D- und orthogonale Seitenansichten zeigen jeweils das gesamte Gebäude mit allen Etagen. Die Seitenansichten richten sich nach der gespeicherten Vorderseite des Gebäudes und zeigen die passende Himmelsrichtung aus dem Nordwinkel. Bei langgestreckten oder diagonalen Grundrissen begrenzt CADas den Tiefenversatz der räumlichen Projektion automatisch relativ zur Geschosshöhe. Dadurch bleiben Bauteile derselben Etage als zusammengehörige Ebene erkennbar und werden nicht optisch zu zusätzlichen Geschossen verschoben.
 
 ## Tastaturkürzel
 
@@ -344,7 +344,7 @@ Die sechs orthogonalen Ansichten werden oberhalb der Zeichenfläche über feste 
 * `→` dreht das Modell aus der aktuellen Sicht nach rechts.
 
 Die Umschaltung wirkt auf die 2D-Projektion und auf die Kompassdarstellung. Besonders bei `Oben` ist der Nordwinkel relevant.
-Die 3D-Kamera bleibt davon bewusst unabhängig und wird über die 3D-Bedienelemente gesteuert.
+Die 3D-Kamera richtet `Vorne`, `Hinten`, `Links` und `Rechts` an der gespeicherten Vorderseite des Gebäudes aus. Wähle dazu im Werkzeug `Bearbeiten` genau eine Wand aus und setze im Kontextmenü `Diese Wand als Vorderseite setzen`.
 
 ## Zwischen 2D, 3D und Innenansicht umschalten
 
@@ -484,6 +484,7 @@ Eigene Beläge werden unter `~/.config/CADas/Belag` gespeichert und beim Start a
 Zusätzlich zu Belägen enthält die Liste jetzt:
 
 * Raumwärmesummen je Etage und Raum aus `FBH`, `DH`, `Flächenheizung`, `Heizelementen` und `Gesamtwärme`
+* die eingetragene `Heizlast`, vorhandene Heizungen, Leistung und Überschuss oder Fehlbetrag
 * einzelne beheizte Raumobjekte mit `Heizart` und Wärmeleistung
 * je Heizkreis die zugehörigen Raum-Summen
 
@@ -503,6 +504,8 @@ Die Komplexität steigt bei vielen Schnitten und kurzen Kanten. Lange Schnittkan
 Die Berechnung nutzt Reststücke desselben Materials weiter, bevor ein neues Werkstück angeschnitten wird. Wenn mehrere Reststücke passen, wird das Reststück mit dem geringsten Verschnitt bevorzugt.
 
 Im Materiallistenfenster druckst du die gerenderte Ansicht über `Drucken`. Über `Berichte` > `Materialliste Beläge als Markdown exportieren` oder den Export-Knopf im Fenster speicherst du dieselbe Liste als `.md`-Datei.
+
+Über `Berichte` > `Heizlast` öffnest du eine Tabelle aller Räume. Dort trägst du die Heizlast je Raum in Watt ein und speicherst sie im Projekt.
 
 ### Objekt
 
