@@ -7,6 +7,7 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Wall;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -55,14 +56,9 @@ class ThreeDViewportTest {
         Assertions.assertNotNull(viewport);
     }
 
-    private static <T> T aufFxThread(FxSupplier<T> supplier) throws ExecutionException, InterruptedException {
-        FutureTask<T> task = new FutureTask<>(supplier::get);
+    private static <T> T aufFxThread(Callable<T> supplier) throws ExecutionException, InterruptedException {
+        FutureTask<T> task = new FutureTask<>(supplier);
         Platform.runLater(task);
         return task.get();
-    }
-
-    @FunctionalInterface
-    private interface FxSupplier<T> {
-        T get();
     }
 }

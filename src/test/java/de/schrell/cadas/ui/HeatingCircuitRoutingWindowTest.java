@@ -8,6 +8,7 @@ import de.schrell.cadas.domain.model.HeatingRoutingLanguage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -283,8 +284,8 @@ class HeatingCircuitRoutingWindowTest {
         return HeatingRoutingLanguage.normalizeCommands(legacyCommands);
     }
 
-    private static <T> T aufFxThread(FxCallable<T> aufgabe) throws Exception {
-        FutureTask<T> task = new FutureTask<>(aufgabe::call);
+    private static <T> T aufFxThread(Callable<T> aufgabe) throws Exception {
+        FutureTask<T> task = new FutureTask<>(aufgabe);
         if (Platform.isFxApplicationThread()) {
             task.run();
         } else {
@@ -304,8 +305,4 @@ class HeatingCircuitRoutingWindowTest {
         }
     }
 
-    @FunctionalInterface
-    private interface FxCallable<T> {
-        T call() throws Exception;
-    }
 }

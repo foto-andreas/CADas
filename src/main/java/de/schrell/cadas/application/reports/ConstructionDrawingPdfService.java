@@ -57,6 +57,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -845,9 +846,9 @@ public final class ConstructionDrawingPdfService {
         }
     }
 
-    private <T> T runOnFxThread(FxSupplier<T> supplier) throws Exception {
+    private <T> T runOnFxThread(Callable<T> supplier) throws Exception {
         if (Platform.isFxApplicationThread()) {
-            return supplier.get();
+            return supplier.call();
         }
         ensureJavaFxStarted();
         CountDownLatch latch = new CountDownLatch(1);
@@ -855,7 +856,7 @@ public final class ConstructionDrawingPdfService {
         java.util.concurrent.atomic.AtomicReference<Exception> failure = new java.util.concurrent.atomic.AtomicReference<>();
         Platform.runLater(() -> {
             try {
-                result.set(supplier.get());
+                result.set(supplier.call());
             } catch (Exception exception) {
                 failure.set(exception);
             } finally {
@@ -1473,11 +1474,6 @@ public final class ConstructionDrawingPdfService {
         private SpatialLine(double x1, double y1, double x2, double y2, boolean top) {
             this(x1, y1, x2, y2, top, false);
         }
-    }
-
-    @FunctionalInterface
-    private interface FxSupplier<T> {
-        T get() throws Exception;
     }
 
     private static final class PageCanvas implements AutoCloseable {

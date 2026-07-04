@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -140,7 +141,7 @@ public final class AutomationBridgeServer {
         }
     }
 
-    private <T> T callOnFx(FxCallable<T> action) {
+    private <T> T callOnFx(Callable<T> action) {
         if (Platform.isFxApplicationThread()) {
             try {
                 return action.call();
@@ -273,11 +274,6 @@ public final class AutomationBridgeServer {
             }
         }
         return escaped.toString();
-    }
-
-    @FunctionalInterface
-    private interface FxCallable<T> {
-        T call() throws Exception;
     }
 
     @FunctionalInterface

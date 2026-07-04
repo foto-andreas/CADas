@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -838,11 +839,11 @@ final class CadWorkbenchDocumentSupport {
         dialog.showAndWait();
     }
 
-    private <T> T runOnFxThread(FxCallable<T> callable) throws Exception {
+    private <T> T runOnFxThread(Callable<T> callable) throws Exception {
         if (Platform.isFxApplicationThread()) {
             return callable.call();
         }
-        FutureTask<T> task = new FutureTask<>(callable::call);
+        FutureTask<T> task = new FutureTask<>(callable);
         Platform.runLater(task);
         try {
             return task.get();
@@ -881,11 +882,6 @@ final class CadWorkbenchDocumentSupport {
     @FunctionalInterface
     private interface BackgroundOperation<T> {
         T run(ProgressCallback progress) throws Exception;
-    }
-
-    @FunctionalInterface
-    private interface FxCallable<T> {
-        T call() throws Exception;
     }
 
     @FunctionalInterface

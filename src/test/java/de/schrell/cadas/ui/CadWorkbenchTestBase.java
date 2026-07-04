@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import javafx.application.Platform;
@@ -364,8 +365,8 @@ abstract class CadWorkbenchTestBase {
         return datei;
     }
 
-    static <T> T aufFxThread(FxCallable<T> aufgabe) throws Exception {
-        FutureTask<T> task = new FutureTask<>(aufgabe::call);
+    static <T> T aufFxThread(Callable<T> aufgabe) throws Exception {
+        FutureTask<T> task = new FutureTask<>(aufgabe);
         if (Platform.isFxApplicationThread()) {
             task.run();
         } else {
@@ -417,8 +418,4 @@ abstract class CadWorkbenchTestBase {
         throw new NoSuchFieldException(fieldName);
     }
 
-    @FunctionalInterface
-    interface FxCallable<T> {
-        T call() throws Exception;
-    }
 }
