@@ -7,6 +7,7 @@ import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskAction
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -284,29 +285,6 @@ fun snapshotAppImageName(): String {
     return if (artifactFileVersion().contains('-')) "CADas-${artifactFileVersion()}.app" else "CADas.app"
 }
 
-abstract class PrepareModulePathTask : DefaultTask() {
-
-    @get:InputDirectory
-    abstract val sourceDirectory: DirectoryProperty
-
-    @get:Input
-    abstract val excludedJarNames: ListProperty<String>
-
-    @get:OutputDirectory
-    abstract val targetDirectory: DirectoryProperty
-
-    @TaskAction
-    fun prepare() {
-        val target = targetDirectory.get().asFile
-        target.deleteRecursively()
-        target.mkdirs()
-        val excluded = excludedJarNames.get().toSet()
-        sourceDirectory.get().asFile
-            .listFiles { file -> file.isFile && file.extension == "jar" && file.name !in excluded }
-            ?.forEach { file -> file.copyTo(target.resolve(file.name)) }
-    }
-}
-
 abstract class JlinkRuntimeImageTask : DefaultTask() {
 
     @get:InputDirectory
@@ -521,10 +499,12 @@ val cleanMacOsPkg = tasks.register<Delete>("cleanMacOsPkg") {
 
 // Bereinigter Modulpfad für jlink: kopiert nur proper modules (echte Java-Module) aus dem
 // lib-Verzeichnis, sodass jlink keine automatic modules vorfindet.
-val prepareJlinkModulePath = tasks.register<PrepareModulePathTask>("prepareJlinkModulePath") {
-    sourceDirectory.set(installLibDirectory)
-    excludedJarNames.set(classpathJars)
-    targetDirectory.set(jlinkModulePath)
+val prepareJlinkModulePath = tasks.register<Sync>("prepareJlinkModulePath") {
+    from(installLibDirectory) {
+        include("*.jar")
+        exclude(classpathJars)
+    }
+    into(jlinkModulePath)
     mustRunAfter(tasks.installDist)
 }
 
@@ -600,20 +580,8 @@ val prepareMacOsAppImageForDmg = tasks.register<JpackageAppImageTask>("prepareMa
 // Phase 2: Beschreibbares DMG ausschließlich mit dem App-Bundle erzeugen.
 val dmgStagingDirectory = layout.buildDirectory.dir("installer/macos/dmg-staging").get().asFile
 
-fun deleteTreeWithoutFollowingLinks(directory: File) {
-    val root = directory.toPath()
-    if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
-        return
-    }
-    Files.walk(root).use { paths ->
-        paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists)
-    }
-}
-
-val cleanMacOsDmgStaging = tasks.register<DefaultTask>("cleanMacOsDmgStaging") {
-    doLast {
-        deleteTreeWithoutFollowingLinks(dmgStagingDirectory)
-    }
+val cleanMacOsDmgStaging = tasks.register<Delete>("cleanMacOsDmgStaging") {
+    delete(dmgStagingDirectory)
 }
 
 val stageDmgContent = tasks.register<DefaultTask>("stageDmgContent") {
