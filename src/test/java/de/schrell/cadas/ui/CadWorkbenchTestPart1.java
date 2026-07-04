@@ -277,6 +277,13 @@ abstract class CadWorkbenchTestPart1 extends CadWorkbenchTestBase {
         });
 
         Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems)
+                .contains("Diese Wand als Vorderseite setzen"));
+        aufFxThread(() -> {
+            workbench.automationInvokeSelectionContextMenuItem("Diese Wand als Vorderseite setzen");
+            return null;
+        });
+        Assertions.assertEquals(0.0, aufFxThread(() -> workbench.project.frontAngle().degrees()), 0.001);
+        Assertions.assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems)
                 .contains("Dachschräge aus Wand erzeugen …"));
     }
 

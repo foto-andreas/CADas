@@ -13,6 +13,7 @@ public final class ProjectModel {
     private Roof roof;
     private Terrain terrain = Terrain.empty();
     private Angle northAngle = Angle.ofDegrees(0.0);
+    private Angle frontAngle = Angle.ofDegrees(0.0);
 
     private ProjectModel(String name, List<Level> initialLevels) {
         this.name = Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -108,6 +109,14 @@ public final class ProjectModel {
         this.northAngle = Objects.requireNonNull(northAngle, "northAngle darf nicht null sein.");
     }
 
+    public Angle frontAngle() {
+        return frontAngle;
+    }
+
+    public void defineFrontAngle(Angle frontAngle) {
+        this.frontAngle = Objects.requireNonNull(frontAngle, "frontAngle darf nicht null sein.");
+    }
+
     public ProjectModel copy() {
         ProjectModel copy = new ProjectModel(name, List.of());
         levels.stream()
@@ -116,6 +125,7 @@ public final class ProjectModel {
         copy.roof = roof;
         copy.terrain = terrain;
         copy.northAngle = northAngle;
+        copy.frontAngle = frontAngle;
         return copy;
     }
 
@@ -129,6 +139,7 @@ public final class ProjectModel {
         roof = snapshot.roof;
         terrain = snapshot.terrain;
         northAngle = snapshot.northAngle;
+        frontAngle = snapshot.frontAngle;
     }
 
     public Level resetToSingleLevel(String levelName) {
@@ -136,6 +147,7 @@ public final class ProjectModel {
         roof = null;
         terrain = Terrain.empty();
         northAngle = Angle.ofDegrees(0.0);
+        frontAngle = Angle.ofDegrees(0.0);
         Level level = new Level(levelName);
         levels.add(level);
         return level;

@@ -52,6 +52,7 @@ class ProjectModelTest {
         model.createLevel("Obergeschoss");
         model.defineRoof(new Roof(RoofType.SADDLE, Angle.ofDegrees(38), Length.of(40, LengthUnit.CENTIMETER), true));
         model.defineNorthAngle(Angle.ofDegrees(90));
+        model.defineFrontAngle(Angle.ofDegrees(180));
 
         Level resetLevel = model.resetToSingleLevel("Neustart");
 
@@ -59,12 +60,14 @@ class ProjectModelTest {
         assertEquals("Neustart", resetLevel.name());
         assertFalse(model.roof().isPresent());
         assertEquals(0, model.northAngle().degrees(), 0.001);
+        assertEquals(0, model.frontAngle().degrees(), 0.001);
     }
 
     @Test
     void projektKannAusEinerMomentaufnahmeWiederhergestelltWerden() {
         ProjectModel model = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         model.defineNorthAngle(Angle.ofDegrees(37.5));
+        model.defineFrontAngle(Angle.ofDegrees(120.0));
         model.primaryLevel().addWall(Wall.create(
                 new PlanSegment(new PlanPoint(0, 0), new PlanPoint(2000, 0)),
                 Length.of(17.5, LengthUnit.CENTIMETER),
@@ -87,6 +90,7 @@ class ProjectModelTest {
         assertNotSame(snapshot.primaryLevel(), model.primaryLevel());
         assertEquals(3, model.terrain().vertices().size());
         assertEquals(37.5, model.northAngle().degrees(), 0.001);
+        assertEquals(120.0, model.frontAngle().degrees(), 0.001);
     }
 
     @Test
@@ -94,12 +98,14 @@ class ProjectModelTest {
         ProjectModel model = ProjectModel.withDefaultLevel("Alt", "Erdgeschoss");
         ProjectModel snapshot = ProjectModel.withDefaultLevel("Neu", "Import");
         snapshot.defineNorthAngle(Angle.ofDegrees(270));
+        snapshot.defineFrontAngle(Angle.ofDegrees(90));
 
         model.replaceWith(snapshot);
 
         assertEquals("Neu", model.name());
         assertEquals("Import", model.primaryLevel().name());
         assertEquals(270, model.northAngle().degrees(), 0.001);
+        assertEquals(90, model.frontAngle().degrees(), 0.001);
     }
 
     @Test

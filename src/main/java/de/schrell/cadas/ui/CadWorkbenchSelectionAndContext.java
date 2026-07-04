@@ -740,6 +740,11 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
         }
         if (selectedWalls().size() == 1) {
             selectionContextMenu.getItems().add(menuItem(
+                    "Diese Wand als Vorderseite setzen",
+                    this::setSelectedWallAsBuildingFront,
+                    null
+            ));
+            selectionContextMenu.getItems().add(menuItem(
                     "Dachschräge aus Wand erzeugen …",
                     this::createRoofSlopeFromSelectedWall,
                     null
@@ -767,6 +772,19 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
         return activeLevel.get().rooms().stream()
                 .filter(room -> room.id().toString().equals(contextMenuSelection.elementId()))
                 .findFirst();
+    }
+
+    void setSelectedWallAsBuildingFront() {
+        List<Wall> walls = selectedWalls();
+        if (walls.size() != 1) {
+            return;
+        }
+        rememberStateForUndo();
+        project.defineFrontAngle(walls.getFirst().axis().angle());
+        markThreeDDirty();
+        refreshThreeDIfNeeded();
+        render();
+        draftLabel.setText("Vorderseite auf ausgewählte Wand gesetzt.");
     }
 
     void setContextHeatingZonePattern(HeatingLayoutPattern pattern) {

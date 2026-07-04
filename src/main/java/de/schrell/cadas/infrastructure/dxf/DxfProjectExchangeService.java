@@ -78,6 +78,11 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 "NORTH|%.3f",
                 project.northAngle().degrees()
         ));
+        appendMetadataText(dxf, context, new PlanPoint(0, 0), String.format(
+                Locale.US,
+                "FRONT|%.3f",
+                project.frontAngle().degrees()
+        ));
 
         for (Level level : project.levels()) {
             String layerPrefix = sanitizeLayerName(level.name());
@@ -135,6 +140,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         List<TerrainVertex> importedTerrainVertices = new ArrayList<>();
         Length importedTerrainWidth = Terrain.defaultDisplayWidth();
         Angle importedNorthAngle = Angle.ofDegrees(0.0);
+        Angle importedFrontAngle = Angle.ofDegrees(0.0);
         boolean encodedFields = DxfMetadataCodec.usesCurrentEncoding(metadata);
         boolean objectRotationDegrees = DxfMetadataCodec.usesObjectRotationDegrees(metadata);
         for (String entry : metadata) {
@@ -146,6 +152,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                 switch (parts[0]) {
                     case "PROJECT" -> importedProjectName = stripDxfExtension(DxfMetadataCodec.decode(parts[1], encodedFields));
                     case "NORTH" -> importedNorthAngle = Angle.ofDegrees(parseDouble(parts[1]));
+                    case "FRONT" -> importedFrontAngle = Angle.ofDegrees(parseDouble(parts[1]));
                     case "LEVEL" -> levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
                     case "TERRAIN_SETTINGS" -> importedTerrainWidth = Length.ofMillimeters(parseDouble(parts[1]));
                     case "TERRAIN" -> importedTerrainVertices.add(new TerrainVertex(
@@ -328,11 +335,13 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         if (levels.isEmpty()) {
             ProjectModel project = ProjectModel.withDefaultLevel(importedProjectName, "Erdgeschoss");
             project.defineNorthAngle(importedNorthAngle);
+            project.defineFrontAngle(importedFrontAngle);
             return project;
         }
         List<Level> importedLevels = new ArrayList<>(levels.values());
         ProjectModel project = ProjectModel.withDefaultLevel(importedProjectName, importedLevels.getFirst().name());
         project.defineNorthAngle(importedNorthAngle);
+        project.defineFrontAngle(importedFrontAngle);
         copyLevelContents(importedLevels.getFirst(), project.primaryLevel());
         for (int index = 1; index < importedLevels.size(); index++) {
             project.addLevel(importedLevels.get(index).copy());

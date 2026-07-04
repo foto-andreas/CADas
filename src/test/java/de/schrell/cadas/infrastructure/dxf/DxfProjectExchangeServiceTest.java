@@ -149,6 +149,7 @@ class DxfProjectExchangeServiceTest {
         ));
         project.defineRoof(new Roof(RoofType.SADDLE, Angle.ofDegrees(38), Length.of(45, LengthUnit.CENTIMETER), true));
         project.defineNorthAngle(Angle.ofDegrees(123.5));
+        project.defineFrontAngle(Angle.ofDegrees(42.0));
 
         Path file = tempDir.resolve("gebaeude.dxf");
         exchangeService.exportProject(project, file);
@@ -156,11 +157,13 @@ class DxfProjectExchangeServiceTest {
         assertTrue(exportedDxf.contains("FOPEN"));
         assertTrue(exportedDxf.contains("HEXCL"));
         assertTrue(exportedDxf.contains("NORTH|123.500"));
+        assertTrue(exportedDxf.contains("FRONT|42.000"));
         ProjectModel imported = exchangeService.importProject(file, "Import");
 
         assertEquals(2, imported.levels().size());
         assertEquals("Haus", imported.name());
         assertEquals(123.5, imported.northAngle().degrees(), 0.001);
+        assertEquals(42.0, imported.frontAngle().degrees(), 0.001);
         assertTrue(imported.roof().isPresent());
         assertEquals(1, imported.primaryLevel().staircases().size());
         assertEquals(1, imported.primaryLevel().floorExtensions().size());
