@@ -1,5 +1,6 @@
 package de.schrell.cadas.infrastructure.dxf;
 
+import static de.schrell.cadas.infrastructure.dxf.DxfDocumentSupport.appendPair;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Angle;
 import de.schrell.cadas.domain.geometry.Length;
@@ -48,7 +49,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -626,33 +626,12 @@ public final class DxfProjectExchangeService {
     }
 
     private List<String> extractMetadata(List<String> lines) {
-        List<String> metadata = new ArrayList<>();
-        DxfEntityBuilder builder = null;
-        for (int index = 0; index < lines.size() - 1; index += 2) {
-            String code = lines.get(index).trim();
-            String value = lines.get(index + 1).trim();
-            if (code.equals("0")) {
-                if (builder != null) {
-                    DxfEntity entity = builder.build();
-                    if (entity.type().equals("TEXT") && entity.layer().equals(DxfLayer.CADAS_META.name())) {
-                        entity.firstValue(1).filter(text -> !text.isBlank()).ifPresent(metadata::add);
-                    }
-                }
-                builder = new DxfEntityBuilder(value);
-            } else if (builder != null) {
-                Optional<Integer> groupCode = parseGroupCode(code);
-                if (groupCode.isPresent()) {
-                    builder.add(groupCode.get(), value);
-                }
-            }
-        }
-        if (builder != null) {
-            DxfEntity entity = builder.build();
-            if (entity.type().equals("TEXT") && entity.layer().equals(DxfLayer.CADAS_META.name())) {
-                entity.firstValue(1).filter(text -> !text.isBlank()).ifPresent(metadata::add);
-            }
-        }
-        return metadata;
+        return DxfDocumentSupport.parseEntities(lines).stream()
+                .filter(entity -> entity.type().equals("TEXT"))
+                .filter(entity -> entity.layer().equals(DxfLayer.CADAS_META.name()))
+                .flatMap(entity -> entity.firstValue(1).stream())
+                .filter(text -> !text.isBlank())
+                .toList();
     }
 
     private void copyLevelContents(Level source, Level target) {
@@ -749,10 +728,6 @@ public final class DxfProjectExchangeService {
         appendPair(dxf, 40, 120.0);
         appendPair(dxf, 1, text);
         appendPair(dxf, 7, "Standard");
-    }
-
-    private void appendPair(StringBuilder builder, int code, Object value) {
-        builder.append(code).append('\n').append(value).append('\n');
     }
 
     private String serializePoints(List<PlanPoint> points) {
@@ -1012,42 +987,4 @@ public final class DxfProjectExchangeService {
         return value.replaceAll("[^A-Za-z0-9_\\-]", "_");
     }
 
-    private Optional<Integer> parseGroupCode(String value) {
-        try {
-            return Optional.of(Integer.parseInt(value));
-        } catch (NumberFormatException exception) {
-            return Optional.empty();
-        }
-    }
-
-    private record DxfEntity(String type, Map<Integer, List<String>> values) {
-
-        String layer() {
-            return firstValue(8).orElse("");
-        }
-
-        java.util.Optional<String> firstValue(int code) {
-            return java.util.Optional.ofNullable(values.get(code))
-                    .filter(list -> !list.isEmpty())
-                    .map(list -> list.getFirst());
-        }
-    }
-
-    private static final class DxfEntityBuilder {
-
-        private final String type;
-        private final Map<Integer, List<String>> values = new LinkedHashMap<>();
-
-        private DxfEntityBuilder(String type) {
-            this.type = type;
-        }
-
-        private void add(int code, String value) {
-            values.computeIfAbsent(code, ignored -> new ArrayList<>()).add(value);
-        }
-
-        private DxfEntity build() {
-            return new DxfEntity(type, values);
-        }
-    }
 }

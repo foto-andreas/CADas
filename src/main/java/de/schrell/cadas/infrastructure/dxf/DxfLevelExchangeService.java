@@ -1,6 +1,8 @@
 package de.schrell.cadas.infrastructure.dxf;
 
+import static de.schrell.cadas.infrastructure.dxf.DxfDocumentSupport.appendPair;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
+import de.schrell.cadas.infrastructure.dxf.DxfDocumentSupport.DxfEntity;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
@@ -33,7 +35,6 @@ import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WallProfilePoint;
 import de.schrell.cadas.domain.model.WindowElement;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -305,7 +306,7 @@ public final class DxfLevelExchangeService {
 
     public Level importLevel(Path sourceFile, String levelName) throws IOException {
         List<String> lines = Files.readAllLines(sourceFile);
-        List<DxfEntity> entities = parseEntities(lines);
+        List<DxfEntity> entities = DxfDocumentSupport.parseEntities(lines);
         Level level = new Level(levelName);
         List<String> metadata = entities.stream()
                 .filter(entity -> entity.type().equals("TEXT"))
@@ -550,30 +551,6 @@ public final class DxfLevelExchangeService {
         return points;
     }
 
-    private List<DxfEntity> parseEntities(List<String> lines) {
-        List<DxfEntity> entities = new ArrayList<>();
-        DxfEntityBuilder builder = null;
-        for (int index = 0; index < lines.size() - 1; index += 2) {
-            String code = lines.get(index).trim();
-            String value = lines.get(index + 1).trim();
-            if (code.equals("0")) {
-                if (builder != null) {
-                    entities.add(builder.build());
-                }
-                builder = new DxfEntityBuilder(value);
-            } else if (builder != null) {
-                Optional<Integer> groupCode = parseGroupCode(code);
-                if (groupCode.isPresent()) {
-                    builder.add(groupCode.get(), value);
-                }
-            }
-        }
-        if (builder != null) {
-            entities.add(builder.build());
-        }
-        return entities;
-    }
-
     private void appendLineEntity(StringBuilder dxf, DxfDocumentSupport.DxfWriteContext context, DxfLayer layer, PlanPoint start, PlanPoint end) {
         DxfDocumentSupport.appendModelSpaceEntityStart(context, "LINE", layer.name());
         appendPair(dxf, 100, "AcDbLine");
@@ -614,10 +591,6 @@ public final class DxfLevelExchangeService {
         appendPair(dxf, 40, 100.0);
         appendPair(dxf, 1, value);
         appendPair(dxf, 7, "Standard");
-    }
-
-    private static void appendPair(StringBuilder dxf, int code, Object value) {
-        dxf.append(code).append('\n').append(value).append('\n');
     }
 
     private static boolean isUuid(String text) {
@@ -782,14 +755,6 @@ public final class DxfLevelExchangeService {
         }
     }
 
-    private static Optional<Integer> parseGroupCode(String value) {
-        try {
-            return Optional.of(Integer.parseInt(value));
-        } catch (NumberFormatException exception) {
-            return Optional.empty();
-        }
-    }
-
     private static String serializeSlopedCeiling(Room room) {
         if (room.slopedCeilingProfiles().isEmpty()) {
             return "NONE";
@@ -888,40 +853,4 @@ public final class DxfLevelExchangeService {
         return layers;
     }
 
-    private record DxfEntity(String type, Map<Integer, List<String>> values) {
-
-        String layer() {
-            return firstValue(8).orElse("");
-        }
-
-        Optional<String> firstValue(int code) {
-            return values.getOrDefault(code, List.of()).stream().findFirst();
-        }
-
-        List<String> values(int code) {
-            return values.getOrDefault(code, List.of());
-        }
-
-        Optional<Double> doubleValue(int code) {
-            return firstValue(code).flatMap(DxfLevelExchangeService::parseOptionalDouble);
-        }
-    }
-
-    private static final class DxfEntityBuilder {
-
-        private final String type;
-        private final Map<Integer, List<String>> values = new LinkedHashMap<>();
-
-        private DxfEntityBuilder(String type) {
-            this.type = type;
-        }
-
-        private void add(int code, String value) {
-            values.computeIfAbsent(code, ignored -> new ArrayList<>()).add(value);
-        }
-
-        private DxfEntity build() {
-            return new DxfEntity(type, values);
-        }
-    }
 }

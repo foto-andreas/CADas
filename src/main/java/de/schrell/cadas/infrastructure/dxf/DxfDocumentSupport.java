@@ -1,12 +1,14 @@
 package de.schrell.cadas.infrastructure.dxf;
 
 import de.schrell.cadas.domain.geometry.PlanPoint;
-
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 final class DxfDocumentSupport {
@@ -66,6 +68,30 @@ final class DxfDocumentSupport {
 
     static void appendPair(StringBuilder dxf, int code, Object value) {
         dxf.append(code).append('\n').append(value).append('\n');
+    }
+
+    static List<DxfEntity> parseEntities(List<String> lines) {
+        List<DxfEntity> entities = new ArrayList<>();
+        DxfEntityBuilder builder = null;
+        for (int index = 0; index < lines.size() - 1; index += 2) {
+            String code = lines.get(index).trim();
+            String value = lines.get(index + 1).trim();
+            if (code.equals("0")) {
+                if (builder != null) {
+                    entities.add(builder.build());
+                }
+                builder = new DxfEntityBuilder(value);
+            } else if (builder != null) {
+                Optional<Integer> groupCode = parseGroupCode(code);
+                if (groupCode.isPresent()) {
+                    builder.add(groupCode.get(), value);
+                }
+            }
+        }
+        if (builder != null) {
+            entities.add(builder.build());
+        }
+        return entities;
     }
 
     private static void appendHeader(DxfWriteContext context) {
@@ -373,6 +399,59 @@ final class DxfDocumentSupport {
             return 8;
         }
         return 7;
+    }
+
+    record DxfEntity(String type, Map<Integer, List<String>> values) {
+
+        String layer() {
+            return firstValue(8).orElse("");
+        }
+
+        Optional<String> firstValue(int code) {
+            return values.getOrDefault(code, List.of()).stream().findFirst();
+        }
+
+        List<String> values(int code) {
+            return values.getOrDefault(code, List.of());
+        }
+
+        Optional<Double> doubleValue(int code) {
+            return firstValue(code).flatMap(DxfDocumentSupport::parseOptionalDouble);
+        }
+    }
+
+    private static final class DxfEntityBuilder {
+
+        private final String type;
+        private final Map<Integer, List<String>> values = new LinkedHashMap<>();
+
+        private DxfEntityBuilder(String type) {
+            this.type = type;
+        }
+
+        private void add(int code, String value) {
+            values.computeIfAbsent(code, ignored -> new ArrayList<>()).add(value);
+        }
+
+        private DxfEntity build() {
+            return new DxfEntity(type, values);
+        }
+    }
+
+    private static Optional<Integer> parseGroupCode(String value) {
+        try {
+            return Optional.of(Integer.parseInt(value));
+        } catch (NumberFormatException exception) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<Double> parseOptionalDouble(String value) {
+        try {
+            return Optional.of(Double.parseDouble(value));
+        } catch (NumberFormatException exception) {
+            return Optional.empty();
+        }
     }
 
     static final class DxfWriteContext {
