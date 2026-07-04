@@ -1600,7 +1600,7 @@ public final class HydronicHeatingLayoutService {
             double secondX = next.xMillimeters() - current.xMillimeters();
             double secondY = next.yMillimeters() - current.yMillimeters();
             double denominator = Math.max(EPSILON, firstLength * secondLength);
-            double cosine = Math.max(-1.0, Math.min(1.0, (firstX * secondX + firstY * secondY) / denominator));
+            double cosine = Math.clamp((firstX * secondX + firstY * secondY) / denominator, -1.0, 1.0);
             double angle = Math.acos(cosine);
             if (angle > EPSILON && angle < Math.PI - EPSILON) {
                 length += radius * angle - 2.0 * radius * Math.tan(angle / 2.0);

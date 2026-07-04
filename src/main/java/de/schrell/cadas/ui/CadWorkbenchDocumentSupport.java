@@ -816,7 +816,7 @@ final class CadWorkbenchDocumentSupport {
             @Override
             protected T call() throws Exception {
                 return operation.run((progress, message) -> {
-                    updateProgress(Math.max(0.0, Math.min(1.0, progress)), 1.0);
+                    updateProgress(Math.clamp(progress, 0.0, 1.0), 1.0);
                     updateMessage(message);
                 });
             }
@@ -890,7 +890,7 @@ final class CadWorkbenchDocumentSupport {
 
         default ProgressCallback range(double start, double end) {
             return (progress, message) -> {
-                double bounded = Math.max(0.0, Math.min(1.0, progress));
+                double bounded = Math.clamp(progress, 0.0, 1.0);
                 update(start + (end - start) * bounded, message);
             };
         }

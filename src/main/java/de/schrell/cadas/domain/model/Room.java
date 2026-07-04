@@ -325,7 +325,7 @@ public final class Room {
             return highHeight;
         }
         double distance = distanceFromLowSide(point, profile.lowSide());
-        double ratio = Math.max(0.0, Math.min(1.0, distance / run));
+        double ratio = Math.clamp(distance / run, 0.0, 1.0);
         return lowHeight + (highHeight - lowHeight) * ratio;
     }
 

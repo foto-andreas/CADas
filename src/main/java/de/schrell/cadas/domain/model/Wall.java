@@ -66,7 +66,7 @@ public record Wall(
         if (totalLength <= EPSILON) {
             return startHeight.toMillimeters();
         }
-        double clampedOffset = Math.max(0.0, Math.min(totalLength, offsetMillimeters));
+        double clampedOffset = Math.clamp(offsetMillimeters, 0.0, totalLength);
         List<WallProfilePoint> points = resolvedProfile();
         for (int index = 1; index < points.size(); index++) {
             WallProfilePoint previous = points.get(index - 1);

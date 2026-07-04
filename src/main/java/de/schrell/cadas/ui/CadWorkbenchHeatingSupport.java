@@ -267,7 +267,7 @@ final class CadWorkbenchHeatingSupport {
         }
         double ratio = ((point.xMillimeters() - start.xMillimeters()) * dx
                 + (point.yMillimeters() - start.yMillimeters()) * dy) / lengthSquared;
-        double clampedRatio = Math.max(0.0, Math.min(1.0, ratio));
+        double clampedRatio = Math.clamp(ratio, 0.0, 1.0);
         return new PlanPoint(
                 start.xMillimeters() + dx * clampedRatio,
                 start.yMillimeters() + dy * clampedRatio

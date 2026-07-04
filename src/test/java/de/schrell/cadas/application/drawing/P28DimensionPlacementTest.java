@@ -197,7 +197,7 @@ class P28DimensionPlacementTest {
         double squaredLength = dx * dx + dy * dy;
         double ratio = squaredLength <= 0.001 ? 0.0 : ((point.xMillimeters() - segment.start().xMillimeters()) * dx
                 + (point.yMillimeters() - segment.start().yMillimeters()) * dy) / squaredLength;
-        ratio = Math.max(0.0, Math.min(1.0, ratio));
+        ratio = Math.clamp(ratio, 0.0, 1.0);
         double nearestX = segment.start().xMillimeters() + ratio * dx;
         double nearestY = segment.start().yMillimeters() + ratio * dy;
         return Math.hypot(point.xMillimeters() - nearestX, point.yMillimeters() - nearestY);

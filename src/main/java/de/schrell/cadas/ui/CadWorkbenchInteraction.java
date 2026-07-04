@@ -333,7 +333,7 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                 );
                 double wallLength = openingDragWallAxis.length().toMillimeters();
                 double rawOffset = openingDragWallAxis.projectedLength(snappedPoint).toMillimeters() + openingDragOffsetDelta;
-                double clampedOffset = Math.max(0.0, Math.min(wallLength - openingDragWidth, rawOffset));
+                double clampedOffset = Math.clamp(rawOffset, 0.0, Math.max(0.0, wallLength - openingDragWidth));
                 Wall openingWall = openingDragWall();
                 Length newOffset = snapToGuides.get()
                         ? guideSnapService.snapOpeningOffset(

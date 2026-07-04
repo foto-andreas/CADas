@@ -30,7 +30,7 @@ public record PlanSegment(PlanPoint start, PlanPoint end) {
             return Length.zero();
         }
         double projection = ((point.xMillimeters() - start.xMillimeters()) * dx + (point.yMillimeters() - start.yMillimeters()) * dy) / lengthSquared;
-        double clampedProjection = Math.max(0.0, Math.min(1.0, projection));
+        double clampedProjection = Math.clamp(projection, 0.0, 1.0);
         return length().multiply(clampedProjection);
     }
 
@@ -47,7 +47,7 @@ public record PlanSegment(PlanPoint start, PlanPoint end) {
             return start;
         }
         double projection = ((point.xMillimeters() - start.xMillimeters()) * dx + (point.yMillimeters() - start.yMillimeters()) * dy) / lengthSquared;
-        double clampedProjection = Math.max(0.0, Math.min(1.0, projection));
+        double clampedProjection = Math.clamp(projection, 0.0, 1.0);
         return new PlanPoint(
                 start.xMillimeters() + dx * clampedProjection,
                 start.yMillimeters() + dy * clampedProjection

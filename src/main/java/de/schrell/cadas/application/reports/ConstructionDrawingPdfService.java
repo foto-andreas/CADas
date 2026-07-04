@@ -255,7 +255,7 @@ public final class ConstructionDrawingPdfService {
     private void reportProgress(ProgressListener progressListener, int completedSteps, int totalSteps, String section) {
         double boundedProgress = totalSteps <= 0
                 ? 1.0
-                : Math.max(0.0, Math.min(1.0, completedSteps / (double) totalSteps));
+                : Math.clamp(completedSteps / (double) totalSteps, 0.0, 1.0);
         progressListener.update(boundedProgress, section);
     }
 

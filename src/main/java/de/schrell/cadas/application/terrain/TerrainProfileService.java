@@ -207,7 +207,7 @@ public final class TerrainProfileService {
         double length = Math.max(EPSILON, Math.hypot(dx, dy));
         double projection = ((point.xMillimeters() - start.xMillimeters()) * dx
                 + (point.yMillimeters() - start.yMillimeters()) * dy) / (length * length);
-        double clamped = Math.max(0.0, Math.min(1.0, projection));
+        double clamped = Math.clamp(projection, 0.0, 1.0);
         PlanPoint projectedPoint = new PlanPoint(
                 start.xMillimeters() + dx * clamped,
                 start.yMillimeters() + dy * clamped

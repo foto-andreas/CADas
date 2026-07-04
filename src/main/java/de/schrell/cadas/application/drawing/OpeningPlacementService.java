@@ -53,7 +53,7 @@ public final class OpeningPlacementService {
         double width = openingWidth.toMillimeters();
         double centeredOffset = wall.axis().projectedLength(clickPoint).toMillimeters() - width / 2.0;
         double maximumOffset = Math.max(0.0, wallLength - width);
-        return Length.ofMillimeters(Math.max(0.0, Math.min(centeredOffset, maximumOffset)));
+        return Length.ofMillimeters(Math.clamp(centeredOffset, 0.0, maximumOffset));
     }
 
     private Optional<Wall> findHostWall(PlanPoint clickPoint, List<Wall> walls, Length snapTolerance) {

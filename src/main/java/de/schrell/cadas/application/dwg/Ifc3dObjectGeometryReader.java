@@ -132,7 +132,7 @@ public final class Ifc3dObjectGeometryReader {
     }
 
     private int colorChannel(double value) {
-        return (int) Math.round(Math.max(0.0, Math.min(1.0, value)) * 255.0);
+        return (int) Math.round(Math.clamp(value, 0.0, 1.0) * 255.0);
     }
 
     private Optional<double[]> facetedBrep(Entity brep, Map<Integer, Entity> entities) {
