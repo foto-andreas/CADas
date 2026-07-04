@@ -1082,6 +1082,9 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
 
     void saveCurrentLevelTo(Path targetFile) {
         try {
+            if (!documentSupport.commitOpenHeatingLoads()) {
+                return;
+            }
             Path exportPath = targetFile.toAbsolutePath().normalize();
             levelExchangeService.exportLevel(activeLevel.get(), exportPath);
             lastLevelSavePath = exportPath;
@@ -1126,6 +1129,9 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
 
     void exportProjectAsDxf(Path targetFile) {
         try {
+            if (!documentSupport.commitOpenHeatingLoads()) {
+                return;
+            }
             Path exportPath = targetFile.toAbsolutePath().normalize();
             projectExchangeService.exportProject(project, exportPath);
             lastProjectSavePath = exportPath;

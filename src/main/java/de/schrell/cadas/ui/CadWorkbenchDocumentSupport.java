@@ -57,6 +57,7 @@ final class CadWorkbenchDocumentSupport {
 
     private final CadWorkbenchBase owner;
     private final SurfaceMaterialReportPdfService surfaceMaterialReportPdfService = new SurfaceMaterialReportPdfService();
+    private List<HeatingLoadField> openHeatingLoadFields = List.of();
 
     CadWorkbenchDocumentSupport(CadWorkbenchBase owner) {
         this.owner = owner;
@@ -97,6 +98,7 @@ final class CadWorkbenchDocumentSupport {
                 rowIndex++;
             }
         }
+        openHeatingLoadFields = fields;
         if (fields.isEmpty()) {
             grid.add(new Label("Keine Räume vorhanden."), 0, rowIndex, 3, 1);
         }
@@ -117,13 +119,27 @@ final class CadWorkbenchDocumentSupport {
         if (ownerWindow != null) {
             stage.initOwner(ownerWindow);
         }
-        saveButton.setOnAction(event -> saveHeatingLoads(fields, stage));
+        saveButton.setOnAction(event -> {
+            if (commitHeatingLoads(fields)) {
+                owner.draftLabel.setText("Heizlasten gespeichert.");
+                stage.close();
+            }
+        });
         closeButton.setOnAction(event -> stage.close());
+        stage.setOnHidden(event -> {
+            if (openHeatingLoadFields == fields) {
+                openHeatingLoadFields = List.of();
+            }
+        });
         stage.setScene(new Scene(container, 620, 520));
         stage.show();
     }
 
-    private void saveHeatingLoads(List<HeatingLoadField> fields, Stage stage) {
+    boolean commitOpenHeatingLoads() {
+        return openHeatingLoadFields.isEmpty() || commitHeatingLoads(openHeatingLoadFields);
+    }
+
+    private boolean commitHeatingLoads(List<HeatingLoadField> fields) {
         Map<java.util.UUID, Double> loadsByRoomId = new LinkedHashMap<>();
         for (HeatingLoadField field : fields) {
             try {
@@ -132,8 +148,14 @@ final class CadWorkbenchDocumentSupport {
             } catch (IllegalArgumentException exception) {
                 owner.draftLabel.setText("Heizlast für " + field.room().name() + " ist ungültig.");
                 field.field().requestFocus();
-                return;
+                return false;
             }
+        }
+        boolean changed = owner.project.levels().stream()
+                .flatMap(level -> level.rooms().stream())
+                .anyMatch(room -> Double.compare(loadsByRoomId.getOrDefault(room.id(), room.heatLoadWatts()), room.heatLoadWatts()) != 0);
+        if (!changed) {
+            return true;
         }
         owner.rememberStateForUndo();
         for (Level level : owner.project.levels()) {
@@ -142,8 +164,7 @@ final class CadWorkbenchDocumentSupport {
                     .toList());
         }
         owner.render();
-        owner.draftLabel.setText("Heizlasten gespeichert.");
-        stage.close();
+        return true;
     }
 
     private double parseWatts(String text) {

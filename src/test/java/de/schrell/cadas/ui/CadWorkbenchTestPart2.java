@@ -52,6 +52,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
@@ -59,6 +60,8 @@ import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.Scene;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import javafx.stage.Window;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -166,6 +169,49 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     void heizlastFelderZeigenNullSichtbarAn() {
         Assertions.assertEquals("0", CadWorkbenchDocumentSupport.formatWatts(0.0));
         Assertions.assertEquals("123", CadWorkbenchDocumentSupport.formatWatts(123.0));
+    }
+
+    @Test
+    void projektexportUebernimmtOffeneHeizlastfelder() throws Exception {
+        Path exportDatei = Files.createTempFile("cadas-heizlast-offen-", ".cadas");
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.automationSetErrorDialogsEnabled(false);
+            instanz.project.primaryLevel().addRoom(Room.rectangular(
+                    "Wohnen",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.of(2.6, LengthUnit.METER),
+                    Length.of(18, LengthUnit.CENTIMETER),
+                    Length.of(20, LengthUnit.CENTIMETER)
+            ));
+            instanz.applyCss();
+            instanz.layout();
+            instanz.documentSupport.showHeatingLoadWindow();
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            Window.getWindows().stream()
+                    .filter(window -> window instanceof Stage stage && "Heizlast".equals(stage.getTitle()))
+                    .flatMap(window -> window.getScene().getRoot().lookupAll(".text-field").stream())
+                    .filter(TextField.class::isInstance)
+                    .map(TextField.class::cast)
+                    .findFirst()
+                    .orElseThrow()
+                    .setText("777");
+            workbench.automationInvoke("exportProjectDxf", exportDatei);
+            Window.getWindows().stream()
+                    .filter(window -> window instanceof Stage stage && "Heizlast".equals(stage.getTitle()))
+                    .toList()
+                    .forEach(Window::hide);
+            return null;
+        });
+
+        ProjectModel imported = new DxfProjectExchangeService().importProject(exportDatei, "Import");
+
+        Assertions.assertEquals(777.0, imported.primaryLevel().rooms().getFirst().heatLoadWatts(), 0.001);
     }
 
     @Test
