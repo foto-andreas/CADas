@@ -80,6 +80,8 @@ class SurfaceMaterialReportPdfServiceTest {
         try (var document = Loader.loadPDF(targetFile.toFile())) {
             assertTrue(document.getNumberOfPages() >= 4);
             String text = new PDFTextStripper().getText(document);
+            assertFalse(text.contains("Rasterzeichnungen Räume und Beläge"));
+            assertFalse(text.contains("Heizflächen-Grafiken"));
             assertTrue(text.contains("Etagenübersicht Erdgeschoss"));
             assertTrue(text.contains("Belag Erdgeschoss / Parkett"));
             assertFalse(text.contains("Heizkreise Erdgeschoss / Fußboden"));

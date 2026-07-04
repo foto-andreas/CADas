@@ -200,7 +200,6 @@ public final class SurfaceMaterialReportPdfService {
         if (levelNames.isEmpty()) {
             return;
         }
-        writer.section("Rasterzeichnungen Räume und Beläge");
         for (String levelName : levelNames) {
             BufferedImage levelPlanImage = exportAssets.levelPlanImages().get(levelName);
             if (levelPlanImage != null) {
@@ -388,7 +387,6 @@ public final class SurfaceMaterialReportPdfService {
         if (levelNames.isEmpty()) {
             return;
         }
-        writer.subsection("Heizflächen-Grafiken");
         for (String levelName : levelNames) {
             for (String surfacePosition : heatingSurfacePositions(heatingPlans, exportAssets, levelName)) {
                 BufferedImage heatingImage = exportAssets.heatingLevelImages().get(heatingLevelImageKey(levelName, surfacePosition));
@@ -702,13 +700,13 @@ public final class SurfaceMaterialReportPdfService {
         }
 
         private void section(String text) throws IOException {
-            gap(8.0f);
-            writeWrappedText(normalize(text), FONT_BOLD, SECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 4.0f);
+            gap(14.0f);
+            writeWrappedText(normalize(text), FONT_BOLD, SECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 5.0f);
         }
 
         private void subsection(String text) throws IOException {
-            gap(4.0f);
-            writeWrappedText(normalize(text), FONT_BOLD, SUBSECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 2.5f);
+            gap(8.0f);
+            writeWrappedText(normalize(text), FONT_BOLD, SUBSECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 3.0f);
         }
 
         private void caption(String text) throws IOException {
