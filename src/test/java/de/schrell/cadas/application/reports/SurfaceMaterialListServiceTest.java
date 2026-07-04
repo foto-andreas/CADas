@@ -52,7 +52,7 @@ class SurfaceMaterialListServiceTest {
                 Length.of(2.6, LengthUnit.METER),
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER)
-        ));
+        ).withHeatLoadWatts(900.0));
 
         SurfaceMaterialReport report = service.create(project);
 
@@ -61,7 +61,12 @@ class SurfaceMaterialListServiceTest {
         assertEquals(14_000.0, report.rooms().getFirst().innerPerimeterMillimeters(), 0.001);
         assertEquals(31.2, report.rooms().getFirst().volumeCubicMeters(), 0.001);
         assertEquals(12.0, report.rooms().getFirst().residentialAreaSquareMeters(), 0.001);
+        assertEquals(900.0, report.rooms().getFirst().heatLoadWatts(), 0.001);
+        assertEquals(-900.0, report.heatingLoads().getFirst().surplusWatts(), 0.001);
         assertTrue(report.toMarkdown().contains("Räume und Mietflächen nach WoFlV"));
+        assertTrue(report.toMarkdown().contains("## Heizlast"));
+        assertTrue(report.toMarkdown().contains("Keine"));
+        assertTrue(report.toMarkdown().contains("-900 W"));
         assertTrue(report.toMarkdown().contains("### Erdgeschoss"));
         assertTrue(report.toMarkdown().contains("4,00 × 3,00 m"));
         assertTrue(report.toMarkdown().contains("Innenumfang"));

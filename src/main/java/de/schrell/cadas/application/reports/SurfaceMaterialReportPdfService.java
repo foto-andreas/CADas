@@ -95,6 +95,7 @@ public final class SurfaceMaterialReportPdfService {
             try (PdfWriter writer = new PdfWriter(document)) {
                 writer.title("Räume und Materialien - " + report.projectName());
                 appendRooms(writer, report.rooms(), Map.of());
+                appendHeatingLoads(writer, report.heatingLoads());
                 appendRasterOverviewAndMaterialPages(writer, report, exportAssets);
                 appendMaterialSummary(writer, report.materials());
                 appendHeatingPlans(writer, report.heatingPlans(), exportAssets);
@@ -136,7 +137,9 @@ public final class SurfaceMaterialReportPdfService {
                         new TableColumn("DH", 0.45f, TableAlignment.RIGHT),
                         new TableColumn("Fläche", 0.55f, TableAlignment.RIGHT),
                         new TableColumn("Heizelemente", 0.8f, TableAlignment.RIGHT),
-                        new TableColumn("Gesamtwärme", 0.9f, TableAlignment.RIGHT)
+                        new TableColumn("Gesamtwärme", 0.9f, TableAlignment.RIGHT),
+                        new TableColumn("Heizlast", 0.75f, TableAlignment.RIGHT),
+                        new TableColumn("Überschuss", 0.75f, TableAlignment.RIGHT)
                 )
         );
         for (Map.Entry<String, List<SurfaceMaterialListService.RoomSummary>> entry : roomsByLevel.entrySet()) {
@@ -159,12 +162,55 @@ public final class SurfaceMaterialReportPdfService {
                         decimal(room.ceilingHeatingWatts(), 0) + " W",
                         decimal(room.additionalSurfaceHeatingWatts(), 0) + " W",
                         decimal(room.heatingElementWatts(), 0) + " W",
-                        decimal(room.totalHeatOutputWatts(), 0) + " W"
+                        decimal(room.totalHeatOutputWatts(), 0) + " W",
+                        decimal(room.heatLoadWatts(), 0) + " W",
+                        decimal(room.heatingSurplusWatts(), 0) + " W"
                 ));
             }
             writer.table(roomTable, rows);
         }
         writer.paragraph("Mietflächen nach WoFlV: ab 2 m volle Anrechnung, zwischen 1 m und 2 m halbe Anrechnung, darunter keine Anrechnung.");
+    }
+
+    private void appendHeatingLoads(
+            PdfWriter writer,
+            List<SurfaceMaterialListService.HeatingLoadSummary> heatingLoads
+    ) throws IOException {
+        writer.section("Heizlast");
+        if (heatingLoads.isEmpty()) {
+            writer.paragraph("Keine Räume vorhanden.");
+            return;
+        }
+        List<List<String>> rows = new ArrayList<>();
+        for (SurfaceMaterialListService.HeatingLoadSummary summary : heatingLoads) {
+            rows.add(List.of(
+                    summary.levelName() + " / " + summary.roomName(),
+                    decimal(summary.heatLoadWatts(), 0) + " W",
+                    summary.heatings(),
+                    decimal(summary.heatOutputWatts(), 0) + " W",
+                    decimal(summary.surplusWatts(), 0) + " W"
+            ));
+        }
+        rows.add(List.of(
+                "Summe",
+                decimal(heatingLoads.stream().mapToDouble(SurfaceMaterialListService.HeatingLoadSummary::heatLoadWatts).sum(), 0) + " W",
+                "",
+                decimal(heatingLoads.stream().mapToDouble(SurfaceMaterialListService.HeatingLoadSummary::heatOutputWatts).sum(), 0) + " W",
+                decimal(heatingLoads.stream().mapToDouble(SurfaceMaterialListService.HeatingLoadSummary::surplusWatts).sum(), 0) + " W"
+        ));
+        writer.table(
+                new TableDefinition(
+                        BODY_FONT_SIZE,
+                        List.of(
+                                new TableColumn("Raum", 1.25f, TableAlignment.LEFT),
+                                new TableColumn("Heizlast", 0.65f, TableAlignment.RIGHT),
+                                new TableColumn("Heizungen", 2.7f, TableAlignment.LEFT),
+                                new TableColumn("Leistung", 0.65f, TableAlignment.RIGHT),
+                                new TableColumn("Überschuss/Fehlbetrag", 0.9f, TableAlignment.RIGHT)
+                        )
+                ),
+                rows
+        );
     }
 
     private void appendRasterOverviewAndMaterialPages(

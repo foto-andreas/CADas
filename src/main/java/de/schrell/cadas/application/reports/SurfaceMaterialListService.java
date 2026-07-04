@@ -93,9 +93,54 @@ public final class SurfaceMaterialListService {
                 project.levels().stream()
                         .flatMap(level -> level.rooms().stream().map(room -> roomSummary(level, room)))
                         .toList(),
+                heatingLoads(project),
                 heatingPlans(project),
                 heatingElements(project)
         );
+    }
+
+    private List<HeatingLoadSummary> heatingLoads(ProjectModel project) {
+        List<HeatingLoadSummary> summaries = new ArrayList<>();
+        for (Level level : project.levels()) {
+            for (Room room : level.rooms()) {
+                RoomHeatingOutputService.RoomHeatTotals totals = roomHeatingOutputService.totals(level, room);
+                summaries.add(new HeatingLoadSummary(
+                        level.name(),
+                        room.name(),
+                        room.heatLoadWatts(),
+                        heatingDeviceSummary(level, room),
+                        totals.totalHeatOutputWatts(),
+                        totals.totalHeatOutputWatts() - room.heatLoadWatts()
+                ));
+            }
+        }
+        return List.copyOf(summaries);
+    }
+
+    private String heatingDeviceSummary(Level level, Room room) {
+        Map<String, HeatingDeviceAccumulator> devices = new LinkedHashMap<>();
+        level.hydronicHeatings().stream()
+                .filter(heating -> heating.roomId().equals(room.id()))
+                .forEach(heating -> heating.zones().forEach(zone -> addHeatingDevice(
+                        devices,
+                        heating.surfacePosition() + " / " + zone.layoutPattern(),
+                        zone.heatOutputWatts()
+                )));
+        roomHeatingOutputService.heatingElements(level, room).forEach(element -> addHeatingDevice(
+                devices,
+                element.heatingType() + " / " + element.objectType(),
+                element.heatOutputWatts()
+        ));
+        if (devices.isEmpty()) {
+            return "Keine";
+        }
+        return devices.values().stream()
+                .map(HeatingDeviceAccumulator::summary)
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private void addHeatingDevice(Map<String, HeatingDeviceAccumulator> devices, String label, double heatOutputWatts) {
+        devices.computeIfAbsent(label, HeatingDeviceAccumulator::new).add(heatOutputWatts);
     }
 
     private List<HeatingPlanSummary> heatingPlans(ProjectModel project) {
@@ -282,7 +327,9 @@ public final class SurfaceMaterialListService {
                 roomHeatTotals.additionalSurfaceHeatingWatts(),
                 roomHeatTotals.surfaceHeatingWatts(),
                 roomHeatTotals.heatingElementWatts(),
-                roomHeatTotals.totalHeatOutputWatts()
+                roomHeatTotals.totalHeatOutputWatts(),
+                room.heatLoadWatts(),
+                roomHeatTotals.totalHeatOutputWatts() - room.heatLoadWatts()
         );
     }
 
@@ -1160,6 +1207,27 @@ public final class SurfaceMaterialListService {
         }
     }
 
+    private static final class HeatingDeviceAccumulator {
+
+        private final String label;
+        private int count;
+        private double heatOutputWatts;
+
+        private HeatingDeviceAccumulator(String label) {
+            this.label = label;
+        }
+
+        private void add(double watts) {
+            count++;
+            heatOutputWatts += watts;
+        }
+
+        private String summary() {
+            String prefix = count > 1 ? count + " × " : "";
+            return prefix + label + " (" + decimal(heatOutputWatts, 0) + " W)";
+        }
+    }
+
     private record MaterialProperties(
             SurfaceType surfaceType,
             double thicknessMillimeters,
@@ -1312,6 +1380,7 @@ public final class SurfaceMaterialListService {
             List<MaterialSummary> materials,
             List<RoomComplexitySummary> roomComplexities,
             List<RoomSummary> rooms,
+            List<HeatingLoadSummary> heatingLoads,
             List<HeatingPlanSummary> heatingPlans,
             List<HeatingElementSummary> heatingElements
     ) {
@@ -1328,6 +1397,7 @@ public final class SurfaceMaterialListService {
             StringBuilder markdown = new StringBuilder();
             markdown.append("# Materialliste Beläge – ").append(projectName).append("\n\n");
             appendRooms(markdown);
+            appendHeatingLoads(markdown);
             if (materials.isEmpty()) {
                 appendHeatingPlans(markdown, includeHeatingPlanSvg);
                 appendHeatingElements(markdown);
@@ -1356,8 +1426,8 @@ public final class SurfaceMaterialListService {
                     ))
                     .forEach((levelName, levelRooms) -> {
                         markdown.append("### ").append(levelName).append("\n\n");
-                        markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Innenumfang | Mietfläche | Volumen | FBH | DH | Flächenheizung | Heizelemente | Gesamtwärme |\n");
-                        markdown.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+                        markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Innenumfang | Mietfläche | Volumen | FBH | DH | Flächenheizung | Heizelemente | Gesamtwärme | Heizlast | Überschuss |\n");
+                        markdown.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
                         for (RoomSummary room : levelRooms) {
                             markdown.append("| ")
                                     .append(markdownCell(room.roomName()))
@@ -1387,11 +1457,42 @@ public final class SurfaceMaterialListService {
                                     .append(decimal(room.heatingElementWatts(), 0)).append(" W")
                                     .append(" | ")
                                     .append(decimal(room.totalHeatOutputWatts(), 0)).append(" W")
+                                    .append(" | ")
+                                    .append(decimal(room.heatLoadWatts(), 0)).append(" W")
+                                    .append(" | ")
+                                    .append(decimal(room.heatingSurplusWatts(), 0)).append(" W")
                                     .append(" |\n");
                         }
                         markdown.append('\n');
                     });
             markdown.append("Die Mietfläche gewichtet lichte Höhen ab 2 m vollständig, zwischen 1 m und 2 m zur Hälfte und unter 1 m nicht. Sichtbare Boden- und Deckenbeläge reduzieren die lichte Höhe.\n\n");
+        }
+
+        private void appendHeatingLoads(StringBuilder markdown) {
+            markdown.append("## Heizlast\n\n");
+            if (heatingLoads.isEmpty()) {
+                markdown.append("Keine Räume vorhanden.\n\n");
+                return;
+            }
+            markdown.append("| Raum | Heizlast | Heizungen | Leistung | Überschuss/Fehlbetrag |\n");
+            markdown.append("|---|---:|---|---:|---:|\n");
+            for (HeatingLoadSummary summary : heatingLoads) {
+                markdown.append("| ")
+                        .append(markdownCell(summary.levelName() + " / " + summary.roomName()))
+                        .append(" | ")
+                        .append(decimal(summary.heatLoadWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(markdownCell(summary.heatings()))
+                        .append(" | ")
+                        .append(decimal(summary.heatOutputWatts(), 0)).append(" W")
+                        .append(" | ")
+                        .append(decimal(summary.surplusWatts(), 0)).append(" W")
+                        .append(" |\n");
+            }
+            markdown.append("| **Summe** | **")
+                    .append(decimal(heatingLoads.stream().mapToDouble(HeatingLoadSummary::heatLoadWatts).sum(), 0)).append(" W** |  | **")
+                    .append(decimal(heatingLoads.stream().mapToDouble(HeatingLoadSummary::heatOutputWatts).sum(), 0)).append(" W** | **")
+                    .append(decimal(heatingLoads.stream().mapToDouble(HeatingLoadSummary::surplusWatts).sum(), 0)).append(" W** |\n\n");
         }
 
         private void appendHeatingPlans(StringBuilder markdown, boolean includeSvg) {
@@ -1720,6 +1821,16 @@ public final class SurfaceMaterialListService {
     ) {
     }
 
+    public record HeatingLoadSummary(
+            String levelName,
+            String roomName,
+            double heatLoadWatts,
+            String heatings,
+            double heatOutputWatts,
+            double surplusWatts
+    ) {
+    }
+
     public record MaterialRoomEntry(
             String levelName,
             String roomName,
@@ -1770,7 +1881,9 @@ public final class SurfaceMaterialListService {
             double additionalSurfaceHeatingWatts,
             double surfaceHeatingWatts,
             double heatingElementWatts,
-            double totalHeatOutputWatts
+            double totalHeatOutputWatts,
+            double heatLoadWatts,
+            double heatingSurplusWatts
     ) {
     }
 }

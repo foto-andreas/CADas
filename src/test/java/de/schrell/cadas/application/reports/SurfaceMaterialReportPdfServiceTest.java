@@ -99,7 +99,7 @@ class SurfaceMaterialReportPdfServiceTest {
                 Length.of(2.6, LengthUnit.METER),
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER)
-        );
+        ).withHeatLoadWatts(900.0);
         project.primaryLevel().addRoom(room);
         SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
         stack.addLayer(SurfaceLayer.create(
@@ -145,6 +145,7 @@ class SurfaceMaterialReportPdfServiceTest {
             assertTrue(text.contains("Innenumfang"));
             assertTrue(text.contains("14,00 m"));
             assertTrue(text.contains("Zusammenfassung"));
+            assertTrue(text.contains("Heizlast"));
             assertTrue(text.contains("Flächenheizungen"));
             assertFalse(text.contains("Reststücke"));
             if (expectSvgText) {
