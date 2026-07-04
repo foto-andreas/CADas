@@ -143,7 +143,7 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
-    void berichteMenueEnthaeltHeizlastDialog() throws Exception {
+    void berichteMenueBeginntMitHeizlastDialog() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
             new Scene(instanz, 1200, 800);
@@ -157,10 +157,15 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
             MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
             return menuBar.getMenus().stream()
                     .filter(menu -> "Berichte".equals(menu.getText()))
-                    .flatMap(menu -> menu.getItems().stream())
-                    .map(MenuItem::getText)
+                    .map(menu -> menu.getItems().getFirst().getText())
                     .anyMatch("Heizlast"::equals);
         }));
+    }
+
+    @Test
+    void heizlastFelderZeigenNullSichtbarAn() {
+        Assertions.assertEquals("0", CadWorkbenchDocumentSupport.formatWatts(0.0));
+        Assertions.assertEquals("123", CadWorkbenchDocumentSupport.formatWatts(123.0));
     }
 
     @Test

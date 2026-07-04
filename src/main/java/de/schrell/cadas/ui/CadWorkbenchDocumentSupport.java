@@ -157,8 +157,8 @@ final class CadWorkbenchDocumentSupport {
         return value;
     }
 
-    private String formatWatts(double watts) {
-        return watts == 0.0 ? "" : String.format(java.util.Locale.GERMAN, "%.0f", watts);
+    static String formatWatts(double watts) {
+        return String.format(java.util.Locale.GERMAN, "%.0f", watts);
     }
 
     private void showSurfaceMaterialReportWindow(SurfaceMaterialReport report, String renderedHtml) {
