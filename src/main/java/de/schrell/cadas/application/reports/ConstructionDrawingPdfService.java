@@ -96,24 +96,17 @@ public final class ConstructionDrawingPdfService {
     private final TerrainContourService terrainContourService = new TerrainContourService();
     private final TerrainProfileService terrainProfileService = new TerrainProfileService();
 
-    public enum GraphicVariant {
-        VEKTOR,
-        RASTERGRAFIK
-    }
-
     public record ExportAssets(
-            GraphicVariant graphicVariant,
             Map<String, BufferedImage> levelPlanImages,
             Map<String, BufferedImage> heatingPlanImages
     ) {
         public ExportAssets {
-            Objects.requireNonNull(graphicVariant, "graphicVariant darf nicht null sein.");
             levelPlanImages = Map.copyOf(levelPlanImages);
             heatingPlanImages = Map.copyOf(heatingPlanImages);
         }
 
         public static ExportAssets empty() {
-            return new ExportAssets(GraphicVariant.VEKTOR, Map.of(), Map.of());
+            return new ExportAssets(Map.of(), Map.of());
         }
     }
 
@@ -174,9 +167,7 @@ public final class ConstructionDrawingPdfService {
         try (PDDocument document = new PDDocument()) {
             for (Level level : project.levels()) {
                 reportProgress(progressListener, completedSteps, totalSteps, planPageTitle(level));
-                BufferedImage levelPlanImage = exportAssets.graphicVariant() == GraphicVariant.RASTERGRAFIK
-                        ? exportAssets.levelPlanImages().get(level.name())
-                        : null;
+                BufferedImage levelPlanImage = exportAssets.levelPlanImages().get(level.name());
                 if (levelPlanImage != null) {
                     addRasterPage(document, project.name(), planPageTitle(level), levelPlanImage);
                 } else {
@@ -186,9 +177,7 @@ public final class ConstructionDrawingPdfService {
                 for (HeatingSurfacePosition surfacePosition : HeatingSurfacePosition.values()) {
                     if (hasHeatingSurfacePage(level, surfacePosition)) {
                         reportProgress(progressListener, completedSteps, totalSteps, heatingPageTitle(level, surfacePosition));
-                        BufferedImage heatingPlanImage = exportAssets.graphicVariant() == GraphicVariant.RASTERGRAFIK
-                                ? exportAssets.heatingPlanImages().get(heatingPageKey(level.name(), surfacePosition))
-                                : null;
+                        BufferedImage heatingPlanImage = exportAssets.heatingPlanImages().get(heatingPageKey(level.name(), surfacePosition));
                         if (heatingPlanImage != null) {
                             addRasterPage(document, project.name(), heatingPageTitle(level, surfacePosition), heatingPlanImage);
                         } else {

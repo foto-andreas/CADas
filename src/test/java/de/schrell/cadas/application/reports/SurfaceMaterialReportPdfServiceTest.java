@@ -41,7 +41,7 @@ class SurfaceMaterialReportPdfServiceTest {
 
         pdfService.export(report, targetFile);
 
-        assertStandardInhalt(targetFile, true);
+        assertStandardInhalt(targetFile, false);
         Files.deleteIfExists(targetFile);
     }
 
@@ -64,15 +64,12 @@ class SurfaceMaterialReportPdfServiceTest {
                 report,
                 targetFile,
                 new SurfaceMaterialReportPdfService.ExportAssets(
-                        SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK,
                         Map.of("Erdgeschoss", levelImage),
-                        Map.of("Erdgeschoss\u0000Wohnen\u0000Fußboden", heatingImage),
                         Map.of(SurfaceMaterialReportPdfService.materialLevelImageKey(report.materials().getFirst(), "Erdgeschoss"), levelImage),
                         Map.of(
                                 SurfaceMaterialReportPdfService.heatingLevelImageKey("Erdgeschoss", "Fußboden"), heatingImage,
                                 SurfaceMaterialReportPdfService.heatingLevelImageKey("Erdgeschoss", "Decke"), heatingImage
-                        ),
-                        Map.of()
+                        )
                 )
         );
 

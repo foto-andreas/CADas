@@ -171,7 +171,6 @@ class ConstructionDrawingPdfServiceTest {
                 target,
                 ConstructionDrawingOptions.defaults(),
                 new ConstructionDrawingPdfService.ExportAssets(
-                        ConstructionDrawingPdfService.GraphicVariant.RASTERGRAFIK,
                         Map.of("Erdgeschoss", filledImage(620, 420, new Color(226, 238, 228))),
                         Map.of("Erdgeschoss\u0000FLOOR", filledImage(620, 420, new Color(238, 230, 222)))
                 )

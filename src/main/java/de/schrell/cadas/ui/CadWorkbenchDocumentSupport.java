@@ -285,7 +285,6 @@ final class CadWorkbenchDocumentSupport {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".md");
             SurfaceMaterialReportPdfService.ExportAssets exportAssets = createExportAssets(
                     report,
-                    SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK,
                     (progress, message) -> {
                     }
             );
@@ -372,14 +371,10 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf() {
-        exportSurfaceMaterialReportPdf(null, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
+        exportSurfaceMaterialReportPdf((SurfaceMaterialReport) null);
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report) {
-        exportSurfaceMaterialReportPdf(report, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
-    }
-
-    void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant) {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Materialliste als PDF mit Rastergrafiken speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
@@ -389,7 +384,7 @@ final class CadWorkbenchDocumentSupport {
         if (file == null) {
             return;
         }
-        exportSurfaceMaterialReportPdf(report, file.toPath(), variant);
+        exportSurfaceMaterialReportPdf(report, file.toPath());
     }
 
     void exportSurfaceMaterialReportPdf(Path targetFile) {
@@ -397,10 +392,6 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile) {
-        exportSurfaceMaterialReportPdf(report, targetFile, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
-    }
-
-    void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant) {
         try {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
             runWithProgressDialog(
@@ -417,7 +408,6 @@ final class CadWorkbenchDocumentSupport {
                         }
                         SurfaceMaterialReportPdfService.ExportAssets exportAssets = createExportAssets(
                                 effectiveReport,
-                                variant,
                                 progress.range(assetStart, 0.85)
                         );
                         progress.update(0.9, "Materiallisten-PDF wird geschrieben");
@@ -434,54 +424,26 @@ final class CadWorkbenchDocumentSupport {
 
     private SurfaceMaterialReportPdfService.ExportAssets createExportAssets(
             SurfaceMaterialReport report,
-            SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant,
             ProgressCallback progress
     ) throws Exception {
-        boolean raster = variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK;
-        List<MaterialRoomCapture> materialCaptures = raster
-                ? List.of()
-                : report.materials().stream()
-                .filter(material -> material.surfaceType() == SurfaceType.FLOOR)
-                .flatMap(material -> material.roomEntries().stream()
-                        .map(entry -> new MaterialRoomCapture(material, entry)))
-                .toList();
-        List<MaterialLevelCapture> materialLevelCaptures = raster
-                ? report.materials().stream()
+        List<MaterialLevelCapture> materialLevelCaptures = report.materials().stream()
                 .filter(material -> material.surfaceType() == SurfaceType.FLOOR)
                 .flatMap(material -> material.roomEntries().stream()
                         .map(SurfaceMaterialListService.MaterialRoomEntry::levelName)
                         .distinct()
                         .map(levelName -> new MaterialLevelCapture(material, levelName)))
-                .toList()
-                : List.of();
-        List<HeatingPlanCapture> heatingLevelCaptures = raster
-                ? materialHeatingLevelCaptures(report)
-                : List.of();
-        int totalSteps = Math.max(1, owner.project.levels().size() + materialCaptures.size() + materialLevelCaptures.size() + heatingLevelCaptures.size());
+                .toList();
+        List<HeatingPlanCapture> heatingLevelCaptures = materialHeatingLevelCaptures(report);
+        int totalSteps = Math.max(1, owner.project.levels().size() + materialLevelCaptures.size() + heatingLevelCaptures.size());
         int completedSteps = 0;
         Map<String, BufferedImage> levelPlanImages = new LinkedHashMap<>();
         for (Level level : owner.project.levels()) {
             progress.update(completedSteps / (double) totalSteps, "2D-Ansicht " + level.name() + " wird erstellt");
-            levelPlanImages.put(level.name(), raster
-                    ? captureMaterialOverviewImage(level.name())
-                    : captureLevelPlanImage(level.name()));
+            levelPlanImages.put(level.name(), captureMaterialOverviewImage(level.name()));
             completedSteps++;
         }
-        Map<String, BufferedImage> heatingPlanImages = new LinkedHashMap<>();
         Map<String, BufferedImage> materialLevelImages = new LinkedHashMap<>();
         Map<String, BufferedImage> heatingLevelImages = new LinkedHashMap<>();
-        Map<String, BufferedImage> materialRoomImages = new LinkedHashMap<>();
-        for (MaterialRoomCapture capture : materialCaptures) {
-            progress.update(completedSteps / (double) totalSteps, "Raumgrafik " + capture.entry().roomName() + " wird erstellt");
-            BufferedImage image = captureMaterialRoomImage(capture.material(), capture.entry());
-            if (image != null) {
-                materialRoomImages.put(
-                        SurfaceMaterialReportPdfService.materialRoomImageKey(capture.material(), capture.entry()),
-                        image
-                );
-            }
-            completedSteps++;
-        }
         for (MaterialLevelCapture capture : materialLevelCaptures) {
             progress.update(completedSteps / (double) totalSteps, "Belag " + capture.material().name() + " – " + capture.levelName() + " wird gerastert");
             BufferedImage image = captureMaterialLevelImage(capture.material(), capture.levelName());
@@ -503,21 +465,18 @@ final class CadWorkbenchDocumentSupport {
         }
         progress.update(1.0, "Materialgrafiken abgeschlossen");
         return new SurfaceMaterialReportPdfService.ExportAssets(
-                variant,
                 levelPlanImages,
-                heatingPlanImages,
                 materialLevelImages,
-                heatingLevelImages,
-                materialRoomImages
+                heatingLevelImages
         );
-    }
-
-    private BufferedImage captureLevelPlanImage(String levelName) throws Exception {
-        return runOnFxThread(() -> SwingFXUtils.fromFXImage(owner.reportLevelSnapshot(levelName), null));
     }
 
     private BufferedImage captureMaterialOverviewImage(String levelName) throws Exception {
         return runOnFxThread(() -> SwingFXUtils.fromFXImage(owner.reportMaterialOverviewSnapshot(levelName), null));
+    }
+
+    private BufferedImage captureLevelPlanImage(String levelName) throws Exception {
+        return runOnFxThread(() -> SwingFXUtils.fromFXImage(owner.reportLevelSnapshot(levelName), null));
     }
 
     private List<HeatingPlanCapture> materialHeatingLevelCaptures(SurfaceMaterialReport report) {
@@ -616,34 +575,6 @@ final class CadWorkbenchDocumentSupport {
         return captureFilteredLevelPlanImage(level.name(), visibleLayerIds, false);
     }
 
-    private BufferedImage captureMaterialRoomImage(
-            SurfaceMaterialListService.MaterialSummary material,
-            SurfaceMaterialListService.MaterialRoomEntry entry
-    ) throws Exception {
-        Level level = owner.project.levels().stream()
-                .filter(candidate -> candidate.name().equals(entry.levelName()))
-                .findFirst()
-                .orElse(null);
-        if (level == null) {
-            return null;
-        }
-        Room room = level.rooms().stream()
-                .filter(candidate -> candidate.name().equals(entry.roomName()))
-                .findFirst()
-                .orElse(null);
-        if (room == null) {
-            return null;
-        }
-        Set<java.util.UUID> visibleLayerIds = materialLayerIds(level, room, material);
-        if (visibleLayerIds.isEmpty()) {
-            return null;
-        }
-        return runOnFxThread(() -> SwingFXUtils.fromFXImage(
-                owner.reportRoomSnapshot(level.name(), room.outline(), visibleLayerIds, false),
-                null
-        ));
-    }
-
     private ConstructionDrawingPdfService.ExportAssets createConstructionDrawingExportAssets(ProgressCallback progress) throws Exception {
         List<HeatingPlanCapture> heatingCaptures = new ArrayList<>();
         for (Level level : owner.project.levels()) {
@@ -682,7 +613,6 @@ final class CadWorkbenchDocumentSupport {
         }
         progress.update(1.0, "Rastergrafiken abgeschlossen");
         return new ConstructionDrawingPdfService.ExportAssets(
-                ConstructionDrawingPdfService.GraphicVariant.RASTERGRAFIK,
                 levelPlanImages,
                 heatingPlanImages
         );
@@ -822,12 +752,6 @@ final class CadWorkbenchDocumentSupport {
     }
 
     private record MaterialReportWindowContent(SurfaceMaterialReport report, String renderedHtml) {
-    }
-
-    private record MaterialRoomCapture(
-            SurfaceMaterialListService.MaterialSummary material,
-            SurfaceMaterialListService.MaterialRoomEntry entry
-    ) {
     }
 
     private record MaterialLevelCapture(

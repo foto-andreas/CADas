@@ -56,34 +56,21 @@ public final class SurfaceMaterialReportPdfService {
     private static final Color SVG_FRAME_FILL = new Color(252, 252, 250);
     private static final Color SVG_FRAME_STROKE = new Color(182, 186, 191);
     private static final float SVG_INNER_PADDING = 10.0f;
-    private static final float SVG_MAX_HEIGHT = 240.0f;
-    private static final float HEATING_PLAN_MAX_HEIGHT = SVG_MAX_HEIGHT * 1.8f;
     private static final float LEVEL_PLAN_MAX_HEIGHT = 220.0f;
 
-    public enum HeatingPlanGraphicVariant {
-        SVG,
-        RASTERGRAFIK
-    }
-
     public record ExportAssets(
-            HeatingPlanGraphicVariant heatingPlanGraphicVariant,
             Map<String, BufferedImage> levelPlanImages,
-            Map<String, BufferedImage> heatingPlanImages,
             Map<String, BufferedImage> materialLevelImages,
-            Map<String, BufferedImage> heatingLevelImages,
-            Map<String, BufferedImage> materialRoomImages
+            Map<String, BufferedImage> heatingLevelImages
     ) {
         public ExportAssets {
-            Objects.requireNonNull(heatingPlanGraphicVariant, "heatingPlanGraphicVariant darf nicht null sein.");
             levelPlanImages = Map.copyOf(levelPlanImages);
-            heatingPlanImages = Map.copyOf(heatingPlanImages);
             materialLevelImages = Map.copyOf(materialLevelImages);
             heatingLevelImages = Map.copyOf(heatingLevelImages);
-            materialRoomImages = Map.copyOf(materialRoomImages);
         }
 
         public static ExportAssets empty() {
-            return new ExportAssets(HeatingPlanGraphicVariant.SVG, Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+            return new ExportAssets(Map.of(), Map.of(), Map.of());
         }
     }
 
@@ -107,18 +94,12 @@ public final class SurfaceMaterialReportPdfService {
         try (PDDocument document = new PDDocument()) {
             try (PdfWriter writer = new PdfWriter(document)) {
                 writer.title("Räume und Materialien - " + report.projectName());
-                appendRooms(
-                        writer,
-                        report.rooms(),
-                        exportAssets.heatingPlanGraphicVariant() == HeatingPlanGraphicVariant.RASTERGRAFIK
-                                ? Map.of()
-                                : exportAssets.levelPlanImages()
-                );
+                appendRooms(writer, report.rooms(), Map.of());
                 appendRasterOverviewAndMaterialPages(writer, report, exportAssets);
                 appendMaterialSummary(writer, report.materials());
                 appendHeatingPlans(writer, report.heatingPlans(), exportAssets);
                 appendHeatingElements(writer, report.heatingElements());
-                appendMaterialDetails(writer, report.materials(), exportAssets.materialRoomImages());
+                appendMaterialDetails(writer, report.materials());
                 appendRoomComplexities(writer, report.roomComplexities());
             }
             saveAtomically(document, exportPath);
@@ -191,9 +172,6 @@ public final class SurfaceMaterialReportPdfService {
             SurfaceMaterialListService.SurfaceMaterialReport report,
             ExportAssets exportAssets
     ) throws IOException {
-        if (exportAssets.heatingPlanGraphicVariant() != HeatingPlanGraphicVariant.RASTERGRAFIK) {
-            return;
-        }
         LinkedHashSet<String> levelNames = new LinkedHashSet<>();
         report.rooms().stream().map(SurfaceMaterialListService.RoomSummary::levelName).forEach(levelNames::add);
         levelNames.addAll(exportAssets.levelPlanImages().keySet());
@@ -349,29 +327,7 @@ public final class SurfaceMaterialReportPdfService {
                         ))
                         .toList()
         );
-        if (exportAssets.heatingPlanGraphicVariant() == HeatingPlanGraphicVariant.RASTERGRAFIK) {
-            appendRasterHeatingPlanPages(writer, heatingPlans, exportAssets);
-            return;
-        }
-        writer.subsection("Heizplan-Grafiken");
-        Map<String, List<SurfaceMaterialListService.HeatingPlanSummary>> groupedPlans = heatingPlans.stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        plan -> plan.levelName() + "\u0000" + plan.roomName() + "\u0000" + plan.surfacePosition(),
-                        LinkedHashMap::new,
-                        java.util.stream.Collectors.toList()
-                ));
-        for (List<SurfaceMaterialListService.HeatingPlanSummary> plans : groupedPlans.values()) {
-            SurfaceMaterialListService.HeatingPlanSummary first = plans.getFirst();
-            String title = "Heizplan " + first.levelName() + " / " + first.roomName() + " / " + first.surfacePosition();
-            BufferedImage heatingPlanImage = exportAssets.heatingPlanImages().get(heatingPlanImageKey(first));
-            if (exportAssets.heatingPlanGraphicVariant() == HeatingPlanGraphicVariant.RASTERGRAFIK && heatingPlanImage != null) {
-                writer.imageBlock(title, heatingPlanImage, HEATING_PLAN_MAX_HEIGHT);
-            } else if (!first.svg().isBlank()) {
-                writer.svgBlock(title, first.svg(), HEATING_PLAN_MAX_HEIGHT);
-            } else {
-                writer.paragraph(title + ": Keine Raumgrafik verfügbar.");
-            }
-        }
+        appendRasterHeatingPlanPages(writer, heatingPlans, exportAssets);
     }
 
     private void appendRasterHeatingPlanPages(
@@ -395,10 +351,6 @@ public final class SurfaceMaterialReportPdfService {
                 }
             }
         }
-    }
-
-    private String heatingPlanImageKey(SurfaceMaterialListService.HeatingPlanSummary heatingPlan) {
-        return heatingPlan.levelName() + "\u0000" + heatingPlan.roomName() + "\u0000" + heatingPlan.surfacePosition();
     }
 
     private void appendHeatingElements(PdfWriter writer, List<SurfaceMaterialListService.HeatingElementSummary> heatingElements) throws IOException {
@@ -438,11 +390,7 @@ public final class SurfaceMaterialReportPdfService {
         );
     }
 
-    private void appendMaterialDetails(
-            PdfWriter writer,
-            List<SurfaceMaterialListService.MaterialSummary> materials,
-            Map<String, BufferedImage> materialRoomImages
-    ) throws IOException {
+    private void appendMaterialDetails(PdfWriter writer, List<SurfaceMaterialListService.MaterialSummary> materials) throws IOException {
         writer.section("Beläge");
         if (materials.isEmpty()) {
             writer.paragraph("Keine Beläge vorhanden.");
@@ -504,7 +452,6 @@ public final class SurfaceMaterialReportPdfService {
                                 .toList()
                 );
             }
-            appendMaterialRoomImages(writer, material, materialRoomImages);
             writer.caption("Belegte Flächen");
             writer.table(
                     roomEntryTable,
@@ -520,30 +467,6 @@ public final class SurfaceMaterialReportPdfService {
                             .toList()
             );
         }
-    }
-
-    private void appendMaterialRoomImages(
-            PdfWriter writer,
-            SurfaceMaterialListService.MaterialSummary material,
-            Map<String, BufferedImage> materialRoomImages
-    ) throws IOException {
-        if (material.surfaceType() != de.schrell.cadas.domain.model.SurfaceType.FLOOR) {
-            return;
-        }
-        for (SurfaceMaterialListService.MaterialRoomEntry entry : material.roomEntries()) {
-            BufferedImage image = materialRoomImages.get(materialRoomImageKey(material, entry));
-            if (image == null) {
-                continue;
-            }
-            writer.imageBlock("2D-Ansicht " + entry.levelName() + " / " + entry.roomName(), image, LEVEL_PLAN_MAX_HEIGHT);
-        }
-    }
-
-    public static String materialRoomImageKey(
-            SurfaceMaterialListService.MaterialSummary material,
-            SurfaceMaterialListService.MaterialRoomEntry entry
-    ) {
-        return material.lookupKey() + "\u0000" + entry.levelName() + "\u0000" + entry.roomName() + "\u0000" + entry.surfaceDescription();
     }
 
     public static String materialLevelImageKey(SurfaceMaterialListService.MaterialSummary material, String levelName) {
@@ -683,7 +606,6 @@ public final class SurfaceMaterialReportPdfService {
     private static final class PdfWriter implements AutoCloseable {
 
         private final PDDocument document;
-        private final SvgRenderer svgRenderer = new SvgRenderer();
         private PageCanvas canvas;
         private float y;
         private String documentTitle;
@@ -743,34 +665,6 @@ public final class SurfaceMaterialReportPdfService {
                 rowIndex++;
             }
             gap(8.0f);
-        }
-
-        private void svgBlock(String title, String svgMarkup, float maximumHeight) throws IOException {
-            SvgDocument svg = svgRenderer.parse(svgMarkup);
-            float frameWidth = availableWidth();
-            float innerWidth = frameWidth - SVG_INNER_PADDING * 2.0f;
-            float svgHeight = svg.scaledHeight(innerWidth, maximumHeight);
-            float blockHeight = estimateWrappedHeight(normalize(title), FONT_BOLD, SUBSECTION_FONT_SIZE, availableWidth())
-                    + 4.0f
-                    + svgHeight
-                    + SVG_INNER_PADDING * 2.0f
-                    + 6.0f;
-            if (!hasSpace(blockHeight)) {
-                newPage();
-            }
-            writeWrappedText(normalize(title), FONT_BOLD, SUBSECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 3.0f);
-            float top = y;
-            float frameHeight = svgHeight + SVG_INNER_PADDING * 2.0f;
-            canvas.rectangle(PAGE_MARGIN, top - frameHeight, frameWidth, frameHeight, 0.65f, SVG_FRAME_STROKE, SVG_FRAME_FILL);
-            svgRenderer.render(
-                    canvas,
-                    svg,
-                    PAGE_MARGIN + SVG_INNER_PADDING,
-                    top - SVG_INNER_PADDING,
-                    innerWidth,
-                    svgHeight
-            );
-            y = top - frameHeight - 6.0f;
         }
 
         private void imageBlock(String title, BufferedImage image, float maximumHeight) throws IOException {
