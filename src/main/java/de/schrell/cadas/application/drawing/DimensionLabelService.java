@@ -7,7 +7,7 @@ import java.util.Locale;
 /**
  * Zentraler Aufbau der Maßtexte für 2D-Ansicht und Bauzeichnung-PDF.
  *
- * <p>Je nach {@link DimensionLabelOptions} wird entweder der vollständige Text
+ * <p>Je nach {@link DimensionTextStyle} wird entweder der vollständige Text
  * ("Küche: Raummaß 0,90 m" / "Außenmaß 4,20 m") oder nur die nackte Länge ("0,90 m")
  * geliefert. So bauen 2D und PDF die Maßtexte identisch auf.</p>
  */
@@ -18,11 +18,11 @@ public final class DimensionLabelService {
      *
      * @param dimension die fachliche Seitendimension (enthält Raumname und Länge)
      * @param exterior  {@code true} für das Außenmaß, {@code false} für ein Raummaß
-     * @param options   die aktiven Texteinstellungen
+     * @param textStyle die aktive Texteinstellung
      * @return der formatierte Maßtext
      */
-    public String label(WallDimensionService.SideDimension dimension, boolean exterior, DimensionLabelOptions options) {
-        return label(dimension.name(), dimension.length(), exterior, options);
+    public String label(WallDimensionService.SideDimension dimension, boolean exterior, DimensionTextStyle textStyle) {
+        return label(dimension.name(), dimension.length(), exterior, textStyle);
     }
 
     public String deduplicationKey(WallDimensionService.SideDimension dimension, boolean exterior) {
@@ -46,11 +46,11 @@ public final class DimensionLabelService {
      * @param name     Anzeigename (z. B. Raumname oder "Achsmaß")
      * @param length   die zu beschriftende Länge
      * @param exterior {@code true} für ein Außenmaß, {@code false} für ein Raummaß
-     * @param options  die aktiven Texteinstellungen
+     * @param textStyle die aktive Texteinstellung
      * @return der formatierte Maßtext
      */
-    public String label(String name, Length length, boolean exterior, DimensionLabelOptions options) {
-        if (!options.showsFullText()) {
+    public String label(String name, Length length, boolean exterior, DimensionTextStyle textStyle) {
+        if (textStyle != DimensionTextStyle.FULL) {
             return formatLength(length);
         }
         if (exterior) {

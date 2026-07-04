@@ -12,7 +12,6 @@ import static de.schrell.cadas.ui.CadWorkbenchCoveringSourceSupport.formatCoveri
 
 import de.schrell.cadas.application.drawing.DraftingConstraints;
 import de.schrell.cadas.application.drawing.DraftingService;
-import de.schrell.cadas.application.drawing.DimensionLabelOptions;
 import de.schrell.cadas.application.drawing.DimensionLabelPlacementService;
 import de.schrell.cadas.application.drawing.DimensionLabelService;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
@@ -553,10 +552,10 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
             drawReportInteriorRoomDimensions(graphics, seedBlockers);
             return;
         }
-        DimensionLabelOptions options = currentDimensionLabelOptions();
+        DimensionTextStyle textStyle = currentDimensionTextStyle();
         List<PendingWallDimensionLabel> pendingLabels = new ArrayList<>();
         for (Wall wall : activeLevel.get().walls()) {
-            appendWallDimensionLabels(pendingLabels, wall, options);
+            appendWallDimensionLabels(pendingLabels, wall, textStyle);
         }
         List<RenderedWallDimensionLabel> placed = dimensionLabelPlacementService.place(
                 pendingLabels,
@@ -676,7 +675,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
         );
     }
 
-    void appendWallDimensionLabels(List<PendingWallDimensionLabel> pendingLabels, Wall wall, DimensionLabelOptions options) {
+    void appendWallDimensionLabels(List<PendingWallDimensionLabel> pendingLabels, Wall wall, DimensionTextStyle textStyle) {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(activeLevel.get(), wall);
         double isoExtra = currentDimensionStandard() == DimensionStandard.DIN_EN_ISO_7519_2025_01 ? 12.0 : 0.0;
         double baseOffset = Math.max(wall.thickness().toMillimeters() * scale() / 2.0 + 16.0 + isoExtra, 28.0 + isoExtra);
@@ -692,7 +691,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
             WallDimensionService.SideDimension dimension = placement.dimension();
             pendingLabels.add(new PendingWallDimensionLabel(
                     dimension.dimensionSegment(),
-                    dimensionLabelService.label(dimension, placement.exterior(), options),
+                    dimensionLabelService.label(dimension, placement.exterior(), textStyle),
                     placement.normalOffset(),
                     placement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, placement.normalOffset()),
@@ -709,7 +708,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
             );
             pendingLabels.add(new PendingWallDimensionLabel(
                     wall.axis(),
-                    dimensionLabelService.label("Achsmaß", wall.axis().length(), false, options),
+                    dimensionLabelService.label("Achsmaß", wall.axis().length(), false, textStyle),
                     axisPlacement.normalOffset(),
                     axisPlacement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, axisPlacement.normalOffset()),

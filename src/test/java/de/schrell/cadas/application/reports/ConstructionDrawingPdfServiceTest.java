@@ -1,6 +1,5 @@
 package de.schrell.cadas.application.reports;
 
-import de.schrell.cadas.application.drawing.DimensionLabelOptions;
 import de.schrell.cadas.application.drawing.DimensionTextStyle;
 import de.schrell.cadas.domain.geometry.Angle;
 import de.schrell.cadas.domain.geometry.Length;
@@ -316,7 +315,7 @@ class ConstructionDrawingPdfServiceTest {
         ProjectModel project = sampleProject();
         Path target = tempDir.resolve("bauzeichnung_nurLaenge.pdf");
         ConstructionDrawingOptions options = new ConstructionDrawingOptions(
-                DimensionLabelOptions.lengthOnly(), true, true
+                DimensionTextStyle.LENGTH_ONLY, true, true
         );
 
         new ConstructionDrawingPdfService().export(project, target, options);
@@ -333,7 +332,7 @@ class ConstructionDrawingPdfServiceTest {
         ProjectModel project = sampleProject();
         Path target = tempDir.resolve("bauzeichnung_voll.pdf");
         ConstructionDrawingOptions options = new ConstructionDrawingOptions(
-                DimensionLabelOptions.full(), true, true
+                DimensionTextStyle.FULL, true, true
         );
 
         new ConstructionDrawingPdfService().export(project, target, options);
@@ -350,7 +349,7 @@ class ConstructionDrawingPdfServiceTest {
         ProjectModel project = sampleProject();
         Path target = tempDir.resolve("bauzeichnung_ohneBemaßung.pdf");
         ConstructionDrawingOptions options = new ConstructionDrawingOptions(
-                DimensionLabelOptions.full(), false, true
+                DimensionTextStyle.FULL, false, true
         );
 
         new ConstructionDrawingPdfService().export(project, target, options);

@@ -12,7 +12,6 @@ import static de.schrell.cadas.ui.CadWorkbenchCoveringSourceSupport.formatCoveri
 
 import de.schrell.cadas.application.drawing.DraftingConstraints;
 import de.schrell.cadas.application.drawing.DraftingService;
-import de.schrell.cadas.application.drawing.DimensionLabelOptions;
 import de.schrell.cadas.application.drawing.DimensionLabelPlacementService;
 import de.schrell.cadas.application.drawing.DimensionLabelService;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
@@ -441,7 +440,7 @@ abstract class CadWorkbenchContracts extends BorderPane {
 
     abstract PlanPoint offsetPoint(PlanPoint point, double unitX, double unitY, double offsetMillimeters);
 
-    abstract void appendWallDimensionLabels(List<PendingWallDimensionLabel> pendingLabels, Wall wall, DimensionLabelOptions options);
+    abstract void appendWallDimensionLabels(List<PendingWallDimensionLabel> pendingLabels, Wall wall, DimensionTextStyle textStyle);
 
     abstract RenderedWallDimensionLabel layoutWallDimensionLabel(PendingWallDimensionLabel pendingLabel, double normalOffset);
 

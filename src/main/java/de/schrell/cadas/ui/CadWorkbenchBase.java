@@ -12,7 +12,6 @@ import static de.schrell.cadas.ui.CadWorkbenchCoveringSourceSupport.formatCoveri
 
 import de.schrell.cadas.application.drawing.DraftingConstraints;
 import de.schrell.cadas.application.drawing.DraftingService;
-import de.schrell.cadas.application.drawing.DimensionLabelOptions;
 import de.schrell.cadas.application.drawing.DimensionLabelPlacementService;
 import de.schrell.cadas.application.drawing.DimensionLabelService;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
@@ -715,8 +714,8 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
 
 
 
-    DimensionLabelOptions currentDimensionLabelOptions() {
-        return new DimensionLabelOptions(dimensionTextStyle.get());
+    DimensionTextStyle currentDimensionTextStyle() {
+        return dimensionTextStyle.get();
     }
 
 

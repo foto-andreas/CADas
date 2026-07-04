@@ -1,9 +1,9 @@
 package de.schrell.cadas.application.reports;
 
-import de.schrell.cadas.application.drawing.DimensionLabelOptions;
 import de.schrell.cadas.application.drawing.DimensionLabelPlacementService;
 import de.schrell.cadas.application.drawing.DimensionLabelService;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
+import de.schrell.cadas.application.drawing.DimensionTextStyle;
 import de.schrell.cadas.application.drawing.TextBlockingBox;
 import de.schrell.cadas.application.drawing.WallDimensionPlacementService;
 import de.schrell.cadas.application.drawing.WallDimensionService;
@@ -1098,10 +1098,10 @@ public final class ConstructionDrawingPdfService {
     }
 
     private void drawWallDimensions(PageCanvas canvas, Viewport viewport, Level level, ConstructionDrawingOptions options, List<TextBlockingBox> seedBlockers) throws IOException {
-        DimensionLabelOptions labelOptions = options.dimensionLabelOptions();
+        DimensionTextStyle textStyle = options.dimensionTextStyle();
         List<PdfPendingDimension> pending = new ArrayList<>();
         for (Wall wall : level.walls()) {
-            appendPdfWallDimensions(pending, level, wall, viewport, labelOptions);
+            appendPdfWallDimensions(pending, level, wall, viewport, textStyle);
         }
         List<PdfPlacedDimension> placed = dimensionLabelPlacementService.place(
                 pending,
@@ -1113,7 +1113,7 @@ public final class ConstructionDrawingPdfService {
         }
     }
 
-    private void appendPdfWallDimensions(List<PdfPendingDimension> pending, Level level, Wall wall, Viewport viewport, DimensionLabelOptions options) {
+    private void appendPdfWallDimensions(List<PdfPendingDimension> pending, Level level, Wall wall, Viewport viewport, DimensionTextStyle textStyle) {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(level, wall);
         double baseOffset = pdfDimensionBaseOffset(wall, viewport.factor());
         double stepOffset = 16.0;
@@ -1123,7 +1123,7 @@ public final class ConstructionDrawingPdfService {
             WallDimensionService.SideDimension dimension = placement.dimension();
             pending.add(new PdfPendingDimension(
                     dimension.dimensionSegment(),
-                    dimensionLabelService.label(dimension, placement.exterior(), options),
+                    dimensionLabelService.label(dimension, placement.exterior(), textStyle),
                     placement.normalOffset(),
                     placement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, placement.normalOffset()),
@@ -1137,7 +1137,7 @@ public final class ConstructionDrawingPdfService {
             );
             pending.add(new PdfPendingDimension(
                     wall.axis(),
-                    dimensionLabelService.label("Achsmaß", wall.axis().length(), false, options),
+                    dimensionLabelService.label("Achsmaß", wall.axis().length(), false, textStyle),
                     axis.normalOffset(),
                     axis.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, axis.normalOffset()),
@@ -1163,7 +1163,7 @@ public final class ConstructionDrawingPdfService {
             Viewport viewport = centeredViewport(buildingBounds, scale);
             List<PdfPendingDimension> pending = new ArrayList<>();
             for (Wall wall : level.walls()) {
-                appendPdfWallDimensions(pending, level, wall, viewport, options.dimensionLabelOptions());
+                appendPdfWallDimensions(pending, level, wall, viewport, options.dimensionTextStyle());
             }
             List<PdfPlacedDimension> placed = dimensionLabelPlacementService.place(
                     pending,

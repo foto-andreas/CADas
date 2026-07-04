@@ -225,7 +225,7 @@ final class CadWorkbenchDocumentSupport {
                 return;
             }
             ConstructionDrawingOptions options = new ConstructionDrawingOptions(
-                    owner.currentDimensionLabelOptions(),
+                    owner.currentDimensionTextStyle(),
                     owner.showDimensions.get(),
                     owner.showAreaVolume.get()
             );
