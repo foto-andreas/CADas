@@ -567,15 +567,21 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
             // In der Automatisierung Overwrite ohne Nachfrage bestätigen, damit Aktionen nicht hängen.
             return true;
         }
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, content, ButtonType.CANCEL, ButtonType.OK);
+        ButtonType overwriteButton = new ButtonType("Überschreiben", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelButton = new ButtonType("Abbrechen", ButtonBar.ButtonData.CANCEL_CLOSE);
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, content, cancelButton, overwriteButton);
         alert.setTitle(title);
         alert.setHeaderText(header);
         Window owner = getScene() != null ? getScene().getWindow() : null;
         if (owner != null) {
             alert.initOwner(owner);
         }
+        applyTooltip(alert.getDialogPane().lookupButton(overwriteButton),
+                "Ersetzt die vorhandene Datei beziehungsweise das vorhandene Preset durch die neu gewählten Daten.");
+        applyTooltip(alert.getDialogPane().lookupButton(cancelButton),
+                "Bricht den Vorgang ab und lässt die vorhandenen Daten unverändert.");
         return alert.showAndWait()
-                .filter(ButtonType.OK::equals)
+                .filter(overwriteButton::equals)
                 .isPresent();
     }
 
@@ -609,7 +615,6 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
         if (preset == null) {
             return;
         }
-        roomObjectNameField.setText(preset.name());
         setLengthInput(roomObjectWidthField, roomObjectWidthUnit, preset.width(), LengthUnit.CENTIMETER);
         setLengthInput(roomObjectDepthField, roomObjectDepthUnit, preset.depth(), LengthUnit.CENTIMETER);
         setLengthInput(roomObjectHeightField, roomObjectHeightUnit, preset.height(), LengthUnit.CENTIMETER);

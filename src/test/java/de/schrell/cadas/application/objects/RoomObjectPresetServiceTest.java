@@ -11,6 +11,10 @@ import de.schrell.cadas.application.dwg.DwgConversionResult;
 import de.schrell.cadas.application.dwg.DwgLibraryAnalyzer;
 import de.schrell.cadas.application.dwg.DwgToDxfConverter;
 import de.schrell.cadas.application.dwg.DwgUnit;
+import de.schrell.cadas.domain.geometry.Length;
+import de.schrell.cadas.domain.geometry.LengthUnit;
+import de.schrell.cadas.domain.geometry.PlanPoint;
+import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 
@@ -39,6 +43,20 @@ class RoomObjectPresetServiceTest {
         RoomObjectPreset cuboid = presets.stream().filter(preset -> preset.type() == RoomObjectType.CUBOID).findFirst().orElseThrow();
         assertEquals("custom-cuboid", cuboid.id());
         assertEquals(1000.0, cuboid.width().toMillimeters(), 0.001);
+    }
+
+    @Test
+    void zeigtElementnamenVorPresetnamenUndPresetnamenVorTyp() {
+        RoomObjectPresetService service = new RoomObjectPresetService(tempDir);
+        RoomObject benannt = object("table-round", "Esstisch", RoomObjectType.TABLE);
+        RoomObject unbenannt = object("table-round", "", RoomObjectType.TABLE);
+        RoomObject unbekanntesPreset = object("extern", "", RoomObjectType.TABLE);
+        RoomObject temporärerDwgBlock = object("dwg-partner-spiegel", "", RoomObjectType.DWG_REFERENCE, "Partner.dwg#Spiegel");
+
+        assertEquals("Esstisch", service.displayName(benannt));
+        assertEquals("Tisch rund 110", service.displayName(unbenannt));
+        assertEquals("Tisch", service.displayName(unbekanntesPreset));
+        assertEquals("DWG-Objekt: Spiegel", service.displayName(temporärerDwgBlock, List.of()));
     }
 
     @Test
@@ -161,5 +179,24 @@ class RoomObjectPresetServiceTest {
         public DwgConversionResult convert(Path dwgFile, Path targetDxfFile) throws IOException {
             throw new IOException("nicht verfügbar");
         }
+    }
+
+    private RoomObject object(String presetId, String name, RoomObjectType type) {
+        return object(presetId, name, type, "");
+    }
+
+    private RoomObject object(String presetId, String name, RoomObjectType type, String source) {
+        return RoomObject.create(
+                presetId,
+                name,
+                type,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(0, 0),
+                Length.of(100, LengthUnit.CENTIMETER),
+                Length.of(100, LengthUnit.CENTIMETER),
+                Length.of(100, LengthUnit.CENTIMETER),
+                false,
+                source
+        );
     }
 }

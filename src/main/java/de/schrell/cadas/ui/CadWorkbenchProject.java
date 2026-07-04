@@ -373,7 +373,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
 
     String currentRoomObjectName(RoomObjectPreset preset) {
         String name = roomObjectNameField.getText();
-        return name == null || name.isBlank() ? Optional.ofNullable(preset).map(RoomObjectPreset::name).orElse("Objekt") : name.trim();
+        return name == null ? "" : name.trim();
     }
 
     Length currentRoomObjectDepth(RoomObjectPreset preset) {
@@ -1056,17 +1056,22 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     }
 
     void saveCurrentLevelAs() {
-        FileChooser fileChooser = createCadasFileChooser();
         String levelName = exchangeFileNameService.stripRepeatedExtension(Path.of(activeLevel.get().name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(levelName);
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        java.io.File file = fileChooser.showSaveDialog(window);
-        if (file == null) {
+        Optional<Path> selectedTarget = WriteTargetDialog.choose(
+                this,
+                "Etage sichern als ...",
+                "Schreibziel festlegen",
+                levelName
+        );
+        if (selectedTarget.isEmpty()) {
             return;
         }
-        Path targetFile = file.toPath();
+        Path targetFile = selectedTarget.orElseThrow();
         if (!targetFile.getFileName().toString().contains(".")) {
             targetFile = exchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
+        }
+        if (!WriteTargetDialog.confirmOverwrite(this, targetFile, "Etage")) {
+            return;
         }
         String newLevelName = exchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
         if (!newLevelName.isBlank() && !newLevelName.equals(activeLevel.get().name())) {
@@ -1107,17 +1112,22 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     }
 
     void saveProjectAs() {
-        FileChooser fileChooser = createCadasFileChooser();
         String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName);
-        Window window = getScene() != null ? getScene().getWindow() : null;
-        java.io.File file = fileChooser.showSaveDialog(window);
-        if (file == null) {
+        Optional<Path> selectedTarget = WriteTargetDialog.choose(
+                this,
+                "Gebäude sichern als ...",
+                "Schreibziel festlegen",
+                projectName
+        );
+        if (selectedTarget.isEmpty()) {
             return;
         }
-        Path targetFile = file.toPath();
+        Path targetFile = selectedTarget.orElseThrow();
         if (!targetFile.getFileName().toString().contains(".")) {
             targetFile = exchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
+        }
+        if (!WriteTargetDialog.confirmOverwrite(this, targetFile, "Gebäude")) {
+            return;
         }
         String newProjectName = exchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
         if (!newProjectName.isBlank() && !newProjectName.equals(project.name())) {

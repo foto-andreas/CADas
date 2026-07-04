@@ -9,6 +9,7 @@ import de.schrell.cadas.application.layers.TileLayoutService;
 import de.schrell.cadas.application.layers.TilePlacement;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.layers.WallSurfaceSideService;
+import de.schrell.cadas.application.objects.RoomObjectPresetService;
 import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.layers.WallSurfaceTargetKey;
 import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService;
@@ -56,6 +57,7 @@ public final class SurfaceMaterialListService {
     private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
+    private final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
 
     public static String materialLookupKey(SurfaceType surfaceType, SurfaceLayer layer) {
         return layer.name() + "|" + MaterialProperties.from(surfaceType, layer).materialKey();
@@ -128,7 +130,7 @@ public final class SurfaceMaterialListService {
                 )));
         roomHeatingOutputService.heatingElements(level, room).forEach(element -> addHeatingDevice(
                 devices,
-                element.heatingType() + " / " + element.objectType(),
+                element.heatingType() + " / " + element.objectName(),
                 element.heatOutputWatts()
         ));
         if (devices.isEmpty()) {
@@ -274,7 +276,7 @@ public final class SurfaceMaterialListService {
             svg.append("<text x=\"").append(decimal(roomObject.center().xMillimeters(), 1))
                     .append("\" y=\"").append(decimal(roomObject.center().yMillimeters(), 1))
                     .append("\" text-anchor=\"middle\" font-family=\"Menlo, monospace\" font-size=\"96\" fill=\"#6b2f18\">")
-                    .append(roomObject.name())
+                    .append(roomObjectPresetService.displayName(roomObject))
                     .append(" ")
                     .append(decimal(roomObject.heatOutputWatts(), 0))
                     .append(" W</text>");

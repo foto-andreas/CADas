@@ -10,6 +10,7 @@ import de.schrell.cadas.application.drawing.WallDimensionService;
 import de.schrell.cadas.application.heating.RoomHeatingOutputService;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
+import de.schrell.cadas.application.objects.RoomObjectPresetService;
 import de.schrell.cadas.application.view.ProjectionMode;
 import de.schrell.cadas.application.terrain.TerrainContourService;
 import de.schrell.cadas.application.terrain.TerrainProfileService;
@@ -92,6 +93,7 @@ public final class ConstructionDrawingPdfService {
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
+    private final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
     private final WallPlanOutlineService wallPlanOutlineService = new WallPlanOutlineService();
     private final TerrainContourService terrainContourService = new TerrainContourService();
     private final TerrainProfileService terrainProfileService = new TerrainProfileService();
@@ -541,7 +543,7 @@ public final class ConstructionDrawingPdfService {
             return String.format(
                     Locale.GERMAN,
                     "%s | %s | %.0f W",
-                    roomObject.name(),
+                    roomObjectPresetService.displayName(roomObject),
                     roomObject.heatingType(),
                     roomObject.heatOutputWatts()
             );
@@ -550,7 +552,7 @@ public final class ConstructionDrawingPdfService {
                 Locale.GERMAN,
                 "%s | %s | %s | %.0f W",
                 entry.room().name(),
-                roomObject.name(),
+                roomObjectPresetService.displayName(roomObject),
                 roomObject.heatingType(),
                 roomObject.heatOutputWatts()
         );
@@ -1013,14 +1015,12 @@ public final class ConstructionDrawingPdfService {
 
     private void drawRoomObject(PageCanvas canvas, Viewport viewport, RoomObject roomObject) throws IOException {
         canvas.polygon(rotatedRoomObjectOutline(viewport, roomObject), 0.75f, new Color(63, 96, 90), new Color(229, 239, 235));
-        if (!roomObject.name().isBlank()) {
-            canvas.text(
-                    viewport.x(roomObject.center().xMillimeters()) + 5.0,
-                    viewport.y(roomObject.center().yMillimeters()) - 5.0,
-                    6.5f,
-                    roomObject.name()
-            );
-        }
+        canvas.text(
+                viewport.x(roomObject.center().xMillimeters()) + 5.0,
+                viewport.y(roomObject.center().yMillimeters()) - 5.0,
+                6.5f,
+                roomObjectPresetService.displayName(roomObject)
+        );
     }
 
     private float[] rotatedRoomObjectOutline(Viewport viewport, RoomObject roomObject) {

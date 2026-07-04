@@ -977,14 +977,16 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             }
         }
         graphics.restore();
-        if (!roomObject.name().isBlank()) {
-            graphics.save();
-            graphics.setFill(Color.web("#183f37"));
-            graphics.setFont(Font.font("Menlo", 11));
-            graphics.setTextAlign(TextAlignment.CENTER);
-            graphics.fillText(roomObject.name(), toScreenX(roomObject.center().xMillimeters()), toScreenY(roomObject.center().yMillimeters()) + 4.0);
-            graphics.restore();
-        }
+        graphics.save();
+        graphics.setFill(Color.web("#183f37"));
+        graphics.setFont(Font.font("Menlo", 11));
+        graphics.setTextAlign(TextAlignment.CENTER);
+        graphics.fillText(
+                roomObjectPresetService.displayName(roomObject, availableRoomObjectPresets),
+                toScreenX(roomObject.center().xMillimeters()),
+                toScreenY(roomObject.center().yMillimeters()) + 4.0
+        );
+        graphics.restore();
     }
 
     void drawFloorExtensions(GraphicsContext graphics) {

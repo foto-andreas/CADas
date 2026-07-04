@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.heating;
 
+import de.schrell.cadas.application.objects.RoomObjectPresetService;
 import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
@@ -16,6 +17,19 @@ import java.util.Objects;
  * Ermittelt Heizleistungen pro Raum aus Heizkreisen und heizenden Objekten.
  */
 public final class RoomHeatingOutputService {
+
+    private final RoomObjectPresetService roomObjectPresetService;
+
+    public RoomHeatingOutputService() {
+        this(new RoomObjectPresetService());
+    }
+
+    public RoomHeatingOutputService(RoomObjectPresetService roomObjectPresetService) {
+        this.roomObjectPresetService = Objects.requireNonNull(
+                roomObjectPresetService,
+                "roomObjectPresetService darf nicht null sein."
+        );
+    }
 
     public RoomHeatTotals totals(Level level, Room room) {
         Objects.requireNonNull(level, "level darf nicht null sein.");
@@ -73,7 +87,7 @@ public final class RoomHeatingOutputService {
     private HeatingElementSummary summary(RoomObject roomObject) {
         return new HeatingElementSummary(
                 roomObject.id().toString(),
-                roomObject.name(),
+                roomObjectPresetService.displayName(roomObject),
                 roomObject.type().toString(),
                 roomObject.center(),
                 roomObject.width().toMillimeters(),

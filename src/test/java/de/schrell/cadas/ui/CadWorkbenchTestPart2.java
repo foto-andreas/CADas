@@ -574,6 +574,33 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
+    void unbenanntesObjektZeigtPresetbezeichnungInDerDraufsicht() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSelectRoomObjectPreset("table-round");
+            instanz.automationSetTool("OBJECT");
+            instanz.automationCanvasClick(600, 450, javafx.scene.input.MouseButton.PRIMARY, false, false, false);
+            return instanz;
+        });
+
+        RoomObject placed = aufFxThread(() -> workbench.automationRoomObject(0));
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
+        int centerX = (int) Math.round(snapshot.offsetX() + placed.center().xMillimeters() * 0.1 * snapshot.zoom());
+        int centerY = (int) Math.round(snapshot.offsetY() + placed.center().yMillimeters() * 0.1 * snapshot.zoom());
+
+        Assertions.assertTrue(placed.name().isBlank());
+        int darkPixels = countDarkPixels(image, centerX - 55, centerY - 16, centerX + 55, centerY + 16);
+        Assertions.assertTrue(
+                darkPixels > 3,
+                "Die Presetbezeichnung wurde in der 2D-Ansicht nicht als Fallback gezeichnet. Dunkle Pixel: " + darkPixels
+        );
+    }
+
+    @Test
     void lFoermigerRaumTextBleibtInnerhalbDesRaums() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();

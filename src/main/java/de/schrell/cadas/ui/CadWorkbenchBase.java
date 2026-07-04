@@ -382,7 +382,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final ComboBox<WindowPreset> windowPresetSelector = new ComboBox<>();
     final ComboBox<StairPreset> stairPresetSelector = new ComboBox<>();
     final ComboBox<RoomObjectPreset> roomObjectPresetSelector = new ComboBox<>();
-    final TextField roomObjectNameField = new TextField("Objekt");
+    final TextField roomObjectNameField = new TextField();
     final TextField roomObjectWidthField = new TextField("90");
     final ComboBox<LengthUnit> roomObjectWidthUnit = new ComboBox<>();
     final TextField roomObjectDepthField = new TextField("90");

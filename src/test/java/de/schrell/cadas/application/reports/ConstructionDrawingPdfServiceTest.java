@@ -159,6 +159,31 @@ class ConstructionDrawingPdfServiceTest {
     }
 
     @Test
+    void exportiertPresetbezeichnungFürUnbenannteHeizobjekte() throws Exception {
+        ProjectModel project = sampleProject();
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "table-round",
+                "",
+                RoomObjectType.TABLE,
+                RoomObjectShape.CIRCLE,
+                new PlanPoint(2_000, 2_000),
+                Length.of(110, LengthUnit.CENTIMETER),
+                Length.of(110, LengthUnit.CENTIMETER),
+                Length.of(75, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ).withHeatingType(RoomObjectHeatingType.HEATING_ELEMENT).withHeatOutputWatts(250.0));
+        Path target = tempDir.resolve("heizelemente-presetname.pdf");
+
+        new ConstructionDrawingPdfService().export(project, target);
+
+        try (var document = Loader.loadPDF(target.toFile())) {
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("Tisch rund 110"));
+        }
+    }
+
+    @Test
     void exportiertRasterbauzeichnungMitGrafischenPlanseiten() throws Exception {
         ProjectModel project = sampleProject();
         Room room = project.primaryLevel().rooms().getFirst();

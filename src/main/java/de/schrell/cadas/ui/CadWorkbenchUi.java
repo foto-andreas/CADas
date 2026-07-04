@@ -1691,7 +1691,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         applyTooltip(autoRouteHeatingZoneOnResizeCheckBox, "Legt fest, ob ein Heizkreis nach dem Ziehen seines Rechtecks automatisch neu geroutet wird. Ausgeschaltet bleiben die vorhandenen Routing-Befehle erhalten.");
         applyTooltip(heatingSummaryLabel, "Zeigt Fläche, Verlegeart, Anzahl der Heizkreise, gesamte HKL und die aufsummierte Heizleistung der gewählten Flächenheizung.");
         applyTooltip(roomObjectPresetSelector, "Wählt ein Objekt zum Platzieren aus und übernimmt dessen Standardmaße. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
-        applyTooltip(roomObjectNameField, "Legt die sichtbare Bezeichnung eines neuen oder ausgewählten Objekts fest. Die Bezeichnung wird in der 2D-Draufsicht direkt am Objekt angezeigt.");
+        applyTooltip(roomObjectNameField, "Legt die sichtbare Bezeichnung eines neuen oder ausgewählten Objekts fest. Bleibt das Feld leer, verwendet CADas in 2D, Tabellen und PDFs die Bezeichnung des gewählten Objekt-Presets.");
         applyTooltip(roomObjectWidthField, "Legt die Breite eines neuen oder ausgewählten Objekts fest.");
         applyTooltip(roomObjectWidthUnit, "Bestimmt die Einheit für die Objektbreite.");
         applyTooltip(roomObjectDepthField, "Legt die Tiefe eines neuen oder ausgewählten Objekts fest.");

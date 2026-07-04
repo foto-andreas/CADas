@@ -229,6 +229,38 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
+    void nutztPresetbezeichnungAlsFallbackFuerUnbenannteObjekteInTabellen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room room = Room.rectangular(
+                "Essen",
+                new PlanPoint(0, 0),
+                new PlanPoint(2_000, 1_500),
+                Length.ofMillimeters(2_600),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200)
+        ).withHeatLoadWatts(500.0);
+        project.primaryLevel().addRoom(room);
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "table-round",
+                "",
+                RoomObjectType.TABLE,
+                RoomObjectShape.CIRCLE,
+                new PlanPoint(1_000, 750),
+                Length.of(110, LengthUnit.CENTIMETER),
+                Length.of(110, LengthUnit.CENTIMETER),
+                Length.of(75, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ).withHeatingType(RoomObjectHeatingType.HEATING_ELEMENT).withHeatOutputWatts(250.0));
+
+        SurfaceMaterialReport report = service.create(project);
+
+        assertEquals("Tisch rund 110", report.heatingElements().getFirst().objectName());
+        assertTrue(report.heatingLoads().getFirst().heatings().contains("Heizelement / Tisch rund 110"));
+        assertTrue(report.toMarkdown().contains("| Erdgeschoss / Essen | Tisch rund 110 | Heizelement | 250 W"));
+    }
+
+    @Test
     void berechnetRechteckigenBodenOhneSchnitteAlsEinfacheVerlegung() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Room room = Room.rectangular(

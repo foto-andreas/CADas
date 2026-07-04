@@ -45,7 +45,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.web.WebView;
-import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -210,17 +209,21 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportConstructionDrawingPdf() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Gerasterte Bauzeichnung als PDF speichern");
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
         String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName + "_Bauzeichnung_Raster.pdf");
-        java.io.File file = fileChooser.showSaveDialog(owner.currentWindow());
-        if (file == null) {
+        Optional<Path> selectedTarget = WriteTargetDialog.choose(
+                owner,
+                "Gerasterte Bauzeichnung als PDF speichern",
+                "Exportziel festlegen",
+                projectName + "_Bauzeichnung_Raster"
+        ).map(path -> owner.exchangeFileNameService.ensureSingleExtension(path, ".pdf"));
+        if (selectedTarget.isEmpty()) {
             return;
         }
         try {
-            Path target = owner.exchangeFileNameService.ensureSingleExtension(file.toPath(), ".pdf");
+            Path target = selectedTarget.orElseThrow();
+            if (!WriteTargetDialog.confirmOverwrite(owner, target, "Bauzeichnung")) {
+                return;
+            }
             ConstructionDrawingOptions options = new ConstructionDrawingOptions(
                     owner.currentDimensionLabelOptions(),
                     owner.showDimensions.get(),
@@ -368,16 +371,13 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportMarkdown(SurfaceMaterialReport report) {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Materialliste als Markdown speichern");
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Markdown-Dateien", "*.md"));
         String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName + "_Räume_und_Material");
-        java.io.File file = fileChooser.showSaveDialog(owner.currentWindow());
-        if (file == null) {
-            return;
-        }
-        exportSurfaceMaterialReportMarkdown(report, file.toPath());
+        WriteTargetDialog.choose(
+                owner,
+                "Materialliste als Markdown speichern",
+                "Exportziel festlegen",
+                projectName + "_Räume_und_Material"
+        ).ifPresent(target -> exportSurfaceMaterialReportMarkdown(report, target));
     }
 
     void exportSurfaceMaterialReportMarkdown(Path targetFile) {
@@ -387,6 +387,9 @@ final class CadWorkbenchDocumentSupport {
     void exportSurfaceMaterialReportMarkdown(SurfaceMaterialReport report, Path targetFile) {
         try {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".md");
+            if (!WriteTargetDialog.confirmOverwrite(owner, exportPath, "Materialliste")) {
+                return;
+            }
             SurfaceMaterialReportPdfService.ExportAssets exportAssets = createExportAssets(
                     report,
                     (progress, message) -> {
@@ -479,16 +482,13 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report) {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Materialliste als PDF mit Rastergrafiken speichern");
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
         String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(projectName + "_Räume_und_Material_Raster.pdf");
-        java.io.File file = fileChooser.showSaveDialog(owner.currentWindow());
-        if (file == null) {
-            return;
-        }
-        exportSurfaceMaterialReportPdf(report, file.toPath());
+        WriteTargetDialog.choose(
+                owner,
+                "Materialliste als PDF mit Rastergrafiken speichern",
+                "Exportziel festlegen",
+                projectName + "_Räume_und_Material_Raster"
+        ).ifPresent(target -> exportSurfaceMaterialReportPdf(report, target));
     }
 
     void exportSurfaceMaterialReportPdf(Path targetFile) {
@@ -498,6 +498,9 @@ final class CadWorkbenchDocumentSupport {
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile) {
         try {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
+            if (!WriteTargetDialog.confirmOverwrite(owner, exportPath, "Materialliste")) {
+                return;
+            }
             runWithProgressDialog(
                     "Materialliste mit Rastergrafiken wird exportiert",
                     "Materialliste wird vorbereitet",

@@ -8,6 +8,7 @@ import de.schrell.cadas.application.dwg.Ifc3dObjectGeometryReader;
 import de.schrell.cadas.application.dwg.Rfa3dObjectGeometryReader;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
+import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
@@ -49,6 +50,49 @@ public final class RoomObjectPresetService {
 
     public List<RoomObjectPreset> presets() {
         return Stream.of(defaults(), loadDwgPresets(), loadCad3dPresets()).flatMap(List::stream).toList();
+    }
+
+    public String displayName(RoomObject roomObject) {
+        return displayName(roomObject, defaults());
+    }
+
+    public String displayName(RoomObject roomObject, List<RoomObjectPreset> presets) {
+        Objects.requireNonNull(roomObject, "roomObject darf nicht null sein.");
+        String name = roomObject.name().trim();
+        if (!name.isBlank()) {
+            return name;
+        }
+        return presets.stream()
+                .filter(preset -> preset.id().equals(roomObject.presetId()))
+                .map(RoomObjectPreset::name)
+                .findFirst()
+                .or(() -> sourceDisplayName(roomObject))
+                .orElse(roomObject.type().label());
+    }
+
+    private Optional<String> sourceDisplayName(RoomObject roomObject) {
+        String source = roomObject.source().trim();
+        if (source.isBlank()) {
+            return Optional.empty();
+        }
+        return switch (roomObject.type()) {
+            case DWG_REFERENCE -> Optional.of("DWG-Objekt: " + sourceName(source));
+            case DXF_3D_REFERENCE -> Optional.of("3D-DXF: " + sourceName(source));
+            case IFC_3D_REFERENCE -> Optional.of("3D-IFC: " + sourceName(source));
+            case RFA_3D_REFERENCE -> Optional.of("3D-RFA: " + sourceName(source));
+            default -> Optional.empty();
+        };
+    }
+
+    private String sourceName(String source) {
+        int blockSeparator = source.lastIndexOf('#');
+        if (blockSeparator >= 0 && blockSeparator + 1 < source.length()) {
+            return source.substring(blockSeparator + 1);
+        }
+        int separator = Math.max(source.lastIndexOf('/'), source.lastIndexOf('\\'));
+        String fileName = separator >= 0 ? source.substring(separator + 1) : source;
+        int extensionSeparator = fileName.lastIndexOf('.');
+        return extensionSeparator > 0 ? fileName.substring(0, extensionSeparator) : fileName;
     }
 
     public List<RoomObjectPreset> defaults() {
