@@ -222,6 +222,8 @@ import javafx.embed.swing.SwingFXUtils;
 abstract class CadWorkbenchBase extends CadWorkbenchContracts {
 
     static final double BASE_PIXELS_PER_MILLIMETER = 0.10;
+    static final double MINIMUM_TWO_D_ZOOM = 0.25;
+    static final double MAXIMUM_TWO_D_ZOOM = 40.0;
     static final double RULER_SIZE = 32.0;
     static final Length DEFAULT_GRID = Length.of(1, LengthUnit.CENTIMETER);
     static final Length DEFAULT_WALL_THICKNESS = Length.of(17.5, LengthUnit.CENTIMETER);
@@ -300,7 +302,6 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
     final GuideDistanceService guideDistanceService = new GuideDistanceService();
     final PointerCursorService pointerCursorService = new PointerCursorService();
-    final TwoDZoomRange twoDZoomRange = new TwoDZoomRange();
     final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
     final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();

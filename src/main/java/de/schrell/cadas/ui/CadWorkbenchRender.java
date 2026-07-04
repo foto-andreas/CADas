@@ -1136,7 +1136,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
 
     PlanPoint wallOffsetPoint(Wall wall, double localDistance, double normalOffset) {
         double wallLength = wall.axis().length().toMillimeters();
-        PlanPoint axisPoint = wall.axis().pointAt(Length.ofMillimeters(clamp(localDistance, 0.0, wallLength)));
+        PlanPoint axisPoint = wall.axis().pointAt(Length.ofMillimeters(Math.clamp(localDistance, 0.0, wallLength)));
         double dx = wall.axis().end().xMillimeters() - wall.axis().start().xMillimeters();
         double dy = wall.axis().end().yMillimeters() - wall.axis().start().yMillimeters();
         double length = Math.max(1.0, Math.hypot(dx, dy));
@@ -1147,7 +1147,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
     }
 
     double interpolateScreen(double start, double end, double ratio) {
-        return start + (end - start) * clamp(ratio, 0.0, 1.0);
+        return start + (end - start) * Math.clamp(ratio, 0.0, 1.0);
     }
 
     void drawRooms(GraphicsContext graphics) {

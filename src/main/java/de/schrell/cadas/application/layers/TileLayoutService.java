@@ -129,11 +129,11 @@ public final class TileLayoutService {
             double tileHeight,
             double minimumStartEndMargin
     ) {
-        double explicitWidth = clamp(request.startRowWidth().toMillimeters(), 0.0, tileHeight);
+        double explicitWidth = Math.clamp(request.startRowWidth().toMillimeters(), 0.0, tileHeight);
         if (explicitWidth > 0.001) {
             return Math.max(0.0, tileHeight - explicitWidth);
         }
-        double explicitTrim = clamp(request.startRowTrim().toMillimeters(), 0.0, tileHeight);
+        double explicitTrim = Math.clamp(request.startRowTrim().toMillimeters(), 0.0, tileHeight);
         if (explicitTrim > 0.001 || request.layoutAnchor() != SurfaceLayoutAnchor.AUTO) {
             return explicitTrim;
         }
@@ -153,7 +153,4 @@ public final class TileLayoutService {
         return Math.min(requiredTrim, maximumTrim);
     }
 
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
-    }
 }

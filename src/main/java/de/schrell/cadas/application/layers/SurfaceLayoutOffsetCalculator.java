@@ -33,13 +33,13 @@ final class SurfaceLayoutOffsetCalculator {
         }
         double lowerBound = Math.max(minimumOffset, minimumEdgeWidth);
         if (lowerBound <= EPSILON) {
-            return Math.max(0.0, Math.min(requestedOffset, tileWidth));
+            return Math.clamp(requestedOffset, 0.0, tileWidth);
         }
         double upperBound = tileWidth - lowerBound;
         if (upperBound < lowerBound) {
             return lowerBound;
         }
-        return Math.max(lowerBound, Math.min(requestedOffset, upperBound));
+        return Math.clamp(requestedOffset, lowerBound, upperBound);
     }
 
     private static double modulo(double value, double divisor) {

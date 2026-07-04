@@ -1236,7 +1236,7 @@ public final class ThreeDViewport extends BorderPane {
 
     private void zoomInteriorFieldOfView(double factor) {
         fitToSceneRequested = false;
-        interiorFieldOfViewDegrees = clamp(
+        interiorFieldOfViewDegrees = Math.clamp(
                 interiorFieldOfViewDegrees * factor,
                 INTERIOR_MIN_FOV_DEGREES,
                 INTERIOR_MAX_FOV_DEGREES
@@ -1396,10 +1396,6 @@ public final class ThreeDViewport extends BorderPane {
         return worldUnits / WORLD_SCALE;
     }
 
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
     private PlanPoint boundedInteriorEyePosition(double startX, double startZ, double targetX, double targetZ) {
         if (isAllowedInteriorEyePosition(targetX, targetZ)) {
             return new PlanPoint(targetX, targetZ);
@@ -1468,7 +1464,7 @@ public final class ThreeDViewport extends BorderPane {
         if (lengthSquared <= 0.001) {
             return point.distanceTo(start).toMillimeters();
         }
-        double ratio = clamp(
+        double ratio = Math.clamp(
                 ((point.xMillimeters() - start.xMillimeters()) * dx + (point.yMillimeters() - start.yMillimeters()) * dy) / lengthSquared,
                 0.0,
                 1.0

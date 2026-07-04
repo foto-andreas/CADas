@@ -1077,7 +1077,4 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         return activeView.get() == ViewOrientation.TOP;
     }
 
-    double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
-    }
 }

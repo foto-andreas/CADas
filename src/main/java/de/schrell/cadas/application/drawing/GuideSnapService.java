@@ -29,7 +29,7 @@ public final class GuideSnapService {
     ) {
         double wallLength = wall.axis().length().toMillimeters();
         double width = openingWidth.toMillimeters();
-        double offset = clamp(rawOffset.toMillimeters(), 0.0, Math.max(0.0, wallLength - width));
+        double offset = Math.clamp(rawOffset.toMillimeters(), 0.0, Math.max(0.0, wallLength - width));
         Direction direction = direction(wall.axis());
         Optional<Double> bestDelta = java.util.stream.Stream.concat(
                         targets.verticalGuides().stream()
@@ -47,7 +47,7 @@ public final class GuideSnapService {
                 .filter(delta -> Math.abs(delta) <= tolerance.toMillimeters())
                 .min(Comparator.comparingDouble(Math::abs));
         double snappedOffset = bestDelta.map(delta -> offset + delta).orElse(offset);
-        return Length.ofMillimeters(clamp(snappedOffset, 0.0, Math.max(0.0, wallLength - width)));
+        return Length.ofMillimeters(Math.clamp(snappedOffset, 0.0, Math.max(0.0, wallLength - width)));
     }
 
     public PlanSegment snapWallSegment(
@@ -143,10 +143,6 @@ public final class GuideSnapService {
                 (segment.end().xMillimeters() - segment.start().xMillimeters()) / length,
                 (segment.end().yMillimeters() - segment.start().yMillimeters()) / length
         );
-    }
-
-    private double clamp(double value, double minimum, double maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
     }
 
     private record Direction(double x, double y) {

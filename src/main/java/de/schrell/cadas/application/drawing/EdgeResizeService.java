@@ -152,11 +152,11 @@ public final class EdgeResizeService {
         double startShift;
         if (handle.kind() == EdgeHandleKind.WALL_START) {
             double maximumStart = minimumOpeningOffset(level, wall).orElse(oldLength - MINIMUM_LENGTH);
-            startShift = clamp(projected, -Double.MAX_VALUE, maximumStart - MINIMUM_LENGTH);
+            startShift = Math.clamp(projected, -Double.MAX_VALUE, maximumStart - MINIMUM_LENGTH);
             resizedAxis = new PlanSegment(pointAt(wall.axis().start(), direction, startShift), wall.axis().end());
         } else {
             double minimumEnd = maximumOpeningEnd(level, wall).orElse(MINIMUM_LENGTH);
-            double newLength = clamp(projected, minimumEnd + MINIMUM_LENGTH, Double.MAX_VALUE);
+            double newLength = Math.clamp(projected, minimumEnd + MINIMUM_LENGTH, Double.MAX_VALUE);
             startShift = 0.0;
             resizedAxis = new PlanSegment(wall.axis().start(), pointAt(wall.axis().start(), direction, newLength));
         }
@@ -174,7 +174,7 @@ public final class EdgeResizeService {
     private ResizeResult resizeDoor(Level level, EdgeHandle handle, PlanPoint targetPoint) {
         Door door = level.doors().stream().filter(candidate -> candidate.id().equals(handle.elementId())).findFirst().orElseThrow();
         Wall wall = level.findWall(door.wallId());
-        double target = clamp(projectedLength(wall, targetPoint), 0.0, wall.axis().length().toMillimeters());
+        double target = Math.clamp(projectedLength(wall, targetPoint), 0.0, wall.axis().length().toMillimeters());
         double start = door.offsetFromStart().toMillimeters();
         double end = start + door.width().toMillimeters();
         Door resized = handle.kind() == EdgeHandleKind.DOOR_START
@@ -187,7 +187,7 @@ public final class EdgeResizeService {
     private ResizeResult resizeWindow(Level level, EdgeHandle handle, PlanPoint targetPoint) {
         WindowElement window = level.windows().stream().filter(candidate -> candidate.id().equals(handle.elementId())).findFirst().orElseThrow();
         Wall wall = level.findWall(window.wallId());
-        double target = clamp(projectedLength(wall, targetPoint), 0.0, wall.axis().length().toMillimeters());
+        double target = Math.clamp(projectedLength(wall, targetPoint), 0.0, wall.axis().length().toMillimeters());
         double start = window.offsetFromStart().toMillimeters();
         double end = start + window.width().toMillimeters();
         WindowElement resized = handle.kind() == EdgeHandleKind.WINDOW_START
@@ -508,10 +508,6 @@ public final class EdgeResizeService {
 
     private PlanPoint pointAt(PlanPoint origin, Direction direction, double distance) {
         return new PlanPoint(origin.xMillimeters() + direction.x() * distance, origin.yMillimeters() + direction.y() * distance);
-    }
-
-    private double clamp(double value, double minimum, double maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
     }
 
     private record Direction(double x, double y) {

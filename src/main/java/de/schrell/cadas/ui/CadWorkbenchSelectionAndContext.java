@@ -307,7 +307,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
             return;
         }
         double oldZoom = zoom;
-        double newZoom = twoDZoomRange.clamp(zoom * factor);
+        double newZoom = Math.clamp(zoom * factor, MINIMUM_TWO_D_ZOOM, MAXIMUM_TWO_D_ZOOM);
         double effectiveFactor = newZoom / oldZoom;
         double centerX = viewportWidth / 2.0;
         double centerY = viewportHeight / 2.0;
@@ -365,7 +365,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
         double availableWidth = Math.max(220.0, viewportWidth - horizontalPadding);
         double availableHeight = Math.max(180.0, viewportHeight - verticalPadding);
         double fitScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
-        zoom = twoDZoomRange.clamp(fitScale / BASE_PIXELS_PER_MILLIMETER);
+        zoom = Math.clamp(fitScale / BASE_PIXELS_PER_MILLIMETER, MINIMUM_TWO_D_ZOOM, MAXIMUM_TWO_D_ZOOM);
         offsetX = viewportWidth / 2.0 - centerHorizontalMillimeters * scale();
         offsetY = viewportHeight / 2.0 - centerVerticalMillimeters * scale();
     }

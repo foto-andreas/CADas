@@ -1790,7 +1790,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         drawingCanvas.setOnScroll(event -> {
             double oldScale = scale();
             double zoomFactor = event.getDeltaY() > 0 ? 1.1 : 0.9;
-            zoom = twoDZoomRange.clamp(zoom * zoomFactor);
+            zoom = Math.clamp(zoom * zoomFactor, MINIMUM_TWO_D_ZOOM, MAXIMUM_TWO_D_ZOOM);
             double newScale = scale();
             offsetX = event.getX() - ((event.getX() - offsetX) / oldScale) * newScale;
             offsetY = event.getY() - ((event.getY() - offsetY) / oldScale) * newScale;

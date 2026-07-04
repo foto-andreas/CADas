@@ -1029,8 +1029,8 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
 
     Point2D projectedPointInDrawingPane(MouseEvent event) {
         Point2D localPoint = drawingPane.sceneToLocal(event.getSceneX(), event.getSceneY());
-        double x = clamp(localPoint.getX(), 0.0, drawingCanvas.getWidth());
-        double y = clamp(localPoint.getY(), 0.0, drawingCanvas.getHeight());
+        double x = Math.clamp(localPoint.getX(), 0.0, drawingCanvas.getWidth());
+        double y = Math.clamp(localPoint.getY(), 0.0, drawingCanvas.getHeight());
         return new Point2D(x, y);
     }
 

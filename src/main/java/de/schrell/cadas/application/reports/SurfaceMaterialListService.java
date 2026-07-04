@@ -543,7 +543,7 @@ public final class SurfaceMaterialListService {
     }
 
     private double clippedWallHeight(Wall wall, double offset, double lowerHeight, double upperHeight) {
-        return Math.max(lowerHeight, Math.min(upperHeight, wall.heightAt(offset)));
+        return Math.clamp(wall.heightAt(offset), lowerHeight, upperHeight);
     }
 
     private List<OrthogonalPolygonDecompositionService.CellRectangle> roomRectangles(Room room) {
@@ -588,10 +588,6 @@ public final class SurfaceMaterialListService {
 
     private static double squareMeters(double squareMillimeters) {
         return squareMillimeters / 1_000_000.0;
-    }
-
-    private static double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     private static String decimal(double value, int decimals) {
@@ -813,11 +809,11 @@ public final class SurfaceMaterialListService {
             cutPieces.add(normalizedMaterialCutPiece(width, height));
             if (cutsWidth) {
                 cutCount++;
-                cutPenaltySum += 1.0 - clamp(height / tileHeight, 0.0, 1.0);
+                cutPenaltySum += 1.0 - Math.clamp(height / tileHeight, 0.0, 1.0);
             }
             if (cutsHeight) {
                 cutCount++;
-                cutPenaltySum += 1.0 - clamp(width / tileWidth, 0.0, 1.0);
+                cutPenaltySum += 1.0 - Math.clamp(width / tileWidth, 0.0, 1.0);
             }
         }
 
@@ -1070,8 +1066,8 @@ public final class SurfaceMaterialListService {
             return 0.0;
         }
         double cutShare = Math.min(1.0, cutCount / (pieceCount * 2.0));
-        double shortEdgePenalty = clamp(cutPenaltySum / cutCount, 0.0, 1.0);
-        return clamp((0.65 * cutShare + 0.35 * shortEdgePenalty) * 100.0, 0.0, 100.0);
+        double shortEdgePenalty = Math.clamp(cutPenaltySum / cutCount, 0.0, 1.0);
+        return Math.clamp((0.65 * cutShare + 0.35 * shortEdgePenalty) * 100.0, 0.0, 100.0);
     }
 
     private record CoverageEstimate(

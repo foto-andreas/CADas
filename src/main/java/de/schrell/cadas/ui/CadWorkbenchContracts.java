@@ -1152,8 +1152,6 @@ abstract class CadWorkbenchContracts extends BorderPane {
 
     abstract boolean isDirectEditingView();
 
-    abstract double clamp(double value, double min, double max);
-
     abstract void resetTwoDView();
 
     abstract void fitCurrentViewToContent();

@@ -220,10 +220,10 @@ public final class WallSurfaceOpeningService {
             double wallLength,
             double wallHeight
     ) {
-        double clippedStart = clamp(start, 0.0, wallLength);
-        double clippedEnd = clamp(end, 0.0, wallLength);
-        double clippedLower = clamp(lower, 0.0, wallHeight);
-        double clippedUpper = clamp(upper, 0.0, wallHeight);
+        double clippedStart = Math.clamp(start, 0.0, wallLength);
+        double clippedEnd = Math.clamp(end, 0.0, wallLength);
+        double clippedLower = Math.clamp(lower, 0.0, wallHeight);
+        double clippedUpper = Math.clamp(upper, 0.0, wallHeight);
         if (clippedEnd - clippedStart > EPSILON && clippedUpper - clippedLower > EPSILON) {
             openings.add(new WallOpeningRectangle(clippedStart, clippedEnd, clippedLower, clippedUpper));
         }
@@ -342,10 +342,6 @@ public final class WallSurfaceOpeningService {
             ));
         }
         return merged;
-    }
-
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     public record WallSurfaceRectangle(

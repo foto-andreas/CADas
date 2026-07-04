@@ -253,7 +253,7 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
     }
 
     public void automationSetViewport(double zoomFactor, double newOffsetX, double newOffsetY) {
-        zoom = twoDZoomRange.clamp(zoomFactor);
+        zoom = Math.clamp(zoomFactor, MINIMUM_TWO_D_ZOOM, MAXIMUM_TWO_D_ZOOM);
         offsetX = newOffsetX;
         offsetY = newOffsetY;
         updateStatus();
@@ -698,7 +698,7 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
     }
 
     public void automationSetHeatingRoutingCommandAreaCaretPosition(int position) {
-        heatingRoutingCommandArea.positionCaret(Math.max(0, Math.min(position, heatingRoutingCommandArea.getLength())));
+        heatingRoutingCommandArea.positionCaret(Math.clamp(position, 0, heatingRoutingCommandArea.getLength()));
         render();
     }
 
