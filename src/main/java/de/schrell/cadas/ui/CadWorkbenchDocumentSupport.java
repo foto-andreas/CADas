@@ -85,16 +85,13 @@ final class CadWorkbenchDocumentSupport {
         Button exportButton = new Button("Markdown exportieren");
         exportButton.setOnAction(event -> exportSurfaceMaterialReportMarkdown(report));
         owner.applyTooltip(exportButton, "Exportiert genau diese Materialliste als Markdown-Datei.");
-        Button exportPdfSvgButton = new Button("PDF exportieren (SVG)");
-        exportPdfSvgButton.setOnAction(event -> exportSurfaceMaterialReportPdf(report));
-        owner.applyTooltip(exportPdfSvgButton, "Exportiert diese Materialliste als PDF-Datei mit SVG-Heizplänen und zusätzlichen 2D-Etagenbildern aus der Workbench.");
-        Button exportPdfRasterButton = new Button("PDF exportieren (Raster)");
-        exportPdfRasterButton.setOnAction(event -> exportSurfaceMaterialReportPdfRaster(report));
-        owner.applyTooltip(exportPdfRasterButton, "Exportiert diese Materialliste als PDF-Datei mit Raster-Heizplänen und zusätzlichen 2D-Etagenbildern aus der Workbench.");
+        Button exportPdfButton = new Button("PDF exportieren");
+        exportPdfButton.setOnAction(event -> exportSurfaceMaterialReportPdf(report));
+        owner.applyTooltip(exportPdfButton, "Exportiert diese Materialliste als PDF-Datei mit Raster-Heizplänen und zusätzlichen 2D-Etagenbildern aus der Workbench.");
         Button printButton = new Button("Drucken");
         printButton.setOnAction(event -> printSurfaceMaterialReport(reportView));
         owner.applyTooltip(printButton, "Druckt die gerenderte Materialliste so, wie sie in diesem Fenster angezeigt wird.");
-        HBox actions = new HBox(8.0, printButton, exportPdfSvgButton, exportPdfRasterButton, exportButton);
+        HBox actions = new HBox(8.0, printButton, exportPdfButton, exportButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
         VBox container = new VBox(10.0, reportView, actions);
         container.setPadding(new Insets(12));
@@ -109,23 +106,11 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportConstructionDrawingPdf() {
-        exportConstructionDrawingPdf(false);
-    }
-
-    void exportConstructionDrawingPdfRaster() {
-        exportConstructionDrawingPdf(true);
-    }
-
-    private void exportConstructionDrawingPdf(boolean raster) {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle(raster
-                ? "Gerasterte Bauzeichnung als PDF speichern"
-                : "Maßstabgerechte Bauzeichnung als PDF speichern");
+        fileChooser.setTitle("Gerasterte Bauzeichnung als PDF speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
         String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(raster
-                ? projectName + "_Bauzeichnung_Raster.pdf"
-                : projectName + "_Bauzeichnung.pdf");
+        fileChooser.setInitialFileName(projectName + "_Bauzeichnung_Raster.pdf");
         java.io.File file = fileChooser.showSaveDialog(owner.currentWindow());
         if (file == null) {
             return;
@@ -138,19 +123,19 @@ final class CadWorkbenchDocumentSupport {
                     owner.showAreaVolume.get()
             );
             runWithProgressDialog(
-                    raster ? "Raster-Bauzeichnung wird exportiert" : "Bauzeichnung wird exportiert",
+                    "Raster-Bauzeichnung wird exportiert",
                     "Bauplan wird vorbereitet",
                     "PDF-Export fehlgeschlagen",
                     progress -> {
-                        ConstructionDrawingPdfService.ExportAssets exportAssets = raster
-                                ? createConstructionDrawingExportAssets(progress.range(0.0, 0.35))
-                                : ConstructionDrawingPdfService.ExportAssets.empty();
+                        ConstructionDrawingPdfService.ExportAssets exportAssets = createConstructionDrawingExportAssets(
+                                progress.range(0.0, 0.35)
+                        );
                         owner.constructionDrawingPdfService.export(
                                 owner.project,
                                 target,
                                 options,
                                 exportAssets,
-                                progress.range(raster ? 0.35 : 0.0, 1.0)::update
+                                progress.range(0.35, 1.0)::update
                         );
                         return target;
                     },
@@ -387,31 +372,19 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf() {
-        exportSurfaceMaterialReportPdf((SurfaceMaterialReport) null);
-    }
-
-    void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report) {
-        exportSurfaceMaterialReportPdf(report, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.SVG);
-    }
-
-    void exportSurfaceMaterialReportPdfRaster() {
         exportSurfaceMaterialReportPdf(null, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
     }
 
-    void exportSurfaceMaterialReportPdfRaster(SurfaceMaterialReport report) {
+    void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report) {
         exportSurfaceMaterialReportPdf(report, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant) {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle(variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK
-                ? "Materialliste als PDF mit Rastergrafiken speichern"
-                : "Materialliste als PDF speichern");
+        fileChooser.setTitle("Materialliste als PDF mit Rastergrafiken speichern");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF-Dateien", "*.pdf"));
         String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
-        fileChooser.setInitialFileName(variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK
-                ? projectName + "_Räume_und_Material_Raster.pdf"
-                : projectName + "_Räume_und_Material.pdf");
+        fileChooser.setInitialFileName(projectName + "_Räume_und_Material_Raster.pdf");
         java.io.File file = fileChooser.showSaveDialog(owner.currentWindow());
         if (file == null) {
             return;
@@ -424,16 +397,14 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile) {
-        exportSurfaceMaterialReportPdf(report, targetFile, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.SVG);
+        exportSurfaceMaterialReportPdf(report, targetFile, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK);
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile, SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant variant) {
         try {
             Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
             runWithProgressDialog(
-                    variant == SurfaceMaterialReportPdfService.HeatingPlanGraphicVariant.RASTERGRAFIK
-                            ? "Materialliste mit Rastergrafiken wird exportiert"
-                            : "Materialliste wird exportiert",
+                    "Materialliste mit Rastergrafiken wird exportiert",
                     "Materialliste wird vorbereitet",
                     "Materiallisten-PDF-Export fehlgeschlagen",
                     progress -> {

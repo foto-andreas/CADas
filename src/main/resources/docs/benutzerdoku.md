@@ -318,9 +318,8 @@ Wichtige Kürzel der aktuellen Oberfläche:
 * `Cmd+Shift+I` oder `Strg+Shift+I`: Projekt laden
 * `Cmd+S` oder `Strg+S`: Projekt sichern
 * `Cmd+Shift+S` oder `Strg+Shift+S`: Projekt unter neuem Namen sichern
-* `Cmd+P` oder `Strg+P`: Bauzeichnung als PDF exportieren
-* `Alt+P`: Raster-Bauzeichnung als PDF exportieren
-* `Alt+M`: Raster-Materialliste als PDF exportieren
+* `Cmd+P` oder `Strg+P`: Raster-Bauzeichnung als PDF exportieren
+* `Cmd+M` oder `Strg+M`: Raster-Materialliste als PDF exportieren
 * `Cmd+Shift+B` oder `Strg+Shift+B`: Teilebibliothek laden
 * `Cmd+Z` oder `Strg+Z`: Rückgängig
 * `Cmd+Shift+Z` oder `Strg+Shift+Z`: Wiederherstellen

@@ -28,8 +28,8 @@ class HelpContentServiceTest {
         assertTrue(markdown.contains("Mausbedienung"));
         assertTrue(markdown.contains("F1"));
         assertTrue(markdown.contains("⌘/Strg+S"));
-        assertTrue(markdown.contains("Alt+P"));
-        assertTrue(markdown.contains("Alt+M"));
+        assertTrue(markdown.contains("⌘/Strg+P"));
+        assertTrue(markdown.contains("⌘/Strg+M"));
         assertTrue(markdown.contains("Leertaste + Ziehen"));
         assertTrue(markdown.contains("Umschalt beim Wandzeichnen"));
         assertTrue(markdown.contains("3D-Navigation"));

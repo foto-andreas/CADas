@@ -96,7 +96,7 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
     }
 
     @Test
-    void berichteMenueEnthaeltBeideBauzeichnungsVarianten() throws Exception {
+    void berichteMenueEnthaeltNurRasterBauzeichnung() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
             new Scene(instanz, 1200, 800);
@@ -114,12 +114,12 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
                     .map(MenuItem::getText)
                     .toList();
             return berichte.contains("Bauzeichnung als PDF exportieren")
-                    && berichte.contains("Bauzeichnung als PDF exportieren (Rastergrafik)");
+                    && !berichte.contains("Bauzeichnung als PDF exportieren (Rastergrafik)");
         }));
     }
 
     @Test
-    void berichteMenueEnthaeltBeideMaterialPdfVarianten() throws Exception {
+    void berichteMenueEnthaeltNurRasterMaterialPdf() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
             new Scene(instanz, 1200, 800);
@@ -136,43 +136,14 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
                     .flatMap(menu -> menu.getItems().stream())
                     .map(MenuItem::getText)
                     .toList();
-            return berichte.contains("Räume und Materialien als PDF exportieren (SVG-Heizpläne)")
-                    && berichte.contains("Räume und Materialien als PDF exportieren (Rastergrafik)");
+            return berichte.contains("Räume und Materialien als PDF exportieren")
+                    && !berichte.contains("Räume und Materialien als PDF exportieren (SVG-Heizpläne)")
+                    && !berichte.contains("Räume und Materialien als PDF exportieren (Rastergrafik)");
         }));
     }
 
     @Test
-    void berichteMenueSortiertRasterExporteVorNichtRasterExporte() throws Exception {
-        CadWorkbench workbench = aufFxThread(() -> {
-            CadWorkbench instanz = new CadWorkbench();
-            new Scene(instanz, 1200, 800);
-            instanz.applyCss();
-            instanz.layout();
-            return instanz;
-        });
-
-        List<String> berichte = aufFxThread(() -> {
-            VBox topArea = (VBox) workbench.getTop();
-            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
-            return menuBar.getMenus().stream()
-                    .filter(menu -> "Berichte".equals(menu.getText()))
-                    .flatMap(menu -> menu.getItems().stream())
-                    .map(MenuItem::getText)
-                    .toList();
-        });
-
-        Assertions.assertTrue(
-                berichte.indexOf("Bauzeichnung als PDF exportieren (Rastergrafik)")
-                        < berichte.indexOf("Bauzeichnung als PDF exportieren")
-        );
-        Assertions.assertTrue(
-                berichte.indexOf("Räume und Materialien als PDF exportieren (Rastergrafik)")
-                        < berichte.indexOf("Räume und Materialien als PDF exportieren (SVG-Heizpläne)")
-        );
-    }
-
-    @Test
-    void rasterExporteHabenAltTastaturkuerzel() throws Exception {
+    void rasterExporteHabenShortcutTastaturkuerzel() throws Exception {
         CadWorkbench workbench = aufFxThread(() -> {
             CadWorkbench instanz = new CadWorkbench();
             new Scene(instanz, 1200, 800);
@@ -193,12 +164,12 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
         });
 
         Assertions.assertEquals(
-                new KeyCodeCombination(KeyCode.P, KeyCombination.ALT_DOWN),
-                shortcuts.get("Bauzeichnung als PDF exportieren (Rastergrafik)")
+                new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN),
+                shortcuts.get("Bauzeichnung als PDF exportieren")
         );
         Assertions.assertEquals(
-                new KeyCodeCombination(KeyCode.M, KeyCombination.ALT_DOWN),
-                shortcuts.get("Räume und Materialien als PDF exportieren (Rastergrafik)")
+                new KeyCodeCombination(KeyCode.M, KeyCombination.SHORTCUT_DOWN),
+                shortcuts.get("Räume und Materialien als PDF exportieren")
         );
     }
 

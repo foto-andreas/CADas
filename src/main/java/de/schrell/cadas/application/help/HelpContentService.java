@@ -31,9 +31,8 @@ public final class HelpContentService {
                 | ⌘/Strg+L | Projekt leeren |
                 | ⌘/Strg+Umschalt+I | Gebäude laden |
                 | ⌘/Strg+Umschalt+B | Teilebibliothek laden |
-                | ⌘/Strg+P | Bauzeichnung als PDF exportieren |
-                | Alt+P | Raster-Bauzeichnung als PDF exportieren |
-                | Alt+M | Raster-Materialliste als PDF exportieren |
+                | ⌘/Strg+P | Raster-Bauzeichnung als PDF exportieren |
+                | ⌘/Strg+M | Raster-Materialliste als PDF exportieren |
                 | ⌘/Strg+Umschalt+→ | Auswahl 90° rechts drehen |
                 | ⌘/Strg+Umschalt+← | Auswahl 90° links drehen |
                 | Entf | Auswahl löschen |
