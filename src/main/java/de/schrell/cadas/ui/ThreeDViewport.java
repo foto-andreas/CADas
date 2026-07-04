@@ -82,6 +82,7 @@ public final class ThreeDViewport extends BorderPane {
     private static final double ORTHO_FOV_DEGREES = 15.0;
     private static final double ORTHO_FIT_PADDING = 1.4;
     private static final double SIDE_VIEW_FIT_DISTANCE_FACTOR = 1.26;
+    private static final double FRONT_SIDE_CAMERA_OFFSET_DEGREES = 180.0;
     private static final double INTERIOR_FOV_DEGREES = 64.0;
     private static final double INTERIOR_MIN_FOV_DEGREES = 28.0;
     private static final double INTERIOR_MAX_FOV_DEGREES = 115.0;
@@ -296,7 +297,7 @@ public final class ThreeDViewport extends BorderPane {
         CameraPose defaultPose = viewPreparation.defaultPose();
         cameraPose = new CameraPose(
                 projectionMode,
-                defaultPose.azimuthDegrees() + frontAngleDegrees(),
+                frontSideAzimuthDegrees(defaultPose.azimuthDegrees(), frontAngleDegrees()),
                 defaultPose.elevationDegrees(),
                 defaultPose.distance(),
                 0.0,
@@ -1361,10 +1362,23 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private double viewAzimuthDegrees(ThreeDViewPreset viewPreset) {
+        return viewAzimuthDegrees(viewPreset, frontAngleDegrees());
+    }
+
+    static double viewAzimuthDegrees(ThreeDViewPreset viewPreset, double frontAngleDegrees) {
         if (Math.abs(viewPreset.cameraElevationDegrees()) >= 89.9) {
-            return viewPreset.cameraAzimuthDegrees();
+            return normalizeAngleDegrees(viewPreset.cameraAzimuthDegrees());
         }
-        return viewPreset.cameraAzimuthDegrees() + frontAngleDegrees();
+        return frontSideAzimuthDegrees(viewPreset.cameraAzimuthDegrees(), frontAngleDegrees);
+    }
+
+    private static double frontSideAzimuthDegrees(double baseAzimuthDegrees, double frontAngleDegrees) {
+        return normalizeAngleDegrees(baseAzimuthDegrees + frontAngleDegrees + FRONT_SIDE_CAMERA_OFFSET_DEGREES);
+    }
+
+    private static double normalizeAngleDegrees(double angleDegrees) {
+        double normalized = angleDegrees % 360.0;
+        return normalized < 0.0 ? normalized + 360.0 : normalized;
     }
 
     private double frontAngleDegrees() {

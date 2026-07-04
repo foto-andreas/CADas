@@ -370,6 +370,19 @@ class ConstructionDrawingPdfServiceTest {
     }
 
     @Test
+    void räumlichePdfAnsichtenSchauenVonAussenAufDieGespeicherteVorderseite() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Fronthaus", "Erdgeschoss");
+
+        assertEquals(180.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 0), 0.001);
+        assertEquals(270.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 90), 0.001);
+
+        project.defineFrontAngle(de.schrell.cadas.domain.geometry.Angle.ofDegrees(90));
+
+        assertEquals(270.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 0), 0.001);
+        assertEquals(90.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 180), 0.001);
+    }
+
+    @Test
     void meldetExportfortschrittMitAbschnittsbezeichnungen() throws Exception {
         ProjectModel project = sampleProject();
         Path target = tempDir.resolve("bauzeichnung_progress.pdf");
