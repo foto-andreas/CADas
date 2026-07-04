@@ -1,6 +1,5 @@
 package de.schrell.cadas.application.drawing;
 
-import de.schrell.cadas.application.exchange.ProjectExchangeService;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
@@ -38,7 +37,7 @@ class P28DimensionPlacementTest {
 
     @BeforeAll
     void ladeBeispieldatei() throws Exception {
-        ProjectExchangeService exchange = new DxfProjectExchangeService();
+        DxfProjectExchangeService exchange = new DxfProjectExchangeService();
         project = exchange.importProject(Path.of("src/test/resources/P28_2.dxf"), "P28_2");
         level = project.primaryLevel();
     }

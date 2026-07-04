@@ -1,6 +1,5 @@
 package de.schrell.cadas.infrastructure.dxf;
 
-import de.schrell.cadas.application.exchange.ProjectExchangeService;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Angle;
 import de.schrell.cadas.domain.geometry.Length;
@@ -54,12 +53,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public final class DxfProjectExchangeService implements ProjectExchangeService {
+public final class DxfProjectExchangeService {
 
     private final DxfLevelExchangeService levelExchangeService = new DxfLevelExchangeService();
     private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
-    @Override
     public void exportProject(ProjectModel project, Path targetFile) throws IOException {
         Path parent = targetFile.toAbsolutePath().getParent();
         if (parent != null) {
@@ -118,7 +116,6 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         Files.writeString(targetFile, dxf.toString());
     }
 
-    @Override
     public ProjectModel importProject(Path sourceFile, String projectName) throws IOException {
         List<String> lines = Files.readAllLines(sourceFile);
         List<String> metadata = extractMetadata(lines);

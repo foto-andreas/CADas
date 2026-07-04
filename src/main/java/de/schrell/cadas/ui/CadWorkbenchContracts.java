@@ -47,8 +47,6 @@ import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.application.dwg.DwgConversionAvailability;
 import de.schrell.cadas.application.dwg.DwgLibraryAnalysis;
 import de.schrell.cadas.application.dwg.DwgLibraryAnalyzer;
-import de.schrell.cadas.application.exchange.LevelExchangeService;
-import de.schrell.cadas.application.exchange.ProjectExchangeService;
 import de.schrell.cadas.application.layers.SurfaceCoveringPreset;
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.application.layers.DwgBlockCatalogService;

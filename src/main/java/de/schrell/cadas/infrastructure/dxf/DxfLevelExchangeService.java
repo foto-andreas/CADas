@@ -1,6 +1,5 @@
 package de.schrell.cadas.infrastructure.dxf;
 
-import de.schrell.cadas.application.exchange.LevelExchangeService;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -48,7 +47,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-public final class DxfLevelExchangeService implements LevelExchangeService {
+public final class DxfLevelExchangeService {
 
     private static final Length DEFAULT_WALL_THICKNESS = Length.ofMillimeters(175.0);
     private static final Length DEFAULT_WALL_HEIGHT = Length.ofMillimeters(2750.0);
@@ -57,7 +56,6 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
     private static final Length DEFAULT_CEILING_THICKNESS = Length.ofMillimeters(1.0);
     private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
-    @Override
     public void exportLevel(Level level, Path targetFile) throws IOException {
         Path parent = targetFile.toAbsolutePath().getParent();
         if (parent != null) {
@@ -305,7 +303,6 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
         Files.writeString(targetFile, dxf.toString());
     }
 
-    @Override
     public Level importLevel(Path sourceFile, String levelName) throws IOException {
         List<String> lines = Files.readAllLines(sourceFile);
         List<DxfEntity> entities = parseEntities(lines);
