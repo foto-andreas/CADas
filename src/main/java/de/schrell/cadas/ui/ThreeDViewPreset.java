@@ -5,8 +5,8 @@ public enum ThreeDViewPreset {
     BOTTOM("Unten", "Wechselt die 3D-Kamera auf eine Untersicht.", 0.0, 90.0),
     FRONT("Vorne", "Wechselt die 3D-Kamera auf eine Vorderansicht.", 0.0, 0.0),
     BACK("Hinten", "Wechselt die 3D-Kamera auf eine Rückansicht.", 180.0, 0.0),
-    RIGHT("Rechts", "Wechselt die 3D-Kamera auf eine rechte Seitenansicht.", -90.0, 0.0),
-    LEFT("Links", "Wechselt die 3D-Kamera auf eine linke Seitenansicht.", 90.0, 0.0);
+    RIGHT("Rechts", "Wechselt die 3D-Kamera auf eine rechte Seitenansicht.", 90.0, 0.0),
+    LEFT("Links", "Wechselt die 3D-Kamera auf eine linke Seitenansicht.", -90.0, 0.0);
 
     private final String label;
     private final String tooltip;

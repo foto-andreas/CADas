@@ -366,6 +366,8 @@ class ConstructionDrawingPdfServiceTest {
 
         assertEquals(270.0, ConstructionDrawingPdfService.viewAngleForNorth(project, 0), 0.001);
         assertEquals(180.0, ConstructionDrawingPdfService.viewAngleForNorth(project, 270), 0.001);
+        assertEquals(0.0, ConstructionDrawingPdfService.compassAngleForView(project, 270), 0.001);
+        assertEquals("Nord", ConstructionDrawingPdfService.compassDirectionForView(project, 270));
     }
 
     @Test

@@ -631,13 +631,14 @@ public final class ConstructionDrawingPdfService {
     private void addSpatialViewsPage(PDDocument document, ProjectModel project, boolean isometric) throws IOException {
         String title = isometric ? "3D-ISO – gesamtes Gebäude" : "Seitenansichten – gesamtes Gebäude";
         try (PageCanvas canvas = addPage(document, project.name(), title, STANDARD)) {
-            double[] angles = isometric ? new double[]{45, 135, 225, 315} : new double[]{0, 90, 180, 270};
-            for (int index = 0; index < angles.length; index++) {
+            double[] relativeAngles = isometric ? new double[]{45, 135, 225, 315} : new double[]{0, 90, 180, 270};
+            for (int index = 0; index < relativeAngles.length; index++) {
                 double x = MARGIN + (index % 2) * (PAGE_WIDTH - 2 * MARGIN) / 2.0;
                 double y = MARGIN + TITLE_HEIGHT + (1 - index / 2) * (PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT) / 2.0;
                 double width = (PAGE_WIDTH - 2 * MARGIN) / 2.0 - 12.0;
                 double height = (PAGE_HEIGHT - 2 * MARGIN - TITLE_HEIGHT) / 2.0 - 18.0;
-                drawSpatialView(canvas, project, viewAngleForNorth(project, angles[index]), angles[index], isometric, x, y, width, height);
+                double viewAngle = normalizeAngle(project.frontAngle().degrees() + relativeAngles[index]);
+                drawSpatialView(canvas, project, viewAngle, relativeAngles[index], isometric, x, y, width, height);
             }
         }
     }
@@ -650,7 +651,7 @@ public final class ConstructionDrawingPdfService {
                                  double x, double y, double width, double height) throws IOException {
         BufferedImage renderedImage = renderSpatialViewImage(project, viewAngleDegrees, isometric, width, height).orElse(null);
         if (renderedImage != null) {
-            canvas.text(x + 4, y + height - 12, 8.5f, spatialViewGraphicLabel(labelAngleDegrees, isometric));
+            canvas.text(x + 4, y + height - 12, 8.5f, spatialViewGraphicLabel(project, viewAngleDegrees, labelAngleDegrees, isometric));
             drawFittedImage(canvas, renderedImage, x + 2, y + 8, width - 4, height - 24);
             drawOverallDimension(canvas, x + 12, y + 8, x + width - 12, y + 8, "grafische 3D-Ansicht");
             return;
@@ -661,7 +662,7 @@ public final class ConstructionDrawingPdfService {
         double factor = POINTS_PER_MILLIMETER / scale;
         double centerX = x + width / 2.0;
         double centerY = y + height / 2.0;
-        canvas.text(x + 4, y + height - 12, 8.5f, spatialViewFallbackLabel(labelAngleDegrees, isometric, scale));
+        canvas.text(x + 4, y + height - 12, 8.5f, spatialViewFallbackLabel(project, viewAngleDegrees, labelAngleDegrees, isometric, scale));
         for (SpatialLine line : lines) {
             canvas.line(centerX + (line.x1() - projected.centerX()) * factor,
                     centerY + (line.y1() - projected.centerY()) * factor,
@@ -673,24 +674,36 @@ public final class ConstructionDrawingPdfService {
         drawOverallDimension(canvas, x + 12, y + 8, x + width - 12, y + 8, "maßstabgerechte Ansicht");
     }
 
-    private String spatialViewGraphicLabel(double angleDegrees, boolean isometric) {
+    private String spatialViewGraphicLabel(ProjectModel project, double viewAngleDegrees, double relativeAngleDegrees, boolean isometric) {
         if (isometric) {
-            return String.format(Locale.GERMAN, "3D-Grafik %.0f°", angleDegrees);
+            return String.format(Locale.GERMAN, "3D-Grafik %s", compassDirectionForView(project, viewAngleDegrees));
         }
-        String direction = switch ((int) Math.round(angleDegrees)) {
-            case 0 -> "Nord";
-            case 90 -> "Ost";
-            case 180 -> "Süd";
-            case 270 -> "West";
-            default -> String.format(Locale.GERMAN, "Blick %.0f°", angleDegrees);
-        };
-        return direction + " – Grafik";
+        return sideLabel(relativeAngleDegrees) + " (" + compassDirectionForView(project, viewAngleDegrees) + ") – Grafik";
     }
 
-    private String spatialViewFallbackLabel(double angleDegrees, boolean isometric, int scale) {
+    private String spatialViewFallbackLabel(ProjectModel project, double viewAngleDegrees, double relativeAngleDegrees, boolean isometric, int scale) {
         if (isometric) {
-            return String.format(Locale.GERMAN, "Blick %.0f° – M 1:%d", angleDegrees, scale);
+            return String.format(Locale.GERMAN, "Blick %s – M 1:%d", compassDirectionForView(project, viewAngleDegrees), scale);
         }
+        return sideLabel(relativeAngleDegrees) + " (" + compassDirectionForView(project, viewAngleDegrees) + ") – M 1:" + scale;
+    }
+
+    private String sideLabel(double relativeAngleDegrees) {
+        return switch ((int) Math.round(normalizeAngle(relativeAngleDegrees))) {
+            case 0 -> "Vorne";
+            case 90 -> "Rechts";
+            case 180 -> "Hinten";
+            case 270 -> "Links";
+            default -> String.format(Locale.GERMAN, "Blick %.0f°", relativeAngleDegrees);
+        };
+    }
+
+    static double compassAngleForView(ProjectModel project, double viewAngleDegrees) {
+        return normalizeAngle(viewAngleDegrees + project.northAngle().degrees());
+    }
+
+    static String compassDirectionForView(ProjectModel project, double viewAngleDegrees) {
+        double angleDegrees = compassAngleForView(project, viewAngleDegrees);
         String direction = switch ((int) Math.round(angleDegrees)) {
             case 0 -> "Nord";
             case 90 -> "Ost";
@@ -698,7 +711,7 @@ public final class ConstructionDrawingPdfService {
             case 270 -> "West";
             default -> String.format(Locale.GERMAN, "Blick %.0f°", angleDegrees);
         };
-        return direction + " – M 1:" + scale;
+        return direction;
     }
 
     private java.util.Optional<BufferedImage> renderSpatialViewImage(
@@ -752,7 +765,7 @@ public final class ConstructionDrawingPdfService {
             return;
         }
         viewport.applyViewPreset(ThreeDViewPreset.FRONT);
-        viewport.automationOrbit(-angleDegrees, 0.0);
+        viewport.automationOrbit(angleDegrees, 0.0);
         viewport.setProjectionMode(ProjectionMode.ORTHOGRAPHIC);
     }
 

@@ -274,7 +274,7 @@ public final class ThreeDViewport extends BorderPane {
         orbitViewActivationConsumer.run();
         cameraPose = viewPreparation.poseForAngles(
                 currentProjectionMode(),
-                viewPreset.cameraAzimuthDegrees(),
+                viewAzimuthDegrees(viewPreset),
                 viewPreset.cameraElevationDegrees()
         );
         rememberedOrbitCameraPose = cameraPose;
@@ -296,7 +296,7 @@ public final class ThreeDViewport extends BorderPane {
         CameraPose defaultPose = viewPreparation.defaultPose();
         cameraPose = new CameraPose(
                 projectionMode,
-                defaultPose.azimuthDegrees(),
+                defaultPose.azimuthDegrees() + frontAngleDegrees(),
                 defaultPose.elevationDegrees(),
                 defaultPose.distance(),
                 0.0,
@@ -1358,6 +1358,17 @@ public final class ThreeDViewport extends BorderPane {
         return projectionModeSelector.getValue() == null
                 ? cameraPose.projectionMode()
                 : projectionModeSelector.getValue();
+    }
+
+    private double viewAzimuthDegrees(ThreeDViewPreset viewPreset) {
+        if (Math.abs(viewPreset.cameraElevationDegrees()) >= 89.9) {
+            return viewPreset.cameraAzimuthDegrees();
+        }
+        return viewPreset.cameraAzimuthDegrees() + frontAngleDegrees();
+    }
+
+    private double frontAngleDegrees() {
+        return currentProject == null ? 0.0 : currentProject.frontAngle().degrees();
     }
 
     private Button viewPresetButton(ThreeDViewPreset viewPreset) {

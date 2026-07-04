@@ -13,4 +13,10 @@ class ThreeDViewPresetTest {
         assertEquals("Unten", ThreeDViewPreset.BOTTOM.label());
         assertEquals(90.0, ThreeDViewPreset.BOTTOM.cameraElevationDegrees());
     }
+
+    @Test
+    void rechteUndLinkeAnsichtNutzenDieGleicheDrehrichtungWieDieZweiDAnsichten() {
+        assertEquals(90.0, ThreeDViewPreset.RIGHT.cameraAzimuthDegrees());
+        assertEquals(-90.0, ThreeDViewPreset.LEFT.cameraAzimuthDegrees());
+    }
 }
