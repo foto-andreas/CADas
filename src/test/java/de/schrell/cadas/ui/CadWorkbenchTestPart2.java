@@ -55,6 +55,8 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TitledPane;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.Scene;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Assertions;
@@ -166,6 +168,37 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
         Assertions.assertTrue(
                 berichte.indexOf("Räume und Materialien als PDF exportieren (Rastergrafik)")
                         < berichte.indexOf("Räume und Materialien als PDF exportieren (SVG-Heizpläne)")
+        );
+    }
+
+    @Test
+    void rasterExporteHabenAltTastaturkuerzel() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        Map<String, KeyCombination> shortcuts = aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            Map<String, KeyCombination> result = new HashMap<>();
+            menuBar.getMenus().stream()
+                    .filter(menu -> "Berichte".equals(menu.getText()))
+                    .flatMap(menu -> menu.getItems().stream())
+                    .forEach(item -> result.put(item.getText(), item.getAccelerator()));
+            return result;
+        });
+
+        Assertions.assertEquals(
+                new KeyCodeCombination(KeyCode.P, KeyCombination.ALT_DOWN),
+                shortcuts.get("Bauzeichnung als PDF exportieren (Rastergrafik)")
+        );
+        Assertions.assertEquals(
+                new KeyCodeCombination(KeyCode.M, KeyCombination.ALT_DOWN),
+                shortcuts.get("Räume und Materialien als PDF exportieren (Rastergrafik)")
         );
     }
 
@@ -592,15 +625,52 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
         Assertions.assertTrue(startOben > startRechts, "Nordwinkel 0° richtet den Kompass nicht nach oben aus.");
 
         aufFxThread(() -> {
-            workbench.northAngleField.setText("90");
+            workbench.northAngleField.setText("220");
             return null;
         });
         WritableImage image = aufFxThread(workbench::automationDrawingSnapshot);
-        int rechts = countCompassPixels(image, 5, -12, 25, 12);
-        int oben = countCompassPixels(image, -12, -25, 12, -5);
+        int rechtsUnten = countCompassPixels(image, 4, 4, 22, 22);
+        int linksUnten = countCompassPixels(image, -22, 4, -4, 22);
 
-        Assertions.assertTrue(rechts > oben, "Nordwinkel 90° richtet den Kompass nicht sofort nach rechts aus.");
-        Assertions.assertEquals(90.0, workbench.project.northAngle().degrees(), 0.001);
+        Assertions.assertTrue(rechtsUnten > linksUnten, "Nordwinkel 220° muss den Nordpfeil nach rechts unten ausrichten.");
+        Assertions.assertEquals(220.0, workbench.project.northAngle().degrees(), 0.001);
+    }
+
+    @Test
+    void kompassPfeilNutztBildschirmwinkelMitOstenBei90Grad() {
+        var nord = CadWorkbenchRenderDetails.compassArrow(100, 100, 0);
+        var ost = CadWorkbenchRenderDetails.compassArrow(100, 100, 90);
+        var sued = CadWorkbenchRenderDetails.compassArrow(100, 100, 180);
+        var west = CadWorkbenchRenderDetails.compassArrow(100, 100, 270);
+
+        Assertions.assertEquals(100.0, nord.tip().getX(), 0.001);
+        Assertions.assertEquals(86.0, nord.tip().getY(), 0.001);
+        Assertions.assertEquals(114.0, ost.tip().getX(), 0.001);
+        Assertions.assertEquals(100.0, ost.tip().getY(), 0.001);
+        Assertions.assertEquals(100.0, sued.tip().getX(), 0.001);
+        Assertions.assertEquals(114.0, sued.tip().getY(), 0.001);
+        Assertions.assertEquals(86.0, west.tip().getX(), 0.001);
+        Assertions.assertEquals(100.0, west.tip().getY(), 0.001);
+        Assertions.assertTrue(ost.leftWing().getX() < ost.tip().getX());
+        Assertions.assertTrue(ost.rightWing().getX() < ost.tip().getX());
+    }
+
+    @Test
+    void nordwinkelIstPeilungDerPlanoberkante() {
+        var pfeil = CadWorkbenchRenderDetails.compassArrow(
+                100,
+                100,
+                CadWorkbenchRenderDetails.compassDisplayAngleDegrees(220, ViewOrientation.TOP)
+        );
+        var beschriftung = CadWorkbenchRenderDetails.compassLabelPosition(
+                100,
+                100,
+                CadWorkbenchRenderDetails.compassDisplayAngleDegrees(220, ViewOrientation.TOP)
+        );
+
+        Assertions.assertTrue(pfeil.tip().getX() > 100.0, "Nordpfeil muss nach rechts zeigen.");
+        Assertions.assertTrue(pfeil.tip().getY() > 100.0, "Nordpfeil muss nach unten zeigen.");
+        Assertions.assertTrue(beschriftung.distance(100, 100) > 18.0, "Nord-N muss außerhalb des Kompasskreises liegen.");
     }
 
     @Test
@@ -763,6 +833,21 @@ abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
         double[] nachher = aufFxThread(() -> ((SplitPane) workbench.getCenter()).getDividerPositions());
 
         Assertions.assertArrayEquals(vorher, nachher, 0.001);
+    }
+
+    @Test
+    void eigenschaftenbereichStartetMitSiebzigProzentDerBisherigenBreite() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            return instanz;
+        });
+
+        double[] dividerPositions = aufFxThread(() -> ((SplitPane) workbench.getCenter()).getDividerPositions());
+
+        Assertions.assertEquals(CadWorkbenchUi.INITIAL_PROPERTY_PANE_DIVIDER_POSITION, dividerPositions[0], 0.001);
     }
 
     @Test

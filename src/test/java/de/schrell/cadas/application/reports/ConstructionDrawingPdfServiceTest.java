@@ -364,8 +364,8 @@ class ConstructionDrawingPdfServiceTest {
         ProjectModel project = ProjectModel.withDefaultLevel("Nordhaus", "Erdgeschoss");
         project.defineNorthAngle(de.schrell.cadas.domain.geometry.Angle.ofDegrees(90));
 
-        assertEquals(90.0, ConstructionDrawingPdfService.viewAngleForNorth(project, 0), 0.001);
-        assertEquals(0.0, ConstructionDrawingPdfService.viewAngleForNorth(project, 270), 0.001);
+        assertEquals(270.0, ConstructionDrawingPdfService.viewAngleForNorth(project, 0), 0.001);
+        assertEquals(180.0, ConstructionDrawingPdfService.viewAngleForNorth(project, 270), 0.001);
     }
 
     @Test

@@ -221,6 +221,8 @@ import javafx.embed.swing.SwingFXUtils;
 
 abstract class CadWorkbenchUi extends CadWorkbenchBase {
 
+    static final double INITIAL_PROPERTY_PANE_DIVIDER_POSITION = 0.154;
+
     void configureControls() {
         initializeUnitSelectors();
         levelSelector.setItems(availableLevels);
@@ -329,7 +331,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         drawingArea.setStyle("-fx-background-color: rgba(255,255,255,0.55); -fx-background-radius: 16;");
         workspacePane.getChildren().setAll(drawingArea, threeDViewport);
         SplitPane splitPane = new SplitPane(buildPropertyPane(), workspacePane);
-        splitPane.setDividerPositions(0.22);
+        splitPane.setDividerPositions(INITIAL_PROPERTY_PANE_DIVIDER_POSITION);
         setCenter(splitPane);
 
         HBox statusBar = new HBox(18.0, viewLabel, zoomLabel, cursorLabel, draftLabel);
@@ -853,8 +855,8 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
 
         Menu berichteMenu = new Menu("Berichte");
         berichteMenu.getItems().addAll(
-                menuItem("Bauzeichnung als PDF exportieren (Rastergrafik)", documentSupport::exportConstructionDrawingPdfRaster, null),
-                menuItem("Räume und Materialien als PDF exportieren (Rastergrafik)", documentSupport::exportSurfaceMaterialReportPdfRaster, null),
+                menuItem("Bauzeichnung als PDF exportieren (Rastergrafik)", documentSupport::exportConstructionDrawingPdfRaster, altKey(KeyCode.P)),
+                menuItem("Räume und Materialien als PDF exportieren (Rastergrafik)", documentSupport::exportSurfaceMaterialReportPdfRaster, altKey(KeyCode.M)),
                 menuItem("Bauzeichnung als PDF exportieren", documentSupport::exportConstructionDrawingPdf, shortcutKey(KeyCode.P)),
                 menuItem("Räume und Materialien anzeigen", documentSupport::showSurfaceMaterialReportWindow, null),
                 menuItem("Räume und Materialien als PDF exportieren (SVG-Heizpläne)", documentSupport::exportSurfaceMaterialReportPdf, null),
@@ -1343,6 +1345,10 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         return new KeyCodeCombination(keyCode, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
     }
 
+    KeyCombination altKey(KeyCode keyCode) {
+        return new KeyCodeCombination(keyCode, KeyCombination.ALT_DOWN);
+    }
+
     void runGuardedAction(String actionLabel, Runnable action) {
         try {
             action.run();
@@ -1612,7 +1618,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         applyTooltip(lengthField, "Optionaler Längenwert für die gerade gezeichnete Wand. Wenn ein Wert eingetragen ist, wird die Wand auf diese Länge gesetzt.");
         applyTooltip(lengthUnit, "Bestimmt die Einheit für die manuelle Längeneingabe während des Zeichnens.");
         applyTooltip(angleField, "Optionaler Winkel in Grad für die aktuelle Wand. Ohne Eingabe bleibt der orthogonale 90°-Modus aktiv.");
-        applyTooltip(northAngleField, "Definiert die Nordausrichtung des Gebäudes in Grad. Die Kompassanzeige richtet sich danach aus.");
+        applyTooltip(northAngleField, "Definiert die Kompasspeilung der oberen Planrichtung in Grad. 0° zeigt nach Norden, 90° nach Osten; der Nordpfeil wird entsprechend gegenläufig ausgerichtet.");
         applyTooltip(wallThicknessField, "Definiert die Wandstärke für neu gezeichnete Wände.");
         applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
         applyTooltip(wallHeightField, "Legt die Raum- beziehungsweise Wandhöhe für neu gezeichnete Wände fest.");

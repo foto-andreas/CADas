@@ -643,7 +643,7 @@ public final class ConstructionDrawingPdfService {
     }
 
     static double viewAngleForNorth(ProjectModel project, double angleDegrees) {
-        return normalizeAngle(angleDegrees + project.northAngle().degrees());
+        return normalizeAngle(angleDegrees - project.northAngle().degrees());
     }
 
     private void drawSpatialView(PageCanvas canvas, ProjectModel project, double viewAngleDegrees, double labelAngleDegrees, boolean isometric,

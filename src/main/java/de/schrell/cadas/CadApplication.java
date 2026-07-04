@@ -37,6 +37,7 @@ public final class CadApplication extends Application {
                 automationBridge.ifPresent(AutomationBridgeServer::stop);
             });
             stage.setScene(scene);
+            stage.setMaximized(true);
             stage.show();
         } catch (RuntimeException exception) {
             UiErrorDialogs.show(

@@ -1503,18 +1503,54 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         }
         double x = drawingCanvas.getWidth() - 78;
         double y = 34;
-        double angle = Math.toRadians(currentNorthAngleDegrees() - activeView.get().cameraAzimuthDegrees());
-        double arrowLength = 14.0;
-        double arrowX = Math.sin(angle) * arrowLength;
-        double arrowY = -Math.cos(angle) * arrowLength;
+        CompassArrow arrow = compassArrow(x, y, compassDisplayAngleDegrees(currentNorthAngleDegrees(), activeView.get()));
         graphics.setStroke(Color.web("#4b6a88"));
         graphics.setFill(Color.web("#4b6a88"));
         graphics.setLineWidth(2);
         graphics.strokeOval(x - 18, y - 18, 36, 36);
-        graphics.strokeLine(x - arrowX, y - arrowY, x + arrowX, y + arrowY);
-        graphics.strokeLine(x + arrowX, y + arrowY, x + arrowX - 5 * Math.cos(angle), y + arrowY + 5 * Math.sin(angle));
-        graphics.strokeLine(x + arrowX, y + arrowY, x + arrowX + 5 * Math.cos(angle), y + arrowY - 5 * Math.sin(angle));
-        graphics.fillText("N", x + arrowX - 4, y + arrowY - 8);
+        graphics.strokeLine(arrow.tail().getX(), arrow.tail().getY(), arrow.tip().getX(), arrow.tip().getY());
+        graphics.strokeLine(arrow.tip().getX(), arrow.tip().getY(), arrow.leftWing().getX(), arrow.leftWing().getY());
+        graphics.strokeLine(arrow.tip().getX(), arrow.tip().getY(), arrow.rightWing().getX(), arrow.rightWing().getY());
+        Point2D label = compassLabelPosition(x, y, compassDisplayAngleDegrees(currentNorthAngleDegrees(), activeView.get()));
+        graphics.fillText("N", label.getX() - 4, label.getY() + 4);
+    }
+
+    static CompassArrow compassArrow(double centerX, double centerY, double angleDegrees) {
+        double angle = Math.toRadians(angleDegrees);
+        double directionX = Math.sin(angle);
+        double directionY = -Math.cos(angle);
+        double perpendicularX = -directionY;
+        double perpendicularY = directionX;
+        double arrowLength = 14.0;
+        double headBack = 6.0;
+        double headSide = 4.0;
+        Point2D tip = new Point2D(centerX + directionX * arrowLength, centerY + directionY * arrowLength);
+        Point2D tail = new Point2D(centerX - directionX * arrowLength, centerY - directionY * arrowLength);
+        Point2D leftWing = new Point2D(
+                tip.getX() - directionX * headBack + perpendicularX * headSide,
+                tip.getY() - directionY * headBack + perpendicularY * headSide
+        );
+        Point2D rightWing = new Point2D(
+                tip.getX() - directionX * headBack - perpendicularX * headSide,
+                tip.getY() - directionY * headBack - perpendicularY * headSide
+        );
+        return new CompassArrow(tail, tip, leftWing, rightWing);
+    }
+
+    static double compassDisplayAngleDegrees(double northAngleDegrees, ViewOrientation orientation) {
+        return orientation.cameraAzimuthDegrees() - northAngleDegrees;
+    }
+
+    static Point2D compassLabelPosition(double centerX, double centerY, double angleDegrees) {
+        double angle = Math.toRadians(angleDegrees);
+        double labelDistance = 25.0;
+        return new Point2D(
+                centerX + Math.sin(angle) * labelDistance,
+                centerY - Math.cos(angle) * labelDistance
+        );
+    }
+
+    record CompassArrow(Point2D tail, Point2D tip, Point2D leftWing, Point2D rightWing) {
     }
 
     void drawRulers() {

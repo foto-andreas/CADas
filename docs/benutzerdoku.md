@@ -319,6 +319,8 @@ Wichtige Kürzel der aktuellen Oberfläche:
 * `Cmd+S` oder `Strg+S`: Projekt sichern
 * `Cmd+Shift+S` oder `Strg+Shift+S`: Projekt unter neuem Namen sichern
 * `Cmd+P` oder `Strg+P`: Bauzeichnung als PDF exportieren
+* `Alt+P`: Raster-Bauzeichnung als PDF exportieren
+* `Alt+M`: Raster-Materialliste als PDF exportieren
 * `Cmd+Shift+B` oder `Strg+Shift+B`: Teilebibliothek laden
 * `Cmd+Z` oder `Strg+Z`: Rückgängig
 * `Cmd+Shift+Z` oder `Strg+Shift+Z`: Wiederherstellen
@@ -647,11 +649,12 @@ Praktische Beispiele:
 
 ### Nordwinkel
 
-`Nordwinkel` legt fest, wie das Gebäude relativ zur Planansicht ausgerichtet ist.
+`Nordwinkel` legt fest, in welche Himmelsrichtung die Oberkante der Planansicht zeigt.
 
-* `0` bedeutet: oben im Plan ist Norden.
-* `90` bedeutet: Norden liegt nach rechts.
-* `180` bedeutet: Norden liegt unten.
+* `0` bedeutet: die Planoberkante zeigt nach Norden.
+* `90` bedeutet: die Planoberkante zeigt nach Osten, der Nordpfeil zeigt nach links.
+* `180` bedeutet: die Planoberkante zeigt nach Süden, der Nordpfeil zeigt nach unten.
+* `220` bedeutet: die Planoberkante zeigt nach Süd-Süd-West, der Nordpfeil zeigt nach rechts unten.
 * Der Kompass in der Zeichenfläche wird entsprechend gedreht.
 
 Diese Einstellung ist vor allem in der Draufsicht hilfreich, wenn das Gebäude nicht exakt achsparallel gezeichnet wurde.
