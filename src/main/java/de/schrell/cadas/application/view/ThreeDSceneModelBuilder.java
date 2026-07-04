@@ -36,6 +36,7 @@ import de.schrell.cadas.domain.model.Staircase;
 import de.schrell.cadas.domain.model.StairType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 import de.schrell.cadas.domain.model.WindowElement;
@@ -1078,7 +1079,10 @@ public final class ThreeDSceneModelBuilder {
                 layer.minimumOffset(),
                 layer.minimumEdgeWidth(),
                 layer.minimumStartEndMargin(),
-                layer.freeMargins()
+                layer.freeMargins(),
+                SurfaceLayoutAnchor.AUTO,
+                Length.zero(),
+                Length.zero()
         );
         List<TilePlacement> tiles = tileLayoutService.fillSurface(request);
         var horizontalKeys = new java.util.HashSet<String>();

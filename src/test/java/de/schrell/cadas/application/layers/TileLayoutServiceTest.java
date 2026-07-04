@@ -20,12 +20,15 @@ class TileLayoutServiceTest {
 
     @Test
     void fuelltEineRechteckigeFlaecheMitVersatzreihen() {
-        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+        List<TilePlacement> placements = tileLayoutService.fillSurface(TileLayoutRequest.withDefaults(
                 Length.of(3, LengthUnit.METER),
                 Length.of(2, LengthUnit.METER),
                 Length.of(60, LengthUnit.CENTIMETER),
                 Length.of(30, LengthUnit.CENTIMETER),
-                Length.of(10, LengthUnit.CENTIMETER)
+                SurfaceLayoutMode.AUTOMATIC,
+                Length.of(10, LengthUnit.CENTIMETER),
+                Length.zero(),
+                Length.zero()
         ));
 
         assertFalse(placements.isEmpty());
@@ -35,7 +38,7 @@ class TileLayoutServiceTest {
     @Test
     void fixerVersatzErhoehtSichAbDerZweitenReiheKonsequentJeReiheModuloTileBreite() {
         double tileWidthMm = 600.0;
-        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+        List<TilePlacement> placements = tileLayoutService.fillSurface(TileLayoutRequest.withDefaults(
                 Length.of(3, LengthUnit.METER),
                 Length.of(2, LengthUnit.METER),
                 Length.ofMillimeters(tileWidthMm),
@@ -63,7 +66,7 @@ class TileLayoutServiceTest {
     @Test
     void fixerVersatzModuloTileBreiteWickeltDurch() {
         double tileWidthMm = 600.0;
-        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+        List<TilePlacement> placements = tileLayoutService.fillSurface(TileLayoutRequest.withDefaults(
                 Length.of(3, LengthUnit.METER),
                 Length.of(2, LengthUnit.METER),
                 Length.ofMillimeters(tileWidthMm),
@@ -87,7 +90,7 @@ class TileLayoutServiceTest {
     void minimumOffsetBegrenztAutoVersatzNachUnten() {
         double tileWidthMm = 600.0;
         double minimumOffsetMm = 400.0;
-        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+        List<TilePlacement> placements = tileLayoutService.fillSurface(TileLayoutRequest.withDefaults(
                 Length.of(3, LengthUnit.METER),
                 Length.of(2, LengthUnit.METER),
                 Length.ofMillimeters(tileWidthMm),
@@ -110,7 +113,7 @@ class TileLayoutServiceTest {
     void minimumEdgeWidthBegrenztVersatzNachObenUndUnten() {
         double tileWidthMm = 600.0;
         double minimumEdgeWidth = 100.0;
-        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+        List<TilePlacement> placements = tileLayoutService.fillSurface(TileLayoutRequest.withDefaults(
                 Length.of(3, LengthUnit.METER),
                 Length.of(2, LengthUnit.METER),
                 Length.ofMillimeters(tileWidthMm),
@@ -133,7 +136,7 @@ class TileLayoutServiceTest {
         double tileWidthMm = 600.0;
         double layoutOffsetMm = 50.0;
         double minimumEdgeWidth = 100.0;
-        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+        List<TilePlacement> placements = tileLayoutService.fillSurface(TileLayoutRequest.withDefaults(
                 Length.of(3, LengthUnit.METER),
                 Length.of(2, LengthUnit.METER),
                 Length.ofMillimeters(tileWidthMm),
@@ -153,7 +156,7 @@ class TileLayoutServiceTest {
 
     @Test
     void fixerVersatzVerwendetBeiHochformatPlattenDieLangeKanteAlsZyklus() {
-        List<TilePlacement> placements = tileLayoutService.fillSurface(new TileLayoutRequest(
+        List<TilePlacement> placements = tileLayoutService.fillSurface(TileLayoutRequest.withDefaults(
                 Length.ofMillimeters(3_000),
                 Length.ofMillimeters(5_000),
                 Length.ofMillimeters(600),
@@ -184,7 +187,11 @@ class TileLayoutServiceTest {
                 Length.zero(),
                 Length.zero(),
                 Length.zero(),
-                Length.ofMillimeters(100)
+                Length.ofMillimeters(100),
+                SurfaceLayoutMargins.zero(),
+                SurfaceLayoutAnchor.AUTO,
+                Length.zero(),
+                Length.zero()
         ));
 
         assertFalse(placements.isEmpty());
@@ -227,6 +234,7 @@ class TileLayoutServiceTest {
                 Length.zero(),
                 Length.zero(),
                 Length.ofMillimeters(100),
+                SurfaceLayoutMargins.zero(),
                 SurfaceLayoutAnchor.AUTO,
                 Length.zero(),
                 Length.ofMillimeters(200)
@@ -258,6 +266,7 @@ class TileLayoutServiceTest {
                 Length.zero(),
                 Length.zero(),
                 Length.zero(),
+                SurfaceLayoutMargins.zero(),
                 SurfaceLayoutAnchor.MAX_X_MAX_Y,
                 Length.zero(),
                 Length.zero()
@@ -292,7 +301,10 @@ class TileLayoutServiceTest {
                         Length.ofMillimeters(180),
                         Length.ofMillimeters(90),
                         Length.ofMillimeters(150)
-                )
+                ),
+                SurfaceLayoutAnchor.AUTO,
+                Length.zero(),
+                Length.zero()
         ));
 
         assertFalse(placements.isEmpty());

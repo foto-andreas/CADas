@@ -31,6 +31,7 @@ import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
+import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
@@ -789,7 +790,10 @@ public final class SurfaceMaterialListService {
                     layer.minimumOffset(),
                     layer.minimumEdgeWidth(),
                     layer.minimumStartEndMargin(),
-                    layer.freeMargins()
+                    layer.freeMargins(),
+                    SurfaceLayoutAnchor.AUTO,
+                    Length.zero(),
+                    Length.zero()
             ));
             for (TilePlacement placement : placements) {
                 addPlacementDimensions(placement.width().toMillimeters(), placement.height().toMillimeters(), tileWidth, tileHeight);

@@ -904,7 +904,10 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
                 layer.minimumOffset(),
                 layer.minimumEdgeWidth(),
                 layer.minimumStartEndMargin(),
-                layer.freeMargins()
+                layer.freeMargins(),
+                SurfaceLayoutAnchor.AUTO,
+                Length.zero(),
+                Length.zero()
         );
         graphics.setStroke(selected ? Color.color(0.78, 0.24, 0.08, 0.92) : Color.color(0.20, 0.15, 0.09, 0.72));
         graphics.setLineWidth(Math.max(selected ? 1.2 : 0.8, jointWidth * scale()));
@@ -1047,7 +1050,10 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
                 layer.minimumOffset(),
                 layer.minimumEdgeWidth(),
                 layer.minimumStartEndMargin(),
-                layer.freeMargins()
+                layer.freeMargins(),
+                SurfaceLayoutAnchor.AUTO,
+                Length.zero(),
+                Length.zero()
         );
         graphics.setStroke(selected ? Color.color(0.78, 0.24, 0.08, 0.92) : Color.color(0.16, 0.12, 0.08, 0.78));
         graphics.setLineWidth(Math.max(selected ? 1.1 : 0.7, jointWidth * scale()));

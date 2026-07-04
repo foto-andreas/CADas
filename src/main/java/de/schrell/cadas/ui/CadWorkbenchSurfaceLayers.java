@@ -289,7 +289,10 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
                 layer.minimumOffset(),
                 layer.minimumEdgeWidth(),
                 layer.minimumStartEndMargin(),
-                layer.freeMargins()
+                layer.freeMargins(),
+                SurfaceLayoutAnchor.AUTO,
+                Length.zero(),
+                Length.zero()
         );
         return tileLayoutService.fillSurface(request).size();
     }
