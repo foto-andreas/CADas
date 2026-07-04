@@ -125,7 +125,7 @@ class AutoRoomGenerationServiceTest {
 
         List<Room> firstRooms = service.synchronize(level, defaults());
         Room firstRoom = firstRooms.getFirst();
-        level.replaceRooms(firstRooms);
+        level.replaceRooms(List.of(firstRoom.withHeatLoadWatts(1_234.0)));
 
         level.replaceWalls(List.of(
                 level.walls().get(0),
@@ -139,6 +139,7 @@ class AutoRoomGenerationServiceTest {
         assertEquals(1, updatedRooms.size());
         assertEquals(firstRoom.id(), updatedRooms.getFirst().id());
         assertEquals("Dachraum", updatedRooms.getFirst().name());
+        assertEquals(1_234.0, updatedRooms.getFirst().heatLoadWatts(), 0.001);
         assertEquals(SlopedCeilingSide.NORTH, updatedRooms.getFirst().slopedCeilingProfile().orElseThrow().lowSide());
     }
 

@@ -73,7 +73,7 @@ class DxfLevelExchangeServiceTest {
                 Length.of(2.6, LengthUnit.METER),
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER)
-        ));
+        ).withHeatLoadWatts(860.0));
         Door door = Door.create(
                 wall.id(),
                 Length.of(1.0, LengthUnit.METER),
@@ -152,6 +152,7 @@ class DxfLevelExchangeServiceTest {
         assertEquals(window.id(), imported.windows().getFirst().id());
         assertEquals("Küche", imported.rooms().getFirst().name());
         assertEquals(14.0, imported.rooms().getFirst().areaSquareMeters(), 0.001);
+        assertEquals(860.0, imported.rooms().getFirst().heatLoadWatts(), 0.001);
         assertEquals(StairType.SWITCHBACK, imported.staircases().getFirst().stairType());
         assertEquals(1, imported.staircases().getFirst().rotationQuarterTurns());
         assertEquals(800, imported.staircases().getFirst().startLandingWidth().toMillimeters(), 0.001);

@@ -552,7 +552,7 @@ public final class AutoRoomGenerationService {
                                 ? previous.slopedCeilingProfiles()
                                 : List.of(),
                         preserveManualSlope ? null : vertexHeights
-                );
+                ).withHeatLoadWatts(previous.heatLoadWatts());
             } else {
                 room = Room.withSlopedCeilings(
                         UUID.randomUUID(),

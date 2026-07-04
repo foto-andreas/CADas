@@ -93,7 +93,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
             appendClosedPolyline(dxf, context, DxfLayer.ROOMS, room.outline());
             appendMetadataText(dxf, context, room.centerPoint(), String.format(
                     Locale.US,
-                    "ROOM|%s|%s|%.3f|%.3f|%.3f|%s|%s|%s",
+                    "ROOM|%s|%s|%.3f|%.3f|%.3f|%s|%s|%s|%.3f",
                     DxfMetadataCodec.encode(room.name()),
                     room.id(),
                     room.roomHeight().toMillimeters(),
@@ -101,7 +101,8 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                     room.ceilingThickness().toMillimeters(),
                     serializePoints(room.outline()),
                     serializeSlopedCeiling(room),
-                    serializeCeilingVertexHeights(room)
+                    serializeCeilingVertexHeights(room),
+                    room.heatLoadWatts()
             ));
         }
 
@@ -375,7 +376,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                                     Length.ofMillimeters(parseDouble(parts[5])),
                                     parts.length >= 8 ? deserializeSlopedCeilings(parts[7]) : List.of(),
                                     parts.length >= 9 ? deserializeCeilingVertexHeights(parts[8]) : null
-                            ));
+                            ).withHeatLoadWatts(parts.length >= 10 ? parseDouble(parts[9]) : 0.0));
                         } else {
                             importedRooms.add(Room.withSlopedCeilings(
                                     UUID.randomUUID(),
@@ -386,7 +387,7 @@ public final class DxfLevelExchangeService implements LevelExchangeService {
                                     Length.ofMillimeters(parseDouble(parts[4])),
                                     parts.length >= 7 ? deserializeSlopedCeilings(parts[6]) : List.of(),
                                     parts.length >= 8 ? deserializeCeilingVertexHeights(parts[7]) : null
-                            ));
+                            ).withHeatLoadWatts(parts.length >= 9 ? parseDouble(parts[8]) : 0.0));
                         }
                     }
                     case "DOOR" -> pendingDoors.add(deserializeDoor(parts));

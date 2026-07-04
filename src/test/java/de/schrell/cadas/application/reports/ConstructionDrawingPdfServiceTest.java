@@ -2,6 +2,7 @@ package de.schrell.cadas.application.reports;
 
 import de.schrell.cadas.application.drawing.DimensionLabelOptions;
 import de.schrell.cadas.application.drawing.DimensionTextStyle;
+import de.schrell.cadas.domain.geometry.Angle;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -373,13 +374,13 @@ class ConstructionDrawingPdfServiceTest {
     void räumlichePdfAnsichtenSchauenVonAussenAufDieGespeicherteVorderseite() {
         ProjectModel project = ProjectModel.withDefaultLevel("Fronthaus", "Erdgeschoss");
 
-        assertEquals(180.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 0), 0.001);
-        assertEquals(270.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 90), 0.001);
+        assertEquals(0.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 0), 0.001);
+        assertEquals(90.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 90), 0.001);
 
-        project.defineFrontAngle(de.schrell.cadas.domain.geometry.Angle.ofDegrees(90));
+        project.defineFrontAngle(Angle.ofDegrees(90));
 
-        assertEquals(270.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 0), 0.001);
-        assertEquals(90.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 180), 0.001);
+        assertEquals(90.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 0), 0.001);
+        assertEquals(270.0, ConstructionDrawingPdfService.viewAngleForBuildingFront(project, 180), 0.001);
     }
 
     @Test

@@ -82,7 +82,6 @@ public final class ConstructionDrawingPdfService {
     private static final double SPATIAL_VIEW_MINIMUM_PIXELS = 560.0;
     private static final double STANDARD_SPATIAL_DEPTH_FACTOR = 0.45;
     private static final double MAXIMUM_SAME_LEVEL_DEPTH_SHIFT_RATIO = 0.55;
-    private static final double FRONT_SIDE_VIEW_OFFSET_DEGREES = 180.0;
     private static final String RASTER_SUBTITLE = "Grafische Rasteransicht";
     private static final AtomicBoolean JAVA_FX_STARTED = new AtomicBoolean();
     private final WallDimensionService wallDimensionService = new WallDimensionService();
@@ -638,7 +637,7 @@ public final class ConstructionDrawingPdfService {
     }
 
     static double viewAngleForBuildingFront(ProjectModel project, double relativeAngleDegrees) {
-        return normalizeAngle(project.frontAngle().degrees() + relativeAngleDegrees + FRONT_SIDE_VIEW_OFFSET_DEGREES);
+        return normalizeAngle(project.frontAngle().degrees() + relativeAngleDegrees);
     }
 
     private void drawSpatialView(PageCanvas canvas, ProjectModel project, double viewAngleDegrees, double labelAngleDegrees, boolean isometric,
