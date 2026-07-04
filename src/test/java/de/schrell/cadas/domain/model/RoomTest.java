@@ -148,7 +148,7 @@ class RoomTest {
         Room room = Room.rectangular(
                 "Alt", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
                 Length.ofMillimeters(2_600), Length.ofMillimeters(180), Length.ofMillimeters(200)
-        );
+        ).withHeatLoadWatts(750.0);
 
         Room renamed = room.withName("Neu");
 
@@ -158,7 +158,9 @@ class RoomTest {
         assertEquals(room.roomHeight(), renamed.roomHeight());
         assertEquals(room.floorThickness(), renamed.floorThickness());
         assertEquals(room.ceilingThickness(), renamed.ceilingThickness());
+        assertEquals(750.0, renamed.heatLoadWatts(), 0.001);
         assertThrows(IllegalArgumentException.class, () -> room.withName("  "));
+        assertThrows(IllegalArgumentException.class, () -> room.withHeatLoadWatts(-1.0));
         assertEquals(room.hashCode(), room.hashCode());
         assertTrue(room.toString().contains("Alt"));
     }

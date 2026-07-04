@@ -181,7 +181,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     case "ROOM" -> {
                         Level level = levels.computeIfAbsent(DxfMetadataCodec.decode(parts[1], encodedFields), Level::new);
                         if (isUuid(parts[2])) {
-                            level.addRoom(Room.withSlopedCeilings(
+                            Room room = Room.withSlopedCeilings(
                                     UUID.fromString(parts[2]),
                                     DxfMetadataCodec.decode(parts[3], encodedFields),
                                     deserializePoints(parts[7]),
@@ -190,9 +190,10 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                     Length.ofMillimeters(parseDouble(parts[6])),
                                     parts.length >= 9 ? deserializeSlopedCeilings(parts[8]) : List.of(),
                                     parts.length >= 10 ? deserializeCeilingVertexHeights(parts[9]) : null
-                            ));
+                            );
+                            level.addRoom(room.withHeatLoadWatts(parts.length >= 11 ? parseDouble(parts[10]) : 0.0));
                         } else {
-                            level.addRoom(Room.withSlopedCeilings(
+                            Room room = Room.withSlopedCeilings(
                                     UUID.randomUUID(),
                                     DxfMetadataCodec.decode(parts[2], encodedFields),
                                     deserializePoints(parts[6]),
@@ -201,7 +202,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                                     Length.ofMillimeters(parseDouble(parts[5])),
                                     parts.length >= 8 ? deserializeSlopedCeilings(parts[7]) : List.of(),
                                     parts.length >= 9 ? deserializeCeilingVertexHeights(parts[8]) : null
-                            ));
+                            );
+                            level.addRoom(room.withHeatLoadWatts(parts.length >= 10 ? parseDouble(parts[9]) : 0.0));
                         }
                     }
                     case "DOOR" -> {
@@ -455,7 +457,7 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
         for (Room room : level.rooms()) {
             appendMetadataText(dxf, context, room.centerPoint(), String.format(
                     Locale.US,
-                    "ROOM|%s|%s|%s|%.3f|%.3f|%.3f|%s|%s|%s",
+                    "ROOM|%s|%s|%s|%.3f|%.3f|%.3f|%s|%s|%s|%.3f",
                     DxfMetadataCodec.encode(level.name()),
                     room.id(),
                     DxfMetadataCodec.encode(room.name()),
@@ -464,7 +466,8 @@ public final class DxfProjectExchangeService implements ProjectExchangeService {
                     room.ceilingThickness().toMillimeters(),
                     serializePoints(room.outline()),
                     serializeSlopedCeiling(room),
-                    serializeCeilingVertexHeights(room)
+                    serializeCeilingVertexHeights(room),
+                    room.heatLoadWatts()
             ));
         }
         for (Door door : level.doors()) {

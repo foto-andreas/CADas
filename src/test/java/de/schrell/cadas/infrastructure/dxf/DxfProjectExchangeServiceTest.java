@@ -97,7 +97,7 @@ class DxfProjectExchangeServiceTest {
                 Length.of(2.6, LengthUnit.METER),
                 Length.of(18, LengthUnit.CENTIMETER),
                 Length.of(20, LengthUnit.CENTIMETER)
-        ));
+        ).withHeatLoadWatts(1_230.0));
         Room heatedRoom = project.primaryLevel().rooms().getFirst();
         HydronicHeating baseFloorHeating = HydronicHeating.create(
                 heatedRoom.id(), HeatingSurfacePosition.FLOOR, HeatingLayoutPattern.SPIRAL,
@@ -158,12 +158,14 @@ class DxfProjectExchangeServiceTest {
         assertTrue(exportedDxf.contains("HEXCL"));
         assertTrue(exportedDxf.contains("NORTH|123.500"));
         assertTrue(exportedDxf.contains("FRONT|42.000"));
+        assertTrue(exportedDxf.contains("|1230.000"));
         ProjectModel imported = exchangeService.importProject(file, "Import");
 
         assertEquals(2, imported.levels().size());
         assertEquals("Haus", imported.name());
         assertEquals(123.5, imported.northAngle().degrees(), 0.001);
         assertEquals(42.0, imported.frontAngle().degrees(), 0.001);
+        assertEquals(1_230.0, imported.primaryLevel().rooms().getFirst().heatLoadWatts(), 0.001);
         assertTrue(imported.roof().isPresent());
         assertEquals(1, imported.primaryLevel().staircases().size());
         assertEquals(1, imported.primaryLevel().floorExtensions().size());

@@ -18,6 +18,7 @@ public final class Room {
     private final Length ceilingThickness;
     private final List<SlopedCeilingProfile> slopedCeilings;
     private final List<Length> ceilingVertexHeights;
+    private final double heatLoadWatts;
 
     public Room(
             UUID id,
@@ -30,7 +31,7 @@ public final class Room {
             List<Length> ceilingVertexHeights
     ) {
         this(id, name, outline, roomHeight, floorThickness, ceilingThickness,
-                slopedCeiling == null ? List.of() : List.of(slopedCeiling), ceilingVertexHeights);
+                slopedCeiling == null ? List.of() : List.of(slopedCeiling), ceilingVertexHeights, 0.0);
     }
 
     private Room(
@@ -41,7 +42,8 @@ public final class Room {
             Length floorThickness,
             Length ceilingThickness,
             List<SlopedCeilingProfile> slopedCeilings,
-            List<Length> ceilingVertexHeights
+            List<Length> ceilingVertexHeights,
+            double heatLoadWatts
     ) {
         Objects.requireNonNull(id, "id darf nicht null sein.");
         Objects.requireNonNull(name, "name darf nicht null sein.");
@@ -59,6 +61,9 @@ public final class Room {
         if (outline.size() < 3) {
             throw new IllegalArgumentException("Ein Raum benötigt mindestens drei Eckpunkte.");
         }
+        if (heatLoadWatts < 0.0 || !Double.isFinite(heatLoadWatts)) {
+            throw new IllegalArgumentException("Die Heizlast darf nicht negativ oder unendlich sein.");
+        }
         this.id = id;
         this.name = name;
         this.outline = List.copyOf(outline);
@@ -67,6 +72,7 @@ public final class Room {
         this.ceilingThickness = ceilingThickness;
         this.slopedCeilings = List.copyOf(slopedCeilings);
         this.ceilingVertexHeights = ceilingVertexHeights == null ? null : List.copyOf(ceilingVertexHeights);
+        this.heatLoadWatts = heatLoadWatts;
     }
 
     public static Room withSlopedCeilings(
@@ -79,7 +85,7 @@ public final class Room {
             List<SlopedCeilingProfile> slopedCeilings,
             List<Length> ceilingVertexHeights
     ) {
-        return new Room(id, name, outline, roomHeight, floorThickness, ceilingThickness, slopedCeilings, ceilingVertexHeights);
+        return new Room(id, name, outline, roomHeight, floorThickness, ceilingThickness, slopedCeilings, ceilingVertexHeights, 0.0);
     }
 
     public Room(
@@ -181,6 +187,10 @@ public final class Room {
         return ceilingThickness;
     }
 
+    public double heatLoadWatts() {
+        return heatLoadWatts;
+    }
+
     public List<Length> ceilingVertexHeights() {
         return ceilingVertexHeights;
     }
@@ -192,12 +202,16 @@ public final class Room {
         }
         return new Room(
                 id, trimmedName, outline, roomHeight, floorThickness, ceilingThickness,
-                slopedCeilings, ceilingVertexHeights
+                slopedCeilings, ceilingVertexHeights, heatLoadWatts
         );
     }
 
     public Room withSlopedCeilingProfiles(List<SlopedCeilingProfile> profiles) {
-        return new Room(id, name, outline, roomHeight, floorThickness, ceilingThickness, profiles, null);
+        return new Room(id, name, outline, roomHeight, floorThickness, ceilingThickness, profiles, null, heatLoadWatts);
+    }
+
+    public Room withHeatLoadWatts(double newHeatLoadWatts) {
+        return new Room(id, name, outline, roomHeight, floorThickness, ceilingThickness, slopedCeilings, ceilingVertexHeights, newHeatLoadWatts);
     }
 
     public Optional<List<Length>> ceilingVertexHeightsProfile() {
