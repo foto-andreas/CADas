@@ -9,7 +9,7 @@ class HelpContentServiceTest {
 
     @Test
     void benutzerdokumentationIstVollstaendig() {
-        String markdown = new HelpContentService().createMarkdown();
+        String markdown = HelpContentService.createMarkdown();
 
         assertTrue(markdown.contains("# Benutzerdokumentation"));
         assertTrue(markdown.contains("Grundbedienung"));
@@ -22,7 +22,7 @@ class HelpContentServiceTest {
 
     @Test
     void keymapEnthaeltKuerzelUndMausbedienung() {
-        String markdown = new HelpContentService().createKeymapMarkdown();
+        String markdown = HelpContentService.createKeymapMarkdown();
 
         assertTrue(markdown.contains("Tastaturkürzel"));
         assertTrue(markdown.contains("Mausbedienung"));
@@ -38,7 +38,7 @@ class HelpContentServiceTest {
 
     @Test
     void drittanbieterLizenzenWerdenAusLaufzeitabhaengigkeitenErzeugt() {
-        String markdown = new HelpContentService().createThirdPartyLicensesMarkdown();
+        String markdown = HelpContentService.createThirdPartyLicensesMarkdown();
 
         assertTrue(markdown.contains("# Drittanbieter-Lizenzen"));
         assertTrue(markdown.contains("commonmark-0.24.0.jar"));

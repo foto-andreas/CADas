@@ -12,7 +12,10 @@ import java.util.List;
 
 public final class PartLibraryImportService {
 
-    public StandardPartLibrary importLibrary(Path sourceFile) throws IOException {
+    private PartLibraryImportService() {
+    }
+
+    public static StandardPartLibrary importLibrary(Path sourceFile) throws IOException {
         List<DoorPreset> doorPresets = new ArrayList<>();
         List<WindowPreset> windowPresets = new ArrayList<>();
         List<StairPreset> stairPresets = new ArrayList<>();

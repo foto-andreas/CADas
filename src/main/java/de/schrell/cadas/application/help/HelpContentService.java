@@ -10,11 +10,14 @@ public final class HelpContentService {
     private static final String BENUTZERDOKU_PFAD = "/docs/benutzerdoku.md";
     private static final String LIZENZEN_PFAD = "/docs/drittanbieter-lizenzen.md";
 
-    public String createMarkdown() {
+    private HelpContentService() {
+    }
+
+    public static String createMarkdown() {
         return ladeRessource(BENUTZERDOKU_PFAD);
     }
 
-    public String createKeymapMarkdown() {
+    public static String createKeymapMarkdown() {
         return """
                 # Tastaturkürzel und Mausbedienung
 
@@ -77,11 +80,11 @@ public final class HelpContentService {
                 """;
     }
 
-    public String createThirdPartyLicensesMarkdown() {
+    public static String createThirdPartyLicensesMarkdown() {
         return ladeRessource(LIZENZEN_PFAD);
     }
 
-    private String ladeRessource(String pfad) {
+    private static String ladeRessource(String pfad) {
         try (InputStream stream = HelpContentService.class.getResourceAsStream(pfad)) {
             return new String(Objects.requireNonNull(stream, "Ressource " + pfad + " nicht gefunden.").readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException exception) {

@@ -4,6 +4,7 @@ import de.schrell.cadas.application.drawing.DraftingConstraints;
 import de.schrell.cadas.application.drawing.GuideSnapTargets;
 import de.schrell.cadas.application.exchange.ExchangeFileNameService;
 import de.schrell.cadas.application.objects.RoomObjectPreset;
+import de.schrell.cadas.application.parts.PartLibraryImportService;
 import de.schrell.cadas.application.parts.StairPreset;
 import de.schrell.cadas.application.parts.StandardPartLibrary;
 import de.schrell.cadas.application.room.AutoRoomGenerationService;
@@ -1157,7 +1158,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             return;
         }
         try {
-            StandardPartLibrary importedLibrary = partLibraryImportService.importLibrary(sourceFile);
+            StandardPartLibrary importedLibrary = PartLibraryImportService.importLibrary(sourceFile);
             availableDoorPresets.addAll(importedLibrary.doorPresets());
             availableWindowPresets.addAll(importedLibrary.windowPresets());
             availableStairPresets.addAll(importedLibrary.stairPresets());

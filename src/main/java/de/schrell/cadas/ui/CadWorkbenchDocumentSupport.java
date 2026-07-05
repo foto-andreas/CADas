@@ -1,6 +1,7 @@
 package de.schrell.cadas.ui;
 
 import de.schrell.cadas.application.help.AboutInformation;
+import de.schrell.cadas.application.help.HelpContentService;
 import de.schrell.cadas.application.help.MarkdownNavigationService;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.exchange.ExchangeFileNameService;
@@ -258,7 +259,7 @@ final class CadWorkbenchDocumentSupport {
 
     void showHelpWindow() {
         showMarkdownWindow(
-                owner.helpContentService.createMarkdown(),
+                HelpContentService.createMarkdown(),
                 "CADas-Benutzerdokumentation",
                 "Benutzerdokumentation",
                 "Druckt die vollständige Benutzerdokumentation. Im Druckdialog kann auch ein PDF-Drucker gewählt werden."
@@ -267,7 +268,7 @@ final class CadWorkbenchDocumentSupport {
 
     void showKeymapWindow() {
         showMarkdownWindow(
-                owner.helpContentService.createKeymapMarkdown(),
+                HelpContentService.createKeymapMarkdown(),
                 "CADas-Keymap und Mausbedienung",
                 "Keymap und Mausbedienung",
                 "Druckt die Tastaturkürzel und Mausbedienung. Im Druckdialog kann auch ein PDF-Drucker gewählt werden."
@@ -276,7 +277,7 @@ final class CadWorkbenchDocumentSupport {
 
     void showThirdPartyLicensesWindow() {
         showMarkdownWindow(
-                owner.helpContentService.createThirdPartyLicensesMarkdown(),
+                HelpContentService.createThirdPartyLicensesMarkdown(),
                 "CADas-Drittanbieter-Lizenzen",
                 "Drittanbieter-Lizenzen",
                 "Druckt die automatisch erzeugte Liste aller Drittanbieter-Lizenzen."

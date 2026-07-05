@@ -10,8 +10,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 class PartLibraryImportServiceTest {
 
-    private final PartLibraryImportService importService = new PartLibraryImportService();
-
     @TempDir
     Path tempDir;
 
@@ -25,7 +23,7 @@ class PartLibraryImportServiceTest {
                 STAIR;stair-custom;Partner Treppe;HALF_TURN;2900;17
                 """);
 
-        StandardPartLibrary library = importService.importLibrary(file);
+        StandardPartLibrary library = PartLibraryImportService.importLibrary(file);
 
         assertEquals(1, library.doorPresets().size());
         assertEquals(1, library.windowPresets().size());
