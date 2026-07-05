@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,7 +21,7 @@ class DwgLibraryAnalyzerTest {
     void analysiertKonvertierteDxfGeometrieUndMeldetKonverter() throws Exception {
         Path dwgFile = tempDir.resolve("teile.dwg");
         Files.writeString(dwgFile, "binäre Quelle wird im Test nicht gelesen");
-        DwgLibraryAnalyzer analyzer = new DwgLibraryAnalyzer(new TestConverter(true));
+        DwgLibraryAnalyzer analyzer = new DwgLibraryAnalyzer(testConverter());
 
         DwgLibraryAnalysis analysis = analyzer.analyze(dwgFile);
 
@@ -34,70 +34,72 @@ class DwgLibraryAnalyzerTest {
 
     @Test
     void bleibtOhneExternenKonverterEhrlichNichtVerfügbar() {
-        DwgLibraryAnalyzer analyzer = new DwgLibraryAnalyzer(new TestConverter(false));
+        DwgLibraryAnalyzer analyzer = new DwgLibraryAnalyzer(
+                ExternalDwgToDxfConverter.fromEnvironment(Map.of("PATH", ""), List.of())
+        );
 
         DwgLibraryAnalysis analysis = analyzer.analyze(tempDir.resolve("teile.dwg"));
 
         assertFalse(analysis.successful());
-        assertTrue(analysis.messages().getFirst().contains("kein Testkonverter"));
+        assertTrue(analysis.messages().getFirst().contains("Kein DWG-Konverter"));
     }
 
-    private static final class TestConverter implements DwgToDxfConverter {
-
-        private final boolean available;
-
-        private TestConverter(boolean available) {
-            this.available = available;
-        }
-
-        @Override
-        public DwgConversionAvailability availability() {
-            return available
-                    ? DwgConversionAvailability.available("Testkonverter", "/tmp/testkonverter")
-                    : DwgConversionAvailability.unavailable("kein Testkonverter verfügbar");
-        }
-
-        @Override
-        public DwgConversionResult convert(Path dwgFile, Path targetDxfFile) throws IOException {
-            Files.writeString(targetDxfFile, """
-                    0
-                    SECTION
-                    2
-                    HEADER
-                    9
-                    $INSUNITS
-                    70
-                    4
-                    0
-                    ENDSEC
-                    0
-                    SECTION
-                    2
-                    BLOCKS
-                    0
-                    BLOCK
-                    2
-                    TESTBLOCK
-                    0
-                    LINE
-                    8
-                    TEST
-                    10
-                    0
-                    20
-                    0
-                    11
-                    800
-                    21
-                    400
-                    0
-                    ENDBLK
-                    0
-                    ENDSEC
-                    0
-                    EOF
-                    """);
-            return new DwgConversionResult(targetDxfFile, "Testkonverter", List.of("ok"));
-        }
+    private ExternalDwgToDxfConverter testConverter() throws Exception {
+        Path executable = tempDir.resolve("dwg2dxf");
+        Files.writeString(executable, """
+                #!/bin/sh
+                while [ "$#" -gt 0 ]; do
+                  if [ "$1" = "-o" ]; then
+                    shift
+                    ziel="$1"
+                  fi
+                  shift
+                done
+                cat > "$ziel" <<'DXF'
+                0
+                SECTION
+                2
+                HEADER
+                9
+                $INSUNITS
+                70
+                4
+                0
+                ENDSEC
+                0
+                SECTION
+                2
+                BLOCKS
+                0
+                BLOCK
+                2
+                TESTBLOCK
+                0
+                LINE
+                8
+                TEST
+                10
+                0
+                20
+                0
+                11
+                800
+                21
+                400
+                0
+                ENDBLK
+                0
+                ENDSEC
+                0
+                EOF
+                DXF
+                echo ok
+                """);
+        executable.toFile().setExecutable(true);
+        return new ExternalDwgToDxfConverter(new ExternalDwgToDxfConverter.Tool(
+                "Testkonverter",
+                executable,
+                ExternalDwgToDxfConverter.ToolMode.DWG2DXF
+        ));
     }
 }

@@ -8,14 +8,14 @@ import java.util.Objects;
 
 public final class DwgLibraryAnalyzer {
 
-    private final DwgToDxfConverter converter;
+    private final ExternalDwgToDxfConverter converter;
     private final DwgDxfGeometryReader geometryReader = new DwgDxfGeometryReader();
 
     public DwgLibraryAnalyzer() {
         this(new ExternalDwgToDxfConverter());
     }
 
-    public DwgLibraryAnalyzer(DwgToDxfConverter converter) {
+    public DwgLibraryAnalyzer(ExternalDwgToDxfConverter converter) {
         this.converter = Objects.requireNonNull(converter, "converter darf nicht null sein.");
     }
 

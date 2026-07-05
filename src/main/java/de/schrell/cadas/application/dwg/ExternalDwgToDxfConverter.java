@@ -12,7 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-public final class ExternalDwgToDxfConverter implements DwgToDxfConverter {
+public final class ExternalDwgToDxfConverter {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(90);
     private static final List<Path> STANDARD_TOOL_DIRECTORIES = List.of(
@@ -43,11 +43,10 @@ public final class ExternalDwgToDxfConverter implements DwgToDxfConverter {
         return fromEnvironment(environment, STANDARD_TOOL_DIRECTORIES);
     }
 
-    static ExternalDwgToDxfConverter fromEnvironment(Map<String, String> environment, List<Path> standardToolDirectories) {
+    public static ExternalDwgToDxfConverter fromEnvironment(Map<String, String> environment, List<Path> standardToolDirectories) {
         return new ExternalDwgToDxfConverter(detect(environment, standardToolDirectories), TIMEOUT);
     }
 
-    @Override
     public DwgConversionAvailability availability() {
         if (tool == null) {
             return DwgConversionAvailability.unavailable(
@@ -57,7 +56,6 @@ public final class ExternalDwgToDxfConverter implements DwgToDxfConverter {
         return DwgConversionAvailability.available(tool.displayName(), tool.executable().toString());
     }
 
-    @Override
     public DwgConversionResult convert(Path dwgFile, Path targetDxfFile) throws IOException, InterruptedException {
         if (tool == null) {
             throw new IOException(availability().message());

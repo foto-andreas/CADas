@@ -6,11 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.application.dwg.DwgBounds;
-import de.schrell.cadas.application.dwg.DwgConversionAvailability;
-import de.schrell.cadas.application.dwg.DwgConversionResult;
 import de.schrell.cadas.application.dwg.DwgLibraryAnalyzer;
-import de.schrell.cadas.application.dwg.DwgToDxfConverter;
 import de.schrell.cadas.application.dwg.DwgUnit;
+import de.schrell.cadas.application.dwg.ExternalDwgToDxfConverter;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
@@ -18,10 +16,10 @@ import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -63,7 +61,7 @@ class RoomObjectPresetServiceTest {
     void importiertDwgDateienAusObjektverzeichnisAlsPresets() throws Exception {
         Files.writeString(tempDir.resolve("Toilette.dwg"), "DWG");
         Files.writeString(tempDir.resolve("Notiz.txt"), "kein Objekt");
-        RoomObjectPresetService service = new RoomObjectPresetService(tempDir, new DwgLibraryAnalyzer(new UnavailableConverter()));
+        RoomObjectPresetService service = new RoomObjectPresetService(tempDir, unavailableAnalyzer());
 
         var presets = service.loadDwgPresets();
 
@@ -89,7 +87,7 @@ class RoomObjectPresetServiceTest {
                 0,
                 List.of()
         );
-        RoomObjectPresetService service = new RoomObjectPresetService(tempDir, new DwgLibraryAnalyzer(new UnavailableConverter()));
+        RoomObjectPresetService service = new RoomObjectPresetService(tempDir, unavailableAnalyzer());
 
         RoomObjectPreset preset = service.fromDwgBlock(block, true);
 
@@ -109,7 +107,7 @@ class RoomObjectPresetServiceTest {
         Files.createDirectories(sourceDirectory);
         Path sourceFile = sourceDirectory.resolve("Wärmepumpe.dxf");
         Files.writeString(sourceFile, simpleSolidDxf());
-        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, new DwgLibraryAnalyzer(new UnavailableConverter()));
+        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, unavailableAnalyzer());
 
         RoomObjectPreset preset = service.importCad3dObject(sourceFile);
 
@@ -140,7 +138,7 @@ class RoomObjectPresetServiceTest {
                 END-ISO-10303-21;
                 """);
         Path objectDirectory = tempDir.resolve("Objekte");
-        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, new DwgLibraryAnalyzer(new UnavailableConverter()));
+        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, unavailableAnalyzer());
 
         RoomObjectPreset preset = service.importCad3dObject(sourceFile);
 
@@ -157,7 +155,7 @@ class RoomObjectPresetServiceTest {
         Path rfa = sourceDirectory.resolve("Wärmepumpe.rfa");
         Files.writeString(rfa, "RFA");
         Files.writeString(sourceDirectory.resolve("Wärmepumpe.dxf"), simpleSolidDxf());
-        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, new DwgLibraryAnalyzer(new UnavailableConverter()));
+        RoomObjectPresetService service = new RoomObjectPresetService(objectDirectory, unavailableAnalyzer());
 
         RoomObjectPreset preset = service.importCad3dObject(rfa);
 
@@ -168,17 +166,8 @@ class RoomObjectPresetServiceTest {
         assertEquals(1, service.loadCad3dPresets().size());
     }
 
-    private static final class UnavailableConverter implements DwgToDxfConverter {
-
-        @Override
-        public DwgConversionAvailability availability() {
-            return DwgConversionAvailability.unavailable("kein Testkonverter");
-        }
-
-        @Override
-        public DwgConversionResult convert(Path dwgFile, Path targetDxfFile) throws IOException {
-            throw new IOException("nicht verfügbar");
-        }
+    private DwgLibraryAnalyzer unavailableAnalyzer() {
+        return new DwgLibraryAnalyzer(ExternalDwgToDxfConverter.fromEnvironment(Map.of("PATH", ""), List.of()));
     }
 
     private RoomObject object(String presetId, String name, RoomObjectType type) {
