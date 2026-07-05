@@ -2,6 +2,7 @@ package de.schrell.cadas.application.reports;
 
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
@@ -58,32 +59,16 @@ public final class ResidentialAreaService {
         }
         return level.staircases().stream()
                 .filter(staircase -> staircase.stepCount() > 3)
-                .anyMatch(staircase -> contains(staircase, point));
+                .anyMatch(staircase -> PlanPolygonSupport.containsPoint(staircaseOutline(staircase), point));
     }
 
-    private boolean contains(Staircase staircase, PlanPoint point) {
-        List<PlanPoint> outline = List.of(
+    private List<PlanPoint> staircaseOutline(Staircase staircase) {
+        return List.of(
                 staircase.pointAtLocalPosition(0.0, 0.0),
                 staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0.0),
                 staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()),
                 staircase.pointAtLocalPosition(0.0, staircase.heightMillimeters())
         );
-        boolean inside = false;
-        int previousIndex = outline.size() - 1;
-        for (int index = 0; index < outline.size(); index++) {
-            PlanPoint current = outline.get(index);
-            PlanPoint previous = outline.get(previousIndex);
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside;
     }
 
     private int sampleCount(double lengthMillimeters) {
