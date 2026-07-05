@@ -40,7 +40,7 @@ import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-abstract class CadWorkbenchTestPart1 extends CadWorkbenchTestBase {
+class CadWorkbenchTestPart1 extends CadWorkbenchTestBase {
 
     @Test
     void startetMitEinemZentimeterRasterweite() throws Exception {

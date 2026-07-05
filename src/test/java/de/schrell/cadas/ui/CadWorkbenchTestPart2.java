@@ -47,7 +47,7 @@ import javafx.stage.Window;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-abstract class CadWorkbenchTestPart2 extends CadWorkbenchTestPart1 {
+class CadWorkbenchTestPart2 extends CadWorkbenchTestBase {
 
     @Test
     void berichteMenueEnthaeltBauzeichnungsExportStattDateimenue() throws Exception {

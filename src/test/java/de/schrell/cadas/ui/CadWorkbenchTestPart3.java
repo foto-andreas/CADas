@@ -30,7 +30,7 @@ import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-abstract class CadWorkbenchTestPart3 extends CadWorkbenchTestPart2 {
+class CadWorkbenchTestPart3 extends CadWorkbenchTestBase {
 
     @Test
     void innenansichtNutztDas3dFensterMitRaumkamera() throws Exception {
