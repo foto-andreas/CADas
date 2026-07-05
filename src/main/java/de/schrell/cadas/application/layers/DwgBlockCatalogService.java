@@ -3,7 +3,6 @@ package de.schrell.cadas.application.layers;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -35,13 +34,12 @@ public final class DwgBlockCatalogService {
     }
 
     private static List<Path> catalogCandidates(Path dwgFile) {
-        List<Path> candidates = new ArrayList<>();
         String fileName = dwgFile.getFileName().toString();
-        candidates.add(dwgFile.resolveSibling(fileName + ".blocks"));
+        Path namedLikeDwg = dwgFile.resolveSibling(fileName + ".blocks");
         if (fileName.toLowerCase(Locale.ROOT).endsWith(".dwg")) {
             String baseName = fileName.substring(0, fileName.length() - 4);
-            candidates.add(dwgFile.resolveSibling(baseName + ".blocks"));
+            return List.of(namedLikeDwg, dwgFile.resolveSibling(baseName + ".blocks"));
         }
-        return candidates;
+        return List.of(namedLikeDwg);
     }
 }
