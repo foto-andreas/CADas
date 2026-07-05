@@ -15,6 +15,7 @@ import de.schrell.cadas.application.view.ThreeDSceneFitService;
 import de.schrell.cadas.application.view.ThreeDSceneModel;
 import de.schrell.cadas.application.view.ThreeDSceneModelBuilder;
 import de.schrell.cadas.application.view.ThreeDViewPreparation;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.ProjectModel;
@@ -1063,7 +1064,7 @@ public final class ThreeDViewport extends BorderPane {
                 if (room.id().equals(interiorRoomId)) {
                     continue;
                 }
-                if (containsPoint(room.outline(), new PlanPoint(probeX, probeY))) {
+                if (PlanPolygonSupport.containsPoint(room.outline(), new PlanPoint(probeX, probeY))) {
                     return room;
                 }
             }
@@ -1083,25 +1084,6 @@ public final class ThreeDViewport extends BorderPane {
                     .orElse(null);
         }
         return null;
-    }
-
-    private static boolean containsPoint(java.util.List<PlanPoint> outline, PlanPoint point) {
-        boolean inside = false;
-        for (int current = 0, previous = outline.size() - 1; current < outline.size(); previous = current++) {
-            PlanPoint a = outline.get(current);
-            PlanPoint b = outline.get(previous);
-            boolean crosses = (a.yMillimeters() > point.yMillimeters()) != (b.yMillimeters() > point.yMillimeters());
-            if (crosses) {
-                double intersectionX = (b.xMillimeters() - a.xMillimeters())
-                        * (point.yMillimeters() - a.yMillimeters())
-                        / (b.yMillimeters() - a.yMillimeters())
-                        + a.xMillimeters();
-                if (point.xMillimeters() < intersectionX) {
-                    inside = !inside;
-                }
-            }
-        }
-        return inside;
     }
 
     boolean isInteriorFloorHit(RenderableKind kind, double pickedHeightMillimeters) {
@@ -1427,23 +1409,7 @@ public final class ThreeDViewport extends BorderPane {
     }
 
     private boolean isInsideRoom(PlanPoint point) {
-        List<PlanPoint> outline = interiorTarget.roomOutline();
-        boolean inside = false;
-        for (int current = 0, previous = outline.size() - 1; current < outline.size(); previous = current++) {
-            PlanPoint a = outline.get(current);
-            PlanPoint b = outline.get(previous);
-            boolean crossesHorizontalRay = (a.yMillimeters() > point.yMillimeters()) != (b.yMillimeters() > point.yMillimeters());
-            if (crossesHorizontalRay) {
-                double intersectionX = (b.xMillimeters() - a.xMillimeters())
-                        * (point.yMillimeters() - a.yMillimeters())
-                        / (b.yMillimeters() - a.yMillimeters())
-                        + a.xMillimeters();
-                if (point.xMillimeters() < intersectionX) {
-                    inside = !inside;
-                }
-            }
-        }
-        return inside;
+        return PlanPolygonSupport.containsPoint(interiorTarget.roomOutline(), point);
     }
 
     private double distanceToRoomBoundary(PlanPoint point) {
