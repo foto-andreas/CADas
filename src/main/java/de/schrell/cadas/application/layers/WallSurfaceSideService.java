@@ -64,7 +64,7 @@ public final class WallSurfaceSideService {
         PlanPoint probePoint = probePoint(wall, sideSign, probeOffset);
         return rooms.stream()
                 .filter(room -> roomId == null || room.id().equals(roomId))
-                .anyMatch(room -> containsPoint(room.outline(), probePoint));
+                .anyMatch(room -> PlanPolygonSupport.containsPoint(room.outline(), probePoint));
     }
 
     private PlanPoint probePoint(Wall wall, double sideSign, double probeOffset) {
@@ -77,10 +77,6 @@ public final class WallSurfaceSideService {
                 (wall.axis().start().xMillimeters() + wall.axis().end().xMillimeters()) / 2.0 + normalX * probeOffset * sideSign,
                 (wall.axis().start().yMillimeters() + wall.axis().end().yMillimeters()) / 2.0 + normalY * probeOffset * sideSign
         );
-    }
-
-    private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
-        return PlanPolygonSupport.containsPoint(outline, point);
     }
 
     public record WallLayerSides(boolean positiveSide, boolean negativeSide) {

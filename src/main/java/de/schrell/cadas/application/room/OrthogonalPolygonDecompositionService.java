@@ -25,7 +25,7 @@ public final class OrthogonalPolygonDecompositionService {
                 double minY = yCoordinates.get(yIndex);
                 double maxY = yCoordinates.get(yIndex + 1);
                 PlanPoint center = new PlanPoint((minX + maxX) / 2.0, (minY + maxY) / 2.0);
-                if (containsPoint(outline, center)) {
+                if (PlanPolygonSupport.containsPoint(outline, center)) {
                     rectangles.add(new CellRectangle(minX, maxX, minY, maxY));
                 }
             }
@@ -112,10 +112,6 @@ public final class OrthogonalPolygonDecompositionService {
             }
         } while (merged);
         return remaining;
-    }
-
-    private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
-        return PlanPolygonSupport.containsPoint(outline, point);
     }
 
     public record CellRectangle(double minX, double maxX, double minY, double maxY) {

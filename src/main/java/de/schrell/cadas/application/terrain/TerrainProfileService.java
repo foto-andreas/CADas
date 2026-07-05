@@ -27,7 +27,7 @@ public final class TerrainProfileService {
     private static final double MAX_SAMPLE_STEP_MILLIMETERS = 250.0;
 
     public Optional<ProjectedTerrainPoint> projectToBand(PlanPoint point, List<PlanPoint> contour) {
-        if (contour.size() < 3 || containsPoint(contour, point)) {
+        if (contour.size() < 3 || PlanPolygonSupport.containsPoint(contour, point)) {
             return Optional.empty();
         }
         Optional<ProjectedTerrainPoint> projection = projectToContour(point, contour);
@@ -270,10 +270,6 @@ public final class TerrainProfileService {
                 point.xMillimeters() + normalX * distance,
                 point.yMillimeters() + normalY * distance
         );
-    }
-
-    private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
-        return PlanPolygonSupport.containsPoint(outline, point);
     }
 
     public record ProjectedTerrainPoint(

@@ -237,7 +237,7 @@ public final class SurfaceMaterialListService {
                 .filter(roomObject -> roomObject.visible())
                 .filter(roomObject -> roomObject.heatOutputWatts() > 0.0)
                 .filter(roomObject -> roomObject.heatingType() == heatingType)
-                .filter(roomObject -> containsPoint(room, roomObject.center()))
+                .filter(roomObject -> PlanPolygonSupport.containsPoint(room.outline(), roomObject.center()))
                 .toList();
         if (heatingObjects.isEmpty()) {
             return "";
@@ -604,7 +604,7 @@ public final class SurfaceMaterialListService {
     }
 
     private boolean objectCenterInsideRoom(Room room, RoomObject roomObject) {
-        return containsPoint(room, roomObject.center());
+        return PlanPolygonSupport.containsPoint(room.outline(), roomObject.center());
     }
 
     private List<SurfaceRectangle> subtractCutout(List<SurfaceRectangle> rectangles, SurfaceRectangle cutout) {
@@ -635,10 +635,6 @@ public final class SurfaceMaterialListService {
         if (width > EPSILON && height > EPSILON) {
             rectangles.add(new SurfaceRectangle(minX, minY, width, height));
         }
-    }
-
-    private boolean containsPoint(Room room, PlanPoint point) {
-        return PlanPolygonSupport.containsPoint(room.outline(), point);
     }
 
     private record SurfaceRectangle(double minXMillimeters, double minYMillimeters, double widthMillimeters, double heightMillimeters) {

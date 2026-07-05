@@ -92,7 +92,7 @@ public final class WallSurfaceRoomIntervalService {
                 midpoint.xMillimeters() + normalX * ROOM_PROBE_OFFSET * sideSign,
                 midpoint.yMillimeters() + normalY * ROOM_PROBE_OFFSET * sideSign
         );
-        return containsPoint(room.outline(), probe);
+        return PlanPolygonSupport.containsPoint(room.outline(), probe);
     }
 
     private double projectedLengthOnWall(Wall wall, PlanPoint point) {
@@ -128,7 +128,4 @@ public final class WallSurfaceRoomIntervalService {
         return List.copyOf(merged);
     }
 
-    private boolean containsPoint(List<PlanPoint> outline, PlanPoint point) {
-        return PlanPolygonSupport.containsPoint(outline, point);
-    }
 }
