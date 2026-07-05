@@ -57,7 +57,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     double chooseRulerStep() {
         double[] candidates = {100, 250, 500, 1000, 2000, 5000};
         for (double candidate : candidates) {
-            if (candidate * scale() >= 60.0) {
+            if (candidate * self().scale() >= 60.0) {
                 return candidate;
             }
         }
@@ -88,7 +88,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     Length pointerSelectionTolerance() {
         return Length.ofMillimeters(Math.min(
                 SNAP_TOLERANCE.toMillimeters(),
-                POINTER_SELECTION_TOLERANCE_PIXELS / Math.max(scale(), 0.0001)
+                POINTER_SELECTION_TOLERANCE_PIXELS / Math.max(self().scale(), 0.0001)
         ));
     }
 
@@ -339,11 +339,11 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             return;
         }
         String finalLevelName = levelName.isBlank() ? "Etage " + (availableLevels.size() + 1) : levelName;
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         Level level = project.createLevel(finalLevelName);
         availableLevels.add(level);
-        activateLevel(level);
-        fitCurrentViewToContent();
+        self().activateLevel(level);
+        self().fitCurrentViewToContent();
     }
 
     void renameCurrentLevel() {
@@ -373,7 +373,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         if (newName.equals(current.name())) {
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         try {
             project.renameLevel(current, newName);
         } catch (IllegalArgumentException exception) {
@@ -393,7 +393,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         if (index >= 0) {
             availableLevels.set(index, current);
         }
-        activateLevel(current);
+        self().activateLevel(current);
     }
 
     void moveCurrentLevelUp() {
@@ -417,7 +417,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         if (newIndex < 0 || newIndex >= availableLevels.size()) {
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         try {
             project.moveLevel(current, newIndex);
         } catch (IndexOutOfBoundsException exception) {
@@ -434,7 +434,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             return;
         }
         availableLevels.setAll(project.levels());
-        activateLevel(current);
+        self().activateLevel(current);
     }
 
     DrawingTool currentTool() {
@@ -525,10 +525,10 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
                 SNAP_TOLERANCE)
                 .map(this::snapDoorToGuides)
                 .ifPresent(door -> {
-                    rememberStateForUndo();
+                    self().rememberStateForUndo();
                     activeLevel.get().addDoor(door);
-                    selectSingle(new SelectionKey(RenderableKind.DOOR, activeLevel.get().name(), door.id().toString()));
-                    markThreeDDirty();
+                    self().selectSingle(new SelectionKey(RenderableKind.DOOR, activeLevel.get().name(), door.id().toString()));
+                    self().markThreeDDirty();
                 });
     }
 
@@ -542,10 +542,10 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
                 SNAP_TOLERANCE)
                 .map(this::snapWindowToGuides)
                 .ifPresent(window -> {
-                    rememberStateForUndo();
+                    self().rememberStateForUndo();
                     activeLevel.get().addWindow(window);
-                    selectSingle(new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString()));
-                    markThreeDDirty();
+                    self().selectSingle(new SelectionKey(RenderableKind.WINDOW, activeLevel.get().name(), window.id().toString()));
+                    self().markThreeDDirty();
                 });
     }
 
@@ -554,10 +554,10 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
                         activeLevel.get(), clickPoint, currentWindowWidth(), currentWindowHeight()
                 )
                 .ifPresentOrElse(roofWindow -> {
-                    rememberStateForUndo();
+                    self().rememberStateForUndo();
                     activeLevel.get().addRoofWindow(roofWindow);
-                    selectSingle(new SelectionKey(RenderableKind.ROOF_WINDOW, activeLevel.get().name(), roofWindow.id().toString()));
-                    markThreeDDirty();
+                    self().selectSingle(new SelectionKey(RenderableKind.ROOF_WINDOW, activeLevel.get().name(), roofWindow.id().toString()));
+                    self().markThreeDDirty();
                     draftLabel.setText("Dachfenster auf Dachschräge platziert.");
                 }, () -> draftLabel.setText("Dachfenster können nur innerhalb eines Raums mit Dachschräge platziert werden."));
     }
@@ -568,7 +568,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             draftLabel.setText("Kein Objekt-Preset ausgewählt.");
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         RoomObject roomObject = RoomObject.create(
                 preset.id(),
                 currentRoomObjectName(preset),
@@ -586,8 +586,8 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
                 .withHeatingType(currentRoomObjectHeatingType(RoomObjectHeatingType.NONE))
                 .withHeatOutputWatts(currentRoomObjectHeatOutputWatts(preset.heatOutputWatts()));
         activeLevel.get().addRoomObject(roomObject);
-        selectSingle(new SelectionKey(RenderableKind.ROOM_OBJECT, activeLevel.get().name(), roomObject.id().toString()));
-        markThreeDDirty();
+        self().selectSingle(new SelectionKey(RenderableKind.ROOM_OBJECT, activeLevel.get().name(), roomObject.id().toString()));
+        self().markThreeDDirty();
     }
 
     void createFloorOpening(PlanSegment bounds, FloorOpeningShape shape) {
@@ -607,14 +607,14 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             draftLabel.setText("Bodenöffnungen müssen mit ihrem Mittelpunkt in einem Raum liegen.");
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         FloorOpening opening = FloorOpening.create(
                 room.orElseThrow().id(), shape, center,
                 Length.ofMillimeters(width), Length.ofMillimeters(depth)
         );
         activeLevel.get().addFloorOpening(opening);
-        selectSingle(new SelectionKey(RenderableKind.FLOOR_OPENING, activeLevel.get().name(), opening.id().toString()));
-        markThreeDDirty();
+        self().selectSingle(new SelectionKey(RenderableKind.FLOOR_OPENING, activeLevel.get().name(), opening.id().toString()));
+        self().markThreeDDirty();
         draftLabel.setText("Bodenöffnung erzeugt.");
     }
 
@@ -628,7 +628,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             draftLabel.setText("FBH-Sperrflächen müssen mit ihrem Mittelpunkt in einem Raum liegen.");
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         HeatingExclusionArea area = HeatingExclusionArea.create(
                 room.orElseThrow().id(),
                 "FBH-Sperrfläche " + (activeLevel.get().heatingExclusionAreas().size() + 1),
@@ -636,7 +636,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
                 bounds.end()
         );
         activeLevel.get().addHeatingExclusionArea(area);
-        selectSingle(new SelectionKey(RenderableKind.HEATING_EXCLUSION, activeLevel.get().name(), area.id().toString()));
+        self().selectSingle(new SelectionKey(RenderableKind.HEATING_EXCLUSION, activeLevel.get().name(), area.id().toString()));
         draftLabel.setText("FBH-Sperrfläche erzeugt.");
     }
 
@@ -656,7 +656,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         HydronicHeating heating;
         try {
             heating = existing == null
-                    ? heatingFromInputs(room, UUID.randomUUID())
+                    ? self().heatingFromInputs(room, UUID.randomUUID())
                     : existing;
         } catch (RuntimeException exception) {
             draftLabel.setText("Heizkreis nicht erzeugt: " + UiErrorDialogs.userMessage(exception));
@@ -673,22 +673,22 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         );
         try {
             zone = heatingCircuitRoutingService.regenerate(zone, heating);
-            zone = snapHeatingZoneRoutingStartIfNeeded(zone);
+            zone = self().snapHeatingZoneRoutingStartIfNeeded(zone);
         } catch (RuntimeException exception) {
             draftLabel.setText("Heizkreis nicht erzeugt: " + UiErrorDialogs.userMessage(exception));
             return;
         }
         zones.add(zone);
         HydronicHeating updatedHeating = heating.withZones(zones);
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         if (existing == null) {
             activeLevel.get().addHydronicHeating(updatedHeating);
         } else {
             activeLevel.get().replaceHydronicHeating(updatedHeating);
         }
-        selectSingle(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), zone.id().toString()));
-        refreshHeatingSection();
-        draftLabel.setText(heatingUpdateMessage(updatedHeating, "Heizkreis erzeugt."));
+        self().selectSingle(new SelectionKey(RenderableKind.HEATING_ZONE, activeLevel.get().name(), zone.id().toString()));
+        self().refreshHeatingSection();
+        draftLabel.setText(self().heatingUpdateMessage(updatedHeating, "Heizkreis erzeugt."));
         recomputeHeatingLayoutNow(updatedHeating.id());
     }
 
@@ -704,14 +704,14 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
                 point.xMillimeters() + DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS,
                 point.yMillimeters()
         );
-        setLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(point.xMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(point.yMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(returnPoint.xMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(returnPoint.yMillimeters()), LengthUnit.CENTIMETER);
+        self().setLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(point.xMillimeters()), LengthUnit.CENTIMETER);
+        self().setLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(point.yMillimeters()), LengthUnit.CENTIMETER);
+        self().setLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(returnPoint.xMillimeters()), LengthUnit.CENTIMETER);
+        self().setLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(returnPoint.yMillimeters()), LengthUnit.CENTIMETER);
         HydronicHeating updated;
         try {
             HydronicHeating base = existing == null
-                    ? heatingFromInputs(room, UUID.randomUUID())
+                    ? self().heatingFromInputs(room, UUID.randomUUID())
                     : existing;
             updated = base.withManifold(point, returnPoint)
                     .withManifoldFreeArea(
@@ -722,14 +722,14 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             draftLabel.setText("HKV nicht gesetzt: " + UiErrorDialogs.userMessage(exception));
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         if (existing == null) {
             activeLevel.get().addHydronicHeating(updated);
         } else {
             activeLevel.get().replaceHydronicHeating(updated);
         }
-        selectSingle(new SelectionKey(RenderableKind.HEATING_MANIFOLD, activeLevel.get().name(), updated.id().toString()));
-        refreshHeatingSection();
+        self().selectSingle(new SelectionKey(RenderableKind.HEATING_MANIFOLD, activeLevel.get().name(), updated.id().toString()));
+        self().refreshHeatingSection();
         draftLabel.setText("HKV gesetzt.");
         render();
     }
@@ -751,14 +751,14 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         PlanPoint returnPoint = horizontal
                 ? new PlanPoint(point.xMillimeters() + DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS / 2.0, point.yMillimeters())
                 : new PlanPoint(point.xMillimeters(), point.yMillimeters() + DEFAULT_HKV_PAIR_DISTANCE_MILLIMETERS / 2.0);
-        setLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(supplyPoint.xMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(supplyPoint.yMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(returnPoint.xMillimeters()), LengthUnit.CENTIMETER);
-        setLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(returnPoint.yMillimeters()), LengthUnit.CENTIMETER);
+        self().setLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(supplyPoint.xMillimeters()), LengthUnit.CENTIMETER);
+        self().setLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(supplyPoint.yMillimeters()), LengthUnit.CENTIMETER);
+        self().setLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(returnPoint.xMillimeters()), LengthUnit.CENTIMETER);
+        self().setLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(returnPoint.yMillimeters()), LengthUnit.CENTIMETER);
         HydronicHeating updated;
         try {
             HydronicHeating base = existing == null
-                    ? heatingFromInputs(room, UUID.randomUUID())
+                    ? self().heatingFromInputs(room, UUID.randomUUID())
                     : existing;
             updated = base.withManifold(supplyPoint, returnPoint)
                     .withManifoldFreeArea(
@@ -769,14 +769,14 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             draftLabel.setText("HKV nicht gesetzt: " + UiErrorDialogs.userMessage(exception));
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         if (existing == null) {
             activeLevel.get().addHydronicHeating(updated);
         } else {
             activeLevel.get().replaceHydronicHeating(updated);
         }
-        selectSingle(new SelectionKey(RenderableKind.HEATING_MANIFOLD, activeLevel.get().name(), updated.id().toString()));
-        refreshHeatingSection();
+        self().selectSingle(new SelectionKey(RenderableKind.HEATING_MANIFOLD, activeLevel.get().name(), updated.id().toString()));
+        self().refreshHeatingSection();
         draftLabel.setText("HKV gesetzt.");
         render();
     }
@@ -789,7 +789,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             Room room = pointRoom.orElseThrow();
             return Optional.of(new ManifoldTarget(room, activeLevel.get().findHydronicHeating(room.id(), surfacePosition)));
         }
-        Optional<HydronicHeating> selectedHeating = selectedHydronicHeating();
+        Optional<HydronicHeating> selectedHeating = self().selectedHydronicHeating();
         if (selectedHeating.isPresent()) {
             HydronicHeating heating = selectedHeating.orElseThrow();
             return activeLevel.get().rooms().stream()
@@ -797,7 +797,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
                     .findFirst()
                     .map(room -> new ManifoldTarget(room, heating));
         }
-        return selectedRoom()
+        return self().selectedRoom()
                 .map(room -> new ManifoldTarget(room, activeLevel.get().findHydronicHeating(room.id(), surfacePosition)));
     }
 
@@ -811,13 +811,13 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     }
 
     void startGuideDrag(GuideOrientation orientation, double worldMillimeters) {
-        if (!isDirectEditingView()) {
+        if (!self().isDirectEditingView()) {
             render();
             draftLabel.setText("Hilfslinien lassen sich aktuell nur in der Draufsicht platzieren.");
             return;
         }
         if (pendingGuideOrientation == null) {
-            rememberStateForUndo();
+            self().rememberStateForUndo();
         }
         pendingGuideOrientation = orientation;
         pendingGuideWorldMillimeters = worldMillimeters;
@@ -846,7 +846,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     void removeNearestGuide(PlanPoint clickPoint) {
         GuideDistanceService.nearestGuide(guideLines, clickPoint, SNAP_TOLERANCE)
                 .ifPresent(guideLine -> {
-                    rememberStateForUndo();
+                    self().rememberStateForUndo();
                     guideLines.remove(guideLine);
                 });
         render();
@@ -869,7 +869,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
 
     PlanPoint snapGuidePoint(Point2D point) {
         return snapService.snap(
-                screenToWorld(point.getX(), point.getY()),
+                self().screenToWorld(point.getX(), point.getY()),
                 currentConstraints(false),
                 activeLevel.get().walls()
         );
@@ -891,7 +891,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     void saveCurrentLevelAs() {
         String levelName = ExchangeFileNameService.stripRepeatedExtension(Path.of(activeLevel.get().name().replace(' ', '_')), ".cadas");
         Optional<Path> selectedTarget = WriteTargetDialog.choose(
-                this,
+                self(),
                 "Etage sichern als ...",
                 "Schreibziel festlegen",
                 levelName
@@ -903,12 +903,12 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         if (!targetFile.getFileName().toString().contains(".")) {
             targetFile = ExchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
         }
-        if (!WriteTargetDialog.confirmOverwrite(this, targetFile, "Etage")) {
+        if (!WriteTargetDialog.confirmOverwrite(self(), targetFile, "Etage")) {
             return;
         }
         String newLevelName = ExchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
         if (!newLevelName.isBlank() && !newLevelName.equals(activeLevel.get().name())) {
-            rememberStateForUndo();
+            self().rememberStateForUndo();
             project.renameLevel(activeLevel.get(), newLevelName);
             int index = availableLevels.indexOf(activeLevel.get());
             if (index >= 0) {
@@ -947,7 +947,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     void saveProjectAs() {
         String projectName = ExchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
         Optional<Path> selectedTarget = WriteTargetDialog.choose(
-                this,
+                self(),
                 "Gebäude sichern als ...",
                 "Schreibziel festlegen",
                 projectName
@@ -959,12 +959,12 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         if (!targetFile.getFileName().toString().contains(".")) {
             targetFile = ExchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
         }
-        if (!WriteTargetDialog.confirmOverwrite(this, targetFile, "Gebäude")) {
+        if (!WriteTargetDialog.confirmOverwrite(self(), targetFile, "Gebäude")) {
             return;
         }
         String newProjectName = ExchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
         if (!newProjectName.isBlank() && !newProjectName.equals(project.name())) {
-            rememberStateForUndo();
+            self().rememberStateForUndo();
             project.rename(newProjectName);
         }
         exportProjectAsDxf(targetFile);
@@ -1036,8 +1036,8 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         try {
             Path targetFile = roomObjectPresetService.importTarget(sourceFile);
             if (Files.exists(targetFile)
-                    && !isSameFile(sourceFile, targetFile)
-                    && !confirmOverwrite(
+                    && !self().isSameFile(sourceFile, targetFile)
+                    && !self().confirmOverwrite(
                     "3D-CAD-Objekt überschreiben",
                     "Ein 3D-CAD-Objekt mit dem Namen `" + sourceFile.getFileName() + "` ist bereits registriert.",
                     "Soll die vorhandene Objektdatei ersetzt werden?"
@@ -1045,7 +1045,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
                 return;
             }
             RoomObjectPreset preset = roomObjectPresetService.importCad3dObject(sourceFile);
-            registerRoomObjectPreset(preset);
+            self().registerRoomObjectPreset(preset);
             roomObjectPresetSelector.setValue(preset);
             toolSelector.setValue(DrawingTool.OBJECT);
             draftLabel.setText("3D-CAD-Objekt geladen: " + sourceFile.getFileName());
@@ -1056,14 +1056,14 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
 
     void importLevel(Path sourceFile) {
         try {
-            rememberStateForUndo();
+            self().rememberStateForUndo();
             String levelName = uniqueLevelName(ExchangeFileNameService.stripRepeatedExtension(sourceFile, ".cadas"));
             Level importedLevel = levelExchangeService.importLevel(sourceFile, levelName);
             importedLevel.replaceRooms(autoRoomGenerationService.synchronize(importedLevel, currentRoomDefaults()));
             project.addLevel(importedLevel);
             availableLevels.add(importedLevel);
-            activateLevel(importedLevel);
-            fitCurrentViewToContent();
+            self().activateLevel(importedLevel);
+            self().fitCurrentViewToContent();
             lastLevelSavePath = sourceFile.toAbsolutePath().normalize();
             draftLabel.setText("Etage geladen: " + sourceFile.getFileName());
         } catch (Exception exception) {
@@ -1083,7 +1083,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
 
     void importProjectFromDxf(Path sourceFile) {
         try {
-            rememberStateForUndo();
+            self().rememberStateForUndo();
             String projectName = ExchangeFileNameService.stripRepeatedExtension(sourceFile, ".cadas");
             ProjectModel importedProject = projectExchangeService.importProject(sourceFile, projectName);
             importedProject.levels().forEach(level -> level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults())));
@@ -1091,11 +1091,11 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             syncNorthAngleFieldFromProject();
             availableLevels.setAll(project.levels());
             guideLines.clear();
-            clearSelectionsInternal();
-            activateLevel(project.primaryLevel());
+            self().clearSelectionsInternal();
+            self().activateLevel(project.primaryLevel());
             clearHeatingLayoutCache();
-            markThreeDDirty();
-            fitCurrentViewToContent();
+            self().markThreeDDirty();
+            self().fitCurrentViewToContent();
             lastProjectSavePath = sourceFile.toAbsolutePath().normalize();
             savedChangeRevision = currentChangeRevision;
             draftLabel.setText("Gebäude geladen: " + sourceFile.getFileName());
@@ -1153,7 +1153,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     void importPartLibrary(Path sourceFile) {
         String fileName = sourceFile.getFileName().toString();
         if (fileName.toLowerCase(Locale.ROOT).endsWith(".dwg")) {
-            registerDwgLibrary(sourceFile, true);
+            self().registerDwgLibrary(sourceFile, true);
             return;
         }
         try {
@@ -1164,7 +1164,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
             if (!cadLibraryReferences.contains(sourceFile)) {
                 cadLibraryReferences.add(sourceFile);
             }
-            updateCadLibrarySummary();
+            self().updateCadLibrarySummary();
             if (!importedLibrary.doorPresets().isEmpty()) {
                 doorPresetSelector.setValue(importedLibrary.doorPresets().getFirst());
             }

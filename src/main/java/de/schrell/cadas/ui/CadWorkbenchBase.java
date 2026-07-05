@@ -213,7 +213,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
     final DwgLibraryAnalyzer dwgLibraryAnalyzer = new DwgLibraryAnalyzer();
-    final CadWorkbenchDocumentSupport documentSupport = new CadWorkbenchDocumentSupport(this);
+    final CadWorkbenchDocumentSupport documentSupport = new CadWorkbenchDocumentSupport(self());
     final CadWorkbenchVariothermGrooveRenderer variothermGrooveRenderer = new CadWorkbenchVariothermGrooveRenderer();
     SurfaceType preferredRoomSurfaceType = SurfaceType.FLOOR;
     final ProjectModel project = ProjectModel.withDefaultLevel("Neues Projekt", "Erdgeschoss");
@@ -394,7 +394,10 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final ObservableList<RoomObjectPreset> availableRoomObjectPresets = FXCollections.observableArrayList();
     final ObservableList<SurfaceCoveringPreset> availableSurfacePresets = FXCollections.observableArrayList();
     final ObservableList<DwgBlockDefinition> availableDwgBlocks = FXCollections.observableArrayList();
-    final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection, this::switchToThreeDWorkspaceFromViewport);
+    final ThreeDViewport threeDViewport = new ThreeDViewport(
+            selection -> self().handleThreeDSelection(selection),
+            () -> self().switchToThreeDWorkspaceFromViewport()
+    );
     final ProjectedModelBoundsService projectedBoundsService = new ProjectedModelBoundsService();
     final UndoRedoStack<WorkbenchSnapshot> history = new UndoRedoStack<>();
     final VBox propertySections = new VBox(12.0);
@@ -1048,7 +1051,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
 
 
     WritableImage reportLevelSnapshot(String levelName) {
-        return reportSnapshot(
+        return self().reportSnapshot(
                 levelName,
                 null,
                 0.0,
@@ -1057,7 +1060,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     }
 
     WritableImage reportMaterialOverviewSnapshot(String levelName) {
-        return reportSnapshot(
+        return self().reportSnapshot(
                 levelName,
                 null,
                 0.0,
@@ -1085,7 +1088,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
             Set<RoomObjectHeatingType> visibleHeatingObjectTypes,
             Set<HeatingSurfacePosition> visibleHydronicSurfacePositions
     ) {
-        return reportSnapshot(
+        return self().reportSnapshot(
                 levelName,
                 null,
                 0.0,
@@ -1094,7 +1097,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     }
 
     WritableImage reportRoomSnapshot(String levelName, List<PlanPoint> focusPoints) {
-        return reportSnapshot(levelName, List.copyOf(focusPoints), 280.0, ReportSnapshotOptions.defaults().hideHeatingRoomObjects().withRenderScale(2.0));
+        return self().reportSnapshot(levelName, List.copyOf(focusPoints), 280.0, ReportSnapshotOptions.defaults().hideHeatingRoomObjects().withRenderScale(2.0));
     }
 
     WritableImage reportRoomSnapshot(
@@ -1103,7 +1106,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
             Set<UUID> visibleSurfaceLayerIds,
             boolean includeHydronicHeating
     ) {
-        return reportSnapshot(
+        return self().reportSnapshot(
                 levelName,
                 List.copyOf(focusPoints),
                 280.0,

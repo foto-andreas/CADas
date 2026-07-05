@@ -56,11 +56,11 @@ import javafx.stage.Window;
  */
 final class CadWorkbenchDocumentSupport {
 
-    private final CadWorkbenchBase owner;
+    private final CadWorkbench owner;
     private final SurfaceMaterialReportPdfService surfaceMaterialReportPdfService = new SurfaceMaterialReportPdfService();
     private List<HeatingLoadField> openHeatingLoadFields = List.of();
 
-    CadWorkbenchDocumentSupport(CadWorkbenchBase owner) {
+    CadWorkbenchDocumentSupport(CadWorkbench owner) {
         this.owner = owner;
     }
 

@@ -136,7 +136,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
             draftLabel.setText("Bitte zuerst einen DWG-Blocknamen eintragen.");
             return;
         }
-        Path dwgLibrary = currentDwgLibraryPath().orElse(null);
+        Path dwgLibrary = self().currentDwgLibraryPath().orElse(null);
         if (dwgLibrary == null) {
             draftLabel.setText("Bitte zuerst eine DWG-Bibliothek laden oder ein DWG-Preset auswählen.");
             return;
@@ -209,7 +209,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
     }
 
     void refreshCurrentDwgLibraryAnalysis() {
-        Optional<Path> currentLibrary = currentDwgLibraryPath();
+        Optional<Path> currentLibrary = self().currentDwgLibraryPath();
         if (currentLibrary.isEmpty()) {
             draftLabel.setText("Bitte zuerst eine DWG-Bibliothek laden oder auswählen.");
             return;
@@ -367,23 +367,23 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
     SurfaceCoveringPreset currentSurfacePresetFromInputs() {
         return new SurfaceCoveringPreset(
                 "",
-                currentSurfaceLayerName(),
-                currentSurfaceLayerThickness(),
-                currentStoredSurfaceTileWidth(),
-                currentStoredSurfaceTileHeight(),
-                currentSurfaceLayoutMode(),
-                currentSurfaceLayoutOffset(),
-                currentSurfaceMinimumOffset(),
-                currentSurfaceMinimumEdgeWidth(),
-                currentSurfaceMinimumStartEndMargin(),
-                currentSurfaceFreeMargins(),
-                currentSurfaceLayoutAnchor(),
-                currentSurfaceLayoutRotatedQuarterTurn(),
+                self().currentSurfaceLayerName(),
+                self().currentSurfaceLayerThickness(),
+                self().currentStoredSurfaceTileWidth(),
+                self().currentStoredSurfaceTileHeight(),
+                self().currentSurfaceLayoutMode(),
+                self().currentSurfaceLayoutOffset(),
+                self().currentSurfaceMinimumOffset(),
+                self().currentSurfaceMinimumEdgeWidth(),
+                self().currentSurfaceMinimumStartEndMargin(),
+                self().currentSurfaceFreeMargins(),
+                self().currentSurfaceLayoutAnchor(),
+                self().currentSurfaceLayoutRotatedQuarterTurn(),
                 Length.zero(),
                 Length.zero(),
-                currentSurfaceJointWidth(),
-                currentSurfaceCutRestriction(),
-                currentSurfaceCoveringSource()
+                self().currentSurfaceJointWidth(),
+                self().currentSurfaceCutRestriction(),
+                self().currentSurfaceCoveringSource()
         );
     }
 
@@ -414,25 +414,25 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
         if (preset == null) {
             return;
         }
-        setLengthInput(doorWidthField, doorWidthUnit, preset.width(), LengthUnit.CENTIMETER);
-        setLengthInput(doorHeightField, doorHeightUnit, preset.height(), LengthUnit.CENTIMETER);
-        setLengthInput(thresholdField, thresholdUnit, preset.thresholdHeight(), LengthUnit.CENTIMETER);
+        self().setLengthInput(doorWidthField, doorWidthUnit, preset.width(), LengthUnit.CENTIMETER);
+        self().setLengthInput(doorHeightField, doorHeightUnit, preset.height(), LengthUnit.CENTIMETER);
+        self().setLengthInput(thresholdField, thresholdUnit, preset.thresholdHeight(), LengthUnit.CENTIMETER);
     }
 
     void applyWindowPreset(WindowPreset preset) {
         if (preset == null) {
             return;
         }
-        setLengthInput(windowWidthField, windowWidthUnit, preset.width(), LengthUnit.CENTIMETER);
-        setLengthInput(windowHeightField, windowHeightUnit, preset.height(), LengthUnit.CENTIMETER);
-        setLengthInput(sillHeightField, sillHeightUnit, preset.sillHeight(), LengthUnit.CENTIMETER);
+        self().setLengthInput(windowWidthField, windowWidthUnit, preset.width(), LengthUnit.CENTIMETER);
+        self().setLengthInput(windowHeightField, windowHeightUnit, preset.height(), LengthUnit.CENTIMETER);
+        self().setLengthInput(sillHeightField, sillHeightUnit, preset.sillHeight(), LengthUnit.CENTIMETER);
     }
 
     void applyStairPreset(StairPreset preset) {
         if (preset == null) {
             return;
         }
-        setLengthInput(stairHeightField, stairHeightUnit, preset.totalHeight(), LengthUnit.CENTIMETER);
+        self().setLengthInput(stairHeightField, stairHeightUnit, preset.totalHeight(), LengthUnit.CENTIMETER);
         stairStepsField.setText(Integer.toString(preset.stepCount()));
     }
 
@@ -440,14 +440,14 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
         if (preset == null) {
             return;
         }
-        setLengthInput(roomObjectWidthField, roomObjectWidthUnit, preset.width(), LengthUnit.CENTIMETER);
-        setLengthInput(roomObjectDepthField, roomObjectDepthUnit, preset.depth(), LengthUnit.CENTIMETER);
-        setLengthInput(roomObjectHeightField, roomObjectHeightUnit, preset.height(), LengthUnit.CENTIMETER);
-        roomObjectHeatOutputField.setText(formatNonNegativeDouble(preset.heatOutputWatts(), 1));
+        self().setLengthInput(roomObjectWidthField, roomObjectWidthUnit, preset.width(), LengthUnit.CENTIMETER);
+        self().setLengthInput(roomObjectDepthField, roomObjectDepthUnit, preset.depth(), LengthUnit.CENTIMETER);
+        self().setLengthInput(roomObjectHeightField, roomObjectHeightUnit, preset.height(), LengthUnit.CENTIMETER);
+        roomObjectHeatOutputField.setText(self().formatNonNegativeDouble(preset.heatOutputWatts(), 1));
         roomObjectHeatingTypeSelector.setValue(preset.heatOutputWatts() > 0.0
                 ? RoomObjectHeatingType.HEATING_ELEMENT
                 : RoomObjectHeatingType.NONE);
-        setLengthInput(roomObjectBaseElevationField, roomObjectBaseElevationUnit, Length.zero(), LengthUnit.CENTIMETER);
+        self().setLengthInput(roomObjectBaseElevationField, roomObjectBaseElevationUnit, Length.zero(), LengthUnit.CENTIMETER);
         roomObjectAngleField.setText("0");
     }
 
@@ -456,36 +456,36 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
             return;
         }
         surfaceLayerNameField.setText(preset.name().replace("DWG-Referenz: ", "").replace("DWG-Block: ", ""));
-        setLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, preset.thickness(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, preset.tileWidth(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, preset.tileHeight(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, preset.thickness(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, preset.tileWidth(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, preset.tileHeight(), LengthUnit.CENTIMETER);
         SurfaceLayoutAnchor normalizedAnchor = normalizedSurfaceLayoutAnchor(preset.layoutAnchor());
-        applySurfaceLayoutAnchorSelection(normalizedAnchor);
+        self().applySurfaceLayoutAnchorSelection(normalizedAnchor);
         surfaceLayoutDirectionSelector.setValue(surfaceLayoutSelectionDirection(normalizedAnchor, preset.layoutRotatedQuarterTurn()));
         surfaceLayoutModeSelector.setValue(preset.layoutMode());
-        setLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, preset.offset(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, preset.minimumOffset(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, preset.minimumEdgeWidth(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, preset.minimumStartEndMargin(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit, preset.freeMargins().left(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceFreeMarginRightField, surfaceFreeMarginRightUnit, preset.freeMargins().right(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceFreeMarginTopField, surfaceFreeMarginTopUnit, preset.freeMargins().top(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit, preset.freeMargins().bottom(), LengthUnit.CENTIMETER);
-        setLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, preset.jointWidth(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, preset.offset(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, preset.minimumOffset(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, preset.minimumEdgeWidth(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, preset.minimumStartEndMargin(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit, preset.freeMargins().left(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceFreeMarginRightField, surfaceFreeMarginRightUnit, preset.freeMargins().right(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceFreeMarginTopField, surfaceFreeMarginTopUnit, preset.freeMargins().top(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit, preset.freeMargins().bottom(), LengthUnit.CENTIMETER);
+        self().setLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, preset.jointWidth(), LengthUnit.CENTIMETER);
         surfaceCutRestrictionSelector.setValue(preset.cutRestriction());
         dwgBlockNameField.setText(extractDwgBlockName(preset.coveringSource()).orElse(""));
     }
 
     Optional<HydronicHeating> selectedHydronicHeating() {
-        Optional<HeatingZoneContext> zoneContext = selectedHeatingZoneContext();
+        Optional<HeatingZoneContext> zoneContext = self().selectedHeatingZoneContext();
         if (zoneContext.isPresent()) {
             return Optional.of(zoneContext.orElseThrow().heating());
         }
-        Optional<HeatingContext> heatingContext = selectedHeatingContext();
+        Optional<HeatingContext> heatingContext = self().selectedHeatingContext();
         if (heatingContext.isPresent()) {
             return Optional.of(heatingContext.orElseThrow().heating());
         }
-        Room room = selectedRoom().orElse(null);
+        Room room = self().selectedRoom().orElse(null);
         HeatingSurfacePosition surfacePosition = heatingSurfacePositionSelector.getValue();
         if (room == null || surfacePosition == null) {
             return Optional.empty();
@@ -494,7 +494,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
     }
 
     void refreshHeatingSection() {
-        Room room = selectedRoom().orElse(null);
+        Room room = self().selectedRoom().orElse(null);
         HydronicHeating heating = selectedHydronicHeating().orElse(null);
         if (room == null) {
             heatingSummaryLabel.setText("Für die Heizflächenplanung zuerst genau einen Raum auswählen.");
@@ -526,17 +526,17 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
             heatingSurfacePositionSelector.setValue(heating.surfacePosition());
         }
         heatingLayoutPatternSelector.setValue(heating.layoutPattern());
-        syncLengthInput(heatingPipeSpacingField, heatingPipeSpacingUnit, heating.pipeSpacing(), LengthUnit.CENTIMETER);
-        syncLengthInput(heatingPipeDiameterField, heatingPipeDiameterUnit, heating.pipeDiameter(), LengthUnit.CENTIMETER);
-        syncLengthInput(heatingMaximumPipeLengthField, heatingMaximumPipeLengthUnit, heating.maximumPipeLength(), LengthUnit.CENTIMETER);
-        syncLengthInput(heatingWallClearanceField, heatingWallClearanceUnit, heating.wallClearance(), LengthUnit.CENTIMETER);
-        syncLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(heating.supplyPoint().xMillimeters()), LengthUnit.CENTIMETER);
-        syncLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(heating.supplyPoint().yMillimeters()), LengthUnit.CENTIMETER);
-        syncLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(heating.returnPoint().xMillimeters()), LengthUnit.CENTIMETER);
-        syncLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(heating.returnPoint().yMillimeters()), LengthUnit.CENTIMETER);
+        self().syncLengthInput(heatingPipeSpacingField, heatingPipeSpacingUnit, heating.pipeSpacing(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(heatingPipeDiameterField, heatingPipeDiameterUnit, heating.pipeDiameter(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(heatingMaximumPipeLengthField, heatingMaximumPipeLengthUnit, heating.maximumPipeLength(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(heatingWallClearanceField, heatingWallClearanceUnit, heating.wallClearance(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(heatingSupplyXField, heatingSupplyXUnit, Length.ofMillimeters(heating.supplyPoint().xMillimeters()), LengthUnit.CENTIMETER);
+        self().syncLengthInput(heatingSupplyYField, heatingSupplyYUnit, Length.ofMillimeters(heating.supplyPoint().yMillimeters()), LengthUnit.CENTIMETER);
+        self().syncLengthInput(heatingReturnXField, heatingReturnXUnit, Length.ofMillimeters(heating.returnPoint().xMillimeters()), LengthUnit.CENTIMETER);
+        self().syncLengthInput(heatingReturnYField, heatingReturnYUnit, Length.ofMillimeters(heating.returnPoint().yMillimeters()), LengthUnit.CENTIMETER);
         HydronicHeatingLayoutService.PlanningResult layoutResult = hydronicHeatingLayoutService.layoutBestEffort(heating);
         List<HydronicHeatingLayoutService.CircuitLayout> circuits = layoutResult.circuits();
-        int selectedIndex = selectedHeatingZoneContext()
+        int selectedIndex = self().selectedHeatingZoneContext()
                 .filter(context -> context.heating().id().equals(heating.id()))
                 .map(HeatingZoneContext::zoneIndex)
                 .orElse(heatingZoneList.getSelectionModel().getSelectedIndex());
@@ -652,7 +652,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
     }
 
     Optional<HeatingZone> activeHeatingZoneForRoutingInput() {
-        Optional<HeatingZoneContext> zoneContext = selectedHeatingZoneContext();
+        Optional<HeatingZoneContext> zoneContext = self().selectedHeatingZoneContext();
         if (zoneContext.isPresent()) {
             return Optional.of(zoneContext.orElseThrow().zone());
         }
@@ -684,7 +684,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
     }
 
     void planHydronicHeatingAutomatically() {
-        Room room = selectedRoom().orElseThrow(() -> new IllegalStateException("Für die Heizflächenplanung muss ein Raum ausgewählt sein."));
+        Room room = self().selectedRoom().orElseThrow(() -> new IllegalStateException("Für die Heizflächenplanung muss ein Raum ausgewählt sein."));
         HydronicHeating existing = selectedHydronicHeating().orElse(null);
         HydronicHeating unplanned = heatingFromInputs(room, existing == null ? UUID.randomUUID() : existing.id());
         HydronicHeatingLayoutService.PlanningResult result = hydronicHeatingLayoutService.suggest(
@@ -702,7 +702,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
         if (maximumExceeded) {
             throw new IllegalArgumentException("Die maximale Rohrlänge kann mit den gewählten Verteilerpunkten und Abständen nicht eingehalten werden.");
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         if (existing == null) {
             activeLevel.get().addHydronicHeating(result.heating());
         } else {
@@ -844,7 +844,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
     }
 
     void applySelectedHeatingZoneSettings() {
-        HeatingZoneContext context = selectedHeatingZoneContext()
+        HeatingZoneContext context = self().selectedHeatingZoneContext()
                 .orElseThrow(() -> new IllegalStateException("Zuerst einen Heizkreis auswählen."));
         HeatingZone draft = heatingZoneDraft(
                 context.zone(),
@@ -860,8 +860,8 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
                 draft.layoutPattern(),
                 draft.serpentineMiddleLine()
         );
-        replacement = snapHeatingZoneRoutingStartIfNeeded(replacement);
-        replaceHeatingZone(context, replacement, "Heizkreis aktualisiert.");
+        replacement = self().snapHeatingZoneRoutingStartIfNeeded(replacement);
+        self().replaceHeatingZone(context, replacement, "Heizkreis aktualisiert.");
     }
 
     HeatingZone heatingZoneDraft(
@@ -889,7 +889,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
     }
 
     void generateSelectedHeatingZoneRouting() {
-        HeatingZoneContext context = selectedHeatingZoneContext()
+        HeatingZoneContext context = self().selectedHeatingZoneContext()
                 .orElseThrow(() -> new IllegalStateException("Zuerst einen Heizkreis auswählen."));
         HeatingZone draft = heatingZoneDraft(
                 context.zone(),
@@ -897,7 +897,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
                 Optional.ofNullable(heatingZoneLayoutPatternSelector.getValue()).orElse(HeatingLayoutPattern.VARIO),
                 heatingZoneSerpentineMiddleLineCheckBox.isSelected()
         );
-        HeatingZone replacement = snapHeatingZoneRoutingStartIfNeeded(
+        HeatingZone replacement = self().snapHeatingZoneRoutingStartIfNeeded(
                 heatingCircuitRoutingService.regenerateWithPattern(
                         draft,
                         context.heating(),
@@ -905,14 +905,14 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
                         draft.serpentineMiddleLine()
                 )
         );
-        replaceHeatingZone(context, replacement, "Routing für Heizkreis neu erzeugt.");
+        self().replaceHeatingZone(context, replacement, "Routing für Heizkreis neu erzeugt.");
     }
 
     void applySelectedHeatingZoneRouting() {
         if (updatingHeatingRoutingInput) {
             return;
         }
-        HeatingZoneContext context = selectedHeatingZoneContext()
+        HeatingZoneContext context = self().selectedHeatingZoneContext()
                 .orElseThrow(() -> new IllegalStateException("Zuerst einen Heizkreis auswählen."));
         String commands = normalizeRoutingEditorText(heatingRoutingCommandArea.getText(), context.zone());
         if (commands.isBlank()) {
@@ -927,12 +927,12 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
         HeatingZone replacement = heatingCircuitRoutingService.withRoutingCommands(
                 draft, context.heating(), commands, draft.serpentineMiddleLine()
         );
-        replacement = snapHeatingZoneRoutingStartIfNeeded(replacement);
-        replaceHeatingZone(context, replacement, "Routing für Heizkreis übernommen.");
+        replacement = self().snapHeatingZoneRoutingStartIfNeeded(replacement);
+        self().replaceHeatingZone(context, replacement, "Routing für Heizkreis übernommen.");
     }
 
     boolean removeHeatingZoneById(UUID zoneId) {
-        Optional<HeatingZoneContext> context = heatingZoneContext(zoneId);
+        Optional<HeatingZoneContext> context = self().heatingZoneContext(zoneId);
         if (context.isEmpty()) {
             return false;
         }
@@ -945,7 +945,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
 
     void applyHeatingZones(HydronicHeating heating, List<HeatingZone> zones, int selectedIndex) {
         HydronicHeating updatedHeating = heating.withZones(zones);
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         activeLevel.get().replaceHydronicHeating(updatedHeating);
         refreshHeatingSection();
         if (selectedIndex >= 0) {

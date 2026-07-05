@@ -128,22 +128,22 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
             return;
         }
         surfaceLayerNameField.setText(selectedLayer.name());
-        syncLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, selectedLayer.thickness(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, selectedLayer.tileWidth(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, selectedLayer.tileHeight(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, selectedLayer.thickness(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, selectedLayer.tileWidth(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceTileHeightField, surfaceTileHeightUnit, selectedLayer.tileHeight(), LengthUnit.CENTIMETER);
         SurfaceLayoutAnchor normalizedAnchor = normalizedSurfaceLayoutAnchor(selectedLayer.layoutAnchor());
         applySurfaceLayoutAnchorSelection(normalizedAnchor);
         surfaceLayoutDirectionSelector.setValue(surfaceLayoutSelectionDirection(normalizedAnchor, selectedLayer.layoutRotatedQuarterTurn()));
         surfaceLayoutModeSelector.setValue(selectedLayer.layoutMode());
-        syncLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, selectedLayer.layoutOffset(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, selectedLayer.minimumOffset(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, selectedLayer.minimumEdgeWidth(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, selectedLayer.minimumStartEndMargin(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit, selectedLayer.freeMargins().left(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceFreeMarginRightField, surfaceFreeMarginRightUnit, selectedLayer.freeMargins().right(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceFreeMarginTopField, surfaceFreeMarginTopUnit, selectedLayer.freeMargins().top(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit, selectedLayer.freeMargins().bottom(), LengthUnit.CENTIMETER);
-        syncLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, selectedLayer.jointWidth(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceLayoutOffsetField, surfaceLayoutOffsetUnit, selectedLayer.layoutOffset(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceMinimumOffsetField, surfaceMinimumOffsetUnit, selectedLayer.minimumOffset(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceMinimumEdgeWidthField, surfaceMinimumEdgeWidthUnit, selectedLayer.minimumEdgeWidth(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceMinimumStartEndMarginField, surfaceMinimumStartEndMarginUnit, selectedLayer.minimumStartEndMargin(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceFreeMarginLeftField, surfaceFreeMarginLeftUnit, selectedLayer.freeMargins().left(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceFreeMarginRightField, surfaceFreeMarginRightUnit, selectedLayer.freeMargins().right(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceFreeMarginTopField, surfaceFreeMarginTopUnit, selectedLayer.freeMargins().top(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceFreeMarginBottomField, surfaceFreeMarginBottomUnit, selectedLayer.freeMargins().bottom(), LengthUnit.CENTIMETER);
+        self().syncLengthInput(surfaceJointWidthField, surfaceJointWidthUnit, selectedLayer.jointWidth(), LengthUnit.CENTIMETER);
         surfaceCutRestrictionSelector.setValue(selectedLayer.cutRestriction());
         surfaceLayerCoverageLabel.setText(describeSurfaceLayer(selectedLayer));
         updateActionButtons();
@@ -158,7 +158,7 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         if (!validateSurfaceLayerSelection(selectionContext.get())) {
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         for (String targetKey : selectionContext.get().targetKeys()) {
             SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(selectionContext.get().surfaceType(), targetKey);
             if (stack == null) {
@@ -178,7 +178,7 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         for (SurfaceLayerStack stack : stacks) {
             SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
             replaceSurfaceLayer(stack, selectedLayer.id(), new SurfaceLayer(
@@ -212,7 +212,7 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         for (SurfaceLayerStack stack : stacks) {
             SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
             stack.removeLayer(selectedLayer.id());
@@ -229,7 +229,7 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         for (SurfaceLayerStack stack : stacks) {
             SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
             stack.setVisibility(selectedLayer.id(), !selectedLayer.visible());
@@ -243,7 +243,7 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         for (SurfaceLayerStack stack : stacks) {
             SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
             stack.moveLayer(selectedLayer.id(), selectedIndex + direction);
@@ -256,9 +256,9 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
     void afterSurfaceLayerMutation(String message) {
         if (selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.WALL
                 || selection.kind() == RenderableKind.STAIR)) {
-            synchronizeRoomsFromWalls(activeLevel.get());
+            self().synchronizeRoomsFromWalls(activeLevel.get());
         }
-        markThreeDDirty();
+        self().markThreeDDirty();
         refreshSurfaceLayerSection();
         draftLabel.setText(message);
         render();
@@ -278,7 +278,7 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
                 continue;
             }
             if (!changed) {
-                rememberStateForUndo();
+                self().rememberStateForUndo();
                 changed = true;
             }
             replaceSurfaceLayer(stack, selectedLayer.id(), repairedLayer);
@@ -405,7 +405,7 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         if (stacks.isEmpty() || selectedIndex < 0) {
             return false;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         for (SurfaceLayerStack stack : stacks) {
             SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
             replaceSurfaceLayer(

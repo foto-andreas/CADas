@@ -23,7 +23,7 @@ final class WriteTargetDialog {
     private WriteTargetDialog() {
     }
 
-    static Optional<Path> choose(CadWorkbenchBase owner, String title, String header, String initialFileName) {
+    static Optional<Path> choose(CadWorkbench owner, String title, String header, String initialFileName) {
         Dialog<Path> dialog = new Dialog<>();
         dialog.setTitle(title);
         dialog.setHeaderText(header);
@@ -76,7 +76,7 @@ final class WriteTargetDialog {
         return dialog.showAndWait();
     }
 
-    static boolean confirmOverwrite(CadWorkbenchBase owner, Path targetPath, String documentName) {
+    static boolean confirmOverwrite(CadWorkbench owner, Path targetPath, String documentName) {
         if (!Files.exists(targetPath)) {
             return true;
         }
@@ -87,7 +87,7 @@ final class WriteTargetDialog {
         );
     }
 
-    private static void chooseDirectory(CadWorkbenchBase owner, TextField directoryField) {
+    private static void chooseDirectory(CadWorkbench owner, TextField directoryField) {
         DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Zielordner wählen");
         targetPath(directoryField.getText(), "")
@@ -109,7 +109,7 @@ final class WriteTargetDialog {
         }
     }
 
-    private static Path defaultDirectory(CadWorkbenchBase owner) {
+    private static Path defaultDirectory(CadWorkbench owner) {
         return Optional.ofNullable(owner.lastProjectSavePath)
                 .or(() -> Optional.ofNullable(owner.lastLevelSavePath))
                 .map(Path::getParent)

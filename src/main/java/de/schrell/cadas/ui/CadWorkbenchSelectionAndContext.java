@@ -559,7 +559,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
         if (selectedSurfaceLayerNeedsRepair()) {
             selectionContextMenu.getItems().add(menuItem("Belag-Verlegung reparieren", this::repairSelectedSurfaceLayerLayout, null));
         }
-        if (selectedSelections.stream().anyMatch(this::isRotatableSelection)) {
+        if (selectedSelections.stream().anyMatch(self()::isRotatableSelection)) {
             selectionContextMenu.getItems().addAll(
                     menuItem("Bauteile 90° im Uhrzeigersinn drehen", this::rotateSelectedComponentsClockwise, null),
                     menuItem("Bauteile 90° gegen den Uhrzeigersinn drehen", this::rotateSelectedComponentsCounterClockwise, null)
@@ -1154,7 +1154,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
     }
 
     void rotateSelectedComponents(boolean clockwise) {
-        if (selectedSelections.stream().noneMatch(this::isRotatableSelection)) {
+        if (selectedSelections.stream().noneMatch(self()::isRotatableSelection)) {
             return;
         }
         rememberStateForUndo();
@@ -1267,7 +1267,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
         if (selectionKey == null || !selectedSelections.contains(selectionKey)) {
             return;
         }
-        if (selectedSelections.stream().noneMatch(this::isTranslatableSelection)) {
+        if (selectedSelections.stream().noneMatch(self()::isTranslatableSelection)) {
             return;
         }
         selectionDragAnchor = anchorPoint;
@@ -1360,7 +1360,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
                 || activeWorkspaceMode.get() != WorkspaceMode.TWO_D
                 || !isDirectEditingView()
                 || currentTool() != DrawingTool.EDIT
-                || selectedSelections.stream().noneMatch(this::isTranslatableSelection)) {
+                || selectedSelections.stream().noneMatch(self()::isTranslatableSelection)) {
             return false;
         }
         return moveSelectionByArrowKey(keyCode);

@@ -92,7 +92,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         initializeDwgLibraryControls();
         levelSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue != null) {
-                activateLevel(newValue);
+                self().activateLevel(newValue);
             }
         });
 
@@ -114,16 +114,16 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         registerRenderListener(snapToWalls);
         northAngleField.textProperty().addListener((ignored, oldValue, newValue) -> {
             applyNorthAngleField();
-            render();
+            self().render();
         });
         showRoomObjects.addListener((ignored, oldValue, newValue) -> {
             threeDViewport.setRoomObjectsVisible(newValue);
-            markThreeDDirty();
-            render();
+            self().markThreeDDirty();
+            self().render();
         });
         activeView.addListener((ignored, oldValue, newValue) -> {
-            fitCurrentViewToContent();
-            render();
+            self().fitCurrentViewToContent();
+            self().render();
         });
         activeWorkspaceMode.addListener((ignored, oldValue, newValue) -> {
             updateWorkspaceMode();
@@ -133,20 +133,20 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
                 } else {
                     threeDViewport.activateOrbitView();
                 }
-                refreshThreeDIfNeeded();
+                self().refreshThreeDIfNeeded();
             } else if (newValue == WorkspaceMode.INTERIOR) {
-                refreshThreeDIfNeeded();
+                self().refreshThreeDIfNeeded();
             }
-            render();
+            self().render();
         });
         toolSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             storePropertySectionExpansionState(oldValue);
             restorePropertySectionExpansionState(newValue);
             updatePropertySectionVisibility();
             updateActionButtons();
-            updateStatus();
-            updateMouseCursor();
-            render();
+            self().updateStatus();
+            self().updateMouseCursor();
+            self().render();
         });
         configureActionButtons();
         registerConfiguredDwgLibraries();
@@ -218,7 +218,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         Button addLevelButton = createActionButton(
                 "Etage hinzufügen",
                 null,
-                this::createLevel,
+                self()::createLevel,
                 "Legt eine neue Etage für den aktuellen Grundriss an und wechselt direkt in diese Etage."
         );
         this.addLevelButton = addLevelButton;
@@ -226,7 +226,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         Button renameLevelButton = createActionButton(
                 "Etage umbenennen",
                 null,
-                this::renameCurrentLevel,
+                self()::renameCurrentLevel,
                 "Benennt die aktuell ausgewählte Etage um. Der Name muss innerhalb des Projekts eindeutig sein."
         );
         this.renameLevelButton = renameLevelButton;
@@ -234,7 +234,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         Button moveLevelUpButton = createActionButton(
                 "Etage hoch",
                 null,
-                this::moveCurrentLevelUp,
+                self()::moveCurrentLevelUp,
                 "Verschiebt die aktuell ausgewählte Etage eine Position nach oben in der Etagenreihenfolge."
         );
         this.moveLevelUpButton = moveLevelUpButton;
@@ -242,7 +242,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         Button moveLevelDownButton = createActionButton(
                 "Etage runter",
                 null,
-                this::moveCurrentLevelDown,
+                self()::moveCurrentLevelDown,
                 "Verschiebt die aktuell ausgewählte Etage eine Position nach unten in der Etagenreihenfolge."
         );
         this.moveLevelDownButton = moveLevelDownButton;
@@ -275,31 +275,31 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
     ToolBar buildViewOptionsBar() {
         CheckBox gridBox = new CheckBox("Raster");
         gridBox.selectedProperty().bindBidirectional(showGrid);
-        applyTooltip(gridBox, "Blendet das sichtbare Raster der 2D-Zeichenfläche ein oder aus, ohne den Raster-Snap zu verändern.");
+        self().applyTooltip(gridBox, "Blendet das sichtbare Raster der 2D-Zeichenfläche ein oder aus, ohne den Raster-Snap zu verändern.");
 
         CheckBox snapRasterBox = new CheckBox("Raster-Snap");
         snapRasterBox.selectedProperty().bindBidirectional(snapToGrid);
-        applyTooltip(snapRasterBox, "Aktiviert das magnetische Einrasten auf das konfigurierte Raster.");
+        self().applyTooltip(snapRasterBox, "Aktiviert das magnetische Einrasten auf das konfigurierte Raster.");
 
         CheckBox snapPointsBox = new CheckBox("Punkt-Snap");
         snapPointsBox.selectedProperty().bindBidirectional(snapToEndpoints);
-        applyTooltip(snapPointsBox, "Aktiviert das magnetische Einrasten auf vorhandene Linien-Endpunkte.");
+        self().applyTooltip(snapPointsBox, "Aktiviert das magnetische Einrasten auf vorhandene Linien-Endpunkte.");
 
         CheckBox guideDistancesBox = new CheckBox("Hilfslinienabstände");
         guideDistancesBox.selectedProperty().bindBidirectional(showGuideDistances);
-        applyTooltip(guideDistancesBox, "Zeigt beim Herausziehen einer Hilfslinie die Abstände zu allen vorhandenen parallelen Hilfslinien an.");
+        self().applyTooltip(guideDistancesBox, "Zeigt beim Herausziehen einer Hilfslinie die Abstände zu allen vorhandenen parallelen Hilfslinien an.");
 
         CheckBox snapGuidesBox = new CheckBox("Hilfslinien-Snap");
         snapGuidesBox.selectedProperty().bindBidirectional(snapToGuides);
-        applyTooltip(snapGuidesBox, "Lässt Wände, Türen und Fenster mit Kanten oder Mittellinie magnetisch an sichtbaren Hilfslinien einrasten.");
+        self().applyTooltip(snapGuidesBox, "Lässt Wände, Türen und Fenster mit Kanten oder Mittellinie magnetisch an sichtbaren Hilfslinien einrasten.");
 
         CheckBox snapWallsBox = new CheckBox("Wand-Snap");
         snapWallsBox.selectedProperty().bindBidirectional(snapToWalls);
-        applyTooltip(snapWallsBox, "Lässt neue oder verschobene Wände an Achsen, Außenkanten und Endkanten anderer Wände einrasten.");
+        self().applyTooltip(snapWallsBox, "Lässt neue oder verschobene Wände an Achsen, Außenkanten und Endkanten anderer Wände einrasten.");
 
         CheckBox dimensionsBox = new CheckBox("ISO-Bemaßung");
         dimensionsBox.selectedProperty().bindBidirectional(showDimensions);
-        applyTooltip(dimensionsBox, "Blendet die ISO-Bemaßung nach DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien ein oder aus.");
+        self().applyTooltip(dimensionsBox, "Blendet die ISO-Bemaßung nach DIN EN ISO 7519 | 2025-01 mit Maß-, Maßhilfs- und Begrenzungslinien ein oder aus.");
 
         CheckBox dimensionTextPartsBox = new CheckBox("Erweiterte Maßtexte");
         dimensionTextPartsBox.setSelected(dimensionTextStyle.get() == DimensionTextStyle.FULL);
@@ -307,26 +307,26 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
                 dimensionTextStyle.set(Boolean.TRUE.equals(isFull) ? DimensionTextStyle.FULL : DimensionTextStyle.LENGTH_ONLY));
         dimensionTextStyle.addListener((obs, oldStyle, newStyle) ->
                 dimensionTextPartsBox.setSelected(newStyle == DimensionTextStyle.FULL));
-        applyTooltip(dimensionTextPartsBox,
+        self().applyTooltip(dimensionTextPartsBox,
                 "Bestimmt den Textanteil der Maßangaben in 2D-Ansicht und Bauzeichnung-PDF. " +
                 "Aktiviert: vollständige Texte mit Raumname, Raummaß und Außenmaß-Vorsatz. " +
                 "Deaktiviert: ausschließlich die nackte Länge, z. B. \"4,20 m\".");
 
         CheckBox objectsBox = new CheckBox("Objekte");
         objectsBox.selectedProperty().bindBidirectional(showRoomObjects);
-        applyTooltip(objectsBox, "Blendet platzierte Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.");
+        self().applyTooltip(objectsBox, "Blendet platzierte Raumobjekte gemeinsam in 2D, Innenansicht und 3D ein oder aus.");
 
         CheckBox terrainPlanBox = new CheckBox("Gelände 2D");
         terrainPlanBox.selectedProperty().bindBidirectional(showTerrainInPlan);
-        applyTooltip(terrainPlanBox, "Blendet das Gelände in der 2D-Ansicht als Band außerhalb des Gebäudes ein oder aus. Seitenansichten und 3D bleiben davon unberührt.");
+        self().applyTooltip(terrainPlanBox, "Blendet das Gelände in der 2D-Ansicht als Band außerhalb des Gebäudes ein oder aus. Seitenansichten und 3D bleiben davon unberührt.");
 
         CheckBox heatingCircuitsBox = new CheckBox("Heizkreise");
         heatingCircuitsBox.selectedProperty().bindBidirectional(showHeatingCircuits);
-        applyTooltip(heatingCircuitsBox, "Blendet Heizkreisflächen, Vorlauf, Rücklauf, Anschlussmarker und Startpunkte global in der 2D-Ansicht ein oder aus. Planung, Auswahl und Materialauswertung bleiben unverändert.");
+        self().applyTooltip(heatingCircuitsBox, "Blendet Heizkreisflächen, Vorlauf, Rücklauf, Anschlussmarker und Startpunkte global in der 2D-Ansicht ein oder aus. Planung, Auswahl und Materialauswertung bleiben unverändert.");
 
         CheckBox variothermCirclesBox = new CheckBox("Variotherm-Kreise");
         variothermCirclesBox.selectedProperty().bindBidirectional(showVariothermCircles);
-        applyTooltip(variothermCirclesBox, "Blendet die Kreis-Markierungen der Variotherm-Trockenbauplatten global in der 2D-Ansicht ein oder aus. Die Belagsgeometrie und Mengenberechnung bleiben unverändert.");
+        self().applyTooltip(variothermCirclesBox, "Blendet die Kreis-Markierungen der Variotherm-Trockenbauplatten global in der 2D-Ansicht ein oder aus. Die Belagsgeometrie und Mengenberechnung bleiben unverändert.");
 
         return new ToolBar(
                 gridBox,
@@ -362,7 +362,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         box.getChildren().add(viewButton("→", () -> activeView.set(activeView.get().rotateRight()), "Dreht das Modell aus der aktuellen 2D-Ansicht nach rechts."));
         box.getChildren().add(viewButton(
                 "2D zentrieren",
-                this::resetTwoDView,
+                self()::resetTwoDView,
                 "Setzt Zoom und Verschiebung der Zeichenfläche auf die Startansicht zurück."
         ));
         return box;
@@ -372,7 +372,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         Button button = new Button(label);
         button.setOnAction(event -> runGuardedAction(label, action));
         button.setStyle("-fx-background-radius: 999; -fx-padding: 8 14 8 14;");
-        applyTooltip(button, tooltipText);
+        self().applyTooltip(button, tooltipText);
         return button;
     }
 
@@ -382,7 +382,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         button.setStyle(workspaceModeButtonStyle(workspaceMode == activeWorkspaceMode.get()));
         activeWorkspaceMode.addListener((ignored, oldValue, newValue) ->
                 button.setStyle(workspaceModeButtonStyle(workspaceMode == newValue)));
-        applyTooltip(button, switch (workspaceMode) {
+        self().applyTooltip(button, switch (workspaceMode) {
             case TWO_D -> "Zeigt die 2D-Zeichenfläche im großen Mittelbereich an.";
             case THREE_D -> "Zeigt die 3D-Orbitansicht im großen Mittelbereich an und spart Platz gegenüber der Parallelansicht.";
             case INTERIOR -> "Öffnet die 3D-Innenansicht im aktuell ausgewählten Raum oder im ersten Raum der aktiven Etage.";
@@ -458,8 +458,8 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
     }
 
     boolean activateInteriorViewForCurrentRoom() {
-        Optional<Room> targetRoom = selectedSurfaceRoom()
-                .or(this::selectedRoom)
+        Optional<Room> targetRoom = self().selectedSurfaceRoom()
+                .or(self()::selectedRoom)
                 .or(() -> activeLevel.get().rooms().stream().findFirst());
         if (targetRoom.isEmpty()) {
             draftLabel.setText("Innenansicht braucht einen Raum auf der aktiven Etage.");
@@ -478,7 +478,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         }
         activeWorkspaceMode.set(workspaceMode);
         updateWorkspaceMode();
-        refreshThreeDIfNeeded();
+        self().refreshThreeDIfNeeded();
     }
 
     void showInteriorViewUnavailableError() {
@@ -524,7 +524,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
             draftLabel.setText("Für das Gelände wird zuerst eine geschlossene Außenkontur benötigt.");
             return true;
         }
-        PlanPoint clickPoint = screenToWorld(event.getX(), event.getY());
+        PlanPoint clickPoint = self().screenToWorld(event.getX(), event.getY());
         Optional<TerrainProfileService.ProjectedTerrainPoint> existingSample = terrainEditService.existingSampleNear(
                 project.terrain(),
                 contour,
@@ -571,13 +571,13 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         Length currentElevation = existingSample == null
                 ? terrainEditService.currentElevation(project.terrain(), contour, projection)
                 : existingSample.elevation();
-        TextField elevationField = new TextField(formatValue(
+        TextField elevationField = new TextField(self().formatValue(
                 currentElevation,
                 LengthUnit.CENTIMETER,
                 LENGTH_INPUT_DECIMALS
         ));
         elevationField.setPrefColumnCount(8);
-        applyTooltip(elevationField, "Legt die Geländehöhe an diesem Punkt relativ zum Boden der untersten Etage in Zentimetern fest. Der Punkt wird entlang der Außenkontur gespeichert.");
+        self().applyTooltip(elevationField, "Legt die Geländehöhe an diesem Punkt relativ zum Boden der untersten Etage in Zentimetern fest. Der Punkt wird entlang der Außenkontur gespeichert.");
         HBox row = new HBox(10.0,
                 new Label(String.format(Locale.GERMAN, "Punkt bei %.2f / %.2f m", projection.bandPoint().xMillimeters() / 1_000.0, projection.bandPoint().yMillimeters() / 1_000.0)),
                 elevationField,
@@ -594,21 +594,21 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         }
         javafx.scene.Node deleteButton = dialog.getDialogPane().lookupButton(deleteButtonType);
         deleteButton.setDisable(existingSample == null);
-        applyTooltip(deleteButton, existingSample != null
+        self().applyTooltip(deleteButton, existingSample != null
                 ? "Entfernt den gewählten gespeicherten Geländepunkt und interpoliert das Gelände aus den übrigen Punkten neu."
                 : "Ist nur verfügbar, wenn ein bereits gespeicherter Geländepunkt ausgewählt wurde.");
-        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Übernimmt die Geländehöhe an diesem Bandpunkt und aktualisiert 2D, Seitenansichten, 3D und PDF.");
-        applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Verwirft die Eingabe und belässt das Gelände unverändert.");
+        self().applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.OK), "Übernimmt die Geländehöhe an diesem Bandpunkt und aktualisiert 2D, Seitenansichten, 3D und PDF.");
+        self().applyTooltip(dialog.getDialogPane().lookupButton(ButtonType.CANCEL), "Verwirft die Eingabe und belässt das Gelände unverändert.");
         Optional<ButtonType> decision = dialog.showAndWait();
         if (decision.isEmpty() || ButtonType.CANCEL.equals(decision.orElseThrow())) {
             return;
         }
-        rememberStateForUndo();
+        self().rememberStateForUndo();
         if (deleteButtonType.equals(decision.orElseThrow())) {
             project.defineTerrain(terrainEditService.deletePoint(project.terrain(), contour, existingSample));
             draftLabel.setText("Geländepunkt entfernt.");
         } else {
-            Length elevation = parseLength(elevationField, LengthUnit.CENTIMETER).orElse(currentElevation);
+            Length elevation = self().parseLength(elevationField, LengthUnit.CENTIMETER).orElse(currentElevation);
             if (existingSample == null) {
                 project.defineTerrain(terrainEditService.upsertPoint(project.terrain(), contour, projection, elevation));
             } else {
@@ -616,33 +616,33 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
             }
             draftLabel.setText("Geländepunkt aktualisiert.");
         }
-        markThreeDDirty();
-        render();
+        self().markThreeDDirty();
+        self().render();
     }
 
     MenuBar buildMenuBar() {
         Menu dateiMenu = new Menu("Datei");
         dateiMenu.getItems().addAll(
-                menuItem("Etage hinzufügen", this::createLevel, shortcutKey(KeyCode.N)),
-                menuItem("Projekt leeren", this::clearProject, shortcutKey(KeyCode.L)),
-                menuItem("Laden", this::importProjectFromDxf, shortcutShiftKey(KeyCode.I)),
-                menuItem("Sichern", this::saveProject, shortcutKey(KeyCode.S)),
-                menuItem("Sichern als ...", this::saveProjectAs, shortcutShiftKey(KeyCode.S)),
-                menuItem("Etage laden", this::importLevel, null),
-                menuItem("Etage sichern", this::saveCurrentLevel, null),
-                menuItem("Etage sichern als ...", this::saveCurrentLevelAs, null),
-                menuItem("Teilebibliothek laden", this::importPartLibrary, shortcutShiftKey(KeyCode.B)),
-                menuItem("3D-Objekt aus DXF/IFC/RFA laden", this::importThreeDObject, null),
-                menuItem("Beenden", this::requestApplicationExit, shortcutKey(KeyCode.Q))
+                menuItem("Etage hinzufügen", self()::createLevel, shortcutKey(KeyCode.N)),
+                menuItem("Projekt leeren", self()::clearProject, shortcutKey(KeyCode.L)),
+                menuItem("Laden", self()::importProjectFromDxf, shortcutShiftKey(KeyCode.I)),
+                menuItem("Sichern", self()::saveProject, shortcutKey(KeyCode.S)),
+                menuItem("Sichern als ...", self()::saveProjectAs, shortcutShiftKey(KeyCode.S)),
+                menuItem("Etage laden", self()::importLevel, null),
+                menuItem("Etage sichern", self()::saveCurrentLevel, null),
+                menuItem("Etage sichern als ...", self()::saveCurrentLevelAs, null),
+                menuItem("Teilebibliothek laden", self()::importPartLibrary, shortcutShiftKey(KeyCode.B)),
+                menuItem("3D-Objekt aus DXF/IFC/RFA laden", self()::importThreeDObject, null),
+                menuItem("Beenden", self()::requestApplicationExit, shortcutKey(KeyCode.Q))
         );
 
         Menu bearbeitenMenu = new Menu("Bearbeiten");
         bearbeitenMenu.getItems().addAll(
-                menuItem("Rückgängig", this::undo, shortcutKey(KeyCode.Z)),
-                menuItem("Wiederherstellen", this::redo, shortcutShiftKey(KeyCode.Z)),
-                menuItem("Eigenschaften auf Auswahl anwenden", this::applyCurrentInputsToSelection, shortcutShiftKey(KeyCode.P)),
-                menuItem("Auswahl löschen", this::deleteSelection, new KeyCodeCombination(KeyCode.DELETE)),
-                menuItem("Auswahl aufheben", this::clearSelection, new KeyCodeCombination(KeyCode.ESCAPE))
+                menuItem("Rückgängig", self()::undo, shortcutKey(KeyCode.Z)),
+                menuItem("Wiederherstellen", self()::redo, shortcutShiftKey(KeyCode.Z)),
+                menuItem("Eigenschaften auf Auswahl anwenden", self()::applyCurrentInputsToSelection, shortcutShiftKey(KeyCode.P)),
+                menuItem("Auswahl löschen", self()::deleteSelection, new KeyCodeCombination(KeyCode.DELETE)),
+                menuItem("Auswahl aufheben", self()::clearSelection, new KeyCodeCombination(KeyCode.ESCAPE))
         );
 
         Menu ansichtMenu = new Menu("Ansicht");
@@ -660,7 +660,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
             ));
         }
         ansichtMenu.getItems().addAll(
-                menuItem("2D-Ansicht zentrieren", this::resetTwoDView, shortcutKey(KeyCode.DIGIT0)),
+                menuItem("2D-Ansicht zentrieren", self()::resetTwoDView, shortcutKey(KeyCode.DIGIT0)),
                 menuItem("3D-Ansicht zentrieren", threeDViewport::centerCurrentView, shortcutShiftKey(KeyCode.DIGIT0))
         );
 
@@ -679,10 +679,10 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
                 toolMenuItem(DrawingTool.OBJECT, KeyCode.O),
                 new SeparatorMenuItem(),
                 menuItem("Geländehöhen bearbeiten", this::editTerrainElevations, null),
-                menuItem("Ausgewählte Bauteile 90° rechts drehen", this::rotateSelectedComponentsClockwise, shortcutShiftKey(KeyCode.RIGHT)),
-                menuItem("Ausgewählte Bauteile 90° links drehen", this::rotateSelectedComponentsCounterClockwise, shortcutShiftKey(KeyCode.LEFT)),
-                menuItem("Ausgewählte Heizkreise horizontal spiegeln", () -> mirrorSelectedHeatingZones(true), null),
-                menuItem("Ausgewählte Heizkreise vertikal spiegeln", () -> mirrorSelectedHeatingZones(false), null)
+                menuItem("Ausgewählte Bauteile 90° rechts drehen", self()::rotateSelectedComponentsClockwise, shortcutShiftKey(KeyCode.RIGHT)),
+                menuItem("Ausgewählte Bauteile 90° links drehen", self()::rotateSelectedComponentsCounterClockwise, shortcutShiftKey(KeyCode.LEFT)),
+                menuItem("Ausgewählte Heizkreise horizontal spiegeln", () -> self().mirrorSelectedHeatingZones(true), null),
+                menuItem("Ausgewählte Heizkreise vertikal spiegeln", () -> self().mirrorSelectedHeatingZones(false), null)
         );
 
         Menu optionenMenu = new Menu("Optionen");
@@ -715,7 +715,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
 
         Menu hilfeMenu = new Menu("Hilfe");
         hilfeMenu.getItems().addAll(
-                menuItem("Über CADas", this::showAboutDialog, null),
+                menuItem("Über CADas", self()::showAboutDialog, null),
                 new SeparatorMenuItem(),
                 menuItem("Benutzerdokumentation", documentSupport::showHelpWindow, new KeyCodeCombination(KeyCode.F1)),
                 menuItem("Keymap und Mausbedienung", documentSupport::showKeymapWindow, null),
@@ -723,7 +723,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         );
 
         MenuBar menuBar = new MenuBar(dateiMenu, bearbeitenMenu, ansichtMenu, werkzeugMenu, optionenMenu, berichteMenu, hilfeMenu);
-        applyTooltip(menuBar, "Bietet Datei-, Bearbeitungs-, Ansichts- und Werkzeugfunktionen mit passenden Tastaturkürzeln an.");
+        self().applyTooltip(menuBar, "Bietet Datei-, Bearbeitungs-, Ansichts- und Werkzeugfunktionen mit passenden Tastaturkürzeln an.");
         return menuBar;
     }
 
@@ -875,7 +875,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
                 )
         );
         propertySections.setPadding(new Insets(4, 0, 4, 0));
-        restorePropertySectionExpansionState(currentTool());
+        restorePropertySectionExpansionState(self().currentTool());
 
         VBox container = new VBox(10.0, new Label("Eigenschaften"), propertySections);
         container.setPadding(new Insets(12));
@@ -885,7 +885,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         scrollPane.setFitToWidth(true);
         scrollPane.setPrefWidth(290);
         scrollPane.setStyle("-fx-background-color: transparent;");
-        applyTooltip(scrollPane, "Zeigt alle für Werkzeug oder Auswahl passenden Eigenschaften in einer permanent sichtbaren, vertikalen Liste an.");
+        self().applyTooltip(scrollPane, "Zeigt alle für Werkzeug oder Auswahl passenden Eigenschaften in einer permanent sichtbaren, vertikalen Liste an.");
         return scrollPane;
     }
 
@@ -895,16 +895,16 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         content.setStyle("-fx-background-color: rgba(242,236,226,0.92); -fx-background-radius: 0 0 12 12;");
         TitledPane pane = new TitledPane(title, content);
         pane.setAnimated(false);
-        pane.setExpanded(propertySectionExpandedState(currentTool(), title));
+        pane.setExpanded(propertySectionExpandedState(self().currentTool(), title));
         pane.setStyle("-fx-font-size: 13px;");
         pane.expandedProperty().addListener((ignored, oldExpanded, expanded) -> {
             if (!applyingPropertySectionExpansionState) {
                 propertySectionExpandedByTool
-                        .computeIfAbsent(currentTool(), ignoredTool -> new LinkedHashMap<>())
+                        .computeIfAbsent(self().currentTool(), ignoredTool -> new LinkedHashMap<>())
                         .put(title, expanded);
             }
         });
-        applyTooltip(pane, "Klappt den Einstellungsbereich `" + title + "` ein oder aus. Der Zustand wird getrennt für jedes aktive Werkzeug gemerkt.");
+        self().applyTooltip(pane, "Klappt den Einstellungsbereich `" + title + "` ein oder aus. Der Zustand wird getrennt für jedes aktive Werkzeug gemerkt.");
         return pane;
     }
 
@@ -954,60 +954,60 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
     }
 
     void configureActionButtons() {
-        undoButton.setOnAction(event -> runGuardedAction("Rückgängig", this::undo));
-        redoButton.setOnAction(event -> runGuardedAction("Wiederherstellen", this::redo));
-        deleteSelectionButton.setOnAction(event -> runGuardedAction("Auswahl löschen", this::deleteSelection));
-        clearSelectionButton.setOnAction(event -> runGuardedAction("Auswahl aufheben", this::clearSelection));
-        applySelectionPropertiesButton.setOnAction(event -> runGuardedAction("Werte auf Auswahl anwenden", this::applyCurrentInputsToSelection));
-        applyEndpointHeightButton.setOnAction(event -> runGuardedAction("Eckhöhe anwenden", this::applyEndpointHeightToSelection));
-        addSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene hinzufügen", this::addSurfaceLayer));
-        updateSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene aktualisieren", this::updateSurfaceLayer));
-        removeSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene entfernen", this::removeSurfaceLayer));
-        toggleSurfaceLayerVisibilityButton.setOnAction(event -> runGuardedAction("Sichtbarkeit umschalten", this::toggleSurfaceLayerVisibility));
-        surfaceLayoutCornerPreviousButton.setOnAction(event -> cycleSurfaceLayoutCorner(false));
-        surfaceLayoutCornerNextButton.setOnAction(event -> cycleSurfaceLayoutCorner(true));
-        moveSurfaceLayerUpButton.setOnAction(event -> runGuardedAction("Ebene nach oben", () -> moveSurfaceLayer(-1)));
-        moveSurfaceLayerDownButton.setOnAction(event -> runGuardedAction("Ebene nach unten", () -> moveSurfaceLayer(1)));
-        saveSurfacePresetButton.setOnAction(event -> runGuardedAction("Belagspreset speichern", this::saveCurrentSurfacePreset));
-        addDwgBlockPresetButton.setOnAction(event -> runGuardedAction("DWG-Block hinzufügen", this::addDwgBlockPreset));
-        refreshDwgLibraryButton.setOnAction(event -> runGuardedAction("DWG prüfen", this::refreshCurrentDwgLibraryAnalysis));
-        addDwgBlockAsSurfaceButton.setOnAction(event -> runGuardedAction("DWG-Block als Belag", this::addSelectedDwgBlockAsSurfacePreset));
-        addDwgBlockAsObjectButton.setOnAction(event -> runGuardedAction("DWG-Block als Objekt", this::addSelectedDwgBlockAsObjectPreset));
-        planHeatingButton.setOnAction(event -> runGuardedAction("Heizkreise planen", this::planHydronicHeating));
-        applyHeatingZoneSettingsButton.setOnAction(event -> runGuardedAction("Heizkreis übernehmen", this::applySelectedHeatingZoneSettings));
-        generateHeatingZoneRoutingButton.setOnAction(event -> runGuardedAction("Heizkreis-Routing generieren", this::generateSelectedHeatingZoneRouting));
-        applyHeatingRoutingCommandButton.setOnAction(event -> runGuardedAction("Heizkreis-Routing übernehmen", this::applySelectedHeatingZoneRouting));
-        rebuildSelectionContextMenu();
-        applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
-        applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
-        applyTooltip(deleteSelectionButton, "Löscht das aktuell ausgewählte Bauteil aus der aktiven Etage.");
-        applyTooltip(clearSelectionButton, "Hebt die aktuelle Auswahl auf und entfernt die Hervorhebung in 2D und 3D.");
-        applyTooltip(applySelectionPropertiesButton, "Übernimmt die aktuell sichtbaren Eingabewerte auf alle passenden, ausgewählten Bauteile.");
-        applyTooltip(applyEndpointHeightButton, "Übernimmt die eingetragene Höhe auf den aktuell ausgewählten Wand-Endpunkt und aktualisiert daraus die angrenzenden Räume.");
-        applyTooltip(addSurfaceLayerButton, "Legt auf der aktuell ausgewählten Wand- oder Raumfläche eine neue Ebene mit den eingetragenen Maßen an.");
-        applyTooltip(updateSurfaceLayerButton, "Übernimmt die aktuellen Ebenenwerte auf den in der Liste markierten Belag.");
-        applyTooltip(removeSurfaceLayerButton, "Entfernt den in der Liste markierten Belag von der aktuell ausgewählten Fläche.");
-        applyTooltip(toggleSurfaceLayerVisibilityButton, "Schaltet die Sichtbarkeit des markierten Belags um und passt Raumwirkung sowie 3D-Darstellung direkt an.");
-        applyTooltip(surfaceLayoutCornerPreviousButton, "Schaltet die Startecke des Belags gegen den Uhrzeigersinn zur vorherigen Raumecke weiter. Die Verlegerichtung wird dabei passend auf die neue Ecke mitgeführt.");
-        applyTooltip(surfaceLayoutCornerNextButton, "Schaltet die Startecke des Belags im Uhrzeigersinn zur nächsten Raumecke weiter. Die Verlegerichtung wird dabei passend auf die neue Ecke mitgeführt.");
-        applyTooltip(moveSurfaceLayerUpButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach oben.");
-        applyTooltip(moveSurfaceLayerDownButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach unten.");
-        applyTooltip(saveSurfacePresetButton, "Speichert die aktuell eingetragenen Belagswerte als eigenes Preset unter `~/.config/CADas/Belag`, fragt vor dem Überschreiben nach und fügt das Preset der Auswahl hinzu.");
-        applyTooltip(addDwgBlockPresetButton, "Registriert den manuell eingetragenen Blocknamen aus der aktuell ausgewählten DWG-Bibliothek als Belags-Preset. Wenn die DWG analysiert wurde, werden echte Blockmaße übernommen.");
-        applyTooltip(refreshDwgLibraryButton, "Analysiert die aktuell geladene DWG-Bibliothek erneut über einen externen Konverter wie `dwg2dxf` oder `dwgread`.");
-        applyTooltip(addDwgBlockAsSurfaceButton, "Übernimmt den ausgewählten DWG-Block mit echten Blockmaßen als Belags-Preset.");
-        applyTooltip(addDwgBlockAsObjectButton, "Übernimmt den ausgewählten DWG-Block mit echtem Footprint als Objekt-Preset.");
-        applyTooltip(planHeatingButton, "Die automatische Planung ganzer Räume ist vorübergehend deaktiviert. Heizkreise werden aktuell halbautomatisch als Rechtecke mit dem Werkzeug `Heizkreis` angelegt und danach direkt in der Zeichenfläche bearbeitet.");
-        applyTooltip(applyHeatingZoneSettingsButton, "Übernimmt Name, Verlegung, Rollenorientierung, Mittelschlange, Heizleistung und Polygon-Eckpunkte aus der Eigenschaftenleiste auf den markierten Heizkreis.");
-        applyTooltip(generateHeatingZoneRoutingButton, "Erzeugt für den markierten rechteckigen Heizkreis die gespeicherte FBH-Routing-Sprache neu. Vorhandene manuelle Korrekturen im Routing-String werden dabei ersetzt.");
-        applyTooltip(applyHeatingRoutingCommandButton, "Übernimmt den Routing-Text auf den markierten Heizkreis. `=` und `R/L` steuern den Vorlauf, `-` und `r/l` den Rücklauf; `X` und `x` löschen jeweils den letzten Vorlauf- oder Rücklauf-Schritt. Bei einfacher Spiegelung werden zusätzlich `(` und `)` zu `L` und `R` sowie `8` und `9` zu `l` und `r`. Der rote Startpunkt markiert den tatsächlichen Routing-Start, nicht das Rechteck.");
-        applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf.");
-        applyTooltip(dwgStatusLabel, "Zeigt, welcher externe DWG-Konverter gefunden wurde und ob die letzte Analyse erfolgreich war.");
-        applyTooltip(dwgBlockSearchField, "Filtert die analysierten DWG-Blöcke nach Blockname, Layer oder Dateiname.");
-        applyTooltip(dwgBlockSelector, "Wählt einen aus der DWG-Geometrie analysierten Block aus, der als Belag oder Objekt übernommen werden kann.");
-        applyTooltip(dwgPreviewCanvas, "Zeigt eine maßstäbliche Draufsicht-Vorschau der aus dem DWG-Block abgeleiteten 2D-Grenzen.");
-        applyTooltip(dwgBlockDetailLabel, "Zeigt Maße, Ursprung, Layer, Handles, Einheiten und Hinweise zum ausgewählten DWG-Block.");
-        applyTooltip(dwgObjectFloorModeSelector, "Legt fest, ob das aus dem DWG-Block erzeugte Objekt auf dem Bodenbelag steht, den Bodenbelag ausschneidet oder wandmontiert ohne Bodenausschnitt geführt wird.");
+        undoButton.setOnAction(event -> runGuardedAction("Rückgängig", self()::undo));
+        redoButton.setOnAction(event -> runGuardedAction("Wiederherstellen", self()::redo));
+        deleteSelectionButton.setOnAction(event -> runGuardedAction("Auswahl löschen", self()::deleteSelection));
+        clearSelectionButton.setOnAction(event -> runGuardedAction("Auswahl aufheben", self()::clearSelection));
+        applySelectionPropertiesButton.setOnAction(event -> runGuardedAction("Werte auf Auswahl anwenden", self()::applyCurrentInputsToSelection));
+        applyEndpointHeightButton.setOnAction(event -> runGuardedAction("Eckhöhe anwenden", self()::applyEndpointHeightToSelection));
+        addSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene hinzufügen", self()::addSurfaceLayer));
+        updateSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene aktualisieren", self()::updateSurfaceLayer));
+        removeSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene entfernen", self()::removeSurfaceLayer));
+        toggleSurfaceLayerVisibilityButton.setOnAction(event -> runGuardedAction("Sichtbarkeit umschalten", self()::toggleSurfaceLayerVisibility));
+        surfaceLayoutCornerPreviousButton.setOnAction(event -> self().cycleSurfaceLayoutCorner(false));
+        surfaceLayoutCornerNextButton.setOnAction(event -> self().cycleSurfaceLayoutCorner(true));
+        moveSurfaceLayerUpButton.setOnAction(event -> runGuardedAction("Ebene nach oben", () -> self().moveSurfaceLayer(-1)));
+        moveSurfaceLayerDownButton.setOnAction(event -> runGuardedAction("Ebene nach unten", () -> self().moveSurfaceLayer(1)));
+        saveSurfacePresetButton.setOnAction(event -> runGuardedAction("Belagspreset speichern", self()::saveCurrentSurfacePreset));
+        addDwgBlockPresetButton.setOnAction(event -> runGuardedAction("DWG-Block hinzufügen", self()::addDwgBlockPreset));
+        refreshDwgLibraryButton.setOnAction(event -> runGuardedAction("DWG prüfen", self()::refreshCurrentDwgLibraryAnalysis));
+        addDwgBlockAsSurfaceButton.setOnAction(event -> runGuardedAction("DWG-Block als Belag", self()::addSelectedDwgBlockAsSurfacePreset));
+        addDwgBlockAsObjectButton.setOnAction(event -> runGuardedAction("DWG-Block als Objekt", self()::addSelectedDwgBlockAsObjectPreset));
+        planHeatingButton.setOnAction(event -> runGuardedAction("Heizkreise planen", self()::planHydronicHeating));
+        applyHeatingZoneSettingsButton.setOnAction(event -> runGuardedAction("Heizkreis übernehmen", self()::applySelectedHeatingZoneSettings));
+        generateHeatingZoneRoutingButton.setOnAction(event -> runGuardedAction("Heizkreis-Routing generieren", self()::generateSelectedHeatingZoneRouting));
+        applyHeatingRoutingCommandButton.setOnAction(event -> runGuardedAction("Heizkreis-Routing übernehmen", self()::applySelectedHeatingZoneRouting));
+        self().rebuildSelectionContextMenu();
+        self().applyTooltip(undoButton, "Stellt den letzten fachlichen Bearbeitungsschritt des Projekts wieder her.");
+        self().applyTooltip(redoButton, "Stellt einen zuvor rückgängig gemachten Bearbeitungsschritt erneut her.");
+        self().applyTooltip(deleteSelectionButton, "Löscht das aktuell ausgewählte Bauteil aus der aktiven Etage.");
+        self().applyTooltip(clearSelectionButton, "Hebt die aktuelle Auswahl auf und entfernt die Hervorhebung in 2D und 3D.");
+        self().applyTooltip(applySelectionPropertiesButton, "Übernimmt die aktuell sichtbaren Eingabewerte auf alle passenden, ausgewählten Bauteile.");
+        self().applyTooltip(applyEndpointHeightButton, "Übernimmt die eingetragene Höhe auf den aktuell ausgewählten Wand-Endpunkt und aktualisiert daraus die angrenzenden Räume.");
+        self().applyTooltip(addSurfaceLayerButton, "Legt auf der aktuell ausgewählten Wand- oder Raumfläche eine neue Ebene mit den eingetragenen Maßen an.");
+        self().applyTooltip(updateSurfaceLayerButton, "Übernimmt die aktuellen Ebenenwerte auf den in der Liste markierten Belag.");
+        self().applyTooltip(removeSurfaceLayerButton, "Entfernt den in der Liste markierten Belag von der aktuell ausgewählten Fläche.");
+        self().applyTooltip(toggleSurfaceLayerVisibilityButton, "Schaltet die Sichtbarkeit des markierten Belags um und passt Raumwirkung sowie 3D-Darstellung direkt an.");
+        self().applyTooltip(surfaceLayoutCornerPreviousButton, "Schaltet die Startecke des Belags gegen den Uhrzeigersinn zur vorherigen Raumecke weiter. Die Verlegerichtung wird dabei passend auf die neue Ecke mitgeführt.");
+        self().applyTooltip(surfaceLayoutCornerNextButton, "Schaltet die Startecke des Belags im Uhrzeigersinn zur nächsten Raumecke weiter. Die Verlegerichtung wird dabei passend auf die neue Ecke mitgeführt.");
+        self().applyTooltip(moveSurfaceLayerUpButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach oben.");
+        self().applyTooltip(moveSurfaceLayerDownButton, "Verschiebt den markierten Belag in der Stapelreihenfolge nach unten.");
+        self().applyTooltip(saveSurfacePresetButton, "Speichert die aktuell eingetragenen Belagswerte als eigenes Preset unter `~/.config/CADas/Belag`, fragt vor dem Überschreiben nach und fügt das Preset der Auswahl hinzu.");
+        self().applyTooltip(addDwgBlockPresetButton, "Registriert den manuell eingetragenen Blocknamen aus der aktuell ausgewählten DWG-Bibliothek als Belags-Preset. Wenn die DWG analysiert wurde, werden echte Blockmaße übernommen.");
+        self().applyTooltip(refreshDwgLibraryButton, "Analysiert die aktuell geladene DWG-Bibliothek erneut über einen externen Konverter wie `dwg2dxf` oder `dwgread`.");
+        self().applyTooltip(addDwgBlockAsSurfaceButton, "Übernimmt den ausgewählten DWG-Block mit echten Blockmaßen als Belags-Preset.");
+        self().applyTooltip(addDwgBlockAsObjectButton, "Übernimmt den ausgewählten DWG-Block mit echtem Footprint als Objekt-Preset.");
+        self().applyTooltip(planHeatingButton, "Die automatische Planung ganzer Räume ist vorübergehend deaktiviert. Heizkreise werden aktuell halbautomatisch als Rechtecke mit dem Werkzeug `Heizkreis` angelegt und danach direkt in der Zeichenfläche bearbeitet.");
+        self().applyTooltip(applyHeatingZoneSettingsButton, "Übernimmt Name, Verlegung, Rollenorientierung, Mittelschlange, Heizleistung und Polygon-Eckpunkte aus der Eigenschaftenleiste auf den markierten Heizkreis.");
+        self().applyTooltip(generateHeatingZoneRoutingButton, "Erzeugt für den markierten rechteckigen Heizkreis die gespeicherte FBH-Routing-Sprache neu. Vorhandene manuelle Korrekturen im Routing-String werden dabei ersetzt.");
+        self().applyTooltip(applyHeatingRoutingCommandButton, "Übernimmt den Routing-Text auf den markierten Heizkreis. `=` und `R/L` steuern den Vorlauf, `-` und `r/l` den Rücklauf; `X` und `x` löschen jeweils den letzten Vorlauf- oder Rücklauf-Schritt. Bei einfacher Spiegelung werden zusätzlich `(` und `)` zu `L` und `R` sowie `8` und `9` zu `l` und `r`. Der rote Startpunkt markiert den tatsächlichen Routing-Start, nicht das Rechteck.");
+        self().applyTooltip(cadLibrarySummaryLabel, "Listet registrierte externe CAD-Bibliotheken wie `.dwg` oder `.cadasparts` auf.");
+        self().applyTooltip(dwgStatusLabel, "Zeigt, welcher externe DWG-Konverter gefunden wurde und ob die letzte Analyse erfolgreich war.");
+        self().applyTooltip(dwgBlockSearchField, "Filtert die analysierten DWG-Blöcke nach Blockname, Layer oder Dateiname.");
+        self().applyTooltip(dwgBlockSelector, "Wählt einen aus der DWG-Geometrie analysierten Block aus, der als Belag oder Objekt übernommen werden kann.");
+        self().applyTooltip(dwgPreviewCanvas, "Zeigt eine maßstäbliche Draufsicht-Vorschau der aus dem DWG-Block abgeleiteten 2D-Grenzen.");
+        self().applyTooltip(dwgBlockDetailLabel, "Zeigt Maße, Ursprung, Layer, Handles, Einheiten und Hinweise zum ausgewählten DWG-Block.");
+        self().applyTooltip(dwgObjectFloorModeSelector, "Legt fest, ob das aus dem DWG-Block erzeugte Objekt auf dem Bodenbelag steht, den Bodenbelag ausschneidet oder wandmontiert ohne Bodenausschnitt geführt wird.");
     }
 
     void updatePropertySectionVisibility() {
@@ -1017,9 +1017,9 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
                 case 0, 1 -> true;
                 case 2 -> shouldShowSection(DrawingTool.WALL, RenderableKind.WALL);
                 case 3 -> shouldShowRoomSection();
-                case 4 -> selectedRoom().isPresent()
-                        || currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
-                        || currentTool() == DrawingTool.HEATING_MANIFOLD;
+                case 4 -> self().selectedRoom().isPresent()
+                        || self().currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
+                        || self().currentTool() == DrawingTool.HEATING_MANIFOLD;
                 case 5 -> shouldShowSection(DrawingTool.DOOR, RenderableKind.DOOR);
                 case 6 -> shouldShowSection(DrawingTool.WINDOW, RenderableKind.WINDOW)
                         || shouldShowSection(DrawingTool.ROOF_WINDOW, RenderableKind.ROOF_WINDOW);
@@ -1033,13 +1033,13 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
             node.setManaged(visible);
         }
         selectionSummaryLabel.setText(selectionSummary());
-        refreshSurfaceTypeSelector();
-        refreshSurfaceLayerSection();
-        refreshHeatingSection();
+        self().refreshSurfaceTypeSelector();
+        self().refreshSurfaceLayerSection();
+        self().refreshHeatingSection();
     }
 
     boolean shouldShowSection(DrawingTool tool, RenderableKind... kinds) {
-        if (currentTool() == tool) {
+        if (self().currentTool() == tool) {
             return true;
         }
         if (selectedSelection.get() == null) {
@@ -1054,7 +1054,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
     }
 
     boolean shouldShowRoomSection() {
-        if (currentTool() == DrawingTool.WALL) {
+        if (self().currentTool() == DrawingTool.WALL) {
             return true;
         }
         if (selectedSelection.get() == null) {
@@ -1112,7 +1112,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         undoButton.setDisable(!history.canUndo());
         redoButton.setDisable(!history.canRedo());
         boolean hasSelection = !selectedSelections.isEmpty();
-        boolean hasDeletableSelection = selectedSelections.stream().anyMatch(this::isDeletableSelection);
+        boolean hasDeletableSelection = selectedSelections.stream().anyMatch(self()::isDeletableSelection);
         deleteSelectionButton.setDisable(!hasDeletableSelection);
         clearSelectionButton.setDisable(!hasSelection && selectedEndpointGroup == null);
         applySelectionPropertiesButton.setDisable(!hasSelection);
@@ -1130,8 +1130,8 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         if (moveLevelDownButton != null) {
             moveLevelDownButton.setDisable(currentIndex <= 0);
         }
-        boolean hasSurfaceTarget = currentSurfaceSelectionContext().isPresent();
-        boolean hasSurfaceSelection = selectedSurfaceLayer().isPresent();
+        boolean hasSurfaceTarget = self().currentSurfaceSelectionContext().isPresent();
+        boolean hasSurfaceSelection = self().selectedSurfaceLayer().isPresent();
         addSurfaceLayerButton.setDisable(!hasSurfaceTarget);
         updateSurfaceLayerButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
         removeSurfaceLayerButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
@@ -1139,10 +1139,10 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         moveSurfaceLayerUpButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection || surfaceLayerList.getSelectionModel().getSelectedIndex() <= 0);
         moveSurfaceLayerDownButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection || surfaceLayerList.getSelectionModel().getSelectedIndex() >= surfaceLayerList.getItems().size() - 1);
         boolean hasDwgBlock = Optional.ofNullable(dwgBlockSelector.getValue()).filter(DwgBlockDefinition::hasGeometry).isPresent();
-        refreshDwgLibraryButton.setDisable(currentDwgLibraryPath().isEmpty());
+        refreshDwgLibraryButton.setDisable(self().currentDwgLibraryPath().isEmpty());
         addDwgBlockAsSurfaceButton.setDisable(!hasDwgBlock);
         addDwgBlockAsObjectButton.setDisable(!hasDwgBlock);
-        HydronicHeating selectedHeating = selectedHydronicHeating().orElse(null);
+        HydronicHeating selectedHeating = self().selectedHydronicHeating().orElse(null);
         int selectedZoneIndex = heatingZoneList.getSelectionModel().getSelectedIndex();
         boolean hasSelectedHeatingZone = selectedHeating != null && selectedZoneIndex >= 0;
         planHeatingButton.setDisable(true);
@@ -1301,8 +1301,8 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         if (updatingLengthInput || oldUnit == null || newUnit == null || oldUnit == newUnit) {
             return;
         }
-        parseLength(field, oldUnit)
-                .ifPresent(length -> field.setText(formatValue(length, newUnit, LENGTH_INPUT_DECIMALS)));
+        self().parseLength(field, oldUnit)
+                .ifPresent(length -> field.setText(self().formatValue(length, newUnit, LENGTH_INPUT_DECIMALS)));
     }
 
     void initializePresetSelectors() {
@@ -1320,14 +1320,14 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         selectFirstIfAvailable(windowPresetSelector, availableWindowPresets);
         selectFirstIfAvailable(stairPresetSelector, availableStairPresets);
         selectFirstIfAvailable(roomObjectPresetSelector, availableRoomObjectPresets);
-        applyDoorPreset(doorPresetSelector.getValue());
-        applyWindowPreset(windowPresetSelector.getValue());
-        applyStairPreset(stairPresetSelector.getValue());
-        applyRoomObjectPreset(roomObjectPresetSelector.getValue());
-        doorPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyDoorPreset(newValue));
-        windowPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyWindowPreset(newValue));
-        stairPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyStairPreset(newValue));
-        roomObjectPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applyRoomObjectPreset(newValue));
+        self().applyDoorPreset(doorPresetSelector.getValue());
+        self().applyWindowPreset(windowPresetSelector.getValue());
+        self().applyStairPreset(stairPresetSelector.getValue());
+        self().applyRoomObjectPreset(roomObjectPresetSelector.getValue());
+        doorPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> self().applyDoorPreset(newValue));
+        windowPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> self().applyWindowPreset(newValue));
+        stairPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> self().applyStairPreset(newValue));
+        roomObjectPresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> self().applyRoomObjectPreset(newValue));
     }
 
     void initializeSurfaceLayerControls() {
@@ -1345,26 +1345,26 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         surfaceLayoutCornerLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4d4135;");
         surfaceLayoutDirectionSelector.getItems().setAll(SurfaceLayoutDirection.values());
         surfaceLayoutDirectionSelector.setValue(SurfaceLayoutDirection.LEFT_TO_RIGHT);
-        surfaceLayoutDirectionSelector.valueProperty().addListener((ignored, oldValue, newValue) -> syncSurfaceLayoutAnchorForDirection(newValue));
+        surfaceLayoutDirectionSelector.valueProperty().addListener((ignored, oldValue, newValue) -> self().syncSurfaceLayoutAnchorForDirection(newValue));
         surfaceLayoutModeSelector.getItems().setAll(SurfaceLayoutMode.values());
         surfaceLayoutModeSelector.setValue(SurfaceLayoutMode.AUTOMATIC);
         surfaceCutRestrictionSelector.getItems().setAll(SurfaceCutRestriction.values());
         surfaceCutRestrictionSelector.setValue(SurfaceCutRestriction.fallback());
-        updateSurfaceLayoutCornerLabel();
+        self().updateSurfaceLayoutCornerLabel();
         surfaceLayerList.setPrefHeight(120);
         surfaceLayerList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> {
-            syncInputsFromSelectedSurfaceLayer();
-            render();
+            self().syncInputsFromSelectedSurfaceLayer();
+            self().render();
         });
         surfaceTypeSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
             if (newValue == SurfaceType.FLOOR || newValue == SurfaceType.CEILING) {
                 preferredRoomSurfaceType = newValue;
             }
-            refreshSurfaceLayerSection();
+            self().refreshSurfaceLayerSection();
         });
-        surfacePresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> applySurfacePreset(newValue));
-        refreshSurfaceTypeSelector();
-        applySurfacePreset(surfacePresetSelector.getValue());
+        surfacePresetSelector.valueProperty().addListener((ignored, oldValue, newValue) -> self().applySurfacePreset(newValue));
+        self().refreshSurfaceTypeSelector();
+        self().applySurfacePreset(surfacePresetSelector.getValue());
     }
 
     void initializeHeatingControls() {
@@ -1385,28 +1385,28 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         heatingSummaryLabel.setWrapText(true);
         heatingSummaryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5c5146;");
         heatingSurfacePositionSelector.valueProperty().addListener((ignored, oldValue, newValue) -> {
-            refreshHeatingSection();
-            render();
+            self().refreshHeatingSection();
+            self().render();
         });
         heatingRoutingCommandArea.textProperty().addListener((ignored, oldValue, newValue) -> {
             if (updatingHeatingRoutingInput) {
                 return;
             }
-            String normalizedDisplayText = normalizeRoutingEditorDisplayText(newValue);
+            String normalizedDisplayText = self().normalizeRoutingEditorDisplayText(newValue);
             if (!Objects.equals(Optional.ofNullable(newValue).orElse(""), normalizedDisplayText)) {
-                replaceTextPreservingCaretAndScroll(heatingRoutingCommandArea, normalizedDisplayText);
+                self().replaceTextPreservingCaretAndScroll(heatingRoutingCommandArea, normalizedDisplayText);
             }
             if (normalizedDisplayText.trim().isBlank()) {
                 return;
             }
-            runGuardedAction("Heizkreis-Routing übernehmen", this::applySelectedHeatingZoneRouting);
+            runGuardedAction("Heizkreis-Routing übernehmen", self()::applySelectedHeatingZoneRouting);
         });
         heatingZoneList.getSelectionModel().selectedIndexProperty().addListener((ignored, oldValue, newValue) -> {
             if (updatingHeatingZoneSelection) {
                 return;
             }
-            syncHeatingZoneSettingsInputs();
-            syncHeatingRoutingCommandArea();
+            self().syncHeatingZoneSettingsInputs();
+            self().syncHeatingRoutingCommandArea();
             updateActionButtons();
         });
     }
@@ -1417,16 +1417,16 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         dwgBlockSearchField.setPromptText("Block, Layer oder Datei");
         dwgObjectFloorModeSelector.getItems().setAll(RoomObjectMountingMode.values());
         dwgObjectFloorModeSelector.setValue(RoomObjectMountingMode.STANDS_ON_COVERING);
-        dwgBlockSearchField.textProperty().addListener((ignored, oldValue, newValue) -> applyDwgBlockFilter());
-        dwgBlockSelector.valueProperty().addListener((ignored, oldValue, newValue) -> refreshDwgBlockPreviewAndDetails());
+        dwgBlockSearchField.textProperty().addListener((ignored, oldValue, newValue) -> self().applyDwgBlockFilter());
+        dwgBlockSelector.valueProperty().addListener((ignored, oldValue, newValue) -> self().refreshDwgBlockPreviewAndDetails());
         DwgConversionAvailability availability = dwgLibraryAnalyzer.availability();
         dwgStatusLabel.setText(availability.message());
-        drawEmptyDwgPreview("Keine DWG");
+        self().drawEmptyDwgPreview("Keine DWG");
     }
 
     void loadUserSurfacePresets() {
         try {
-            userSurfacePresetLibrary.loadPresets().forEach(this::registerSurfacePreset);
+            userSurfacePresetLibrary.loadPresets().forEach(self()::registerSurfacePreset);
         } catch (RuntimeException | IOException exception) {
             showOperationException("Eigene Belagspresets konnten nicht geladen werden", exception);
         }
@@ -1445,10 +1445,10 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         if (!cadLibraryReferences.contains(normalizedSource)) {
             cadLibraryReferences.add(normalizedSource);
         }
-        registerSurfacePreset(surfaceCoveringPresetService.fromDwg(normalizedSource));
+        self().registerSurfacePreset(surfaceCoveringPresetService.fromDwg(normalizedSource));
         dwgBlockCatalogService.loadCatalog(normalizedSource)
-                .forEach(blockName -> registerSurfacePreset(surfaceCoveringPresetService.fromDwgBlock(normalizedSource, blockName)));
-        updateCadLibrarySummary();
+                .forEach(blockName -> self().registerSurfacePreset(surfaceCoveringPresetService.fromDwgBlock(normalizedSource, blockName)));
+        self().updateCadLibrarySummary();
     }
 
     <T> void selectFirstIfAvailable(ComboBox<T> selector, ObservableList<T> values) {
@@ -1458,147 +1458,147 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
     }
 
     void applyFormTooltips() {
-        applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Räume werden aus geschlossenen Wandzügen automatisch abgeleitet, im Werkzeug `Bearbeiten` ausgewählt und beim Zeichnen von Wänden über die sichtbaren Standardwerte links mitgesteuert.");
-        applyTooltip(gridField, "Legt die Rasterweite für die Zeichenfläche fest. Werte werden mit der gewählten Einheit interpretiert.");
-        applyTooltip(gridUnit, "Bestimmt die Einheit für die Rasterweite, damit Eingaben in Millimeter, Zentimeter oder Meter erfolgen können.");
-        applyTooltip(lengthField, "Optionaler Längenwert für die gerade gezeichnete Wand. Wenn ein Wert eingetragen ist, wird die Wand auf diese Länge gesetzt.");
-        applyTooltip(lengthUnit, "Bestimmt die Einheit für die manuelle Längeneingabe während des Zeichnens.");
-        applyTooltip(angleField, "Optionaler Winkel in Grad für die aktuelle Wand. Ohne Eingabe bleibt der orthogonale 90°-Modus aktiv.");
-        applyTooltip(northAngleField, "Definiert die Kompasspeilung der oberen Planrichtung in Grad. 0° zeigt nach Norden, 90° nach Osten; der Nordpfeil wird entsprechend gegenläufig ausgerichtet.");
-        applyTooltip(wallThicknessField, "Definiert die Wandstärke für neu gezeichnete Wände.");
-        applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
-        applyTooltip(wallHeightField, "Legt die Raum- beziehungsweise Wandhöhe für neu gezeichnete Wände fest.");
-        applyTooltip(wallHeightUnit, "Bestimmt die Einheit für die Wandhöhe.");
-        applyTooltip(endpointHeightField, "Legt die Höhe für den aktuell ausgewählten gemeinsamen Wand-Endpunkt fest. Daraus wird bei geschlossenen Wandzügen eine schräge Decke des betroffenen Raums abgeleitet.");
-        applyTooltip(endpointHeightUnit, "Bestimmt die Einheit für die Endpunkthöhe einer ausgewählten Wandecke.");
-        applyTooltip(roomNameField, "Legt den Namen für automatisch erkannte Räume oder für die aktuell ausgewählte Raumauswahl fest.");
-        applyTooltip(roomHeightField, "Legt die lichte Raumhöhe für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
-        applyTooltip(roomHeightUnit, "Bestimmt die Einheit für die Raumhöhe.");
-        applyTooltip(floorThicknessField, "Legt die Boden- oder Fußbodenstärke für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
-        applyTooltip(floorThicknessUnit, "Bestimmt die Einheit für die Bodenstärke.");
-        applyTooltip(ceilingThicknessField, "Legt die Deckenstärke für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
-        applyTooltip(ceilingThicknessUnit, "Bestimmt die Einheit für die Deckenstärke.");
-        applyTooltip(kneeWallHeightField, "Legt die Sockel- beziehungsweise Kniestockhöhe der Dachschräge an der niedrigen Raumkante fest.");
-        applyTooltip(kneeWallHeightUnit, "Bestimmt die Einheit für die Sockelhöhe der Dachschräge.");
-        applyTooltip(roofSlopeManagementLabel, "Dachschrägen werden über das Kontextmenü ihrer niedrigen Wand erzeugt oder ersetzt. Jede Raumseite kann eine eigene Dachschräge besitzen.");
-        applyTooltip(doorWidthField, "Legt die Breite der nächsten Tür fest.");
-        applyTooltip(doorWidthUnit, "Bestimmt die Einheit für die Türbreite.");
-        applyTooltip(doorHeightField, "Legt die Höhe der nächsten Tür fest.");
-        applyTooltip(doorHeightUnit, "Bestimmt die Einheit für die Türhöhe.");
-        applyTooltip(thresholdField, "Legt den Höhenversatz der Türschwelle für die nächste Tür fest.");
-        applyTooltip(thresholdUnit, "Bestimmt die Einheit für die Türschwellenhöhe.");
-        applyTooltip(doorPresetSelector, "Wählt eine Standardtür aus der internen Teilebibliothek und übernimmt deren Maße.");
-        applyTooltip(windowWidthField, "Legt die Breite des nächsten Fensters fest.");
-        applyTooltip(windowWidthUnit, "Bestimmt die Einheit für die Fensterbreite.");
-        applyTooltip(windowHeightField, "Legt die Höhe des nächsten Fensters fest.");
-        applyTooltip(windowHeightUnit, "Bestimmt die Einheit für die Fensterhöhe.");
-        applyTooltip(sillHeightField, "Legt die Brüstungshöhe des nächsten Fensters fest.");
-        applyTooltip(sillHeightUnit, "Bestimmt die Einheit für die Brüstungshöhe.");
-        applyTooltip(windowPresetSelector, "Wählt ein Standardfenster aus der internen Teilebibliothek und übernimmt dessen Maße.");
-        applyTooltip(stairPresetSelector, "Wählt eine Standardtreppe aus der internen Teilebibliothek und übernimmt Typ, Höhe und Stufenanzahl.");
-        applyTooltip(stairHeightField, "Legt die Gesamthöhe der nächsten Treppe fest.");
-        applyTooltip(stairHeightUnit, "Bestimmt die Einheit für die Treppenhöhe.");
-        applyTooltip(stairStepsField, "Legt die gesamte Stufenanzahl fest. Konfigurierte Anfangs- und Endabsätze zählen jeweils als eine Stufe mit.");
-        applyTooltip(stairStartLandingField, "Legt die Tiefe des ebenen Absatzes am Anfang der Treppe in Laufrichtung fest. Null deaktiviert den Absatz.");
-        applyTooltip(stairStartLandingUnit, "Bestimmt die Einheit für die Tiefe des Anfangsabsatzes.");
-        applyTooltip(stairEndLandingField, "Legt die Tiefe des ebenen Absatzes am Ende der Treppe in Laufrichtung fest. Null deaktiviert den Absatz.");
-        applyTooltip(stairEndLandingUnit, "Bestimmt die Einheit für die Tiefe des Endabsatzes.");
-        applyTooltip(stairLeftUnderbuildField, "Legt die Wandstärke des optionalen linken Treppenunterbaus fest. Null entfernt diese Unterbauwand.");
-        applyTooltip(stairLeftUnderbuildUnit, "Bestimmt die Einheit für die Wandstärke des linken Treppenunterbaus.");
-        applyTooltip(stairRightUnderbuildField, "Legt die Wandstärke des optionalen rechten Treppenunterbaus fest. Null entfernt diese Unterbauwand.");
-        applyTooltip(stairRightUnderbuildUnit, "Bestimmt die Einheit für die Wandstärke des rechten Treppenunterbaus.");
-        applyTooltip(stairUndersideThicknessField, "Legt die senkrechte Dicke der planen schrägen Untersicht unterhalb der Stufen fest. Null deaktiviert die Untersichtplatte.");
-        applyTooltip(stairUndersideThicknessUnit, "Bestimmt die Einheit für die Dicke der planen schrägen Treppenuntersicht.");
-        applyTooltip(floorExtensionTypeSelector, "Wählt, ob die rechteckige Erweiterung als Balkon oder Empore modelliert wird.");
-        applyTooltip(floorExtensionPlacementSelector, "Kennzeichnet die Erweiterung als innen oder außen an die aktive Etage angehängt.");
-        applyTooltip(floorExtensionThicknessField, "Legt die Dicke der tragenden rechteckigen Fußbodenplatte des Balkons oder der Empore fest.");
-        applyTooltip(floorExtensionThicknessUnit, "Bestimmt die Einheit für die Fußbodendicke des Balkons oder der Empore.");
-        applyTooltip(heatingSurfacePositionSelector, "Wählt unabhängig voneinander die Fußboden- oder Deckenheizung des markierten Raums. Für beide Flächen stehen dieselben Planungs- und Bearbeitungsfunktionen bereit.");
-        applyTooltip(heatingLayoutPatternSelector, "Wählt die Start-Verlegeart für neu angelegte manuelle Heizkreise. Vario und Meander erzeugen gespeicherte FBH-Routing-Kommandos; alte Schneckenverlegung bleibt nur für Bestandsdateien erhalten.");
-        applyTooltip(heatingPipeSpacingField, "Legt den Achsabstand benachbarter Rohrläufe fest. Der Kurvenradius wird automatisch als halber Verlegeabstand angesetzt.");
-        applyTooltip(heatingPipeSpacingUnit, "Bestimmt die Einheit für den Verlegeabstand der Heizungsrohre.");
-        applyTooltip(heatingPipeDiameterField, "Legt den Außendurchmesser des Heizungsrohrs fest. Er muss kleiner als der Verlegeabstand sein.");
-        applyTooltip(heatingPipeDiameterUnit, "Bestimmt die Einheit für den Rohrdurchmesser.");
-        applyTooltip(heatingMaximumPipeLengthField, "Begrenzt die gesamte Rohrlänge je Heizkreis einschließlich der Verbindung zum Vor- und Rücklauf. Größere Räume werden automatisch in mehrere Bereiche geteilt.");
-        applyTooltip(heatingMaximumPipeLengthUnit, "Bestimmt die Einheit für die maximal zulässige Rohrlänge je Heizkreis.");
-        applyTooltip(heatingWallClearanceField, "Legt den Mindestabstand der Rohrmitte von der Raumwand fest.");
-        applyTooltip(heatingWallClearanceUnit, "Bestimmt die Einheit für den Mindestabstand zur Wand.");
-        applyTooltip(heatingSupplyXField, "Legt die X-Koordinate des Vorlaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
-        applyTooltip(heatingSupplyXUnit, "Bestimmt die Einheit für die X-Koordinate des Vorlaufanschlusses.");
-        applyTooltip(heatingSupplyYField, "Legt die Y-Koordinate des Vorlaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
-        applyTooltip(heatingSupplyYUnit, "Bestimmt die Einheit für die Y-Koordinate des Vorlaufanschlusses.");
-        applyTooltip(heatingReturnXField, "Legt die X-Koordinate des Rücklaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
-        applyTooltip(heatingReturnXUnit, "Bestimmt die Einheit für die X-Koordinate des Rücklaufanschlusses.");
-        applyTooltip(heatingReturnYField, "Legt die Y-Koordinate des Rücklaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
-        applyTooltip(heatingReturnYUnit, "Bestimmt die Einheit für die Y-Koordinate des Rücklaufanschlusses.");
-        applyTooltip(heatingZoneList, "Listet die getrennten Heizkreise der gewählten Boden- oder Deckenfläche mit Routingart, HKL, Heizfläche und berechneter Heizleistung auf. Die darunterliegenden Eingaben beziehen sich immer auf den markierten Heizkreis.");
-        applyTooltip(heatingZoneNameField, "Legt die sichtbare Bezeichnung des markierten Heizkreises fest.");
-        applyTooltip(heatingZoneLayoutPatternSelector, "Legt fest, ob der markierte Heizkreis als Vario-Doppelspirale oder Meander neu generiert wird. Die Auswahl wirkt auf `Routing generieren` und auf das Übernehmen des Heizkreises.");
-        applyTooltip(heatingZoneFlowInvertedCheckBox, "Tauscht beim markierten Heizkreis Vorlauf und Rücklauf, ohne die rote Startmarke vom tatsächlichen Routing-Beginn wegzubewegen.");
-        applyTooltip(heatingZoneSerpentineMiddleLineCheckBox, "Aktiviert bei passenden rechteckigen Heizkreisen eine schlangenförmige Mittellinie für Vario- oder Meander-Routing.");
-        applyTooltip(heatingZoneHeatOutputField, "Speichert die angenommene Heizleistung des markierten Heizkreises in Watt pro Quadratmeter für Übersicht, PDF und Materialliste.");
-        applyTooltip(heatingZonePointArea, "Erfasst pro Zeile einen Polygon-Eckpunkt des markierten Heizkreises als `X; Y` in Zentimetern. Das Rechteck dient nur als Größenrahmen; nach dem Routing richtet CADas es an der äußeren Rohrkante aus.");
-        applyTooltip(heatingRoutingCommandArea, "Zeigt und bearbeitet die Routing-Sprache des markierten Heizkreises. `=` und `-` verlängern Vorlauf und Rücklauf um eine Rasterlinie, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt. Bei einfacher Spiegelung werden zusätzlich `(` und `)` zu `L` und `R` sowie `8` und `9` zu `l` und `r`. Der rote Startpunkt bleibt an der tatsächlichen Startkante des Heizrohrs; das Rechteck ist nur der Größenrahmen.");
-        applyTooltip(autoRouteHeatingZoneOnResizeCheckBox, "Legt fest, ob ein Heizkreis nach dem Ziehen seines Rechtecks automatisch neu geroutet wird. Ausgeschaltet bleiben die vorhandenen Routing-Befehle erhalten.");
-        applyTooltip(heatingSummaryLabel, "Zeigt Fläche, Verlegeart, Anzahl der Heizkreise, gesamte HKL und die aufsummierte Heizleistung der gewählten Flächenheizung.");
-        applyTooltip(roomObjectPresetSelector, "Wählt ein Objekt zum Platzieren aus und übernimmt dessen Standardmaße. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
-        applyTooltip(roomObjectNameField, "Legt die sichtbare Bezeichnung eines neuen oder ausgewählten Objekts fest. Bleibt das Feld leer, verwendet CADas in 2D, Tabellen und PDFs die Bezeichnung des gewählten Objekt-Presets.");
-        applyTooltip(roomObjectWidthField, "Legt die Breite eines neuen oder ausgewählten Objekts fest.");
-        applyTooltip(roomObjectWidthUnit, "Bestimmt die Einheit für die Objektbreite.");
-        applyTooltip(roomObjectDepthField, "Legt die Tiefe eines neuen oder ausgewählten Objekts fest.");
-        applyTooltip(roomObjectDepthUnit, "Bestimmt die Einheit für die Objekttiefe.");
-        applyTooltip(roomObjectHeightField, "Legt die Höhe eines neuen oder ausgewählten Objekts fest.");
-        applyTooltip(roomObjectHeightUnit, "Bestimmt die Einheit für die Objekthöhe.");
-        applyTooltip(roomObjectHeatOutputField, "Legt die Wärmeleistung eines neuen oder ausgewählten Objekts in Watt fest. Der Wert wird je nach Heizart den Summen für FBH, DH, sonstige Flächenheizung oder Heizelemente zugeordnet.");
-        applyTooltip(roomObjectHeatingTypeSelector, "Legt fest, ob die Wärmeleistung dieses Objekts als keine Heizung, Heizelement, FBH, DH oder sonstige Flächenheizung geführt wird. Diese Zuordnung steuert Raumwärmesummen, Materialliste und PDF.");
-        applyTooltip(roomObjectBaseElevationField, "Legt die vertikale Lage der Objektbasis relativ zum Boden der aktiven Etage fest. Positive Werte heben das Objekt an, negative Werte versenken es.");
-        applyTooltip(roomObjectBaseElevationUnit, "Bestimmt die Einheit für die positive oder negative Basishöhe des Objekts.");
-        applyTooltip(roomObjectAngleField, "Legt den frei einstellbaren Drehwinkel eines neuen oder ausgewählten Objekts in Grad fest.");
-        applyTooltip(surfaceTypeSelector, "Zeigt nur die Belagstypen an, die zur aktuellen Auswahl passen. Raum allein erlaubt Boden oder Decke, Raum plus Wand erlaubt Innenwand, Wand allein erlaubt Innenwand oder Außenwand; Innenwand ist dabei vorausgewählt.");
-        applyTooltip(surfacePresetSelector, "Wählt einen Beispielbelag oder eine DWG-Referenz aus und übernimmt deren Standardwerte in die Ebenenfelder.");
-        applyTooltip(surfaceLayerList, "Zeigt die Ebenen der aktuell ausgewählten Fläche in ihrer Stapelreihenfolge an.");
-        applyTooltip(surfaceLayerNameField, "Legt den Namen der Ebene fest, etwa Fliese, Rigips, Dämmplatte oder eine DWG-Referenz.");
-        applyTooltip(surfaceLayerThicknessField, "Legt die Dicke der Ebene fest. Innenwand- und Deckenbeläge wirken direkt auf Raumgeometrie und Volumen.");
-        applyTooltip(surfaceLayerThicknessUnit, "Bestimmt die Einheit für die Dicke des ausgewählten Belags.");
-        applyTooltip(surfaceTileWidthField, "Legt die Breite einer Fliese oder Platte für die Belegungsbasis fest.");
-        applyTooltip(surfaceTileWidthUnit, "Bestimmt die Einheit für die Breite der Fliese oder Platte.");
-        applyTooltip(surfaceTileHeightField, "Legt die Höhe beziehungsweise Länge einer Fliese oder Platte für die Belegungsbasis fest.");
-        applyTooltip(surfaceTileHeightUnit, "Bestimmt die Einheit für die Höhe oder Länge des Belags.");
-        applyTooltip(surfaceLayoutCornerLabel, "Zeigt die aktuell gewählte Startecke des Belags an. Von dieser Raumecke aus beginnt die erste Reihe.");
-        applyTooltip(surfaceLayoutDirectionSelector, "Legt fest, auf welcher Raumseite die erste Reihe startet. Beim Umschalten bleibt die obere oder untere Startecke erhalten und wechselt nur auf die passende linke oder rechte Seite.");
-        applyTooltip(surfaceLayoutModeSelector, "Bestimmt, ob ohne Versatz, mit automatischem Versatz oder mit festem Reihenversatz belegt wird.");
-        applyTooltip(surfaceLayoutOffsetField, "Legt bei festem Versatz den Reihenversatz entlang der langen Modulkante fest. Der Wert wird von Reihe zu Reihe fortgeschrieben.");
-        applyTooltip(surfaceLayoutOffsetUnit, "Bestimmt die Einheit für den festen Reihenversatz.");
-        applyTooltip(surfaceMinimumOffsetField, "Legt den kleinsten zulässigen automatischen Versatz zwischen zwei Reihen fest.");
-        applyTooltip(surfaceMinimumOffsetUnit, "Bestimmt die Einheit für den Mindestversatz.");
-        applyTooltip(surfaceMinimumEdgeWidthField, "Legt die kleinste zulässige Restbreite links und rechts innerhalb einer Reihe fest.");
-        applyTooltip(surfaceMinimumEdgeWidthUnit, "Bestimmt die Einheit für die seitliche Mindestbreite an den Rändern.");
-        applyTooltip(surfaceMinimumStartEndMarginField, "Legt die kleinste zulässige Breite der Anfangs- und Endreihe in Verlegerichtung fest. Wenn die Endreihe zu schmal würde, wird die Anfangsreihe entsprechend beschnitten, bleibt aber direkt an der Wand.");
-        applyTooltip(surfaceMinimumStartEndMarginUnit, "Bestimmt die Einheit für die Mindestbreite der Anfangs- und Endreihe.");
-        applyTooltip(surfaceFreeMarginLeftField, "Lässt an der linken Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung beginnt erst hinter diesem Rand.");
-        applyTooltip(surfaceFreeMarginLeftUnit, "Bestimmt die Einheit für den freien linken Rand.");
-        applyTooltip(surfaceFreeMarginRightField, "Lässt an der rechten Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung endet vor diesem Rand.");
-        applyTooltip(surfaceFreeMarginRightUnit, "Bestimmt die Einheit für den freien rechten Rand.");
-        applyTooltip(surfaceFreeMarginTopField, "Lässt an der oberen Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung endet vor diesem Rand.");
-        applyTooltip(surfaceFreeMarginTopUnit, "Bestimmt die Einheit für den freien oberen Rand.");
-        applyTooltip(surfaceFreeMarginBottomField, "Lässt an der unteren Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung beginnt erst oberhalb dieses Randes.");
-        applyTooltip(surfaceFreeMarginBottomUnit, "Bestimmt die Einheit für den freien unteren Rand.");
-        applyTooltip(surfaceJointWidthField, "Legt die Breite der Fugen zwischen den Fliesen oder Platten fest.");
-        applyTooltip(surfaceJointWidthUnit, "Bestimmt die Einheit für die Fugenbreite.");
-        applyTooltip(surfaceCutRestrictionSelector, "Legt fest, ob Zuschnitte beliebig frei verwendet werden dürfen, ob Schnittkanten nur an Außenkanten liegen dürfen oder ob zusätzlich die Verlegerichtung ohne Drehung eingehalten werden muss.");
-        applyTooltip(dwgBlockNameField, "Erfasst einen konkreten Blocknamen aus einer geladenen DWG-Bibliothek, damit daraus ein auswählbares Oberflächen-Preset wird.");
-        applyTooltip(surfaceLayerTargetLabel, "Zeigt, auf welcher Wand- oder Raumfläche die aktuellen Ebenen bearbeitet werden.");
-        applyTooltip(surfaceLayerSelectionHintLabel, "Erklärt, welche Kombination aus Raum- und Wandauswahl für den aktuell sichtbaren Belagstyp erforderlich ist.");
-        applyTooltip(surfaceLayerCoverageLabel, "Zeigt eine Kurzbewertung der aktuellen Platten- oder Fliesenbelegung der markierten Ebene.");
-        applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
+        self().applyTooltip(toolSelector, "Wählt das aktuelle Zeichenwerkzeug aus. Räume werden aus geschlossenen Wandzügen automatisch abgeleitet, im Werkzeug `Bearbeiten` ausgewählt und beim Zeichnen von Wänden über die sichtbaren Standardwerte links mitgesteuert.");
+        self().applyTooltip(gridField, "Legt die Rasterweite für die Zeichenfläche fest. Werte werden mit der gewählten Einheit interpretiert.");
+        self().applyTooltip(gridUnit, "Bestimmt die Einheit für die Rasterweite, damit Eingaben in Millimeter, Zentimeter oder Meter erfolgen können.");
+        self().applyTooltip(lengthField, "Optionaler Längenwert für die gerade gezeichnete Wand. Wenn ein Wert eingetragen ist, wird die Wand auf diese Länge gesetzt.");
+        self().applyTooltip(lengthUnit, "Bestimmt die Einheit für die manuelle Längeneingabe während des Zeichnens.");
+        self().applyTooltip(angleField, "Optionaler Winkel in Grad für die aktuelle Wand. Ohne Eingabe bleibt der orthogonale 90°-Modus aktiv.");
+        self().applyTooltip(northAngleField, "Definiert die Kompasspeilung der oberen Planrichtung in Grad. 0° zeigt nach Norden, 90° nach Osten; der Nordpfeil wird entsprechend gegenläufig ausgerichtet.");
+        self().applyTooltip(wallThicknessField, "Definiert die Wandstärke für neu gezeichnete Wände.");
+        self().applyTooltip(wallThicknessUnit, "Bestimmt die Einheit für die Wandstärke.");
+        self().applyTooltip(wallHeightField, "Legt die Raum- beziehungsweise Wandhöhe für neu gezeichnete Wände fest.");
+        self().applyTooltip(wallHeightUnit, "Bestimmt die Einheit für die Wandhöhe.");
+        self().applyTooltip(endpointHeightField, "Legt die Höhe für den aktuell ausgewählten gemeinsamen Wand-Endpunkt fest. Daraus wird bei geschlossenen Wandzügen eine schräge Decke des betroffenen Raums abgeleitet.");
+        self().applyTooltip(endpointHeightUnit, "Bestimmt die Einheit für die Endpunkthöhe einer ausgewählten Wandecke.");
+        self().applyTooltip(roomNameField, "Legt den Namen für automatisch erkannte Räume oder für die aktuell ausgewählte Raumauswahl fest.");
+        self().applyTooltip(roomHeightField, "Legt die lichte Raumhöhe für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
+        self().applyTooltip(roomHeightUnit, "Bestimmt die Einheit für die Raumhöhe.");
+        self().applyTooltip(floorThicknessField, "Legt die Boden- oder Fußbodenstärke für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
+        self().applyTooltip(floorThicknessUnit, "Bestimmt die Einheit für die Bodenstärke.");
+        self().applyTooltip(ceilingThicknessField, "Legt die Deckenstärke für automatisch erkannte Räume oder die aktuell ausgewählte Raumauswahl fest.");
+        self().applyTooltip(ceilingThicknessUnit, "Bestimmt die Einheit für die Deckenstärke.");
+        self().applyTooltip(kneeWallHeightField, "Legt die Sockel- beziehungsweise Kniestockhöhe der Dachschräge an der niedrigen Raumkante fest.");
+        self().applyTooltip(kneeWallHeightUnit, "Bestimmt die Einheit für die Sockelhöhe der Dachschräge.");
+        self().applyTooltip(roofSlopeManagementLabel, "Dachschrägen werden über das Kontextmenü ihrer niedrigen Wand erzeugt oder ersetzt. Jede Raumseite kann eine eigene Dachschräge besitzen.");
+        self().applyTooltip(doorWidthField, "Legt die Breite der nächsten Tür fest.");
+        self().applyTooltip(doorWidthUnit, "Bestimmt die Einheit für die Türbreite.");
+        self().applyTooltip(doorHeightField, "Legt die Höhe der nächsten Tür fest.");
+        self().applyTooltip(doorHeightUnit, "Bestimmt die Einheit für die Türhöhe.");
+        self().applyTooltip(thresholdField, "Legt den Höhenversatz der Türschwelle für die nächste Tür fest.");
+        self().applyTooltip(thresholdUnit, "Bestimmt die Einheit für die Türschwellenhöhe.");
+        self().applyTooltip(doorPresetSelector, "Wählt eine Standardtür aus der internen Teilebibliothek und übernimmt deren Maße.");
+        self().applyTooltip(windowWidthField, "Legt die Breite des nächsten Fensters fest.");
+        self().applyTooltip(windowWidthUnit, "Bestimmt die Einheit für die Fensterbreite.");
+        self().applyTooltip(windowHeightField, "Legt die Höhe des nächsten Fensters fest.");
+        self().applyTooltip(windowHeightUnit, "Bestimmt die Einheit für die Fensterhöhe.");
+        self().applyTooltip(sillHeightField, "Legt die Brüstungshöhe des nächsten Fensters fest.");
+        self().applyTooltip(sillHeightUnit, "Bestimmt die Einheit für die Brüstungshöhe.");
+        self().applyTooltip(windowPresetSelector, "Wählt ein Standardfenster aus der internen Teilebibliothek und übernimmt dessen Maße.");
+        self().applyTooltip(stairPresetSelector, "Wählt eine Standardtreppe aus der internen Teilebibliothek und übernimmt Typ, Höhe und Stufenanzahl.");
+        self().applyTooltip(stairHeightField, "Legt die Gesamthöhe der nächsten Treppe fest.");
+        self().applyTooltip(stairHeightUnit, "Bestimmt die Einheit für die Treppenhöhe.");
+        self().applyTooltip(stairStepsField, "Legt die gesamte Stufenanzahl fest. Konfigurierte Anfangs- und Endabsätze zählen jeweils als eine Stufe mit.");
+        self().applyTooltip(stairStartLandingField, "Legt die Tiefe des ebenen Absatzes am Anfang der Treppe in Laufrichtung fest. Null deaktiviert den Absatz.");
+        self().applyTooltip(stairStartLandingUnit, "Bestimmt die Einheit für die Tiefe des Anfangsabsatzes.");
+        self().applyTooltip(stairEndLandingField, "Legt die Tiefe des ebenen Absatzes am Ende der Treppe in Laufrichtung fest. Null deaktiviert den Absatz.");
+        self().applyTooltip(stairEndLandingUnit, "Bestimmt die Einheit für die Tiefe des Endabsatzes.");
+        self().applyTooltip(stairLeftUnderbuildField, "Legt die Wandstärke des optionalen linken Treppenunterbaus fest. Null entfernt diese Unterbauwand.");
+        self().applyTooltip(stairLeftUnderbuildUnit, "Bestimmt die Einheit für die Wandstärke des linken Treppenunterbaus.");
+        self().applyTooltip(stairRightUnderbuildField, "Legt die Wandstärke des optionalen rechten Treppenunterbaus fest. Null entfernt diese Unterbauwand.");
+        self().applyTooltip(stairRightUnderbuildUnit, "Bestimmt die Einheit für die Wandstärke des rechten Treppenunterbaus.");
+        self().applyTooltip(stairUndersideThicknessField, "Legt die senkrechte Dicke der planen schrägen Untersicht unterhalb der Stufen fest. Null deaktiviert die Untersichtplatte.");
+        self().applyTooltip(stairUndersideThicknessUnit, "Bestimmt die Einheit für die Dicke der planen schrägen Treppenuntersicht.");
+        self().applyTooltip(floorExtensionTypeSelector, "Wählt, ob die rechteckige Erweiterung als Balkon oder Empore modelliert wird.");
+        self().applyTooltip(floorExtensionPlacementSelector, "Kennzeichnet die Erweiterung als innen oder außen an die aktive Etage angehängt.");
+        self().applyTooltip(floorExtensionThicknessField, "Legt die Dicke der tragenden rechteckigen Fußbodenplatte des Balkons oder der Empore fest.");
+        self().applyTooltip(floorExtensionThicknessUnit, "Bestimmt die Einheit für die Fußbodendicke des Balkons oder der Empore.");
+        self().applyTooltip(heatingSurfacePositionSelector, "Wählt unabhängig voneinander die Fußboden- oder Deckenheizung des markierten Raums. Für beide Flächen stehen dieselben Planungs- und Bearbeitungsfunktionen bereit.");
+        self().applyTooltip(heatingLayoutPatternSelector, "Wählt die Start-Verlegeart für neu angelegte manuelle Heizkreise. Vario und Meander erzeugen gespeicherte FBH-Routing-Kommandos; alte Schneckenverlegung bleibt nur für Bestandsdateien erhalten.");
+        self().applyTooltip(heatingPipeSpacingField, "Legt den Achsabstand benachbarter Rohrläufe fest. Der Kurvenradius wird automatisch als halber Verlegeabstand angesetzt.");
+        self().applyTooltip(heatingPipeSpacingUnit, "Bestimmt die Einheit für den Verlegeabstand der Heizungsrohre.");
+        self().applyTooltip(heatingPipeDiameterField, "Legt den Außendurchmesser des Heizungsrohrs fest. Er muss kleiner als der Verlegeabstand sein.");
+        self().applyTooltip(heatingPipeDiameterUnit, "Bestimmt die Einheit für den Rohrdurchmesser.");
+        self().applyTooltip(heatingMaximumPipeLengthField, "Begrenzt die gesamte Rohrlänge je Heizkreis einschließlich der Verbindung zum Vor- und Rücklauf. Größere Räume werden automatisch in mehrere Bereiche geteilt.");
+        self().applyTooltip(heatingMaximumPipeLengthUnit, "Bestimmt die Einheit für die maximal zulässige Rohrlänge je Heizkreis.");
+        self().applyTooltip(heatingWallClearanceField, "Legt den Mindestabstand der Rohrmitte von der Raumwand fest.");
+        self().applyTooltip(heatingWallClearanceUnit, "Bestimmt die Einheit für den Mindestabstand zur Wand.");
+        self().applyTooltip(heatingSupplyXField, "Legt die X-Koordinate des Vorlaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
+        self().applyTooltip(heatingSupplyXUnit, "Bestimmt die Einheit für die X-Koordinate des Vorlaufanschlusses.");
+        self().applyTooltip(heatingSupplyYField, "Legt die Y-Koordinate des Vorlaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
+        self().applyTooltip(heatingSupplyYUnit, "Bestimmt die Einheit für die Y-Koordinate des Vorlaufanschlusses.");
+        self().applyTooltip(heatingReturnXField, "Legt die X-Koordinate des Rücklaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
+        self().applyTooltip(heatingReturnXUnit, "Bestimmt die Einheit für die X-Koordinate des Rücklaufanschlusses.");
+        self().applyTooltip(heatingReturnYField, "Legt die Y-Koordinate des Rücklaufanschlusses am Verteiler im Koordinatensystem der Etage fest.");
+        self().applyTooltip(heatingReturnYUnit, "Bestimmt die Einheit für die Y-Koordinate des Rücklaufanschlusses.");
+        self().applyTooltip(heatingZoneList, "Listet die getrennten Heizkreise der gewählten Boden- oder Deckenfläche mit Routingart, HKL, Heizfläche und berechneter Heizleistung auf. Die darunterliegenden Eingaben beziehen sich immer auf den markierten Heizkreis.");
+        self().applyTooltip(heatingZoneNameField, "Legt die sichtbare Bezeichnung des markierten Heizkreises fest.");
+        self().applyTooltip(heatingZoneLayoutPatternSelector, "Legt fest, ob der markierte Heizkreis als Vario-Doppelspirale oder Meander neu generiert wird. Die Auswahl wirkt auf `Routing generieren` und auf das Übernehmen des Heizkreises.");
+        self().applyTooltip(heatingZoneFlowInvertedCheckBox, "Tauscht beim markierten Heizkreis Vorlauf und Rücklauf, ohne die rote Startmarke vom tatsächlichen Routing-Beginn wegzubewegen.");
+        self().applyTooltip(heatingZoneSerpentineMiddleLineCheckBox, "Aktiviert bei passenden rechteckigen Heizkreisen eine schlangenförmige Mittellinie für Vario- oder Meander-Routing.");
+        self().applyTooltip(heatingZoneHeatOutputField, "Speichert die angenommene Heizleistung des markierten Heizkreises in Watt pro Quadratmeter für Übersicht, PDF und Materialliste.");
+        self().applyTooltip(heatingZonePointArea, "Erfasst pro Zeile einen Polygon-Eckpunkt des markierten Heizkreises als `X; Y` in Zentimetern. Das Rechteck dient nur als Größenrahmen; nach dem Routing richtet CADas es an der äußeren Rohrkante aus.");
+        self().applyTooltip(heatingRoutingCommandArea, "Zeigt und bearbeitet die Routing-Sprache des markierten Heizkreises. `=` und `-` verlängern Vorlauf und Rücklauf um eine Rasterlinie, `R/r` und `L/l` setzen Viertelkreise, `X/x` löschen den letzten Schritt. Bei einfacher Spiegelung werden zusätzlich `(` und `)` zu `L` und `R` sowie `8` und `9` zu `l` und `r`. Der rote Startpunkt bleibt an der tatsächlichen Startkante des Heizrohrs; das Rechteck ist nur der Größenrahmen.");
+        self().applyTooltip(autoRouteHeatingZoneOnResizeCheckBox, "Legt fest, ob ein Heizkreis nach dem Ziehen seines Rechtecks automatisch neu geroutet wird. Ausgeschaltet bleiben die vorhandenen Routing-Befehle erhalten.");
+        self().applyTooltip(heatingSummaryLabel, "Zeigt Fläche, Verlegeart, Anzahl der Heizkreise, gesamte HKL und die aufsummierte Heizleistung der gewählten Flächenheizung.");
+        self().applyTooltip(roomObjectPresetSelector, "Wählt ein Objekt zum Platzieren aus und übernimmt dessen Standardmaße. DWG-Dateien unter `~/.config/CADas/Objekte` erscheinen hier zusätzlich als Objekt-Presets.");
+        self().applyTooltip(roomObjectNameField, "Legt die sichtbare Bezeichnung eines neuen oder ausgewählten Objekts fest. Bleibt das Feld leer, verwendet CADas in 2D, Tabellen und PDFs die Bezeichnung des gewählten Objekt-Presets.");
+        self().applyTooltip(roomObjectWidthField, "Legt die Breite eines neuen oder ausgewählten Objekts fest.");
+        self().applyTooltip(roomObjectWidthUnit, "Bestimmt die Einheit für die Objektbreite.");
+        self().applyTooltip(roomObjectDepthField, "Legt die Tiefe eines neuen oder ausgewählten Objekts fest.");
+        self().applyTooltip(roomObjectDepthUnit, "Bestimmt die Einheit für die Objekttiefe.");
+        self().applyTooltip(roomObjectHeightField, "Legt die Höhe eines neuen oder ausgewählten Objekts fest.");
+        self().applyTooltip(roomObjectHeightUnit, "Bestimmt die Einheit für die Objekthöhe.");
+        self().applyTooltip(roomObjectHeatOutputField, "Legt die Wärmeleistung eines neuen oder ausgewählten Objekts in Watt fest. Der Wert wird je nach Heizart den Summen für FBH, DH, sonstige Flächenheizung oder Heizelemente zugeordnet.");
+        self().applyTooltip(roomObjectHeatingTypeSelector, "Legt fest, ob die Wärmeleistung dieses Objekts als keine Heizung, Heizelement, FBH, DH oder sonstige Flächenheizung geführt wird. Diese Zuordnung steuert Raumwärmesummen, Materialliste und PDF.");
+        self().applyTooltip(roomObjectBaseElevationField, "Legt die vertikale Lage der Objektbasis relativ zum Boden der aktiven Etage fest. Positive Werte heben das Objekt an, negative Werte versenken es.");
+        self().applyTooltip(roomObjectBaseElevationUnit, "Bestimmt die Einheit für die positive oder negative Basishöhe des Objekts.");
+        self().applyTooltip(roomObjectAngleField, "Legt den frei einstellbaren Drehwinkel eines neuen oder ausgewählten Objekts in Grad fest.");
+        self().applyTooltip(surfaceTypeSelector, "Zeigt nur die Belagstypen an, die zur aktuellen Auswahl passen. Raum allein erlaubt Boden oder Decke, Raum plus Wand erlaubt Innenwand, Wand allein erlaubt Innenwand oder Außenwand; Innenwand ist dabei vorausgewählt.");
+        self().applyTooltip(surfacePresetSelector, "Wählt einen Beispielbelag oder eine DWG-Referenz aus und übernimmt deren Standardwerte in die Ebenenfelder.");
+        self().applyTooltip(surfaceLayerList, "Zeigt die Ebenen der aktuell ausgewählten Fläche in ihrer Stapelreihenfolge an.");
+        self().applyTooltip(surfaceLayerNameField, "Legt den Namen der Ebene fest, etwa Fliese, Rigips, Dämmplatte oder eine DWG-Referenz.");
+        self().applyTooltip(surfaceLayerThicknessField, "Legt die Dicke der Ebene fest. Innenwand- und Deckenbeläge wirken direkt auf Raumgeometrie und Volumen.");
+        self().applyTooltip(surfaceLayerThicknessUnit, "Bestimmt die Einheit für die Dicke des ausgewählten Belags.");
+        self().applyTooltip(surfaceTileWidthField, "Legt die Breite einer Fliese oder Platte für die Belegungsbasis fest.");
+        self().applyTooltip(surfaceTileWidthUnit, "Bestimmt die Einheit für die Breite der Fliese oder Platte.");
+        self().applyTooltip(surfaceTileHeightField, "Legt die Höhe beziehungsweise Länge einer Fliese oder Platte für die Belegungsbasis fest.");
+        self().applyTooltip(surfaceTileHeightUnit, "Bestimmt die Einheit für die Höhe oder Länge des Belags.");
+        self().applyTooltip(surfaceLayoutCornerLabel, "Zeigt die aktuell gewählte Startecke des Belags an. Von dieser Raumecke aus beginnt die erste Reihe.");
+        self().applyTooltip(surfaceLayoutDirectionSelector, "Legt fest, auf welcher Raumseite die erste Reihe startet. Beim Umschalten bleibt die obere oder untere Startecke erhalten und wechselt nur auf die passende linke oder rechte Seite.");
+        self().applyTooltip(surfaceLayoutModeSelector, "Bestimmt, ob ohne Versatz, mit automatischem Versatz oder mit festem Reihenversatz belegt wird.");
+        self().applyTooltip(surfaceLayoutOffsetField, "Legt bei festem Versatz den Reihenversatz entlang der langen Modulkante fest. Der Wert wird von Reihe zu Reihe fortgeschrieben.");
+        self().applyTooltip(surfaceLayoutOffsetUnit, "Bestimmt die Einheit für den festen Reihenversatz.");
+        self().applyTooltip(surfaceMinimumOffsetField, "Legt den kleinsten zulässigen automatischen Versatz zwischen zwei Reihen fest.");
+        self().applyTooltip(surfaceMinimumOffsetUnit, "Bestimmt die Einheit für den Mindestversatz.");
+        self().applyTooltip(surfaceMinimumEdgeWidthField, "Legt die kleinste zulässige Restbreite links und rechts innerhalb einer Reihe fest.");
+        self().applyTooltip(surfaceMinimumEdgeWidthUnit, "Bestimmt die Einheit für die seitliche Mindestbreite an den Rändern.");
+        self().applyTooltip(surfaceMinimumStartEndMarginField, "Legt die kleinste zulässige Breite der Anfangs- und Endreihe in Verlegerichtung fest. Wenn die Endreihe zu schmal würde, wird die Anfangsreihe entsprechend beschnitten, bleibt aber direkt an der Wand.");
+        self().applyTooltip(surfaceMinimumStartEndMarginUnit, "Bestimmt die Einheit für die Mindestbreite der Anfangs- und Endreihe.");
+        self().applyTooltip(surfaceFreeMarginLeftField, "Lässt an der linken Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung beginnt erst hinter diesem Rand.");
+        self().applyTooltip(surfaceFreeMarginLeftUnit, "Bestimmt die Einheit für den freien linken Rand.");
+        self().applyTooltip(surfaceFreeMarginRightField, "Lässt an der rechten Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung endet vor diesem Rand.");
+        self().applyTooltip(surfaceFreeMarginRightUnit, "Bestimmt die Einheit für den freien rechten Rand.");
+        self().applyTooltip(surfaceFreeMarginTopField, "Lässt an der oberen Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung endet vor diesem Rand.");
+        self().applyTooltip(surfaceFreeMarginTopUnit, "Bestimmt die Einheit für den freien oberen Rand.");
+        self().applyTooltip(surfaceFreeMarginBottomField, "Lässt an der unteren Außenkante dauerhaft einen freien Rand ohne zugeschnittene Streifen frei. Die Verlegung beginnt erst oberhalb dieses Randes.");
+        self().applyTooltip(surfaceFreeMarginBottomUnit, "Bestimmt die Einheit für den freien unteren Rand.");
+        self().applyTooltip(surfaceJointWidthField, "Legt die Breite der Fugen zwischen den Fliesen oder Platten fest.");
+        self().applyTooltip(surfaceJointWidthUnit, "Bestimmt die Einheit für die Fugenbreite.");
+        self().applyTooltip(surfaceCutRestrictionSelector, "Legt fest, ob Zuschnitte beliebig frei verwendet werden dürfen, ob Schnittkanten nur an Außenkanten liegen dürfen oder ob zusätzlich die Verlegerichtung ohne Drehung eingehalten werden muss.");
+        self().applyTooltip(dwgBlockNameField, "Erfasst einen konkreten Blocknamen aus einer geladenen DWG-Bibliothek, damit daraus ein auswählbares Oberflächen-Preset wird.");
+        self().applyTooltip(surfaceLayerTargetLabel, "Zeigt, auf welcher Wand- oder Raumfläche die aktuellen Ebenen bearbeitet werden.");
+        self().applyTooltip(surfaceLayerSelectionHintLabel, "Erklärt, welche Kombination aus Raum- und Wandauswahl für den aktuell sichtbaren Belagstyp erforderlich ist.");
+        self().applyTooltip(surfaceLayerCoverageLabel, "Zeigt eine Kurzbewertung der aktuellen Platten- oder Fliesenbelegung der markierten Ebene.");
+        self().applyTooltip(levelSelector, "Wechselt zwischen den vorhandenen Etagen des aktuellen Projekts. Jede Etage besitzt ihren eigenen Wandbestand.");
     }
 
     void registerRenderListener(BooleanProperty property) {
-        property.addListener((ignored, oldValue, newValue) -> render());
+        property.addListener((ignored, oldValue, newValue) -> self().render());
     }
 
     <T> void registerRenderListener(ObjectProperty<T> property) {
-        property.addListener((ignored, oldValue, newValue) -> render());
+        property.addListener((ignored, oldValue, newValue) -> self().render());
     }
 
     Button createActionButton(String label, String style, Runnable action, String tooltipText) {
@@ -1607,7 +1607,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         if (style != null) {
             button.setStyle(style);
         }
-        applyTooltip(button, tooltipText);
+        self().applyTooltip(button, tooltipText);
         return button;
     }
 
@@ -1616,36 +1616,36 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         verticalRuler.setWidth(RULER_SIZE);
         drawingCanvas.setFocusTraversable(true);
 
-        drawingPane.widthProperty().addListener((ignored, oldValue, newValue) -> resizeCanvases());
-        drawingPane.heightProperty().addListener((ignored, oldValue, newValue) -> resizeCanvases());
-        horizontalRuler.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> startGuideDrag(GuideOrientation.HORIZONTAL, guideWorldPositionFromHorizontalRuler(event)));
-        horizontalRuler.addEventHandler(MouseEvent.MOUSE_DRAGGED, event -> updateGuideDrag(GuideOrientation.HORIZONTAL, guideWorldPositionFromHorizontalRuler(event)));
-        horizontalRuler.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> finishGuideDrag(GuideOrientation.HORIZONTAL, guideWorldPositionFromHorizontalRuler(event)));
-        verticalRuler.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> startGuideDrag(GuideOrientation.VERTICAL, guideWorldPositionFromVerticalRuler(event)));
-        verticalRuler.addEventHandler(MouseEvent.MOUSE_DRAGGED, event -> updateGuideDrag(GuideOrientation.VERTICAL, guideWorldPositionFromVerticalRuler(event)));
-        verticalRuler.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> finishGuideDrag(GuideOrientation.VERTICAL, guideWorldPositionFromVerticalRuler(event)));
+        drawingPane.widthProperty().addListener((ignored, oldValue, newValue) -> self().resizeCanvases());
+        drawingPane.heightProperty().addListener((ignored, oldValue, newValue) -> self().resizeCanvases());
+        horizontalRuler.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> self().startGuideDrag(GuideOrientation.HORIZONTAL, self().guideWorldPositionFromHorizontalRuler(event)));
+        horizontalRuler.addEventHandler(MouseEvent.MOUSE_DRAGGED, event -> self().updateGuideDrag(GuideOrientation.HORIZONTAL, self().guideWorldPositionFromHorizontalRuler(event)));
+        horizontalRuler.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> self().finishGuideDrag(GuideOrientation.HORIZONTAL, self().guideWorldPositionFromHorizontalRuler(event)));
+        verticalRuler.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> self().startGuideDrag(GuideOrientation.VERTICAL, self().guideWorldPositionFromVerticalRuler(event)));
+        verticalRuler.addEventHandler(MouseEvent.MOUSE_DRAGGED, event -> self().updateGuideDrag(GuideOrientation.VERTICAL, self().guideWorldPositionFromVerticalRuler(event)));
+        verticalRuler.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> self().finishGuideDrag(GuideOrientation.VERTICAL, self().guideWorldPositionFromVerticalRuler(event)));
 
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
             lastMouseX = event.getX();
             lastMouseY = event.getY();
-            lastCursor = screenToWorld(event.getX(), event.getY());
+            lastCursor = self().screenToWorld(event.getX(), event.getY());
             altPressed = event.isAltDown();
-            updateMouseCursor();
-            updateStatus();
-            render();
+            self().updateMouseCursor();
+            self().updateStatus();
+            self().render();
         });
-        drawingCanvas.addEventHandler(MouseEvent.MOUSE_PRESSED, this::handleMousePressed);
-        drawingCanvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, this::handleMouseDragged);
-        drawingCanvas.addEventHandler(MouseEvent.MOUSE_RELEASED, this::handleMouseReleased);
+        drawingCanvas.addEventHandler(MouseEvent.MOUSE_PRESSED, self()::handleMousePressed);
+        drawingCanvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, self()::handleMouseDragged);
+        drawingCanvas.addEventHandler(MouseEvent.MOUSE_RELEASED, self()::handleMouseReleased);
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_EXITED, event -> drawingCanvas.setCursor(Cursor.DEFAULT));
         drawingCanvas.setOnScroll(event -> {
-            double oldScale = scale();
+            double oldScale = self().scale();
             double zoomFactor = event.getDeltaY() > 0 ? 1.1 : 0.9;
             zoom = Math.clamp(zoom * zoomFactor, MINIMUM_TWO_D_ZOOM, MAXIMUM_TWO_D_ZOOM);
-            double newScale = scale();
+            double newScale = self().scale();
             offsetX = event.getX() - ((event.getX() - offsetX) / oldScale) * newScale;
             offsetY = event.getY() - ((event.getY() - offsetY) / oldScale) * newScale;
-            render();
+            self().render();
         });
     }
 }

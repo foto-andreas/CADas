@@ -36,7 +36,7 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
     void handleMousePressed(MouseEvent event) {
         drawingCanvas.requestFocus();
         if (event.getButton() == MouseButton.SECONDARY && event.isAltDown()) {
-            removeNearestGuide(screenToWorld(event.getX(), event.getY()));
+            self().removeNearestGuide(self().screenToWorld(event.getX(), event.getY()));
             return;
         }
 
@@ -45,12 +45,12 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                 || event.getButton() == MouseButton.PRIMARY && spacePressed) {
             panning = true;
             panningMoved = false;
-            pendingContextSelection = event.getButton() == MouseButton.SECONDARY && currentTool() == DrawingTool.EDIT
+            pendingContextSelection = event.getButton() == MouseButton.SECONDARY && self().currentTool() == DrawingTool.EDIT
                     ? contextSelectionAt(event)
                     : null;
             pendingContextWorldPoint = pendingContextSelection == null
                     ? null
-                    : screenToWorld(event.getX(), event.getY());
+                    : self().screenToWorld(event.getX(), event.getY());
             panStartX = event.getX();
             panStartY = event.getY();
             panOriginX = offsetX;
@@ -63,19 +63,19 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             return;
         }
 
-        if (!isDirectEditingView()) {
-            render();
+        if (!self().isDirectEditingView()) {
+            self().render();
             draftLabel.setText("Direktes Zeichnen und Bearbeiten ist aktuell nur in der Draufsicht verfügbar.");
             return;
         }
 
-        if (currentTool() == DrawingTool.EDIT) {
-            PlanPoint rawEditPoint = screenToWorld(event.getX(), event.getY());
+        if (self().currentTool() == DrawingTool.EDIT) {
+            PlanPoint rawEditPoint = self().screenToWorld(event.getX(), event.getY());
             activeEdgeHandle = edgeResizeService.findHandle(
                     activeLevel.get(),
                     Set.copyOf(selectedSelections),
                     rawEditPoint,
-                    Length.ofMillimeters(8.0 / scale())
+                    Length.ofMillimeters(8.0 / self().scale())
             ).orElse(null);
             if (activeEdgeHandle != null) {
                 edgeResizeBaseWalls = List.copyOf(activeLevel.get().walls());
@@ -90,14 +90,14 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                 openingDragId = null;
                 historyCapturedForDrag = false;
                 draftLabel.setText("Kanten-Handle ausgewählt: Ziehen verlängert oder kürzt das Bauteil entlang seiner Wandachse.");
-                render();
+                self().render();
                 return;
             }
             // Für die Selektion wird der reine Klickpunkt verwendet, nicht das gerasterte Ergebnis.
             PlanPoint editPoint = rawEditPoint;
-            selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, pointerSelectionTolerance()).orElse(null);
+            selectedEndpointGroup = wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), editPoint, self().pointerSelectionTolerance()).orElse(null);
             selectionDragAnchor = null;
-            clearSelectionRectangle();
+            self().clearSelectionRectangle();
             selectionDragBaseWalls = List.of();
             selectionDragBaseStaircases = List.of();
             selectionDragBaseRoomObjects = List.of();
@@ -106,24 +106,24 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             selectionDragBaseHydronicHeatings = List.of();
             historyCapturedForDrag = false;
             if (selectedEndpointGroup != null) {
-                syncEndpointHeightInputFromSelection();
+                self().syncEndpointHeightInputFromSelection();
                 preferredEndpointWallSelection(editPoint, selectedEndpointGroup)
-                        .ifPresent(selection -> updateSelection(
+                        .ifPresent(selection -> self().updateSelection(
                                 selection,
                                 event.isShortcutDown() || event.isShiftDown()
                         ));
                 draftLabel.setText("Wandecke ausgewählt. `Eckhöhe anwenden` setzt die Höhe auf alle verbundenen Wandenden.");
             } else {
                 SelectionKey editSelection = editSelectionAt(editPoint, event.isAltDown());
-                updateSelection(editSelection, event.isShortcutDown() || event.isShiftDown());
-                if (shouldStartSelectionRectangle(editSelection)) {
+                self().updateSelection(editSelection, event.isShortcutDown() || event.isShiftDown());
+                if (self().shouldStartSelectionRectangle(editSelection)) {
                     selectionRectangleStart = editPoint;
                     selectionRectangleEnd = editPoint;
                     selectionRectangleToggle = event.isShortcutDown() || event.isShiftDown();
                 } else {
-                    clearSelectionRectangle();
+                    self().clearSelectionRectangle();
                 }
-                prepareSelectionDrag(editSelection, editPoint);
+                self().prepareSelectionDrag(editSelection, editPoint);
                 openingDragId = null;
                 openingDragWallAxis = null;
                 openingDragWidth = 0;
@@ -157,38 +157,38 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                     }
                 }
             }
-            render();
+            self().render();
             return;
         }
 
-        DraftingConstraints constraints = currentConstraints(currentTool() == DrawingTool.WALL && !event.isShiftDown());
-        PlanPoint rawStart = screenToWorld(event.getX(), event.getY());
-        draftStart = currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
+        DraftingConstraints constraints = self().currentConstraints(self().currentTool() == DrawingTool.WALL && !event.isShiftDown());
+        PlanPoint rawStart = self().screenToWorld(event.getX(), event.getY());
+        draftStart = self().currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
                 ? rawStart
-                : snapDrawingPoint(rawStart, constraints);
+                : self().snapDrawingPoint(rawStart, constraints);
         previewSegment = new PlanSegment(draftStart, draftStart);
-        if (currentTool() == DrawingTool.DOOR) {
-            placeDoor(draftStart);
+        if (self().currentTool() == DrawingTool.DOOR) {
+            self().placeDoor(draftStart);
             draftStart = null;
             previewSegment = null;
-        } else if (currentTool() == DrawingTool.WINDOW) {
-            placeWindow(draftStart);
+        } else if (self().currentTool() == DrawingTool.WINDOW) {
+            self().placeWindow(draftStart);
             draftStart = null;
             previewSegment = null;
-        } else if (currentTool() == DrawingTool.ROOF_WINDOW) {
-            placeRoofWindow(draftStart);
+        } else if (self().currentTool() == DrawingTool.ROOF_WINDOW) {
+            self().placeRoofWindow(draftStart);
             draftStart = null;
             previewSegment = null;
-        } else if (currentTool() == DrawingTool.OBJECT) {
-            placeRoomObject(draftStart);
+        } else if (self().currentTool() == DrawingTool.OBJECT) {
+            self().placeRoomObject(draftStart);
             draftStart = null;
             previewSegment = null;
         }
-        render();
+        self().render();
     }
 
     SelectionKey editSelectionAt(PlanPoint editPoint, boolean cycleSelection) {
-        List<SelectionKey> candidates = selectionQueryService.findSelections(activeLevel.get(), editPoint, pointerSelectionTolerance());
+        List<SelectionKey> candidates = selectionQueryService.findSelections(activeLevel.get(), editPoint, self().pointerSelectionTolerance());
         if (candidates.isEmpty()) {
             return null;
         }
@@ -207,7 +207,7 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                 endpointSelection.startWallIds().stream(),
                 endpointSelection.endWallIds().stream()
         ).map(UUID::toString).collect(java.util.stream.Collectors.toSet());
-        Optional<SelectionKey> hitWall = selectionQueryService.findSelections(activeLevel.get(), editPoint, pointerSelectionTolerance()).stream()
+        Optional<SelectionKey> hitWall = selectionQueryService.findSelections(activeLevel.get(), editPoint, self().pointerSelectionTolerance()).stream()
                 .filter(selection -> selection.kind() == RenderableKind.WALL)
                 .filter(selection -> endpointWallIds.contains(selection.elementId()))
                 .findFirst();
@@ -225,20 +225,20 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             panningMoved |= Math.hypot(event.getX() - panStartX, event.getY() - panStartY) > 3.0;
             offsetX = panOriginX + (event.getX() - panStartX);
             offsetY = panOriginY + (event.getY() - panStartY);
-            render();
+            self().render();
             updateMouseCursor();
             return;
         }
 
         if (draftStart == null) {
             if (selectionRectangleStart != null) {
-                selectionRectangleEnd = screenToWorld(event.getX(), event.getY());
-                render();
+                selectionRectangleEnd = self().screenToWorld(event.getX(), event.getY());
+                self().render();
                 return;
             }
             if (activeEdgeHandle != null) {
                 if (!historyCapturedForDrag) {
-                    rememberStateForUndo();
+                    self().rememberStateForUndo();
                     historyCapturedForDrag = true;
                 }
                 Level baseLevel = new Level(activeLevel.get().name());
@@ -257,20 +257,20 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                                 .filter(wall -> !wall.id().equals(activeEdgeHandle.hostWallId()))
                                 .toList()
                         : edgeResizeBaseWalls;
-                boolean heatingZoneHandle = isHeatingZoneHandle(activeEdgeHandle);
-                PlanPoint rawPoint = screenToWorld(event.getX(), event.getY());
+                boolean heatingZoneHandle = self().isHeatingZoneHandle(activeEdgeHandle);
+                PlanPoint rawPoint = self().screenToWorld(event.getX(), event.getY());
                 PlanPoint resizePoint = heatingZoneHandle
                         ? rawPoint
                         : snapService.snap(
                                 rawPoint,
-                                currentConstraints(false),
+                                self().currentConstraints(false),
                                 snapWalls,
-                                currentAlignmentSnapTargets(excludedWallIds)
+                                self().currentAlignmentSnapTargets(excludedWallIds)
                         );
                 EdgeResizeService.ResizeOptions resizeOptions = heatingZoneHandle
                         ? new EdgeResizeService.ResizeOptions(
                                 false,
-                                snapToGrid.get() ? currentGrid() : null
+                                snapToGrid.get() ? self().currentGrid() : null
                         )
                         : EdgeResizeService.ResizeOptions.defaults();
                 EdgeResizeService.ResizeResult result = edgeResizeService.resize(baseLevel, activeEdgeHandle, resizePoint, resizeOptions);
@@ -285,29 +285,29 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                         .filter(staircase -> staircase.leftUnderbuildWidth().toMillimeters() > 0.0
                                 || staircase.rightUnderbuildWidth().toMillimeters() > 0.0)
                         .toList();
-                resizedStaircasesWithUnderbuild.forEach(this::synchronizeStairUnderbuild);
+                resizedStaircasesWithUnderbuild.forEach(self()::synchronizeStairUnderbuild);
                 if (isWallHandle || !resizedStaircasesWithUnderbuild.isEmpty()) {
-                    previewRoomSynchronizationFromWalls(activeLevel.get());
+                    self().previewRoomSynchronizationFromWalls(activeLevel.get());
                 }
-                markThreeDDirty();
-                render();
+                self().markThreeDDirty();
+                self().render();
                 return;
             }
             if (selectedEndpointGroup != null) {
                 if (!historyCapturedForDrag) {
-                    rememberStateForUndo();
+                    self().rememberStateForUndo();
                     historyCapturedForDrag = true;
                 }
-                DraftingConstraints constraints = currentConstraints(false);
+                DraftingConstraints constraints = self().currentConstraints(false);
                 Set<UUID> endpointWallIds = java.util.stream.Stream.concat(
                         selectedEndpointGroup.startWallIds().stream(),
                         selectedEndpointGroup.endWallIds().stream()
                 ).collect(java.util.stream.Collectors.toSet());
                 PlanPoint snappedPoint = snapService.snap(
-                        screenToWorld(event.getX(), event.getY()),
+                        self().screenToWorld(event.getX(), event.getY()),
                         constraints,
                         activeLevel.get().walls(),
-                        currentAlignmentSnapTargets(endpointWallIds)
+                        self().currentAlignmentSnapTargets(endpointWallIds)
                 );
                 activeLevel.get().replaceWalls(wallEditingService.moveEndpointGroup(
                         activeLevel.get().walls(),
@@ -315,32 +315,32 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                         snappedPoint,
                         !event.isShiftDown()
                 ));
-                previewRoomSynchronizationFromWalls(activeLevel.get());
-                markThreeDDirty();
-                render();
+                self().previewRoomSynchronizationFromWalls(activeLevel.get());
+                self().markThreeDDirty();
+                self().render();
             }
             if (openingDragId != null) {
                 if (!historyCapturedForDrag) {
-                    rememberStateForUndo();
+                    self().rememberStateForUndo();
                     historyCapturedForDrag = true;
                 }
-                DraftingConstraints constraints = currentConstraints(false);
+                DraftingConstraints constraints = self().currentConstraints(false);
                 PlanPoint snappedPoint = snapService.snap(
-                        screenToWorld(event.getX(), event.getY()),
+                        self().screenToWorld(event.getX(), event.getY()),
                         constraints,
                         activeLevel.get().walls(),
-                        currentGuideSnapTargets()
+                        self().currentGuideSnapTargets()
                 );
                 double wallLength = openingDragWallAxis.length().toMillimeters();
                 double rawOffset = openingDragWallAxis.projectedLength(snappedPoint).toMillimeters() + openingDragOffsetDelta;
                 double clampedOffset = Math.clamp(rawOffset, 0.0, Math.max(0.0, wallLength - openingDragWidth));
-                Wall openingWall = openingDragWall();
+                Wall openingWall = self().openingDragWall();
                 Length newOffset = snapToGuides.get()
                         ? guideSnapService.snapOpeningOffset(
                                 openingWall,
                                 Length.ofMillimeters(clampedOffset),
                                 Length.ofMillimeters(openingDragWidth),
-                                currentGuideSnapTargets(),
+                                self().currentGuideSnapTargets(),
                                 SNAP_TOLERANCE
                         )
                         : Length.ofMillimeters(clampedOffset);
@@ -350,53 +350,53 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                 activeLevel.get().replaceWindows(activeLevel.get().windows().stream()
                         .map(window -> window.id().equals(openingDragId) ? window.withOffset(newOffset) : window)
                         .toList());
-                previewRoomSynchronizationFromWalls(activeLevel.get());
-                markThreeDDirty();
-                render();
+                self().previewRoomSynchronizationFromWalls(activeLevel.get());
+                self().markThreeDDirty();
+                self().render();
                 return;
             }
             if (selectionDragAnchor != null) {
                 if (!historyCapturedForDrag) {
-                    rememberStateForUndo();
+                    self().rememberStateForUndo();
                     historyCapturedForDrag = true;
                 }
-                PlanPoint rawPoint = screenToWorld(event.getX(), event.getY());
-                PlanPoint dragPoint = hasSelectedHeatingZone()
+                PlanPoint rawPoint = self().screenToWorld(event.getX(), event.getY());
+                PlanPoint dragPoint = self().hasSelectedHeatingZone()
                         ? rawPoint
-                        : snapService.snap(rawPoint, currentConstraints(false), activeLevel.get().walls());
-                translateSelectedComponents(dragPoint);
-                render();
+                        : snapService.snap(rawPoint, self().currentConstraints(false), activeLevel.get().walls());
+                self().translateSelectedComponents(dragPoint);
+                self().render();
             }
             return;
         }
 
-        if (currentTool().isPointTool() && currentTool() != DrawingTool.HEATING_MANIFOLD) {
+        if (self().currentTool().isPointTool() && self().currentTool() != DrawingTool.HEATING_MANIFOLD) {
             return;
         }
 
-        DraftingConstraints constraints = currentConstraints(currentTool() == DrawingTool.WALL && !event.isShiftDown());
-        PlanPoint rawPoint = screenToWorld(event.getX(), event.getY());
-        if (currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE) {
+        DraftingConstraints constraints = self().currentConstraints(self().currentTool() == DrawingTool.WALL && !event.isShiftDown());
+        PlanPoint rawPoint = self().screenToWorld(event.getX(), event.getY());
+        if (self().currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE) {
             previewSegment = new PlanSegment(draftStart, rawPoint);
         } else {
-            PlanPoint snappedPoint = snapDrawingPoint(rawPoint, constraints);
+            PlanPoint snappedPoint = self().snapDrawingPoint(rawPoint, constraints);
             previewSegment = draftingService.createSegment(draftStart, snappedPoint, constraints);
         }
-        if (currentTool() != DrawingTool.HEATING_ZONE_RECTANGLE
+        if (self().currentTool() != DrawingTool.HEATING_ZONE_RECTANGLE
                 && (snapToGuides.get() || snapToWalls.get())
                 && constraints.manualLength().isEmpty()
                 && constraints.manualAngle().isEmpty()) {
             previewSegment = guideSnapService.snapWallSegment(
                     previewSegment,
-                    currentWallThickness(),
-                    currentAlignmentSnapTargets(Set.of()),
+                    self().currentWallThickness(),
+                    self().currentAlignmentSnapTargets(Set.of()),
                     SNAP_TOLERANCE
             );
             draftStart = previewSegment.start();
         }
         lastCursor = previewSegment.end();
-        updateStatus();
-        render();
+        self().updateStatus();
+        self().render();
     }
 
     void handleMouseReleased(MouseEvent event) {
@@ -406,7 +406,7 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                 if (pendingContextSelection != null) {
                     contextMenuSelection = pendingContextSelection;
                     contextMenuWorldPoint = pendingContextWorldPoint;
-                    selectSingle(pendingContextSelection);
+                    self().selectSingle(pendingContextSelection);
                     selectionContextMenu.show(drawingCanvas, event.getScreenX(), event.getScreenY());
                 } else if (handleTerrainBandContextClick(event)) {
                     pendingContextSelection = null;
@@ -433,22 +433,22 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             edgeResizeBaseHydronicHeatings = List.of();
             boolean hadDrag = historyCapturedForDrag;
             historyCapturedForDrag = false;
-            if (isHeatingZoneHandle(releasedHandle) || releasedHandle.elementKind() == RenderableKind.HEATING_MANIFOLD) {
-                if (isHeatingZoneHandle(releasedHandle)) {
+            if (self().isHeatingZoneHandle(releasedHandle) || releasedHandle.elementKind() == RenderableKind.HEATING_MANIFOLD) {
+                if (self().isHeatingZoneHandle(releasedHandle)) {
                     if (autoRouteHeatingZoneOnResize.get()) {
                         heatingZonesPendingRoutingRegeneration.add(releasedHandle.elementId());
                     }
-                    scheduleHeatingLayoutRecalculationForZone(releasedHandle.elementId());
+                    self().scheduleHeatingLayoutRecalculationForZone(releasedHandle.elementId());
                 } else {
-                    scheduleHeatingLayoutRecalculation(releasedHandle.elementId());
+                    self().scheduleHeatingLayoutRecalculation(releasedHandle.elementId());
                 }
             }
             if (hadDrag) {
-                flushPendingRoomSynchronizationWarning();
+                self().flushPendingRoomSynchronizationWarning();
             }
             updatePropertySectionVisibility();
             updateActionButtons();
-            render();
+            self().render();
             return;
         }
 
@@ -456,11 +456,11 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             boolean hadDrag = historyCapturedForDrag;
             historyCapturedForDrag = false;
             if (hadDrag) {
-                flushPendingRoomSynchronizationWarning();
+                self().flushPendingRoomSynchronizationWarning();
             }
             updatePropertySectionVisibility();
             updateActionButtons();
-            render();
+            self().render();
             return;
         }
 
@@ -472,11 +472,11 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             boolean hadDrag = historyCapturedForDrag;
             historyCapturedForDrag = false;
             if (hadDrag) {
-                flushPendingRoomSynchronizationWarning();
+                self().flushPendingRoomSynchronizationWarning();
             }
             updatePropertySectionVisibility();
             updateActionButtons();
-            render();
+            self().render();
             return;
         }
 
@@ -492,14 +492,14 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             historyCapturedForDrag = false;
             if (selectedSelections.stream().anyMatch(selection -> selection.kind() == RenderableKind.HEATING_ZONE
                     || selection.kind() == RenderableKind.HEATING_MANIFOLD)) {
-                scheduleHeatingLayoutRecalculation();
+                self().scheduleHeatingLayoutRecalculation();
             }
             if (hadDrag) {
-                flushPendingRoomSynchronizationWarning();
+                self().flushPendingRoomSynchronizationWarning();
             }
             updatePropertySectionVisibility();
             updateActionButtons();
-            render();
+            self().render();
             return;
         }
 
@@ -507,12 +507,12 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             if (selectionRectangleEnd == null) {
                 selectionRectangleEnd = selectionRectangleStart;
             }
-            if (hasSelectionRectangleArea()) {
-                applySelectionRectangle();
+            if (self().hasSelectionRectangleArea()) {
+                self().applySelectionRectangle();
             } else {
-                clearSelectionRectangle();
+                self().clearSelectionRectangle();
             }
-            render();
+            self().render();
             return;
         }
 
@@ -520,80 +520,80 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             return;
         }
 
-        if (previewSegment.length().toMillimeters() > 1.0 || currentTool() == DrawingTool.HEATING_MANIFOLD) {
-            if (currentTool() == DrawingTool.WALL) {
-                rememberStateForUndo();
-                Wall wall = Wall.create(previewSegment, currentWallThickness(), currentWallHeight());
+        if (previewSegment.length().toMillimeters() > 1.0 || self().currentTool() == DrawingTool.HEATING_MANIFOLD) {
+            if (self().currentTool() == DrawingTool.WALL) {
+                self().rememberStateForUndo();
+                Wall wall = Wall.create(previewSegment, self().currentWallThickness(), self().currentWallHeight());
                 activeLevel.get().addWall(wall);
-                synchronizeRoomsFromWalls(activeLevel.get());
-                selectSingle(new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()));
-            } else if (currentTool() == DrawingTool.STAIR) {
-                rememberStateForUndo();
+                self().synchronizeRoomsFromWalls(activeLevel.get());
+                self().selectSingle(new SelectionKey(RenderableKind.WALL, activeLevel.get().name(), wall.id().toString()));
+            } else if (self().currentTool() == DrawingTool.STAIR) {
+                self().rememberStateForUndo();
                 Staircase staircase = Staircase.create(
-                        currentStairType(),
+                        self().currentStairType(),
                         previewSegment.start(),
                         previewSegment.end(),
-                        currentStairHeight(),
-                        currentStairSteps(),
-                        currentStairStartLanding(),
-                        currentStairEndLanding(),
-                        currentStairLeftUnderbuild(),
-                        currentStairRightUnderbuild(),
-                        currentStairUndersideThickness()
+                        self().currentStairHeight(),
+                        self().currentStairSteps(),
+                        self().currentStairStartLanding(),
+                        self().currentStairEndLanding(),
+                        self().currentStairLeftUnderbuild(),
+                        self().currentStairRightUnderbuild(),
+                        self().currentStairUndersideThickness()
                 );
                 activeLevel.get().addStaircase(staircase);
-                synchronizeStairUnderbuild(staircase);
-                selectSingle(new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), staircase.id().toString()));
-            } else if (currentTool() == DrawingTool.FLOOR_EXTENSION
+                self().synchronizeStairUnderbuild(staircase);
+                self().selectSingle(new SelectionKey(RenderableKind.STAIR, activeLevel.get().name(), staircase.id().toString()));
+            } else if (self().currentTool() == DrawingTool.FLOOR_EXTENSION
                     && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
                     && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
-                rememberStateForUndo();
+                self().rememberStateForUndo();
                 FloorExtension extension = FloorExtension.create(
                         Optional.ofNullable(floorExtensionTypeSelector.getValue()).orElse(FloorExtensionType.BALCONY),
                         Optional.ofNullable(floorExtensionPlacementSelector.getValue()).orElse(FloorExtensionPlacement.EXTERIOR),
                         previewSegment.start(),
                         previewSegment.end(),
-                        currentFloorExtensionThickness()
+                        self().currentFloorExtensionThickness()
                 );
                 activeLevel.get().addFloorExtension(extension);
-                selectSingle(new SelectionKey(RenderableKind.FLOOR_EXTENSION, activeLevel.get().name(), extension.id().toString()));
-            } else if ((currentTool() == DrawingTool.FLOOR_OPENING_RECTANGLE
-                    || currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE)
+                self().selectSingle(new SelectionKey(RenderableKind.FLOOR_EXTENSION, activeLevel.get().name(), extension.id().toString()));
+            } else if ((self().currentTool() == DrawingTool.FLOOR_OPENING_RECTANGLE
+                    || self().currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE)
                     && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
                     && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
-                createFloorOpening(previewSegment, currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE
+                self().createFloorOpening(previewSegment, self().currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE
                         ? FloorOpeningShape.CIRCLE
                         : FloorOpeningShape.RECTANGLE);
-            } else if (currentTool() == DrawingTool.HEATING_EXCLUSION_RECTANGLE
+            } else if (self().currentTool() == DrawingTool.HEATING_EXCLUSION_RECTANGLE
                     && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
                     && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
-                createHeatingExclusionArea(previewSegment);
-            } else if (currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
+                self().createHeatingExclusionArea(previewSegment);
+            } else if (self().currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
                     && Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
                     && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
-                createHeatingZone(previewSegment);
-            } else if (currentTool() == DrawingTool.HEATING_MANIFOLD) {
+                self().createHeatingZone(previewSegment);
+            } else if (self().currentTool() == DrawingTool.HEATING_MANIFOLD) {
                 if (Math.abs(previewSegment.end().xMillimeters() - previewSegment.start().xMillimeters()) > 1.0
                         && Math.abs(previewSegment.end().yMillimeters() - previewSegment.start().yMillimeters()) > 1.0) {
-                    placeHydronicManifold(previewSegment);
+                    self().placeHydronicManifold(previewSegment);
                 } else {
-                    placeHydronicManifold(draftStart);
+                    self().placeHydronicManifold(draftStart);
                 }
             }
-            markThreeDDirty();
+            self().markThreeDDirty();
         }
         draftStart = null;
         previewSegment = null;
-        render();
+        self().render();
     }
 
     SelectionKey contextSelectionAt(MouseEvent event) {
-        PlanPoint editPoint = screenToWorld(event.getX(), event.getY());
+        PlanPoint editPoint = self().screenToWorld(event.getX(), event.getY());
         return contextSelectionAt(editPoint);
     }
 
     SelectionKey contextSelectionAt(PlanPoint editPoint) {
-        List<SelectionKey> candidates = selectionQueryService.findSelections(activeLevel.get(), editPoint, pointerSelectionTolerance());
+        List<SelectionKey> candidates = selectionQueryService.findSelections(activeLevel.get(), editPoint, self().pointerSelectionTolerance());
         SelectionKey currentSelection = selectedSelection.get();
         if (currentSelection != null && candidates.contains(currentSelection)) {
             return currentSelection;
@@ -614,11 +614,11 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             return;
         }
         if (!event.isShortcutDown() && event.getCode() == KeyCode.DELETE) {
-            runGuardedAction("Auswahl löschen", this::deleteSelection);
+            runGuardedAction("Auswahl löschen", self()::deleteSelection);
             event.consume();
             return;
         }
-        if (!event.isShortcutDown() && moveSelectionWithArrowKey(event.getCode())) {
+        if (!event.isShortcutDown() && self().moveSelectionWithArrowKey(event.getCode())) {
             event.consume();
             return;
         }
@@ -626,12 +626,12 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             return;
         }
         if (event.getCode() == KeyCode.Z && event.isShiftDown()) {
-            runGuardedAction("Wiederherstellen", this::redo);
+            runGuardedAction("Wiederherstellen", self()::redo);
             event.consume();
             return;
         }
         if (event.getCode() == KeyCode.Z) {
-            runGuardedAction("Rückgängig", this::undo);
+            runGuardedAction("Rückgängig", self()::undo);
             event.consume();
             return;
         }
@@ -681,16 +681,16 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
         if (owner != null) {
             alert.initOwner(owner);
         }
-        applyTooltip(alert.getDialogPane().lookupButton(saveButton),
+        self().applyTooltip(alert.getDialogPane().lookupButton(saveButton),
                 "Sichert das vollständige Gebäude und beendet CADas anschließend.");
-        applyTooltip(alert.getDialogPane().lookupButton(discardButton),
+        self().applyTooltip(alert.getDialogPane().lookupButton(discardButton),
                 "Beendet CADas und verwirft alle Änderungen seit der letzten Gebäudesicherung.");
-        applyTooltip(alert.getDialogPane().lookupButton(ButtonType.CANCEL),
+        self().applyTooltip(alert.getDialogPane().lookupButton(ButtonType.CANCEL),
                 "Bricht das Beenden ab und kehrt zum aktuellen Projekt zurück.");
 
         Optional<ButtonType> decision = alert.showAndWait();
         if (decision.filter(saveButton::equals).isPresent()) {
-            saveProject();
+            self().saveProject();
             return !hasUnsavedChanges();
         }
         return decision.filter(discardButton::equals).isPresent();
@@ -703,7 +703,7 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
     void updateMouseCursor() {
         PointerCursorService.PointerTarget target = pointerTargetAtLastPosition();
         PointerCursorService.CursorType cursorType = PointerCursorService.cursor(new PointerCursorService.PointerContext(
-                currentTool(),
+                self().currentTool(),
                 target,
                 panning,
                 spacePressed,
@@ -722,12 +722,12 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
     }
 
     PointerCursorService.PointerTarget pointerTargetAtLastPosition() {
-        PlanPoint point = screenToWorld(lastMouseX, lastMouseY);
+        PlanPoint point = self().screenToWorld(lastMouseX, lastMouseY);
         Optional<EdgeResizeService.EdgeHandle> handle = edgeResizeService.findHandle(
                 activeLevel.get(),
                 Set.copyOf(selectedSelections),
                 point,
-                Length.ofMillimeters(8.0 / scale())
+                Length.ofMillimeters(8.0 / self().scale())
         );
         if (handle.isPresent()) {
             EdgeResizeService.EdgeHandle edgeHandle = handle.orElseThrow();
@@ -747,12 +747,12 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
                     ? PointerCursorService.PointerTarget.HORIZONTAL_EDGE
                     : PointerCursorService.PointerTarget.VERTICAL_EDGE;
         }
-        if (currentTool() == DrawingTool.EDIT
-                && wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), point, Length.ofMillimeters(8.0 / scale())).isPresent()) {
+        if (self().currentTool() == DrawingTool.EDIT
+                && wallEditingService.findConnectedEndpoint(activeLevel.get().walls(), point, Length.ofMillimeters(8.0 / self().scale())).isPresent()) {
             return PointerCursorService.PointerTarget.ENDPOINT;
         }
-        if (currentTool() == DrawingTool.EDIT
-                && selectionQueryService.findSelection(activeLevel.get(), point, Length.ofMillimeters(8.0 / scale())).isPresent()) {
+        if (self().currentTool() == DrawingTool.EDIT
+                && selectionQueryService.findSelection(activeLevel.get(), point, Length.ofMillimeters(8.0 / self().scale())).isPresent()) {
             return PointerCursorService.PointerTarget.ELEMENT;
         }
         return PointerCursorService.PointerTarget.EMPTY;
@@ -765,6 +765,6 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
         drawingCanvas.setHeight(height);
         horizontalRuler.setWidth(width);
         verticalRuler.setHeight(height);
-        render();
+        self().render();
     }
 }

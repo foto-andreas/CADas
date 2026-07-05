@@ -60,16 +60,16 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             return;
         }
         double[] outerXPoints = outerOutline.stream()
-                .mapToDouble(point -> toScreenProjectedX(point, 0.0))
+                .mapToDouble(point -> self().toScreenProjectedX(point, 0.0))
                 .toArray();
         double[] outerYPoints = outerOutline.stream()
-                .mapToDouble(point -> toScreenProjectedY(point, 0.0))
+                .mapToDouble(point -> self().toScreenProjectedY(point, 0.0))
                 .toArray();
         double[] innerXPoints = contour.stream()
-                .mapToDouble(point -> toScreenProjectedX(point, 0.0))
+                .mapToDouble(point -> self().toScreenProjectedX(point, 0.0))
                 .toArray();
         double[] innerYPoints = contour.stream()
-                .mapToDouble(point -> toScreenProjectedY(point, 0.0))
+                .mapToDouble(point -> self().toScreenProjectedY(point, 0.0))
                 .toArray();
         graphics.setFill(TERRAIN_FILL_COLOR);
         graphics.fillPolygon(outerXPoints, outerYPoints, outerXPoints.length);
@@ -92,22 +92,22 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         for (int index = 0; index < contour.size(); index++) {
             PlanPoint point = contour.get(index);
             PlanPoint next = contour.get((index + 1) % contour.size());
-            double x = toScreenProjectedX(point, 0.0);
-            double y = toScreenProjectedY(point, 0.0);
+            double x = self().toScreenProjectedX(point, 0.0);
+            double y = self().toScreenProjectedY(point, 0.0);
             graphics.strokeLine(x, y,
-                    toScreenProjectedX(next, 0.0),
-                    toScreenProjectedY(next, 0.0));
+                    self().toScreenProjectedX(next, 0.0),
+                    self().toScreenProjectedY(next, 0.0));
             PlanPoint outerPoint = outerOutline.get(index);
             graphics.strokeLine(
-                    toScreenProjectedX(outerPoint, 0.0),
-                    toScreenProjectedY(outerPoint, 0.0),
-                    toScreenProjectedX(outerOutline.get((index + 1) % outerOutline.size()), 0.0),
-                    toScreenProjectedY(outerOutline.get((index + 1) % outerOutline.size()), 0.0)
+                    self().toScreenProjectedX(outerPoint, 0.0),
+                    self().toScreenProjectedY(outerPoint, 0.0),
+                    self().toScreenProjectedX(outerOutline.get((index + 1) % outerOutline.size()), 0.0),
+                    self().toScreenProjectedY(outerOutline.get((index + 1) % outerOutline.size()), 0.0)
             );
         }
         for (TerrainProfileService.ProjectedTerrainPoint sample : terrainProfileService.projectedSamples(project.terrain(), contour)) {
-            double x = toScreenProjectedX(sample.bandPoint(), 0.0);
-            double y = toScreenProjectedY(sample.bandPoint(), 0.0);
+            double x = self().toScreenProjectedX(sample.bandPoint(), 0.0);
+            double y = self().toScreenProjectedY(sample.bandPoint(), 0.0);
             graphics.fillOval(x - 4.0, y - 4.0, 8.0, 8.0);
             graphics.fillText(sample.elevation().format(LengthUnit.METER, 2), x + 7.0, y - 7.0);
         }
@@ -144,7 +144,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             return;
         }
         SurfaceLayer highlightedLayer = stack.layers().stream()
-                .filter(candidate -> isSelectedSurfaceLayer(stack, candidate))
+                .filter(candidate -> self().isSelectedSurfaceLayer(stack, candidate))
                 .findFirst()
                 .orElse(null);
         SurfaceLayer baseLayer = visibleLayers.getFirst();
@@ -193,11 +193,11 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         }
         SurfaceLayer baseLayer = firstVisibleSurfaceLayer(stack).orElse(null);
         SurfaceLayer selectedLayer = stack.layers().stream()
-                .filter(layer -> isSelectedSurfaceLayer(stack, layer))
+                .filter(layer -> self().isSelectedSurfaceLayer(stack, layer))
                 .findFirst()
                 .orElse(null);
         stack.layers().stream()
-                .filter(this::isVisibleSurfaceLayer)
+                .filter(self()::isVisibleSurfaceLayer)
                 .filter(SurfaceCoveringPresetService::isVariothermDryPanelLayer)
                 .filter(layer -> drawnLayerIds.add(layer.id()))
                 .filter(layer -> !alreadyDrawnWithCircles(layer, baseLayer, selectedLayer))
@@ -223,7 +223,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
 
     List<SurfaceLayer> visiblePlanSurfaceLayers(SurfaceLayerStack stack) {
         return stack.layers().stream()
-                .filter(this::isVisibleSurfaceLayer)
+                .filter(self()::isVisibleSurfaceLayer)
                 .filter(layer -> !reportSnapshotRestrictSurfaceLayers || reportSnapshotVisibleSurfaceLayerIds.contains(layer.id()))
                 .toList();
     }
@@ -240,13 +240,13 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         if (tiles.isEmpty()) {
             return;
         }
-        double jointPx = Math.max(0.4, layer.jointWidth().toMillimeters() * scale());
+        double jointPx = Math.max(0.4, layer.jointWidth().toMillimeters() * self().scale());
         graphics.save();
         graphics.beginPath();
         PlanPoint[] outline = room.outline().toArray(new PlanPoint[0]);
-        graphics.moveTo(toScreenX(outline[0].xMillimeters()), toScreenY(outline[0].yMillimeters()));
+        graphics.moveTo(self().toScreenX(outline[0].xMillimeters()), self().toScreenY(outline[0].yMillimeters()));
         for (int i = 1; i < outline.length; i++) {
-            graphics.lineTo(toScreenX(outline[i].xMillimeters()), toScreenY(outline[i].yMillimeters()));
+            graphics.lineTo(self().toScreenX(outline[i].xMillimeters()), self().toScreenY(outline[i].yMillimeters()));
         }
         graphics.closePath();
         graphics.clip();
@@ -260,21 +260,21 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             double th = tile.height();
             String hKey = String.format(Locale.US, "h:%.3f:%.3f:%.3f", ty + th, tx, tx + tw);
             if (horizontalKeys.add(hKey)) {
-                double screenX = toScreenX(tx);
-                double screenY = toScreenY(ty + th - layer.jointWidth().toMillimeters() / 2.0);
-                graphics.fillRect(screenX, screenY, tw * scale(), jointPx);
+                double screenX = self().toScreenX(tx);
+                double screenY = self().toScreenY(ty + th - layer.jointWidth().toMillimeters() / 2.0);
+                graphics.fillRect(screenX, screenY, tw * self().scale(), jointPx);
             }
             String vKey = String.format(Locale.US, "v:%.3f:%.3f:%.3f", tx + tw, ty, ty + th);
             if (verticalKeys.add(vKey)) {
-                double screenX = toScreenX(tx + tw - layer.jointWidth().toMillimeters() / 2.0);
-                double screenY = toScreenY(ty);
-                graphics.fillRect(screenX, screenY, jointPx, th * scale());
+                double screenX = self().toScreenX(tx + tw - layer.jointWidth().toMillimeters() / 2.0);
+                double screenY = self().toScreenY(ty);
+                graphics.fillRect(screenX, screenY, jointPx, th * self().scale());
             }
             if ((showVariothermCircles.get() || forceVariothermCircles)
                     && SurfaceCoveringPresetService.isVariothermDryPanelLayer(layer)
-                    && scale() * SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS
+                    && self().scale() * SurfaceCoveringPresetService.VARIOTHERM_GROOVE_PITCH_MILLIMETERS
                     >= VARIOTHERM_DETAIL_MIN_SCREEN_SPACING) {
-                variothermGrooveRenderer.drawPanelGrooves(graphics, tile, scale(), this::toScreenX, this::toScreenY);
+                variothermGrooveRenderer.drawPanelGrooves(graphics, tile, self().scale(), self()::toScreenX, self()::toScreenY);
             }
         }
         if (highlighted) {
@@ -282,10 +282,10 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             graphics.setLineWidth(1.6);
             for (SurfaceRectangleTileLayoutService.PlacedSurfaceTile tile : tiles) {
                 graphics.strokeRect(
-                        toScreenX(tile.x()),
-                        toScreenY(tile.y()),
-                        tile.width() * scale(),
-                    tile.height() * scale()
+                        self().toScreenX(tile.x()),
+                        self().toScreenY(tile.y()),
+                        tile.width() * self().scale(),
+                    tile.height() * self().scale()
                 );
             }
         }
@@ -300,10 +300,10 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     ) {
         boolean verticalArrow = layer.layoutRotatedQuarterTurn();
         for (SurfaceRectangleTileLayoutService.PlacedSurfaceTile tile : orderedSurfaceTilesForDirectionArrow(layer, tiles)) {
-            double tileX = toScreenX(tile.x());
-            double tileY = toScreenY(tile.y());
-            double tileWidth = tile.width() * scale();
-            double tileHeight = tile.height() * scale();
+            double tileX = self().toScreenX(tile.x());
+            double tileY = self().toScreenY(tile.y());
+            double tileWidth = tile.width() * self().scale();
+            double tileHeight = tile.height() * self().scale();
             double primarySpan = verticalArrow ? tileHeight : tileWidth;
             double secondarySpan = verticalArrow ? tileWidth : tileHeight;
             if (primarySpan < 8.0 || secondarySpan < 4.5) {
@@ -414,8 +414,8 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
 
     List<TextBlockingBox> drawRoomLabel(GraphicsContext graphics, Room room, PlanPoint center) {
         List<TextBlockingBox> blockers = new ArrayList<>();
-        double centerX = toScreenProjectedX(center, 0.0);
-        double centerY = toScreenProjectedY(center, 0.0);
+        double centerX = self().toScreenProjectedX(center, 0.0);
+        double centerY = self().toScreenProjectedY(center, 0.0);
         graphics.save();
         graphics.setFill(Color.web("#5d4527"));
         graphics.setTextAlign(TextAlignment.CENTER);
@@ -510,10 +510,10 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             }
         }
         graphics.strokeLine(
-                toScreenProjectedX(start, 0.0),
-                toScreenProjectedY(start, 0.0),
-                toScreenProjectedX(end, 0.0),
-                toScreenProjectedY(end, 0.0)
+                self().toScreenProjectedX(start, 0.0),
+                self().toScreenProjectedY(start, 0.0),
+                self().toScreenProjectedX(end, 0.0),
+                self().toScreenProjectedY(end, 0.0)
         );
         graphics.setLineDashes();
         drawSlopeArrow(graphics, arrowCenter, profile.lowSide());
@@ -524,15 +524,15 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
                         profile.kneeWallHeight().toMillimeters() / 1000.0,
                         surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(activeLevel.get(), room) / 1000.0,
                         room.slopeAngleDegrees(profile)),
-                toScreenProjectedX(room.centerPoint(), 0.0) - 72,
-                toScreenProjectedY(room.centerPoint(), 0.0) + 28 + labelIndex * 14.0
+                self().toScreenProjectedX(room.centerPoint(), 0.0) - 72,
+                self().toScreenProjectedY(room.centerPoint(), 0.0) + 28 + labelIndex * 14.0
         );
     }
 
     void drawSlopeArrow(GraphicsContext graphics, PlanPoint arrowCenter, SlopedCeilingSide lowSide) {
         double arrowLength = 28.0;
-        double startX = toScreenProjectedX(arrowCenter, 0.0);
-        double startY = toScreenProjectedY(arrowCenter, 0.0);
+        double startX = self().toScreenProjectedX(arrowCenter, 0.0);
+        double startY = self().toScreenProjectedY(arrowCenter, 0.0);
         double endX = startX;
         double endY = startY;
         switch (lowSide) {
@@ -567,7 +567,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             Wall hostWall = activeLevel.get().findWall(door.wallId());
             PlanPoint openingStart = hostWall.axis().pointAt(door.offsetFromStart());
             PlanPoint openingEnd = hostWall.axis().pointAt(door.offsetFromStart().add(door.width()));
-            boolean selected = isSelected(RenderableKind.DOOR, door.id().toString());
+            boolean selected = self().isSelected(RenderableKind.DOOR, door.id().toString());
             if (!ViewProjectionService.isPlanView(activeView.get())) {
                 drawOpeningElevation(graphics, openingStart, openingEnd, door.thresholdHeight().toMillimeters(), door.height().toMillimeters(), selected ? Color.web("#f08f3c") : Color.web("#d66b2d"));
                 continue;
@@ -575,12 +575,12 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             graphics.save();
             graphics.setLineCap(javafx.scene.shape.StrokeLineCap.BUTT);
             graphics.setStroke(selected ? Color.web("#f08f3c") : Color.web("#d66b2d"));
-            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * 0.55, 3.0));
+            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * self().scale() * 0.55, 3.0));
             graphics.strokeLine(
-                    toScreenProjectedX(openingStart, 0.0),
-                    toScreenProjectedY(openingStart, 0.0),
-                    toScreenProjectedX(openingEnd, 0.0),
-                    toScreenProjectedY(openingEnd, 0.0)
+                    self().toScreenProjectedX(openingStart, 0.0),
+                    self().toScreenProjectedY(openingStart, 0.0),
+                    self().toScreenProjectedX(openingEnd, 0.0),
+                    self().toScreenProjectedY(openingEnd, 0.0)
             );
             graphics.restore();
         }
@@ -591,7 +591,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             Wall hostWall = activeLevel.get().findWall(window.wallId());
             PlanPoint openingStart = hostWall.axis().pointAt(window.offsetFromStart());
             PlanPoint openingEnd = hostWall.axis().pointAt(window.offsetFromStart().add(window.width()));
-            boolean selected = isSelected(RenderableKind.WINDOW, window.id().toString());
+            boolean selected = self().isSelected(RenderableKind.WINDOW, window.id().toString());
             if (!ViewProjectionService.isPlanView(activeView.get())) {
                 drawOpeningElevation(graphics, openingStart, openingEnd, window.sillHeight().toMillimeters(), window.windowHeight().toMillimeters(), selected ? Color.web("#7bc8eb") : Color.web("#4da8da"));
                 continue;
@@ -599,12 +599,12 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             graphics.save();
             graphics.setLineCap(javafx.scene.shape.StrokeLineCap.BUTT);
             graphics.setStroke(selected ? Color.web("#7bc8eb") : Color.web("#4da8da"));
-            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * scale() * 0.35, 3.0));
+            graphics.setLineWidth(Math.max(hostWall.thickness().toMillimeters() * self().scale() * 0.35, 3.0));
             graphics.strokeLine(
-                    toScreenProjectedX(openingStart, 0.0),
-                    toScreenProjectedY(openingStart, 0.0),
-                    toScreenProjectedX(openingEnd, 0.0),
-                    toScreenProjectedY(openingEnd, 0.0)
+                    self().toScreenProjectedX(openingStart, 0.0),
+                    self().toScreenProjectedY(openingStart, 0.0),
+                    self().toScreenProjectedX(openingEnd, 0.0),
+                    self().toScreenProjectedY(openingEnd, 0.0)
             );
             graphics.restore();
         }
@@ -615,21 +615,21 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             return;
         }
         for (RoofWindow roofWindow : activeLevel.get().roofWindows()) {
-            boolean selected = isSelected(RenderableKind.ROOF_WINDOW, roofWindow.id().toString());
+            boolean selected = self().isSelected(RenderableKind.ROOF_WINDOW, roofWindow.id().toString());
             graphics.save();
             graphics.setFill(selected ? Color.color(0.35, 0.72, 0.92, 0.42) : Color.color(0.35, 0.72, 0.92, 0.25));
             graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#2c789f"));
             graphics.setLineWidth(selected ? 2.8 : 1.8);
-            double x = toScreenProjectedX(new PlanPoint(
+            double x = self().toScreenProjectedX(new PlanPoint(
                     roofWindow.center().xMillimeters() - roofWindow.width().toMillimeters() / 2.0,
                     roofWindow.center().yMillimeters() - roofWindow.depth().toMillimeters() / 2.0
             ), 0.0);
-            double y = toScreenProjectedY(new PlanPoint(
+            double y = self().toScreenProjectedY(new PlanPoint(
                     roofWindow.center().xMillimeters() - roofWindow.width().toMillimeters() / 2.0,
                     roofWindow.center().yMillimeters() - roofWindow.depth().toMillimeters() / 2.0
             ), 0.0);
-            double width = roofWindow.width().toMillimeters() * scale();
-            double depth = roofWindow.depth().toMillimeters() * scale();
+            double width = roofWindow.width().toMillimeters() * self().scale();
+            double depth = roofWindow.depth().toMillimeters() * self().scale();
             graphics.fillRect(x, y, width, depth);
             graphics.strokeRect(x, y, width, depth);
             graphics.strokeLine(x, y, x + width, y + depth);
@@ -639,21 +639,21 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawRoofWindowOutline(GraphicsContext graphics, RoofWindow roofWindow) {
-        double x = toScreenProjectedX(new PlanPoint(
+        double x = self().toScreenProjectedX(new PlanPoint(
                 roofWindow.center().xMillimeters() - roofWindow.width().toMillimeters() / 2.0,
                 roofWindow.center().yMillimeters() - roofWindow.depth().toMillimeters() / 2.0
         ), 0.0);
-        double y = toScreenProjectedY(new PlanPoint(
+        double y = self().toScreenProjectedY(new PlanPoint(
                 roofWindow.center().xMillimeters() - roofWindow.width().toMillimeters() / 2.0,
                 roofWindow.center().yMillimeters() - roofWindow.depth().toMillimeters() / 2.0
         ), 0.0);
         graphics.strokeRect(x, y,
-                roofWindow.width().toMillimeters() * scale(),
-                roofWindow.depth().toMillimeters() * scale());
+                roofWindow.width().toMillimeters() * self().scale(),
+                roofWindow.depth().toMillimeters() * self().scale());
     }
 
     void drawEditablePoints(GraphicsContext graphics) {
-        if (currentTool() != DrawingTool.EDIT || !ViewProjectionService.isPlanView(activeView.get())) {
+        if (self().currentTool() != DrawingTool.EDIT || !ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         Map<PlanPoint, Integer> wallEndpointCounts = new LinkedHashMap<>();
@@ -674,23 +674,23 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         }
         for (Door door : activeLevel.get().doors()) {
             Wall wall = activeLevel.get().findWall(door.wallId());
-            boolean selected = isSelected(RenderableKind.DOOR, door.id().toString());
+            boolean selected = self().isSelected(RenderableKind.DOOR, door.id().toString());
             drawOpeningEditablePoints(graphics, wall, door.offsetFromStart(), door.width(), Color.web("#d66b2d"), selected);
         }
         for (WindowElement window : activeLevel.get().windows()) {
             Wall wall = activeLevel.get().findWall(window.wallId());
-            boolean selected = isSelected(RenderableKind.WINDOW, window.id().toString());
+            boolean selected = self().isSelected(RenderableKind.WINDOW, window.id().toString());
             drawOpeningEditablePoints(graphics, wall, window.offsetFromStart(), window.width(), Color.web("#4da8da"), selected);
         }
     }
 
     void drawEdgeResizeHandles(GraphicsContext graphics) {
-        if (currentTool() != DrawingTool.EDIT || !ViewProjectionService.isPlanView(activeView.get())) {
+        if (self().currentTool() != DrawingTool.EDIT || !ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         for (EdgeResizeService.EdgeHandle handle : edgeResizeService.handles(activeLevel.get(), Set.copyOf(selectedSelections))) {
-            double x = toScreenProjectedX(handle.position(), 0.0);
-            double y = toScreenProjectedY(handle.position(), 0.0);
+            double x = self().toScreenProjectedX(handle.position(), 0.0);
+            double y = self().toScreenProjectedY(handle.position(), 0.0);
             boolean active = activeEdgeHandle != null
                     && activeEdgeHandle.kind() == handle.kind()
                     && activeEdgeHandle.elementId().equals(handle.elementId());
@@ -723,8 +723,8 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawEditablePoint(GraphicsContext graphics, PlanPoint point, Color color, double fillOpacity, double radius) {
-        double centerX = toScreenProjectedX(point, 0.0);
-        double centerY = toScreenProjectedY(point, 0.0);
+        double centerX = self().toScreenProjectedX(point, 0.0);
+        double centerY = self().toScreenProjectedY(point, 0.0);
         graphics.save();
         graphics.setFill(Color.color(color.getRed(), color.getGreen(), color.getBlue(), fillOpacity));
         graphics.setStroke(Color.web("#201c18"));
@@ -749,7 +749,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             if (!shouldDrawRoomObject(roomObject)) {
                 continue;
             }
-            boolean selected = isSelected(RenderableKind.ROOM_OBJECT, roomObject.id().toString());
+            boolean selected = self().isSelected(RenderableKind.ROOM_OBJECT, roomObject.id().toString());
             graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#356f62"));
             graphics.setFill(selected ? Color.color(0.85, 0.50, 0.18, 0.30) : Color.color(0.22, 0.44, 0.39, 0.22));
             graphics.setLineWidth(1.8);
@@ -758,9 +758,9 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             if (ViewProjectionService.isPlanView(activeView.get())) {
                 drawRoomObjectPlan(graphics, roomObject);
             } else {
-                double x = toScreenProjectedX(roomObject.center(), 0.0) - width * scale() / 2.0;
-                double y = toScreenProjectedY(roomObject.center(), roomObject.baseElevation().toMillimeters() + roomObject.height().toMillimeters());
-                graphics.strokeRect(x, y, width * scale(), roomObject.height().toMillimeters() * scale());
+                double x = self().toScreenProjectedX(roomObject.center(), 0.0) - width * self().scale() / 2.0;
+                double y = self().toScreenProjectedY(roomObject.center(), roomObject.baseElevation().toMillimeters() + roomObject.height().toMillimeters());
+                graphics.strokeRect(x, y, width * self().scale(), roomObject.height().toMillimeters() * self().scale());
             }
         }
     }
@@ -777,12 +777,12 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawRoomObjectPlan(GraphicsContext graphics, RoomObject roomObject) {
-        double w = roomObject.width().toMillimeters() * scale();
-        double h = roomObject.depth().toMillimeters() * scale();
+        double w = roomObject.width().toMillimeters() * self().scale();
+        double h = roomObject.depth().toMillimeters() * self().scale();
         double x = -w / 2.0;
         double y = -h / 2.0;
         graphics.save();
-        graphics.translate(toScreenX(roomObject.center().xMillimeters()), toScreenY(roomObject.center().yMillimeters()));
+        graphics.translate(self().toScreenX(roomObject.center().xMillimeters()), self().toScreenY(roomObject.center().yMillimeters()));
         graphics.rotate(-roomObject.rotationDegrees());
         switch (roomObject.shape()) {
             case CIRCLE, OVAL -> {
@@ -812,37 +812,37 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         graphics.setTextAlign(TextAlignment.CENTER);
         graphics.fillText(
                 roomObjectPresetService.displayName(roomObject, availableRoomObjectPresets),
-                toScreenX(roomObject.center().xMillimeters()),
-                toScreenY(roomObject.center().yMillimeters()) + 4.0
+                self().toScreenX(roomObject.center().xMillimeters()),
+                self().toScreenY(roomObject.center().yMillimeters()) + 4.0
         );
         graphics.restore();
     }
 
     void drawFloorExtensions(GraphicsContext graphics) {
         for (FloorExtension extension : activeLevel.get().floorExtensions()) {
-            boolean selected = isSelected(RenderableKind.FLOOR_EXTENSION, extension.id().toString());
+            boolean selected = self().isSelected(RenderableKind.FLOOR_EXTENSION, extension.id().toString());
             graphics.save();
             graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#806b4f"));
             graphics.setFill(selected ? Color.color(0.85, 0.50, 0.18, 0.28) : Color.color(0.58, 0.49, 0.36, 0.20));
             graphics.setLineWidth(1.8);
             if (ViewProjectionService.isPlanView(activeView.get())) {
-                double x = toScreenX(extension.minX());
-                double y = toScreenY(extension.minY());
-                double width = extension.widthMillimeters() * scale();
-                double depth = extension.depthMillimeters() * scale();
+                double x = self().toScreenX(extension.minX());
+                double y = self().toScreenY(extension.minY());
+                double width = extension.widthMillimeters() * self().scale();
+                double depth = extension.depthMillimeters() * self().scale();
                 graphics.fillRect(x, y, width, depth);
                 graphics.strokeRect(x, y, width, depth);
                 graphics.setFill(Color.web("#4b4034"));
                 graphics.setFont(Font.font("Menlo", 11));
                 graphics.fillText(extension.type().toString(), x + 8, y + 18);
             } else {
-                double[] horizontals = extension.outline().stream().mapToDouble(point -> projectHorizontal(point, 0.0)).toArray();
+                double[] horizontals = extension.outline().stream().mapToDouble(point -> self().projectHorizontal(point, 0.0)).toArray();
                 double min = java.util.Arrays.stream(horizontals).min().orElse(0.0);
                 double max = java.util.Arrays.stream(horizontals).max().orElse(0.0);
-                double left = toScreenHorizontal(min);
-                double right = toScreenHorizontal(max);
-                double floor = toScreenVertical(0.0);
-                double bottom = toScreenVertical(extension.slabThickness().toMillimeters());
+                double left = self().toScreenHorizontal(min);
+                double right = self().toScreenHorizontal(max);
+                double floor = self().toScreenVertical(0.0);
+                double bottom = self().toScreenVertical(extension.slabThickness().toMillimeters());
                 graphics.fillRect(Math.min(left, right), Math.min(floor, bottom), Math.max(2, Math.abs(right - left)), Math.max(2, Math.abs(bottom - floor)));
                 graphics.strokeRect(Math.min(left, right), Math.min(floor, bottom), Math.max(2, Math.abs(right - left)), Math.max(2, Math.abs(bottom - floor)));
             }
@@ -852,7 +852,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
 
     void drawStaircases(GraphicsContext graphics) {
         for (Staircase staircase : activeLevel.get().staircases()) {
-            boolean selected = isSelected(RenderableKind.STAIR, staircase.id().toString());
+            boolean selected = self().isSelected(RenderableKind.STAIR, staircase.id().toString());
             graphics.setStroke(selected ? Color.web("#8a6848") : Color.web("#5e503f"));
             graphics.setFill(selected ? Color.color(0.63, 0.47, 0.27, 0.24) : Color.color(0.52, 0.46, 0.37, 0.16));
             graphics.setLineWidth(2.0);
@@ -932,16 +932,16 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
 
     void drawSpiralStair(GraphicsContext graphics, Staircase staircase) {
         graphics.strokeOval(
-                toScreenProjectedX(new PlanPoint(staircase.minX(), staircase.minY()), 0.0),
-                toScreenProjectedY(new PlanPoint(staircase.minX(), staircase.minY()), 0.0),
-                staircase.widthMillimeters() * scale(),
-                staircase.heightMillimeters() * scale()
+                self().toScreenProjectedX(new PlanPoint(staircase.minX(), staircase.minY()), 0.0),
+                self().toScreenProjectedY(new PlanPoint(staircase.minX(), staircase.minY()), 0.0),
+                staircase.widthMillimeters() * self().scale(),
+                staircase.heightMillimeters() * self().scale()
         );
         graphics.strokeOval(
-                toScreenProjectedX(new PlanPoint(staircase.minX() + staircase.widthMillimeters() * 0.25, staircase.minY() + staircase.heightMillimeters() * 0.25), 0.0),
-                toScreenProjectedY(new PlanPoint(staircase.minX() + staircase.widthMillimeters() * 0.25, staircase.minY() + staircase.heightMillimeters() * 0.25), 0.0),
-                staircase.widthMillimeters() * scale() * 0.5,
-                staircase.heightMillimeters() * scale() * 0.5
+                self().toScreenProjectedX(new PlanPoint(staircase.minX() + staircase.widthMillimeters() * 0.25, staircase.minY() + staircase.heightMillimeters() * 0.25), 0.0),
+                self().toScreenProjectedY(new PlanPoint(staircase.minX() + staircase.widthMillimeters() * 0.25, staircase.minY() + staircase.heightMillimeters() * 0.25), 0.0),
+                staircase.widthMillimeters() * self().scale() * 0.5,
+                staircase.heightMillimeters() * self().scale() * 0.5
         );
         for (int step = 0; step < staircase.stepCount(); step++) {
             double angle = (360.0 / staircase.stepCount()) * step;
@@ -952,26 +952,26 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
                     center.yMillimeters() + Math.sin(Math.toRadians(angle)) * radius
             );
             graphics.strokeLine(
-                    toScreenProjectedX(center, 0.0),
-                    toScreenProjectedY(center, 0.0),
-                    toScreenProjectedX(outer, 0.0),
-                    toScreenProjectedY(outer, 0.0)
+                    self().toScreenProjectedX(center, 0.0),
+                    self().toScreenProjectedY(center, 0.0),
+                    self().toScreenProjectedX(outer, 0.0),
+                    self().toScreenProjectedY(outer, 0.0)
             );
         }
     }
 
     void drawStairOutline(GraphicsContext graphics, Staircase staircase) {
         double[] xPoints = {
-                toScreenProjectedX(staircase.pointAtLocalPosition(0, 0), 0.0),
-                toScreenProjectedX(staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0), 0.0),
-                toScreenProjectedX(staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()), 0.0),
-                toScreenProjectedX(staircase.pointAtLocalPosition(0, staircase.heightMillimeters()), 0.0)
+                self().toScreenProjectedX(staircase.pointAtLocalPosition(0, 0), 0.0),
+                self().toScreenProjectedX(staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0), 0.0),
+                self().toScreenProjectedX(staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()), 0.0),
+                self().toScreenProjectedX(staircase.pointAtLocalPosition(0, staircase.heightMillimeters()), 0.0)
         };
         double[] yPoints = {
-                toScreenProjectedY(staircase.pointAtLocalPosition(0, 0), 0.0),
-                toScreenProjectedY(staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0), 0.0),
-                toScreenProjectedY(staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()), 0.0),
-                toScreenProjectedY(staircase.pointAtLocalPosition(0, staircase.heightMillimeters()), 0.0)
+                self().toScreenProjectedY(staircase.pointAtLocalPosition(0, 0), 0.0),
+                self().toScreenProjectedY(staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0), 0.0),
+                self().toScreenProjectedY(staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()), 0.0),
+                self().toScreenProjectedY(staircase.pointAtLocalPosition(0, staircase.heightMillimeters()), 0.0)
         };
         graphics.fillPolygon(xPoints, yPoints, 4);
         graphics.strokePolygon(xPoints, yPoints, 4);
@@ -988,10 +988,10 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         PlanPoint start = staircase.pointAtLocalPosition(startLocalX, startLocalY);
         PlanPoint end = staircase.pointAtLocalPosition(endLocalX, endLocalY);
         graphics.strokeLine(
-                toScreenProjectedX(start, 0.0),
-                toScreenProjectedY(start, 0.0),
-                toScreenProjectedX(end, 0.0),
-                toScreenProjectedY(end, 0.0)
+                self().toScreenProjectedX(start, 0.0),
+                self().toScreenProjectedY(start, 0.0),
+                self().toScreenProjectedX(end, 0.0),
+                self().toScreenProjectedY(end, 0.0)
         );
     }
 
@@ -1014,16 +1014,16 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         PlanPoint p3 = new PlanPoint(ex - nx * h, ey - ny * h);
         PlanPoint p4 = new PlanPoint(sx - nx * h, sy - ny * h);
         double[] xPoints = {
-                toScreenProjectedX(p1, 0.0),
-                toScreenProjectedX(p2, 0.0),
-                toScreenProjectedX(p3, 0.0),
-                toScreenProjectedX(p4, 0.0)
+                self().toScreenProjectedX(p1, 0.0),
+                self().toScreenProjectedX(p2, 0.0),
+                self().toScreenProjectedX(p3, 0.0),
+                self().toScreenProjectedX(p4, 0.0)
         };
         double[] yPoints = {
-                toScreenProjectedY(p1, 0.0),
-                toScreenProjectedY(p2, 0.0),
-                toScreenProjectedY(p3, 0.0),
-                toScreenProjectedY(p4, 0.0)
+                self().toScreenProjectedY(p1, 0.0),
+                self().toScreenProjectedY(p2, 0.0),
+                self().toScreenProjectedY(p3, 0.0),
+                self().toScreenProjectedY(p4, 0.0)
         };
         graphics.setFill(color);
         graphics.fillPolygon(xPoints, yPoints, 4);
@@ -1036,15 +1036,15 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         List<WallProfilePoint> profile = wall.resolvedProfile();
         double[] xPoints = new double[profile.size() + 2];
         double[] yPoints = new double[profile.size() + 2];
-        xPoints[0] = toScreenProjectedX(wall.axis().start(), 0.0);
-        yPoints[0] = toScreenProjectedY(wall.axis().start(), 0.0);
-        xPoints[1] = toScreenProjectedX(wall.axis().end(), 0.0);
-        yPoints[1] = toScreenProjectedY(wall.axis().end(), 0.0);
+        xPoints[0] = self().toScreenProjectedX(wall.axis().start(), 0.0);
+        yPoints[0] = self().toScreenProjectedY(wall.axis().start(), 0.0);
+        xPoints[1] = self().toScreenProjectedX(wall.axis().end(), 0.0);
+        yPoints[1] = self().toScreenProjectedY(wall.axis().end(), 0.0);
         for (int index = 0; index < profile.size(); index++) {
             var profilePoint = profile.get(profile.size() - 1 - index);
             PlanPoint point = wall.axis().pointAt(profilePoint.offset());
-            xPoints[index + 2] = toScreenProjectedX(point, profilePoint.height().toMillimeters());
-            yPoints[index + 2] = toScreenProjectedY(point, profilePoint.height().toMillimeters());
+            xPoints[index + 2] = self().toScreenProjectedX(point, profilePoint.height().toMillimeters());
+            yPoints[index + 2] = self().toScreenProjectedY(point, profilePoint.height().toMillimeters());
         }
         graphics.setFill(selected ? Color.color(0.85, 0.57, 0.22, 0.24) : Color.color(0.23, 0.39, 0.54, 0.18));
         graphics.fillPolygon(xPoints, yPoints, profile.size() + 2);
@@ -1055,17 +1055,17 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
 
     void drawRoomElevation(GraphicsContext graphics, Room room) {
         double minProjectedX = room.outline().stream()
-                .mapToDouble(point -> projectHorizontal(point, 0.0))
+                .mapToDouble(point -> self().projectHorizontal(point, 0.0))
                 .min()
                 .orElse(0.0);
         double maxProjectedX = room.outline().stream()
-                .mapToDouble(point -> projectHorizontal(point, 0.0))
+                .mapToDouble(point -> self().projectHorizontal(point, 0.0))
                 .max()
                 .orElse(0.0);
-        double left = toScreenHorizontal(minProjectedX);
-        double right = toScreenHorizontal(maxProjectedX);
-        double floorY = toScreenVertical(0.0);
-        double topY = toScreenVertical(-surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(activeLevel.get(), room));
+        double left = self().toScreenHorizontal(minProjectedX);
+        double right = self().toScreenHorizontal(maxProjectedX);
+        double floorY = self().toScreenVertical(0.0);
+        double topY = self().toScreenVertical(-surfaceLayerEffectService.effectiveMaximumCeilingHeightMillimeters(activeLevel.get(), room));
         if (isSlopeVisibleInCurrentElevation(room)) {
             drawSlopedRoomElevation(graphics, room, left, right, floorY, topY);
             return;
@@ -1090,7 +1090,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             drawPolygonalRoomElevation(graphics, room, floorY);
             return;
         }
-        double lowY = toScreenVertical(-surfaceLayerEffectService.effectiveMinimumCeilingHeightMillimeters(activeLevel.get(), room));
+        double lowY = self().toScreenVertical(-surfaceLayerEffectService.effectiveMinimumCeilingHeightMillimeters(activeLevel.get(), room));
         boolean risesToRight = switch (activeView.get()) {
             case EAST -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.NORTH).orElse(false);
             case WEST -> room.slopedCeilingProfile().map(profile -> profile.lowSide() == SlopedCeilingSide.SOUTH).orElse(false);
@@ -1128,13 +1128,13 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         double[] yPoints = new double[topProfile.size() * 2];
         int pointIndex = 0;
         for (Map.Entry<Long, Double> entry : topProfile.entrySet()) {
-            xPoints[pointIndex] = toScreenHorizontal(entry.getKey());
-            yPoints[pointIndex] = toScreenVertical(-entry.getValue());
+            xPoints[pointIndex] = self().toScreenHorizontal(entry.getKey());
+            yPoints[pointIndex] = self().toScreenVertical(-entry.getValue());
             pointIndex++;
         }
         List<Map.Entry<Long, Double>> entries = new ArrayList<>(topProfile.entrySet());
         for (int reverseIndex = entries.size() - 1; reverseIndex >= 0; reverseIndex--) {
-            xPoints[pointIndex] = toScreenHorizontal(entries.get(reverseIndex).getKey());
+            xPoints[pointIndex] = self().toScreenHorizontal(entries.get(reverseIndex).getKey());
             yPoints[pointIndex] = floorY;
             pointIndex++;
         }
@@ -1146,32 +1146,32 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void addElevationSample(java.util.TreeMap<Long, Double> topProfile, PlanPoint point, double ceilingHeightMillimeters) {
-        long horizontal = Math.round(projectHorizontal(point, 0.0));
+        long horizontal = Math.round(self().projectHorizontal(point, 0.0));
         topProfile.merge(horizontal, ceilingHeightMillimeters, Math::max);
     }
 
     void drawStairElevation(GraphicsContext graphics, Staircase staircase) {
         double[] projectedHorizontals = {
-                projectHorizontal(staircase.pointAtLocalPosition(0, 0), 0.0),
-                projectHorizontal(staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0), 0.0),
-                projectHorizontal(staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()), 0.0),
-                projectHorizontal(staircase.pointAtLocalPosition(0, staircase.heightMillimeters()), 0.0)
+                self().projectHorizontal(staircase.pointAtLocalPosition(0, 0), 0.0),
+                self().projectHorizontal(staircase.pointAtLocalPosition(staircase.widthMillimeters(), 0), 0.0),
+                self().projectHorizontal(staircase.pointAtLocalPosition(staircase.widthMillimeters(), staircase.heightMillimeters()), 0.0),
+                self().projectHorizontal(staircase.pointAtLocalPosition(0, staircase.heightMillimeters()), 0.0)
         };
         double minHorizontal = java.util.Arrays.stream(projectedHorizontals).min().orElse(0.0);
         double maxHorizontal = java.util.Arrays.stream(projectedHorizontals).max().orElse(0.0);
-        double left = toScreenHorizontal(minHorizontal);
-        double right = toScreenHorizontal(maxHorizontal);
-        double floorY = toScreenVertical(0.0);
-        double topY = toScreenVertical(-staircase.totalHeight().toMillimeters());
+        double left = self().toScreenHorizontal(minHorizontal);
+        double right = self().toScreenHorizontal(maxHorizontal);
+        double floorY = self().toScreenVertical(0.0);
+        double topY = self().toScreenVertical(-staircase.totalHeight().toMillimeters());
         graphics.fillRect(Math.min(left, right), Math.min(floorY, topY), Math.max(Math.abs(right - left), 3.0), Math.max(Math.abs(floorY - topY), 3.0));
         graphics.strokeRect(Math.min(left, right), Math.min(floorY, topY), Math.max(Math.abs(right - left), 3.0), Math.max(Math.abs(floorY - topY), 3.0));
     }
 
     void drawOpeningElevation(GraphicsContext graphics, PlanPoint openingStart, PlanPoint openingEnd, double baseHeightMillimeters, double openingHeightMillimeters, Color color) {
-        double startX = toScreenProjectedX(openingStart, 0.0);
-        double endX = toScreenProjectedX(openingEnd, 0.0);
-        double bottomY = toScreenVertical(-baseHeightMillimeters);
-        double topY = toScreenVertical(-(baseHeightMillimeters + openingHeightMillimeters));
+        double startX = self().toScreenProjectedX(openingStart, 0.0);
+        double endX = self().toScreenProjectedX(openingEnd, 0.0);
+        double bottomY = self().toScreenVertical(-baseHeightMillimeters);
+        double topY = self().toScreenVertical(-(baseHeightMillimeters + openingHeightMillimeters));
         graphics.setStroke(color);
         graphics.setLineWidth(2.8);
         graphics.strokeRect(Math.min(startX, endX), Math.min(bottomY, topY), Math.max(Math.abs(endX - startX), 3.0), Math.max(Math.abs(bottomY - topY), 3.0));
@@ -1185,21 +1185,21 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         double startY = Math.min(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
         double endX = Math.max(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
         double endY = Math.max(previewSegment.start().yMillimeters(), previewSegment.end().yMillimeters());
-        if (currentTool() == DrawingTool.STAIR
-                || currentTool() == DrawingTool.FLOOR_EXTENSION
-                || currentTool() == DrawingTool.FLOOR_OPENING_RECTANGLE
-                || currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE
-                || currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
-                || currentTool() == DrawingTool.HEATING_EXCLUSION_RECTANGLE
-                || currentTool() == DrawingTool.HEATING_MANIFOLD) {
+        if (self().currentTool() == DrawingTool.STAIR
+                || self().currentTool() == DrawingTool.FLOOR_EXTENSION
+                || self().currentTool() == DrawingTool.FLOOR_OPENING_RECTANGLE
+                || self().currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE
+                || self().currentTool() == DrawingTool.HEATING_ZONE_RECTANGLE
+                || self().currentTool() == DrawingTool.HEATING_EXCLUSION_RECTANGLE
+                || self().currentTool() == DrawingTool.HEATING_MANIFOLD) {
             graphics.setFill(Color.color(0.45, 0.37, 0.29, 0.18));
             graphics.setStroke(Color.web("#7f6a55"));
             graphics.setLineWidth(2.0);
-            double previewX = toScreenProjectedX(new PlanPoint(startX, startY), 0.0);
-            double previewY = toScreenProjectedY(new PlanPoint(startX, startY), 0.0);
-            double previewWidth = (endX - startX) * scale();
-            double previewHeight = (endY - startY) * scale();
-            if (currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE) {
+            double previewX = self().toScreenProjectedX(new PlanPoint(startX, startY), 0.0);
+            double previewY = self().toScreenProjectedY(new PlanPoint(startX, startY), 0.0);
+            double previewWidth = (endX - startX) * self().scale();
+            double previewHeight = (endY - startY) * self().scale();
+            if (self().currentTool() == DrawingTool.FLOOR_OPENING_CIRCLE) {
                 double diameter = Math.min(previewWidth, previewHeight);
                 graphics.fillOval(previewX, previewY, diameter, diameter);
                 graphics.strokeOval(previewX, previewY, diameter, diameter);
@@ -1207,11 +1207,11 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
                 graphics.fillRect(previewX, previewY, previewWidth, previewHeight);
                 graphics.strokeRect(previewX, previewY, previewWidth, previewHeight);
             }
-            if (currentTool() == DrawingTool.HEATING_MANIFOLD) {
+            if (self().currentTool() == DrawingTool.HEATING_MANIFOLD) {
                 drawHeatingManifoldPreviewMarkers(graphics, startX, startY, endX, endY);
             }
         } else {
-            drawWall(graphics, previewSegment, currentWallThickness(), Color.web("#c26d32"), 1.0);
+            drawWall(graphics, previewSegment, self().currentWallThickness(), Color.web("#c26d32"), 1.0);
         }
         drawDimensionLabel(
                 graphics,
@@ -1238,16 +1238,16 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
                 supplyPoint,
                 "V",
                 Color.web("#1f62d0"),
-                point -> toScreenProjectedX(point, 0.0),
-                point -> toScreenProjectedY(point, 0.0)
+                point -> self().toScreenProjectedX(point, 0.0),
+                point -> self().toScreenProjectedY(point, 0.0)
         );
         CadWorkbenchHeatingRenderer.drawConnectionMarker(
                 graphics,
                 returnPoint,
                 "R",
                 Color.web("#d33b32"),
-                point -> toScreenProjectedX(point, 0.0),
-                point -> toScreenProjectedY(point, 0.0)
+                point -> self().toScreenProjectedX(point, 0.0),
+                point -> self().toScreenProjectedY(point, 0.0)
         );
     }
 
@@ -1256,10 +1256,10 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawDimensionLabel(GraphicsContext graphics, PlanSegment segment, String text, double normalOffset) {
-        double startX = toScreenProjectedX(segment.start(), 0.0);
-        double startY = toScreenProjectedY(segment.start(), 0.0);
-        double endX = toScreenProjectedX(segment.end(), 0.0);
-        double endY = toScreenProjectedY(segment.end(), 0.0);
+        double startX = self().toScreenProjectedX(segment.start(), 0.0);
+        double startY = self().toScreenProjectedY(segment.start(), 0.0);
+        double endX = self().toScreenProjectedX(segment.end(), 0.0);
+        double endY = self().toScreenProjectedY(segment.end(), 0.0);
         double midX = (startX + endX) / 2.0;
         double midY = (startY + endY) / 2.0;
         double directionX = endX - startX;
@@ -1334,7 +1334,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         }
         double x = drawingCanvas.getWidth() - 78;
         double y = 34;
-        CompassArrow arrow = compassArrow(x, y, compassDisplayAngleDegrees(currentNorthAngleDegrees(), activeView.get()));
+        CompassArrow arrow = compassArrow(x, y, compassDisplayAngleDegrees(self().currentNorthAngleDegrees(), activeView.get()));
         graphics.setStroke(Color.web("#4b6a88"));
         graphics.setFill(Color.web("#4b6a88"));
         graphics.setLineWidth(2);
@@ -1342,7 +1342,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         graphics.strokeLine(arrow.tail().getX(), arrow.tail().getY(), arrow.tip().getX(), arrow.tip().getY());
         graphics.strokeLine(arrow.tip().getX(), arrow.tip().getY(), arrow.leftWing().getX(), arrow.leftWing().getY());
         graphics.strokeLine(arrow.tip().getX(), arrow.tip().getY(), arrow.rightWing().getX(), arrow.rightWing().getY());
-        Point2D label = compassLabelPosition(x, y, compassDisplayAngleDegrees(currentNorthAngleDegrees(), activeView.get()));
+        Point2D label = compassLabelPosition(x, y, compassDisplayAngleDegrees(self().currentNorthAngleDegrees(), activeView.get()));
         graphics.fillText("N", label.getX() - 4, label.getY() + 4);
     }
 
@@ -1400,14 +1400,14 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             return;
         }
 
-        double stepMillimeters = chooseRulerStep();
-        double stepPixels = stepMillimeters * scale();
+        double stepMillimeters = self().chooseRulerStep();
+        double stepPixels = stepMillimeters * self().scale();
         double start = offsetX % stepPixels;
-        double worldStart = -offsetX / scale();
+        double worldStart = -offsetX / self().scale();
         for (double x = start; x <= horizontalRuler.getWidth(); x += stepPixels) {
             graphics.strokeLine(x, horizontalRuler.getHeight(), x, horizontalRuler.getHeight() - 10);
-            double worldX = worldStart + (x / scale());
-            graphics.fillText(formatRuler(worldX), x + 3, 12);
+            double worldX = worldStart + (x / self().scale());
+            graphics.fillText(self().formatRuler(worldX), x + 3, 12);
         }
     }
 
@@ -1422,14 +1422,14 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             return;
         }
 
-        double stepMillimeters = chooseRulerStep();
-        double stepPixels = stepMillimeters * scale();
+        double stepMillimeters = self().chooseRulerStep();
+        double stepPixels = stepMillimeters * self().scale();
         double start = offsetY % stepPixels;
-        double worldStart = -offsetY / scale();
+        double worldStart = -offsetY / self().scale();
         for (double y = start; y <= verticalRuler.getHeight(); y += stepPixels) {
             graphics.strokeLine(verticalRuler.getWidth(), y, verticalRuler.getWidth() - 10, y);
-            double worldY = worldStart + (y / scale());
-            graphics.fillText(formatRuler(worldY), 2, y - 3);
+            double worldY = worldStart + (y / self().scale());
+            graphics.fillText(self().formatRuler(worldY), 2, y - 3);
         }
     }
 }
