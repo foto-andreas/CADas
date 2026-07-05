@@ -4,7 +4,7 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 
 public final class ViewProjectionService {
 
-    public ProjectedPoint project(PlanPoint point, double heightMillimeters, ViewOrientation orientation) {
+    public static ProjectedPoint project(PlanPoint point, double heightMillimeters, ViewOrientation orientation) {
         return switch (orientation) {
             case TOP -> new ProjectedPoint(point.xMillimeters(), point.yMillimeters());
             case BOTTOM -> new ProjectedPoint(point.xMillimeters(), -point.yMillimeters());
@@ -15,7 +15,7 @@ public final class ViewProjectionService {
         };
     }
 
-    public boolean isPlanView(ViewOrientation orientation) {
+    public static boolean isPlanView(ViewOrientation orientation) {
         return orientation == ViewOrientation.TOP || orientation == ViewOrientation.BOTTOM;
     }
 

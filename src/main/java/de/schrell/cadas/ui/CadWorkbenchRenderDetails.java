@@ -51,7 +51,7 @@ import javafx.scene.text.TextAlignment;
 abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
 
     void drawTerrainPlanArea(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
+        if (!ViewProjectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
             return;
         }
         List<PlanPoint> contour = terrainContour();
@@ -78,7 +78,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawTerrainPlanMarkers(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
+        if (!ViewProjectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
             return;
         }
         List<PlanPoint> contour = terrainContour();
@@ -115,7 +115,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
 
     List<TextBlockingBox> drawRoomLabels(GraphicsContext graphics) {
         List<TextBlockingBox> blockers = new ArrayList<>();
-        if (!projectionService.isPlanView(activeView.get()) || !showAreaVolume.get()) {
+        if (!ViewProjectionService.isPlanView(activeView.get()) || !showAreaVolume.get()) {
             return blockers;
         }
         for (Room room : activeLevel.get().rooms()) {
@@ -126,7 +126,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawRoomTileGrid(GraphicsContext graphics, Room room) {
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
@@ -162,7 +162,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawSelectedHeatingVarioBackground(GraphicsContext graphics, Room room) {
-        if (!projectionService.isPlanView(activeView.get()) || selectedSelections.isEmpty()) {
+        if (!ViewProjectionService.isPlanView(activeView.get()) || selectedSelections.isEmpty()) {
             return;
         }
         Set<UUID> drawnLayerIds = new HashSet<>();
@@ -467,7 +467,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawRoomSlopeMarker(GraphicsContext graphics, Room room) {
-        if (!projectionService.isPlanView(activeView.get()) || room.slopedCeilingProfiles().isEmpty()) {
+        if (!ViewProjectionService.isPlanView(activeView.get()) || room.slopedCeilingProfiles().isEmpty()) {
             return;
         }
         for (int index = 0; index < room.slopedCeilingProfiles().size(); index++) {
@@ -568,7 +568,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             PlanPoint openingStart = hostWall.axis().pointAt(door.offsetFromStart());
             PlanPoint openingEnd = hostWall.axis().pointAt(door.offsetFromStart().add(door.width()));
             boolean selected = isSelected(RenderableKind.DOOR, door.id().toString());
-            if (!projectionService.isPlanView(activeView.get())) {
+            if (!ViewProjectionService.isPlanView(activeView.get())) {
                 drawOpeningElevation(graphics, openingStart, openingEnd, door.thresholdHeight().toMillimeters(), door.height().toMillimeters(), selected ? Color.web("#f08f3c") : Color.web("#d66b2d"));
                 continue;
             }
@@ -592,7 +592,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             PlanPoint openingStart = hostWall.axis().pointAt(window.offsetFromStart());
             PlanPoint openingEnd = hostWall.axis().pointAt(window.offsetFromStart().add(window.width()));
             boolean selected = isSelected(RenderableKind.WINDOW, window.id().toString());
-            if (!projectionService.isPlanView(activeView.get())) {
+            if (!ViewProjectionService.isPlanView(activeView.get())) {
                 drawOpeningElevation(graphics, openingStart, openingEnd, window.sillHeight().toMillimeters(), window.windowHeight().toMillimeters(), selected ? Color.web("#7bc8eb") : Color.web("#4da8da"));
                 continue;
             }
@@ -611,7 +611,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawRoofWindows(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         for (RoofWindow roofWindow : activeLevel.get().roofWindows()) {
@@ -653,7 +653,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawEditablePoints(GraphicsContext graphics) {
-        if (currentTool() != DrawingTool.EDIT || !projectionService.isPlanView(activeView.get())) {
+        if (currentTool() != DrawingTool.EDIT || !ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         Map<PlanPoint, Integer> wallEndpointCounts = new LinkedHashMap<>();
@@ -685,7 +685,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawEdgeResizeHandles(GraphicsContext graphics) {
-        if (currentTool() != DrawingTool.EDIT || !projectionService.isPlanView(activeView.get())) {
+        if (currentTool() != DrawingTool.EDIT || !ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         for (EdgeResizeService.EdgeHandle handle : edgeResizeService.handles(activeLevel.get(), Set.copyOf(selectedSelections))) {
@@ -755,7 +755,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             graphics.setLineWidth(1.8);
             double width = roomObject.footprintWidthMillimeters();
             double depth = roomObject.footprintDepthMillimeters();
-            if (projectionService.isPlanView(activeView.get())) {
+            if (ViewProjectionService.isPlanView(activeView.get())) {
                 drawRoomObjectPlan(graphics, roomObject);
             } else {
                 double x = toScreenProjectedX(roomObject.center(), 0.0) - width * scale() / 2.0;
@@ -825,7 +825,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             graphics.setStroke(selected ? Color.web("#d97f2f") : Color.web("#806b4f"));
             graphics.setFill(selected ? Color.color(0.85, 0.50, 0.18, 0.28) : Color.color(0.58, 0.49, 0.36, 0.20));
             graphics.setLineWidth(1.8);
-            if (projectionService.isPlanView(activeView.get())) {
+            if (ViewProjectionService.isPlanView(activeView.get())) {
                 double x = toScreenX(extension.minX());
                 double y = toScreenY(extension.minY());
                 double width = extension.widthMillimeters() * scale();
@@ -856,7 +856,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
             graphics.setStroke(selected ? Color.web("#8a6848") : Color.web("#5e503f"));
             graphics.setFill(selected ? Color.color(0.63, 0.47, 0.27, 0.24) : Color.color(0.52, 0.46, 0.37, 0.16));
             graphics.setLineWidth(2.0);
-            if (!projectionService.isPlanView(activeView.get())) {
+            if (!ViewProjectionService.isPlanView(activeView.get())) {
                 drawStairElevation(graphics, staircase);
                 continue;
             }
@@ -1178,7 +1178,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawPreview(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         double startX = Math.min(previewSegment.start().xMillimeters(), previewSegment.end().xMillimeters());
@@ -1329,7 +1329,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
     }
 
     void drawCompass(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         double x = drawingCanvas.getWidth() - 78;
@@ -1395,7 +1395,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         graphics.setStroke(Color.web("#7d7365"));
         graphics.setFill(Color.web("#4a433b"));
         graphics.setFont(Font.font("Menlo", 10));
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!ViewProjectionService.isPlanView(activeView.get())) {
             graphics.fillText("Achse", 6, 12);
             return;
         }
@@ -1417,7 +1417,7 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         graphics.setStroke(Color.web("#7d7365"));
         graphics.setFill(Color.web("#4a433b"));
         graphics.setFont(Font.font("Menlo", 10));
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!ViewProjectionService.isPlanView(activeView.get())) {
             graphics.fillText("H", 6, 12);
             return;
         }

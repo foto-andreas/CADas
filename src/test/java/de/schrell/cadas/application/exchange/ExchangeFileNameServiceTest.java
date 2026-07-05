@@ -8,27 +8,25 @@ import org.junit.jupiter.api.Test;
 
 class ExchangeFileNameServiceTest {
 
-    private final ExchangeFileNameService fileNameService = new ExchangeFileNameService();
-
     @Test
     void sorgtFuerGenauEineDxfExtension() {
         assertEquals(
                 Path.of("Erdgeschoss.dxf"),
-                fileNameService.ensureSingleExtension(Path.of("Erdgeschoss.dxf.dxf"), ".dxf")
+                ExchangeFileNameService.ensureSingleExtension(Path.of("Erdgeschoss.dxf.dxf"), ".dxf")
         );
         assertEquals(
                 Path.of("Erdgeschoss.dxf"),
-                fileNameService.ensureSingleExtension(Path.of("Erdgeschoss"), ".dxf")
+                ExchangeFileNameService.ensureSingleExtension(Path.of("Erdgeschoss"), ".dxf")
         );
         assertEquals(
                 Path.of("Materialliste.md"),
-                fileNameService.ensureSingleExtension(Path.of("Materialliste.md.md"), ".md")
+                ExchangeFileNameService.ensureSingleExtension(Path.of("Materialliste.md.md"), ".md")
         );
     }
 
     @Test
     void entferntMehrfachAnhangeBeimEtagennamen() {
-        assertEquals("Erdgeschoss", fileNameService.stripRepeatedExtension(Path.of("Erdgeschoss.dxf.dxf"), ".dxf"));
-        assertEquals("Haus", fileNameService.stripRepeatedExtension(Path.of("Haus.DXF"), ".dxf"));
+        assertEquals("Erdgeschoss", ExchangeFileNameService.stripRepeatedExtension(Path.of("Erdgeschoss.dxf.dxf"), ".dxf"));
+        assertEquals("Haus", ExchangeFileNameService.stripRepeatedExtension(Path.of("Haus.DXF"), ".dxf"));
     }
 }

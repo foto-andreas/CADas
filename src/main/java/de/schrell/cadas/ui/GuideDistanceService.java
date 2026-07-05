@@ -9,7 +9,7 @@ import java.util.Optional;
 
 final class GuideDistanceService {
 
-    List<GuideDistance> distancesToParallelGuides(
+    static List<GuideDistance> distancesToParallelGuides(
             List<GuideLine> guideLines,
             GuideOrientation pendingOrientation,
             double pendingWorldMillimeters
@@ -25,13 +25,13 @@ final class GuideDistanceService {
                 .toList();
     }
 
-    Optional<GuideLine> nearestGuide(List<GuideLine> guideLines, PlanPoint clickPoint, Length tolerance) {
+    static Optional<GuideLine> nearestGuide(List<GuideLine> guideLines, PlanPoint clickPoint, Length tolerance) {
         return guideLines.stream()
                 .filter(guideLine -> normalDistance(guideLine, clickPoint) <= tolerance.toMillimeters())
                 .min(Comparator.comparingDouble(guideLine -> normalDistance(guideLine, clickPoint)));
     }
 
-    private double normalDistance(GuideLine guideLine, PlanPoint point) {
+    private static double normalDistance(GuideLine guideLine, PlanPoint point) {
         return guideLine.orientation() == GuideOrientation.VERTICAL
                 ? Math.abs(guideLine.worldMillimeters() - point.xMillimeters())
                 : Math.abs(guideLine.worldMillimeters() - point.yMillimeters());

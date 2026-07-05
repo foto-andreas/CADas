@@ -2,7 +2,7 @@ package de.schrell.cadas.ui;
 
 final class PointerCursorService {
 
-    CursorType cursor(PointerContext context) {
+    static CursorType cursor(PointerContext context) {
         if (context.panning()) {
             return CursorType.CLOSED_HAND;
         }

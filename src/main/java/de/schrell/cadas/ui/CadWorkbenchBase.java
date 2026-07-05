@@ -9,7 +9,6 @@ import de.schrell.cadas.application.drawing.EdgeResizeService;
 import de.schrell.cadas.application.drawing.GuideSnapService;
 import de.schrell.cadas.application.drawing.HeatingZoneMirrorService;
 import de.schrell.cadas.application.drawing.WallIntersectionSplitService;
-import de.schrell.cadas.application.exchange.ExchangeFileNameService;
 import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.history.UndoRedoStack;
 import de.schrell.cadas.application.help.HelpContentService;
@@ -180,7 +179,6 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final GuideSnapService guideSnapService = new GuideSnapService();
     final WallSnapService wallSnapService = new WallSnapService();
     final SelectionQueryService selectionQueryService = new SelectionQueryService();
-    final ExchangeFileNameService exchangeFileNameService = new ExchangeFileNameService();
     final OpeningPlacementService openingPlacementService = new OpeningPlacementService();
     final WallEditingService wallEditingService = new WallEditingService();
     final WallDimensionService wallDimensionService = new WallDimensionService();
@@ -205,8 +203,6 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final WallSurfacePlanGeometryService wallSurfacePlanGeometryService = new WallSurfacePlanGeometryService();
     final WallIntersectionSplitService wallIntersectionSplitService = new WallIntersectionSplitService();
     final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
-    final GuideDistanceService guideDistanceService = new GuideDistanceService();
-    final PointerCursorService pointerCursorService = new PointerCursorService();
     final SurfaceCoveringPresetService surfaceCoveringPresetService = new SurfaceCoveringPresetService();
     final UserSurfaceCoveringPresetLibrary userSurfacePresetLibrary = new UserSurfaceCoveringPresetLibrary();
     final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
@@ -399,7 +395,6 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final ObservableList<SurfaceCoveringPreset> availableSurfacePresets = FXCollections.observableArrayList();
     final ObservableList<DwgBlockDefinition> availableDwgBlocks = FXCollections.observableArrayList();
     final ThreeDViewport threeDViewport = new ThreeDViewport(this::handleThreeDSelection, this::switchToThreeDWorkspaceFromViewport);
-    final ViewProjectionService projectionService = new ViewProjectionService();
     final ProjectedModelBoundsService projectedBoundsService = new ProjectedModelBoundsService();
     final UndoRedoStack<WorkbenchSnapshot> history = new UndoRedoStack<>();
     final VBox propertySections = new VBox(12.0);

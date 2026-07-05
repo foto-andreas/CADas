@@ -99,7 +99,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
     }
 
     void drawGuides(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         graphics.setStroke(Color.color(0.73, 0.2, 0.2, 0.75));
@@ -129,7 +129,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
         if (!showGuideDistances.get()) {
             return;
         }
-        List<GuideDistanceService.GuideDistance> distances = guideDistanceService.distancesToParallelGuides(
+        List<GuideDistanceService.GuideDistance> distances = GuideDistanceService.distancesToParallelGuides(
                 guideLines,
                 pendingGuideOrientation,
                 pendingGuideWorldMillimeters
@@ -149,7 +149,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
     }
 
     void drawGrid(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get()) || !showGrid.get()) {
+        if (!ViewProjectionService.isPlanView(activeView.get()) || !showGrid.get()) {
             return;
         }
         double spacingMillimeters = currentGrid().spacing().toMillimeters();
@@ -171,7 +171,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
     }
 
     void drawSelectionOverlay(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get()) || selectedSelections.isEmpty()) {
+        if (!ViewProjectionService.isPlanView(activeView.get()) || selectedSelections.isEmpty()) {
             return;
         }
         graphics.save();
@@ -245,7 +245,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
     }
 
     void drawSelectionRectangle(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get())
+        if (!ViewProjectionService.isPlanView(activeView.get())
                 || selectionRectangleStart == null
                 || selectionRectangleEnd == null
                 || !hasSelectionRectangleArea()) {
@@ -341,7 +341,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
     }
 
     void drawLowerLevel(GraphicsContext graphics) {
-        if (!projectionService.isPlanView(activeView.get())) return;
+        if (!ViewProjectionService.isPlanView(activeView.get())) return;
         int index = availableLevels.indexOf(activeLevel.get());
         if (index <= 0) return;
         Level lowerLevel = availableLevels.get(index - 1);
@@ -367,7 +367,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
 
         for (Wall wall : activeLevel.get().walls()) {
             boolean selected = isSelected(RenderableKind.WALL, wall.id().toString());
-            if (projectionService.isPlanView(activeView.get())) {
+            if (ViewProjectionService.isPlanView(activeView.get())) {
                 drawWall(graphics, wall.axis(), wall.thickness(), selected ? Color.web("#d97f2f") : CadColorPalette.WALL, 1.0);
             } else {
                 drawWallElevation(graphics, wall, selected);
@@ -377,7 +377,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
 
     void drawWallDimensions(GraphicsContext graphics, List<TextBlockingBox> seedBlockers) {
         lastPlanDimensionScreenBounds = null;
-        if (!showDimensions.get() || !projectionService.isPlanView(activeView.get())) {
+        if (!showDimensions.get() || !ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         if (reportSnapshotInteriorRoomDimensionsOnly) {
@@ -605,7 +605,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
     }
 
     void drawWallSurfaceLayers(GraphicsContext graphics) {
-        if (projectionService.isPlanView(activeView.get())) {
+        if (ViewProjectionService.isPlanView(activeView.get())) {
             drawWallSurfaceLayersInPlan(graphics);
         } else {
             drawWallSurfaceLayersInElevation(graphics);
@@ -987,7 +987,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
 
     void drawRooms(GraphicsContext graphics) {
         for (Room room : activeLevel.get().rooms()) {
-            if (!projectionService.isPlanView(activeView.get())) {
+            if (!ViewProjectionService.isPlanView(activeView.get())) {
                 drawRoomElevation(graphics, room);
                 continue;
             }
@@ -1075,7 +1075,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
         if (reportSnapshotHideHydronicHeatings || !showHeatingCircuits.get()) {
             return;
         }
-        if (!projectionService.isPlanView(activeView.get())) {
+        if (!ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         List<HydronicHeating> visibleHeatings = activeLevel.get().hydronicHeatings().stream()
@@ -1145,7 +1145,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
     }
 
     void drawTerrainElevation(GraphicsContext graphics) {
-        if (projectionService.isPlanView(activeView.get())) {
+        if (ViewProjectionService.isPlanView(activeView.get())) {
             return;
         }
         List<TerrainProfileService.StripSample> strip = terrainProfileService.sampledStrip(project.terrain(), terrainContour());

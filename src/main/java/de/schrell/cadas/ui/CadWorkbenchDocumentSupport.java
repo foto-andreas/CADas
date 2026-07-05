@@ -2,6 +2,7 @@ package de.schrell.cadas.ui;
 
 import de.schrell.cadas.application.help.AboutInformation;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
+import de.schrell.cadas.application.exchange.ExchangeFileNameService;
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.application.reports.ConstructionDrawingOptions;
 import de.schrell.cadas.application.reports.ConstructionDrawingPdfService;
@@ -210,13 +211,13 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportConstructionDrawingPdf() {
-        String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
+        String projectName = ExchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
         Optional<Path> selectedTarget = WriteTargetDialog.choose(
                 owner,
                 "Gerasterte Bauzeichnung als PDF speichern",
                 "Exportziel festlegen",
                 projectName + "_Bauzeichnung_Raster"
-        ).map(path -> owner.exchangeFileNameService.ensureSingleExtension(path, ".pdf"));
+        ).map(path -> ExchangeFileNameService.ensureSingleExtension(path, ".pdf"));
         if (selectedTarget.isEmpty()) {
             return;
         }
@@ -372,7 +373,7 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportMarkdown(SurfaceMaterialReport report) {
-        String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
+        String projectName = ExchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
         WriteTargetDialog.choose(
                 owner,
                 "Materialliste als Markdown speichern",
@@ -387,7 +388,7 @@ final class CadWorkbenchDocumentSupport {
 
     void exportSurfaceMaterialReportMarkdown(SurfaceMaterialReport report, Path targetFile) {
         try {
-            Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".md");
+            Path exportPath = ExchangeFileNameService.ensureSingleExtension(targetFile, ".md");
             if (!WriteTargetDialog.confirmOverwrite(owner, exportPath, "Materialliste")) {
                 return;
             }
@@ -483,7 +484,7 @@ final class CadWorkbenchDocumentSupport {
     }
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report) {
-        String projectName = owner.exchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
+        String projectName = ExchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
         WriteTargetDialog.choose(
                 owner,
                 "Materialliste als PDF mit Rastergrafiken speichern",
@@ -498,7 +499,7 @@ final class CadWorkbenchDocumentSupport {
 
     void exportSurfaceMaterialReportPdf(SurfaceMaterialReport report, Path targetFile) {
         try {
-            Path exportPath = owner.exchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
+            Path exportPath = ExchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
             if (!WriteTargetDialog.confirmOverwrite(owner, exportPath, "Materialliste")) {
                 return;
             }

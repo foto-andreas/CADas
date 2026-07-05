@@ -2,6 +2,7 @@ package de.schrell.cadas.ui;
 
 import de.schrell.cadas.application.drawing.DraftingConstraints;
 import de.schrell.cadas.application.drawing.GuideSnapTargets;
+import de.schrell.cadas.application.exchange.ExchangeFileNameService;
 import de.schrell.cadas.application.objects.RoomObjectPreset;
 import de.schrell.cadas.application.parts.StairPreset;
 import de.schrell.cadas.application.parts.StandardPartLibrary;
@@ -843,7 +844,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     }
 
     void removeNearestGuide(PlanPoint clickPoint) {
-        guideDistanceService.nearestGuide(guideLines, clickPoint, SNAP_TOLERANCE)
+        GuideDistanceService.nearestGuide(guideLines, clickPoint, SNAP_TOLERANCE)
                 .ifPresent(guideLine -> {
                     rememberStateForUndo();
                     guideLines.remove(guideLine);
@@ -888,7 +889,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     }
 
     void saveCurrentLevelAs() {
-        String levelName = exchangeFileNameService.stripRepeatedExtension(Path.of(activeLevel.get().name().replace(' ', '_')), ".cadas");
+        String levelName = ExchangeFileNameService.stripRepeatedExtension(Path.of(activeLevel.get().name().replace(' ', '_')), ".cadas");
         Optional<Path> selectedTarget = WriteTargetDialog.choose(
                 this,
                 "Etage sichern als ...",
@@ -900,12 +901,12 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         }
         Path targetFile = selectedTarget.orElseThrow();
         if (!targetFile.getFileName().toString().contains(".")) {
-            targetFile = exchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
+            targetFile = ExchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
         }
         if (!WriteTargetDialog.confirmOverwrite(this, targetFile, "Etage")) {
             return;
         }
-        String newLevelName = exchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
+        String newLevelName = ExchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
         if (!newLevelName.isBlank() && !newLevelName.equals(activeLevel.get().name())) {
             rememberStateForUndo();
             project.renameLevel(activeLevel.get(), newLevelName);
@@ -944,7 +945,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     }
 
     void saveProjectAs() {
-        String projectName = exchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
+        String projectName = ExchangeFileNameService.stripRepeatedExtension(Path.of(project.name().replace(' ', '_')), ".cadas");
         Optional<Path> selectedTarget = WriteTargetDialog.choose(
                 this,
                 "Gebäude sichern als ...",
@@ -956,12 +957,12 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         }
         Path targetFile = selectedTarget.orElseThrow();
         if (!targetFile.getFileName().toString().contains(".")) {
-            targetFile = exchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
+            targetFile = ExchangeFileNameService.ensureSingleExtension(targetFile, ".cadas");
         }
         if (!WriteTargetDialog.confirmOverwrite(this, targetFile, "Gebäude")) {
             return;
         }
-        String newProjectName = exchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
+        String newProjectName = ExchangeFileNameService.stripRepeatedExtension(targetFile.getFileName(), ".cadas");
         if (!newProjectName.isBlank() && !newProjectName.equals(project.name())) {
             rememberStateForUndo();
             project.rename(newProjectName);
@@ -1056,7 +1057,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     void importLevel(Path sourceFile) {
         try {
             rememberStateForUndo();
-            String levelName = uniqueLevelName(exchangeFileNameService.stripRepeatedExtension(sourceFile, ".cadas"));
+            String levelName = uniqueLevelName(ExchangeFileNameService.stripRepeatedExtension(sourceFile, ".cadas"));
             Level importedLevel = levelExchangeService.importLevel(sourceFile, levelName);
             importedLevel.replaceRooms(autoRoomGenerationService.synchronize(importedLevel, currentRoomDefaults()));
             project.addLevel(importedLevel);
@@ -1083,7 +1084,7 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
     void importProjectFromDxf(Path sourceFile) {
         try {
             rememberStateForUndo();
-            String projectName = exchangeFileNameService.stripRepeatedExtension(sourceFile, ".cadas");
+            String projectName = ExchangeFileNameService.stripRepeatedExtension(sourceFile, ".cadas");
             ProjectModel importedProject = projectExchangeService.importProject(sourceFile, projectName);
             importedProject.levels().forEach(level -> level.replaceRooms(autoRoomGenerationService.synchronize(level, currentRoomDefaults())));
             project.replaceWith(importedProject);

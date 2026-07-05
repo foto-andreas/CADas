@@ -702,7 +702,7 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
 
     void updateMouseCursor() {
         PointerCursorService.PointerTarget target = pointerTargetAtLastPosition();
-        PointerCursorService.CursorType cursorType = pointerCursorService.cursor(new PointerCursorService.PointerContext(
+        PointerCursorService.CursorType cursorType = PointerCursorService.cursor(new PointerCursorService.PointerContext(
                 currentTool(),
                 target,
                 panning,

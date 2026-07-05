@@ -8,15 +8,13 @@ import org.junit.jupiter.api.Test;
 
 class ViewProjectionServiceTest {
 
-    private final ViewProjectionService service = new ViewProjectionService();
-
     @Test
     void projiziertDraufsichtUndSeitenansichtenUnterschiedlich() {
         PlanPoint point = new PlanPoint(1200, 3400);
 
-        ViewProjectionService.ProjectedPoint top = service.project(point, 2600, ViewOrientation.TOP);
-        ViewProjectionService.ProjectedPoint front = service.project(point, 2600, ViewOrientation.NORTH);
-        ViewProjectionService.ProjectedPoint right = service.project(point, 2600, ViewOrientation.EAST);
+        ViewProjectionService.ProjectedPoint top = ViewProjectionService.project(point, 2600, ViewOrientation.TOP);
+        ViewProjectionService.ProjectedPoint front = ViewProjectionService.project(point, 2600, ViewOrientation.NORTH);
+        ViewProjectionService.ProjectedPoint right = ViewProjectionService.project(point, 2600, ViewOrientation.EAST);
 
         assertEquals(1200.0, top.horizontalMillimeters(), 0.001);
         assertEquals(3400.0, top.verticalMillimeters(), 0.001);
@@ -28,7 +26,7 @@ class ViewProjectionServiceTest {
 
     @Test
     void erkenntPlanansichten() {
-        assertTrue(service.isPlanView(ViewOrientation.TOP));
-        assertTrue(service.isPlanView(ViewOrientation.BOTTOM));
+        assertTrue(ViewProjectionService.isPlanView(ViewOrientation.TOP));
+        assertTrue(ViewProjectionService.isPlanView(ViewOrientation.BOTTOM));
     }
 }

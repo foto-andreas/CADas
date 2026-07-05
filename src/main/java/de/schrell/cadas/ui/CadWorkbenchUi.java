@@ -516,7 +516,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
     }
 
     boolean handleTerrainBandContextClick(MouseEvent event) {
-        if (!projectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
+        if (!ViewProjectionService.isPlanView(activeView.get()) || !showTerrainInPlan.get()) {
             return false;
         }
         List<PlanPoint> contour = terrainContourService.contour(project);

@@ -11,8 +11,6 @@ import org.junit.jupiter.api.Test;
 
 class GuideDistanceServiceTest {
 
-    private final GuideDistanceService service = new GuideDistanceService();
-
     @Test
     void liefertSortierteAbstaendeNurZuParallelenHilfslinien() {
         List<GuideLine> guides = List.of(
@@ -21,7 +19,7 @@ class GuideDistanceServiceTest {
                 new GuideLine(GuideOrientation.VERTICAL, 4_000)
         );
 
-        List<GuideDistanceService.GuideDistance> distances = service.distancesToParallelGuides(
+        List<GuideDistanceService.GuideDistance> distances = GuideDistanceService.distancesToParallelGuides(
                 guides,
                 GuideOrientation.VERTICAL,
                 2_500
@@ -35,7 +33,7 @@ class GuideDistanceServiceTest {
 
     @Test
     void ignoriertHilfslinieAnIdentischerPosition() {
-        List<GuideDistanceService.GuideDistance> distances = service.distancesToParallelGuides(
+        List<GuideDistanceService.GuideDistance> distances = GuideDistanceService.distancesToParallelGuides(
                 List.of(new GuideLine(GuideOrientation.HORIZONTAL, 800)),
                 GuideOrientation.HORIZONTAL,
                 800
@@ -50,7 +48,7 @@ class GuideDistanceServiceTest {
         GuideLine amNaechsten = new GuideLine(GuideOrientation.VERTICAL, 100);
         GuideLine horizontal = new GuideLine(GuideOrientation.HORIZONTAL, 1_000);
 
-        GuideLine result = service.nearestGuide(
+        GuideLine result = GuideDistanceService.nearestGuide(
                 List.of(weiterEntfernt, horizontal, amNaechsten),
                 new PlanPoint(70, 100),
                 Length.ofMillimeters(120)

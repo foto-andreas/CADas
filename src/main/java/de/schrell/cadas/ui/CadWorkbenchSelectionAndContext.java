@@ -55,8 +55,8 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
 
     void fitCurrentViewToContent() {
         fitCurrentViewToContent(
-                projectionService.isPlanView(activeView.get()) ? 80.0 : 64.0,
-                projectionService.isPlanView(activeView.get()) ? 96.0 : 72.0
+                ViewProjectionService.isPlanView(activeView.get()) ? 80.0 : 64.0,
+                ViewProjectionService.isPlanView(activeView.get()) ? 96.0 : 72.0
         );
     }
 
@@ -82,7 +82,7 @@ abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers
     }
 
     void fitCurrentReportViewToContent() {
-        if (projectionService.isPlanView(activeView.get()) && showDimensions.get()) {
+        if (ViewProjectionService.isPlanView(activeView.get()) && showDimensions.get()) {
             fitCurrentViewToContent(220.0, 240.0);
             fitRenderedReportBoundsIntoView();
             return;

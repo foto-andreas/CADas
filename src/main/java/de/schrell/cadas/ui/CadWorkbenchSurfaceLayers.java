@@ -886,11 +886,11 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
     }
 
     double projectHorizontal(PlanPoint point, double heightMillimeters) {
-        return projectionService.project(point, heightMillimeters, activeView.get()).horizontalMillimeters();
+        return ViewProjectionService.project(point, heightMillimeters, activeView.get()).horizontalMillimeters();
     }
 
     double projectVertical(PlanPoint point, double heightMillimeters) {
-        return projectionService.project(point, heightMillimeters, activeView.get()).verticalMillimeters();
+        return ViewProjectionService.project(point, heightMillimeters, activeView.get()).verticalMillimeters();
     }
 
     double scale() {

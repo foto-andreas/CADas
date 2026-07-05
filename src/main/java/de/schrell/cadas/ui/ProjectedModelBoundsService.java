@@ -14,8 +14,6 @@ import java.util.Optional;
 
 public final class ProjectedModelBoundsService {
 
-    private final ViewProjectionService projectionService = new ViewProjectionService();
-
     public Optional<ProjectedBounds> bounds(Level level, ViewOrientation orientation) {
         List<ViewProjectionService.ProjectedPoint> projectedPoints = new ArrayList<>();
         level.walls().forEach(wall -> collectWall(projectedPoints, wall, orientation));
@@ -93,7 +91,7 @@ public final class ProjectedModelBoundsService {
     }
 
     private void collectPoint(List<ViewProjectionService.ProjectedPoint> projectedPoints, PlanPoint point, double heightMillimeters, ViewOrientation orientation) {
-        projectedPoints.add(projectionService.project(point, heightMillimeters, orientation));
+        projectedPoints.add(ViewProjectionService.project(point, heightMillimeters, orientation));
     }
 
     public record ProjectedBounds(
