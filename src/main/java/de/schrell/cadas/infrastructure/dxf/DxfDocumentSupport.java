@@ -72,26 +72,30 @@ final class DxfDocumentSupport {
 
     static List<DxfEntity> parseEntities(List<String> lines) {
         List<DxfEntity> entities = new ArrayList<>();
-        DxfEntityBuilder builder = null;
+        String type = null;
+        Map<Integer, List<String>> values = new LinkedHashMap<>();
         for (int index = 0; index < lines.size() - 1; index += 2) {
             String code = lines.get(index).trim();
             String value = lines.get(index + 1).trim();
             if (code.equals("0")) {
-                if (builder != null) {
-                    entities.add(builder.build());
-                }
-                builder = new DxfEntityBuilder(value);
-            } else if (builder != null) {
+                addEntity(entities, type, values);
+                type = value;
+                values = new LinkedHashMap<>();
+            } else if (type != null) {
                 Optional<Integer> groupCode = parseGroupCode(code);
                 if (groupCode.isPresent()) {
-                    builder.add(groupCode.get(), value);
+                    values.computeIfAbsent(groupCode.get(), ignored -> new ArrayList<>()).add(value);
                 }
             }
         }
-        if (builder != null) {
-            entities.add(builder.build());
-        }
+        addEntity(entities, type, values);
         return entities;
+    }
+
+    private static void addEntity(List<DxfEntity> entities, String type, Map<Integer, List<String>> values) {
+        if (type != null) {
+            entities.add(new DxfEntity(type, values));
+        }
     }
 
     private static void appendHeader(DxfWriteContext context) {
@@ -417,24 +421,6 @@ final class DxfDocumentSupport {
 
         Optional<Double> doubleValue(int code) {
             return firstValue(code).flatMap(DxfDocumentSupport::parseOptionalDouble);
-        }
-    }
-
-    private static final class DxfEntityBuilder {
-
-        private final String type;
-        private final Map<Integer, List<String>> values = new LinkedHashMap<>();
-
-        private DxfEntityBuilder(String type) {
-            this.type = type;
-        }
-
-        private void add(int code, String value) {
-            values.computeIfAbsent(code, ignored -> new ArrayList<>()).add(value);
-        }
-
-        private DxfEntity build() {
-            return new DxfEntity(type, values);
         }
     }
 
