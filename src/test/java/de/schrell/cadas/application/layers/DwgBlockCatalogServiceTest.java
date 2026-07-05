@@ -11,8 +11,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 class DwgBlockCatalogServiceTest {
 
-    private final DwgBlockCatalogService service = new DwgBlockCatalogService();
-
     @TempDir
     Path tempDir;
 
@@ -28,7 +26,7 @@ class DwgBlockCatalogServiceTest {
                 Rigips_1250x2000
                 """);
 
-        List<String> blockNames = service.loadCatalog(dwg);
+        List<String> blockNames = DwgBlockCatalogService.loadCatalog(dwg);
 
         assertEquals(List.of("Rigips_1250x2000", "OSB_2500x675"), blockNames);
     }

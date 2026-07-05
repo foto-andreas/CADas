@@ -5,7 +5,10 @@ import java.util.List;
 
 public final class MarkdownNavigationService {
 
-    public List<HelpSection> sections(String markdown) {
+    private MarkdownNavigationService() {
+    }
+
+    public static List<HelpSection> sections(String markdown) {
         if (markdown == null || markdown.isBlank()) {
             return List.of();
         }
@@ -24,7 +27,7 @@ public final class MarkdownNavigationService {
         return List.copyOf(sections);
     }
 
-    private int headingLevel(String line) {
+    private static int headingLevel(String line) {
         int level = 0;
         while (level < line.length() && line.charAt(level) == '#') {
             level++;

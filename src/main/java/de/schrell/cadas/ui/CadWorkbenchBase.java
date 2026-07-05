@@ -12,7 +12,6 @@ import de.schrell.cadas.application.drawing.WallIntersectionSplitService;
 import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.history.UndoRedoStack;
 import de.schrell.cadas.application.help.HelpContentService;
-import de.schrell.cadas.application.help.MarkdownNavigationService;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.application.heating.RoomHeatingOutputService;
@@ -32,7 +31,6 @@ import de.schrell.cadas.application.dwg.DwgLibraryAnalysis;
 import de.schrell.cadas.application.dwg.DwgLibraryAnalyzer;
 import de.schrell.cadas.application.layers.SurfaceCoveringPreset;
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
-import de.schrell.cadas.application.layers.DwgBlockCatalogService;
 import de.schrell.cadas.application.layers.SurfaceLayerEffectService;
 import de.schrell.cadas.application.layers.SurfaceLayerConsistencyService;
 import de.schrell.cadas.application.layers.SurfaceRectangleTileLayoutService;
@@ -157,7 +155,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     static final Color TERRAIN_LABEL_COLOR = Color.web("#6f4e2c");
     static final Color TERRAIN_ELEVATION_COLOR = Color.web("#a67c46");
 
-    final StandardPartLibrary partLibrary = new StandardPartLibraryService().load();
+    final StandardPartLibrary partLibrary = StandardPartLibraryService.load();
     final PartLibraryImportService partLibraryImportService = new PartLibraryImportService();
     final AutoRoomGenerationService autoRoomGenerationService = new AutoRoomGenerationService();
     final TerrainContourService terrainContourService = new TerrainContourService();
@@ -208,9 +206,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final SurfaceMaterialListService surfaceMaterialListService = new SurfaceMaterialListService();
     final ConstructionDrawingPdfService constructionDrawingPdfService = new ConstructionDrawingPdfService();
     final HelpContentService helpContentService = new HelpContentService();
-    final MarkdownNavigationService markdownNavigationService = new MarkdownNavigationService();
     final MarkdownHtmlRenderer markdownHtmlRenderer = new MarkdownHtmlRenderer();
-    final DwgBlockCatalogService dwgBlockCatalogService = new DwgBlockCatalogService();
     final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
     final DwgLibraryAnalyzer dwgLibraryAnalyzer = new DwgLibraryAnalyzer();
     final CadWorkbenchDocumentSupport documentSupport = new CadWorkbenchDocumentSupport(self());

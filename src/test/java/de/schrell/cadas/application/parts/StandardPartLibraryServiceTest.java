@@ -7,11 +7,9 @@ import org.junit.jupiter.api.Test;
 
 class StandardPartLibraryServiceTest {
 
-    private final StandardPartLibraryService libraryService = new StandardPartLibraryService();
-
     @Test
     void liefertStandardbibliothekFuerTuerenFensterUndTreppen() {
-        StandardPartLibrary library = libraryService.load();
+        StandardPartLibrary library = StandardPartLibraryService.load();
 
         assertTrue(library.doorPresets().size() >= 3);
         assertTrue(library.windowPresets().size() >= 3);

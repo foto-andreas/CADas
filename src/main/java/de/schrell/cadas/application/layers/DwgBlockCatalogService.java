@@ -11,7 +11,10 @@ import java.util.Set;
 
 public final class DwgBlockCatalogService {
 
-    public List<String> loadCatalog(Path dwgFile) {
+    private DwgBlockCatalogService() {
+    }
+
+    public static List<String> loadCatalog(Path dwgFile) {
         Set<String> blockNames = new LinkedHashSet<>();
         for (Path candidate : catalogCandidates(dwgFile)) {
             if (!Files.isRegularFile(candidate)) {
@@ -31,7 +34,7 @@ public final class DwgBlockCatalogService {
         return List.copyOf(blockNames);
     }
 
-    private List<Path> catalogCandidates(Path dwgFile) {
+    private static List<Path> catalogCandidates(Path dwgFile) {
         List<Path> candidates = new ArrayList<>();
         String fileName = dwgFile.getFileName().toString();
         candidates.add(dwgFile.resolveSibling(fileName + ".blocks"));

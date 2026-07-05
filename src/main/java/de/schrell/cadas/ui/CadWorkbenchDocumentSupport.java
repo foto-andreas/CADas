@@ -1,6 +1,7 @@
 package de.schrell.cadas.ui;
 
 import de.schrell.cadas.application.help.AboutInformation;
+import de.schrell.cadas.application.help.MarkdownNavigationService;
 import de.schrell.cadas.application.help.MarkdownNavigationService.HelpSection;
 import de.schrell.cadas.application.exchange.ExchangeFileNameService;
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
@@ -302,7 +303,7 @@ final class CadWorkbenchDocumentSupport {
         view.getEngine().loadContent(owner.markdownHtmlRenderer.renderDocument(markdown));
         VBox.setVgrow(view, Priority.ALWAYS);
         ComboBox<HelpSection> sectionSelector = new ComboBox<>();
-        sectionSelector.getItems().setAll(owner.markdownNavigationService.sections(markdown));
+        sectionSelector.getItems().setAll(MarkdownNavigationService.sections(markdown));
         sectionSelector.setPromptText("Inhaltsverzeichnis");
         sectionSelector.setPrefWidth(300);
         sectionSelector.setOnAction(event -> Optional.ofNullable(sectionSelector.getValue())

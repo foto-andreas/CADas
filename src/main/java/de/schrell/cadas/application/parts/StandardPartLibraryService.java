@@ -8,7 +8,10 @@ import java.util.List;
 
 public final class StandardPartLibraryService {
 
-    public StandardPartLibrary load() {
+    private StandardPartLibraryService() {
+    }
+
+    public static StandardPartLibrary load() {
         return new StandardPartLibrary(
                 List.of(
                         new DoorPreset("door-101x201", "Standardtür 101 x 201 cm", Length.of(1.01, LengthUnit.METER), Length.of(2.01, LengthUnit.METER), Length.zero()),

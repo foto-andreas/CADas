@@ -3,6 +3,7 @@ package de.schrell.cadas.ui;
 import de.schrell.cadas.application.drawing.DimensionTextStyle;
 import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.application.dwg.DwgConversionAvailability;
+import de.schrell.cadas.application.layers.DwgBlockCatalogService;
 import de.schrell.cadas.application.terrain.TerrainEditService;
 import de.schrell.cadas.application.terrain.TerrainProfileService;
 import de.schrell.cadas.application.view.RenderableKind;
@@ -1446,7 +1447,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
             cadLibraryReferences.add(normalizedSource);
         }
         self().registerSurfacePreset(surfaceCoveringPresetService.fromDwg(normalizedSource));
-        dwgBlockCatalogService.loadCatalog(normalizedSource)
+        DwgBlockCatalogService.loadCatalog(normalizedSource)
                 .forEach(blockName -> self().registerSurfacePreset(surfaceCoveringPresetService.fromDwgBlock(normalizedSource, blockName)));
         self().updateCadLibrarySummary();
     }

@@ -6,11 +6,9 @@ import org.junit.jupiter.api.Test;
 
 class MarkdownNavigationServiceTest {
 
-    private final MarkdownNavigationService service = new MarkdownNavigationService();
-
     @Test
     void extrahiertKapitelUndUnterkapitelInDokumentreihenfolge() {
-        var sections = service.sections("""
+        var sections = MarkdownNavigationService.sections("""
                 # Hilfe
                 ## Projekt
                 ### **Sichern**

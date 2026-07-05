@@ -7,6 +7,7 @@ import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.application.heating.RoomHeatingOutputService;
 import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.application.dwg.DwgLibraryAnalysis;
+import de.schrell.cadas.application.layers.DwgBlockCatalogService;
 import de.schrell.cadas.application.layers.SurfaceCoveringPreset;
 import de.schrell.cadas.application.objects.RoomObjectPreset;
 import de.schrell.cadas.application.parts.DoorPreset;
@@ -80,7 +81,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
         DwgLibraryAnalysis analysis = analyzeDwgLibrary(normalizedRegisteredFile, false);
         SurfaceCoveringPreset dwgPreset = surfaceCoveringPresetService.fromDwg(normalizedRegisteredFile);
         registerSurfacePreset(dwgPreset);
-        dwgBlockCatalogService.loadCatalog(normalizedRegisteredFile).forEach(blockName -> registerDwgBlockPreset(normalizedRegisteredFile, blockName));
+        DwgBlockCatalogService.loadCatalog(normalizedRegisteredFile).forEach(blockName -> registerDwgBlockPreset(normalizedRegisteredFile, blockName));
         applyDwgBlockFilter();
         updateCadLibrarySummary();
         if (surfacePresetSelector.getValue() == null) {
