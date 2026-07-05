@@ -3,8 +3,7 @@ package de.schrell.cadas.application.dwg;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Comparator;
 import java.util.Objects;
 
 public final class DwgLibraryAnalyzer {
@@ -54,12 +53,10 @@ public final class DwgLibraryAnalyzer {
         if (!Files.exists(directory)) {
             return;
         }
-        List<Path> paths = new ArrayList<>();
         try (var stream = Files.walk(directory)) {
-            stream.forEach(paths::add);
-        }
-        for (int index = paths.size() - 1; index >= 0; index--) {
-            Files.deleteIfExists(paths.get(index));
+            for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
         }
     }
 
