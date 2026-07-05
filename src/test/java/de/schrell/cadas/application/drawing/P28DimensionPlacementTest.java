@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.drawing;
 
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.Level;
@@ -166,28 +167,10 @@ class P28DimensionPlacementTest {
     }
 
     private boolean istImGebäude(PlanPoint point) {
-        if (level.rooms().stream().anyMatch(room -> enthält(room, point))) {
+        if (level.rooms().stream().anyMatch(room -> PlanPolygonSupport.containsPoint(room.outline(), point))) {
             return true;
         }
         return level.walls().stream().anyMatch(wall -> abstand(point, wall.axis()) < wall.thickness().toMillimeters() / 2.0 - 0.001);
-    }
-
-    private boolean enthält(Room room, PlanPoint point) {
-        boolean inside = false;
-        int previousIndex = room.outline().size() - 1;
-        for (int index = 0; index < room.outline().size(); index++) {
-            PlanPoint current = room.outline().get(index);
-            PlanPoint previous = room.outline().get(previousIndex);
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters()) + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside;
     }
 
     private double abstand(PlanPoint point, PlanSegment segment) {

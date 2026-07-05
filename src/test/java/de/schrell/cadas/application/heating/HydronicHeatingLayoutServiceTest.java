@@ -2,6 +2,7 @@ package de.schrell.cadas.application.heating;
 
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
 import de.schrell.cadas.domain.geometry.Length;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
@@ -503,7 +504,7 @@ class HydronicHeatingLayoutServiceTest {
                     start.xMillimeters() + (end.xMillimeters() - start.xMillimeters()) * ratio,
                     start.yMillimeters() + (end.yMillimeters() - start.yMillimeters()) * ratio
             );
-            assertTrue(contains(outline, point), () -> "Rohr außerhalb bei " + point);
+            assertTrue(PlanPolygonSupport.containsPoint(outline, point), () -> "Rohr außerhalb bei " + point);
         }
     }
 
@@ -552,37 +553,6 @@ class HydronicHeatingLayoutServiceTest {
                 }
             }
         }
-    }
-
-    private boolean contains(List<PlanPoint> polygon, PlanPoint point) {
-        boolean inside = false;
-        int previousIndex = polygon.size() - 1;
-        for (int index = 0; index < polygon.size(); index++) {
-            PlanPoint current = polygon.get(index);
-            PlanPoint previous = polygon.get(previousIndex);
-            if (pointOnSegment(point, previous, current)) {
-                return true;
-            }
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters()) + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside || polygon.stream().anyMatch(vertex -> vertex.distanceTo(point).toMillimeters() < 0.001);
-    }
-
-    private boolean pointOnSegment(PlanPoint point, PlanPoint start, PlanPoint end) {
-        if (Math.abs(orientation(start, end, point)) > 0.001) {
-            return false;
-        }
-        return point.xMillimeters() >= Math.min(start.xMillimeters(), end.xMillimeters()) - 0.001
-                && point.xMillimeters() <= Math.max(start.xMillimeters(), end.xMillimeters()) + 0.001
-                && point.yMillimeters() >= Math.min(start.yMillimeters(), end.yMillimeters()) - 0.001
-                && point.yMillimeters() <= Math.max(start.yMillimeters(), end.yMillimeters()) + 0.001;
     }
 
     private PlanPoint firstInteriorPoint(List<PlanPoint> path, Room room) {
