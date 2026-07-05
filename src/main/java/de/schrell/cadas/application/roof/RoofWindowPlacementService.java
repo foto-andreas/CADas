@@ -1,6 +1,7 @@
 package de.schrell.cadas.application.roof;
 
 import de.schrell.cadas.domain.geometry.Length;
+import de.schrell.cadas.domain.geometry.PlanPolygonSupport;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.RoofWindow;
@@ -14,7 +15,7 @@ public final class RoofWindowPlacementService {
 
     public Optional<RoofWindow> place(Level level, PlanPoint point, Length width, Length depth) {
         return level.rooms().stream()
-                .filter(room -> contains(room, point))
+                .filter(room -> PlanPolygonSupport.containsPoint(room.outline(), point))
                 .filter(room -> !room.slopedCeilingProfiles().isEmpty())
                 .findFirst()
                 .map(room -> RoofWindow.create(room.id(), point, width, depth, nearestSlope(room, point).lowSide()));
@@ -26,22 +27,4 @@ public final class RoofWindowPlacementService {
                 .orElseThrow();
     }
 
-    private boolean contains(Room room, PlanPoint point) {
-        boolean inside = false;
-        int previousIndex = room.outline().size() - 1;
-        for (int index = 0; index < room.outline().size(); index++) {
-            PlanPoint current = room.outline().get(index);
-            PlanPoint previous = room.outline().get(previousIndex);
-            boolean intersects = (current.yMillimeters() > point.yMillimeters()) != (previous.yMillimeters() > point.yMillimeters())
-                    && point.xMillimeters() < (previous.xMillimeters() - current.xMillimeters())
-                    * (point.yMillimeters() - current.yMillimeters())
-                    / (previous.yMillimeters() - current.yMillimeters())
-                    + current.xMillimeters();
-            if (intersects) {
-                inside = !inside;
-            }
-            previousIndex = index;
-        }
-        return inside;
-    }
 }
