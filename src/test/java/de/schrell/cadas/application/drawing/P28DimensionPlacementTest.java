@@ -32,7 +32,6 @@ class P28DimensionPlacementTest {
     private Level level;
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService placementService = new WallDimensionPlacementService();
-    private final DimensionLabelService dimensionLabelService = new DimensionLabelService();
     private final DimensionLabelPlacementService labelPlacementService = new DimensionLabelPlacementService();
 
     @BeforeAll
@@ -116,7 +115,7 @@ class P28DimensionPlacementTest {
                             placement.normalOffset(),
                             placement.lineDistanceFromAxis(),
                             length,
-                            dimensionLabelService.deduplicationKey(placement.dimension(), false)
+                            DimensionLabelService.deduplicationKey(placement.dimension(), false)
                     ));
                 }
             }

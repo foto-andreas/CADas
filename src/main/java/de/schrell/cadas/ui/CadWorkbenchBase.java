@@ -2,7 +2,6 @@ package de.schrell.cadas.ui;
 
 import de.schrell.cadas.application.drawing.DraftingService;
 import de.schrell.cadas.application.drawing.DimensionLabelPlacementService;
-import de.schrell.cadas.application.drawing.DimensionLabelService;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
 import de.schrell.cadas.application.drawing.DimensionTextStyle;
 import de.schrell.cadas.application.drawing.EdgeResizeService;
@@ -182,7 +181,6 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     final WallDimensionService wallDimensionService = new WallDimensionService();
     final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
     final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
-    final DimensionLabelService dimensionLabelService = new DimensionLabelService();
     final DimensionLabelPlacementService dimensionLabelPlacementService = new DimensionLabelPlacementService();
     final QuarterTurnRotationService quarterTurnRotationService = new QuarterTurnRotationService();
     final HeatingZoneMirrorService heatingZoneMirrorService = new HeatingZoneMirrorService();

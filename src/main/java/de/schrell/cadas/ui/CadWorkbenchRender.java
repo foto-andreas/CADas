@@ -1,5 +1,6 @@
 package de.schrell.cadas.ui;
 
+import de.schrell.cadas.application.drawing.DimensionLabelService;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
 import de.schrell.cadas.application.drawing.DimensionTextStyle;
 import de.schrell.cadas.application.drawing.DimensionStandard;
@@ -523,12 +524,12 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
             WallDimensionService.SideDimension dimension = placement.dimension();
             pendingLabels.add(new PendingWallDimensionLabel(
                     dimension.dimensionSegment(),
-                    dimensionLabelService.label(dimension, placement.exterior(), textStyle),
+                    DimensionLabelService.label(dimension, placement.exterior(), textStyle),
                     placement.normalOffset(),
                     placement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, placement.normalOffset()),
                     dimension.length().toMillimeters(),
-                    dimensionLabelService.deduplicationKey(dimension, placement.exterior())
+                    DimensionLabelService.deduplicationKey(dimension, placement.exterior())
             ));
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
@@ -540,7 +541,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
             );
             pendingLabels.add(new PendingWallDimensionLabel(
                     wall.axis(),
-                    dimensionLabelService.label("Achsmaß", wall.axis().length(), false, textStyle),
+                    DimensionLabelService.label("Achsmaß", wall.axis().length(), false, textStyle),
                     axisPlacement.normalOffset(),
                     axisPlacement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, axisPlacement.normalOffset()),

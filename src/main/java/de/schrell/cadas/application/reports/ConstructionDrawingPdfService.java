@@ -89,7 +89,6 @@ public final class ConstructionDrawingPdfService {
     private final WallDimensionService wallDimensionService = new WallDimensionService();
     private final WallDimensionPlacementService wallDimensionPlacementService = new WallDimensionPlacementService();
     private final DimensionLineLayoutService dimensionLineLayoutService = new DimensionLineLayoutService();
-    private final DimensionLabelService dimensionLabelService = new DimensionLabelService();
     private final DimensionLabelPlacementService dimensionLabelPlacementService = new DimensionLabelPlacementService();
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
@@ -1124,12 +1123,12 @@ public final class ConstructionDrawingPdfService {
             WallDimensionService.SideDimension dimension = placement.dimension();
             pending.add(new PdfPendingDimension(
                     dimension.dimensionSegment(),
-                    dimensionLabelService.label(dimension, placement.exterior(), textStyle),
+                    DimensionLabelService.label(dimension, placement.exterior(), textStyle),
                     placement.normalOffset(),
                     placement.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, placement.normalOffset()),
                     dimension.length().toMillimeters(),
-                    dimensionLabelService.deduplicationKey(dimension, placement.exterior())
+                    DimensionLabelService.deduplicationKey(dimension, placement.exterior())
             ));
         }
         if (dimensions.roomDimensions().isEmpty() && dimensions.exteriorDimension().isEmpty()) {
@@ -1138,7 +1137,7 @@ public final class ConstructionDrawingPdfService {
             );
             pending.add(new PdfPendingDimension(
                     wall.axis(),
-                    dimensionLabelService.label("Achsmaß", wall.axis().length(), false, textStyle),
+                    DimensionLabelService.label("Achsmaß", wall.axis().length(), false, textStyle),
                     axis.normalOffset(),
                     axis.lineDistanceFromAxis(),
                     Math.copySign(stepOffset, axis.normalOffset()),

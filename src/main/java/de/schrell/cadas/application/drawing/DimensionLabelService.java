@@ -13,6 +13,9 @@ import java.util.Locale;
  */
 public final class DimensionLabelService {
 
+    private DimensionLabelService() {
+    }
+
     /**
      * Baut den Maßtext für eine Raum- oder Außenmaßangabe.
      *
@@ -21,11 +24,11 @@ public final class DimensionLabelService {
      * @param textStyle die aktive Texteinstellung
      * @return der formatierte Maßtext
      */
-    public String label(WallDimensionService.SideDimension dimension, boolean exterior, DimensionTextStyle textStyle) {
+    public static String label(WallDimensionService.SideDimension dimension, boolean exterior, DimensionTextStyle textStyle) {
         return label(dimension.name(), dimension.length(), exterior, textStyle);
     }
 
-    public String deduplicationKey(WallDimensionService.SideDimension dimension, boolean exterior) {
+    public static String deduplicationKey(WallDimensionService.SideDimension dimension, boolean exterior) {
         if (exterior) {
             return "";
         }
@@ -49,7 +52,7 @@ public final class DimensionLabelService {
      * @param textStyle die aktive Texteinstellung
      * @return der formatierte Maßtext
      */
-    public String label(String name, Length length, boolean exterior, DimensionTextStyle textStyle) {
+    public static String label(String name, Length length, boolean exterior, DimensionTextStyle textStyle) {
         if (textStyle != DimensionTextStyle.FULL) {
             return formatLength(length);
         }
@@ -62,7 +65,7 @@ public final class DimensionLabelService {
         return name + ": Raummaß " + formatLength(length);
     }
 
-    private String formatLength(Length length) {
+    private static String formatLength(Length length) {
         return String.format(Locale.GERMAN, "%.2f m", length.toMillimeters() / 1_000.0);
     }
 
@@ -70,7 +73,7 @@ public final class DimensionLabelService {
      * Formatierhilfe für Aufrufer, die Längen außerhalb von SideDimension ausgeben
      * und immer dieselbe Formatierung nutzen wollen (z. B. Aufrisse im PDF).
      */
-    public String formatMeters(double millimeters) {
+    public static String formatMeters(double millimeters) {
         return String.format(Locale.GERMAN, "%.2f m", millimeters / 1_000.0);
     }
 }

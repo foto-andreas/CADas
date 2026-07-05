@@ -12,52 +12,50 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DimensionLabelServiceTest {
 
-    private final DimensionLabelService service = new DimensionLabelService();
-
     @Test
     void liefertVollständigenTextFürRaummaßMitNamen() {
         WallDimensionService.SideDimension dimension = sideDimension("Küche", 900);
-        String label = service.label(dimension, false, DimensionTextStyle.FULL);
+        String label = DimensionLabelService.label(dimension, false, DimensionTextStyle.FULL);
         assertEquals("Küche: Raummaß 0,90 m", label);
     }
 
     @Test
     void liefertVollständigenTextFürAußenmaß() {
         WallDimensionService.SideDimension dimension = sideDimension("Außen", 4_200);
-        String label = service.label(dimension, true, DimensionTextStyle.FULL);
+        String label = DimensionLabelService.label(dimension, true, DimensionTextStyle.FULL);
         assertEquals("Außenmaß 4,20 m", label);
     }
 
     @Test
     void liefertNurLängeWennTextstilNurLänge() {
         WallDimensionService.SideDimension dimension = sideDimension("Küche", 900);
-        String label = service.label(dimension, false, DimensionTextStyle.LENGTH_ONLY);
+        String label = DimensionLabelService.label(dimension, false, DimensionTextStyle.LENGTH_ONLY);
         assertEquals("0,90 m", label);
     }
 
     @Test
     void liefertNurLängeAuchFürAußenmaß() {
         WallDimensionService.SideDimension dimension = sideDimension("Außen", 4_200);
-        String label = service.label(dimension, true, DimensionTextStyle.LENGTH_ONLY);
+        String label = DimensionLabelService.label(dimension, true, DimensionTextStyle.LENGTH_ONLY);
         assertEquals("4,20 m", label);
     }
 
     @Test
     void liefertNackteLängeFürAchsmaßOhneNamen() {
-        String label = service.label("Achsmaß", Length.ofMillimeters(8_000), false, DimensionTextStyle.LENGTH_ONLY);
+        String label = DimensionLabelService.label("Achsmaß", Length.ofMillimeters(8_000), false, DimensionTextStyle.LENGTH_ONLY);
         assertEquals("8,00 m", label);
     }
 
     @Test
     void liefertNackteLängeWennNameLeer() {
-        String label = service.label("", Length.ofMillimeters(8_000), false, DimensionTextStyle.FULL);
+        String label = DimensionLabelService.label("", Length.ofMillimeters(8_000), false, DimensionTextStyle.FULL);
         assertEquals("8,00 m", label);
     }
 
     @Test
     void formatMetersNutztDeutschesFormat() {
-        assertTrue(service.formatMeters(4_200).contains("4,20 m"));
-        assertTrue(service.formatMeters(900).contains("0,90 m"));
+        assertTrue(DimensionLabelService.formatMeters(4_200).contains("4,20 m"));
+        assertTrue(DimensionLabelService.formatMeters(900).contains("0,90 m"));
     }
 
     @Test
@@ -71,7 +69,7 @@ class DimensionLabelServiceTest {
                 new PlanSegment(new PlanPoint(900, 500), new PlanPoint(0, 500)), "Raum:1"
         );
 
-        assertEquals(service.deduplicationKey(first, false), service.deduplicationKey(opposite, false));
+        assertEquals(DimensionLabelService.deduplicationKey(first, false), DimensionLabelService.deduplicationKey(opposite, false));
     }
 
     @Test
@@ -86,8 +84,8 @@ class DimensionLabelServiceTest {
         );
 
         org.junit.jupiter.api.Assertions.assertNotEquals(
-                service.deduplicationKey(horizontal, false),
-                service.deduplicationKey(vertical, false)
+                DimensionLabelService.deduplicationKey(horizontal, false),
+                DimensionLabelService.deduplicationKey(vertical, false)
         );
     }
 
