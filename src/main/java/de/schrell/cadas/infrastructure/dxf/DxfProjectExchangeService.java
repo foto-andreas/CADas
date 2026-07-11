@@ -59,10 +59,6 @@ public final class DxfProjectExchangeService {
     private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
     public void exportProject(ProjectModel project, Path targetFile) throws IOException {
-        Path parent = targetFile.toAbsolutePath().getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
         StringBuilder dxf = new StringBuilder();
         DxfDocumentSupport.DxfWriteContext context = DxfDocumentSupport.startDocument(
                 dxf,
@@ -113,7 +109,7 @@ public final class DxfProjectExchangeService {
         )));
 
         DxfDocumentSupport.finishDocument(context);
-        Files.writeString(targetFile, dxf.toString());
+        DxfDocumentSupport.writeAtomically(targetFile, dxf.toString());
     }
 
     public ProjectModel importProject(Path sourceFile, String projectName) throws IOException {

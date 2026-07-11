@@ -58,10 +58,6 @@ public final class DxfLevelExchangeService {
     private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
     public void exportLevel(Level level, Path targetFile) throws IOException {
-        Path parent = targetFile.toAbsolutePath().getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
         StringBuilder dxf = new StringBuilder();
         DxfDocumentSupport.DxfWriteContext context = DxfDocumentSupport.startDocument(
                 dxf,
@@ -301,7 +297,7 @@ public final class DxfLevelExchangeService {
         }
 
         DxfDocumentSupport.finishDocument(context);
-        Files.writeString(targetFile, dxf.toString());
+        DxfDocumentSupport.writeAtomically(targetFile, dxf.toString());
     }
 
     public Level importLevel(Path sourceFile, String levelName) throws IOException {

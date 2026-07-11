@@ -1,6 +1,11 @@
 package de.schrell.cadas.infrastructure.dxf;
 
 import de.schrell.cadas.domain.geometry.PlanPoint;
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -70,6 +75,27 @@ final class DxfDocumentSupport {
 
     static void appendPair(StringBuilder dxf, int code, Object value) {
         dxf.append(code).append('\n').append(value).append('\n');
+    }
+
+    static void writeAtomically(Path targetFile, String content) throws IOException {
+        Path target = targetFile.toAbsolutePath().normalize();
+        Path parent = target.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        String fileName = target.getFileName().toString().replaceAll("[^A-Za-z0-9._-]", "_");
+        String prefix = fileName.length() < 3 ? "dxf_" + fileName : fileName;
+        Path tempFile = Files.createTempFile(parent, prefix, ".tmp");
+        try {
+            Files.writeString(tempFile, content);
+            try {
+                Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException exception) {
+                Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
     }
 
     static List<DxfEntity> parseEntities(List<String> lines) {
