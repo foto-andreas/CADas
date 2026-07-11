@@ -24,6 +24,10 @@ final class DxfDocumentSupport {
         DxfWriteContext context = new DxfWriteContext(dxf);
         context.registerLayer("0");
         layers.forEach(context::registerLayer);
+        context.registerTable("LTYPE");
+        context.registerTable("LAYER");
+        context.registerTable("STYLE");
+        context.registerTable("BLOCK_RECORD");
         context.registerBlockRecord("*Model_Space");
         context.registerBlockRecord("*Paper_Space");
         blockNames.forEach(context::registerBlockRecord);
@@ -48,8 +52,6 @@ final class DxfDocumentSupport {
         appendPair(context.dxf(), 330, context.modelSpaceBlockRecordHandle());
         appendPair(context.dxf(), 100, "AcDbEntity");
         appendPair(context.dxf(), 8, layer);
-        appendPair(context.dxf(), 67, 0);
-        appendPair(context.dxf(), 410, "Model");
     }
 
     static void appendInsert(StringBuilder dxf, DxfWriteContext context, String layer, String blockName,
@@ -120,11 +122,10 @@ final class DxfDocumentSupport {
         appendPair(dxf, 0, "SECTION");
         appendPair(dxf, 2, "TABLES");
 
-        appendPair(dxf, 0, "TABLE");
-        appendPair(dxf, 2, "LTYPE");
-        appendPair(dxf, 70, 1);
+        appendSymbolTableStart(context, "LTYPE", 1);
         appendPair(dxf, 0, "LTYPE");
         appendPair(dxf, 5, context.nextHandle());
+        appendPair(dxf, 330, context.tableHandle("LTYPE"));
         appendPair(dxf, 100, "AcDbSymbolTableRecord");
         appendPair(dxf, 100, "AcDbLinetypeTableRecord");
         appendPair(dxf, 2, "CONTINUOUS");
@@ -135,12 +136,11 @@ final class DxfDocumentSupport {
         appendPair(dxf, 40, 0.0);
         appendPair(dxf, 0, "ENDTAB");
 
-        appendPair(dxf, 0, "TABLE");
-        appendPair(dxf, 2, "LAYER");
-        appendPair(dxf, 70, context.layers().size());
+        appendSymbolTableStart(context, "LAYER", context.layers().size());
         for (String layer : context.layers()) {
             appendPair(dxf, 0, "LAYER");
             appendPair(dxf, 5, context.nextHandle());
+            appendPair(dxf, 330, context.tableHandle("LAYER"));
             appendPair(dxf, 100, "AcDbSymbolTableRecord");
             appendPair(dxf, 100, "AcDbLayerTableRecord");
             appendPair(dxf, 2, layer);
@@ -150,11 +150,10 @@ final class DxfDocumentSupport {
         }
         appendPair(dxf, 0, "ENDTAB");
 
-        appendPair(dxf, 0, "TABLE");
-        appendPair(dxf, 2, "STYLE");
-        appendPair(dxf, 70, 1);
+        appendSymbolTableStart(context, "STYLE", 1);
         appendPair(dxf, 0, "STYLE");
         appendPair(dxf, 5, context.nextHandle());
+        appendPair(dxf, 330, context.tableHandle("STYLE"));
         appendPair(dxf, 100, "AcDbSymbolTableRecord");
         appendPair(dxf, 100, "AcDbTextStyleTableRecord");
         appendPair(dxf, 2, "Standard");
@@ -168,12 +167,11 @@ final class DxfDocumentSupport {
         appendPair(dxf, 4, "");
         appendPair(dxf, 0, "ENDTAB");
 
-        appendPair(dxf, 0, "TABLE");
-        appendPair(dxf, 2, "BLOCK_RECORD");
-        appendPair(dxf, 70, context.blockRecordHandles().size());
+        appendSymbolTableStart(context, "BLOCK_RECORD", context.blockRecordHandles().size());
         for (Map.Entry<String, String> entry : context.blockRecordHandles().entrySet()) {
             appendPair(dxf, 0, "BLOCK_RECORD");
             appendPair(dxf, 5, entry.getValue());
+            appendPair(dxf, 330, context.tableHandle("BLOCK_RECORD"));
             appendPair(dxf, 100, "AcDbSymbolTableRecord");
             appendPair(dxf, 100, "AcDbBlockTableRecord");
             appendPair(dxf, 2, entry.getKey());
@@ -181,6 +179,16 @@ final class DxfDocumentSupport {
         appendPair(dxf, 0, "ENDTAB");
 
         appendPair(dxf, 0, "ENDSEC");
+    }
+
+    private static void appendSymbolTableStart(DxfWriteContext context, String name, int entryCount) {
+        StringBuilder dxf = context.dxf();
+        appendPair(dxf, 0, "TABLE");
+        appendPair(dxf, 2, name);
+        appendPair(dxf, 5, context.tableHandle(name));
+        appendPair(dxf, 330, "0");
+        appendPair(dxf, 100, "AcDbSymbolTable");
+        appendPair(dxf, 70, entryCount);
     }
 
     private static void appendBlocks(DxfWriteContext context) {
@@ -227,7 +235,7 @@ final class DxfDocumentSupport {
     private static void appendDoorBlock(DxfWriteContext context) {
         StringBuilder dxf = context.dxf();
         appendBlockHeader(context, BLOCK_DOOR);
-        appendBlockLine(context, new PlanPoint(0, 0), new PlanPoint(1000, 0));
+        appendBlockLine(context, BLOCK_DOOR, new PlanPoint(0, 0), new PlanPoint(1000, 0));
         appendPair(dxf, 0, "ENDBLK");
         appendPair(dxf, 5, context.nextHandle());
         appendPair(dxf, 330, context.blockRecordHandle(BLOCK_DOOR));
@@ -239,9 +247,9 @@ final class DxfDocumentSupport {
     private static void appendWindowBlock(DxfWriteContext context) {
         StringBuilder dxf = context.dxf();
         appendBlockHeader(context, BLOCK_WINDOW);
-        appendBlockLine(context, new PlanPoint(0, 0), new PlanPoint(1000, 0));
-        appendBlockLine(context, new PlanPoint(250, -60), new PlanPoint(250, 60));
-        appendBlockLine(context, new PlanPoint(750, -60), new PlanPoint(750, 60));
+        appendBlockLine(context, BLOCK_WINDOW, new PlanPoint(0, 0), new PlanPoint(1000, 0));
+        appendBlockLine(context, BLOCK_WINDOW, new PlanPoint(250, -60), new PlanPoint(250, 60));
+        appendBlockLine(context, BLOCK_WINDOW, new PlanPoint(750, -60), new PlanPoint(750, 60));
         appendPair(dxf, 0, "ENDBLK");
         appendPair(dxf, 5, context.nextHandle());
         appendPair(dxf, 330, context.blockRecordHandle(BLOCK_WINDOW));
@@ -253,11 +261,11 @@ final class DxfDocumentSupport {
     private static void appendStairBlock(DxfWriteContext context) {
         StringBuilder dxf = context.dxf();
         appendBlockHeader(context, BLOCK_STAIR);
-        appendBlockPolyline(context, new PlanPoint(0, 0), new PlanPoint(1000, 0), new PlanPoint(1000, 1000), new PlanPoint(0, 1000));
-        appendBlockLine(context, new PlanPoint(180, 200), new PlanPoint(820, 200));
-        appendBlockLine(context, new PlanPoint(180, 400), new PlanPoint(820, 400));
-        appendBlockLine(context, new PlanPoint(180, 600), new PlanPoint(820, 600));
-        appendBlockLine(context, new PlanPoint(180, 800), new PlanPoint(820, 800));
+        appendBlockPolyline(context, BLOCK_STAIR, new PlanPoint(0, 0), new PlanPoint(1000, 0), new PlanPoint(1000, 1000), new PlanPoint(0, 1000));
+        appendBlockLine(context, BLOCK_STAIR, new PlanPoint(180, 200), new PlanPoint(820, 200));
+        appendBlockLine(context, BLOCK_STAIR, new PlanPoint(180, 400), new PlanPoint(820, 400));
+        appendBlockLine(context, BLOCK_STAIR, new PlanPoint(180, 600), new PlanPoint(820, 600));
+        appendBlockLine(context, BLOCK_STAIR, new PlanPoint(180, 800), new PlanPoint(820, 800));
         appendPair(dxf, 0, "ENDBLK");
         appendPair(dxf, 5, context.nextHandle());
         appendPair(dxf, 330, context.blockRecordHandle(BLOCK_STAIR));
@@ -283,10 +291,11 @@ final class DxfDocumentSupport {
         appendPair(dxf, 1, "");
     }
 
-    private static void appendBlockLine(DxfWriteContext context, PlanPoint start, PlanPoint end) {
+    private static void appendBlockLine(DxfWriteContext context, String blockName, PlanPoint start, PlanPoint end) {
         StringBuilder dxf = context.dxf();
         appendPair(dxf, 0, "LINE");
         appendPair(dxf, 5, context.nextHandle());
+        appendPair(dxf, 330, context.blockRecordHandle(blockName));
         appendPair(dxf, 100, "AcDbEntity");
         appendPair(dxf, 8, "0");
         appendPair(dxf, 100, "AcDbLine");
@@ -298,10 +307,11 @@ final class DxfDocumentSupport {
         appendPair(dxf, 31, 0.0);
     }
 
-    private static void appendBlockPolyline(DxfWriteContext context, PlanPoint... points) {
+    private static void appendBlockPolyline(DxfWriteContext context, String blockName, PlanPoint... points) {
         StringBuilder dxf = context.dxf();
         appendPair(dxf, 0, "LWPOLYLINE");
         appendPair(dxf, 5, context.nextHandle());
+        appendPair(dxf, 330, context.blockRecordHandle(blockName));
         appendPair(dxf, 100, "AcDbEntity");
         appendPair(dxf, 8, "0");
         appendPair(dxf, 100, "AcDbPolyline");
@@ -344,19 +354,49 @@ final class DxfDocumentSupport {
         appendPair(dxf, 3, "Layout1");
         appendPair(dxf, 350, context.paperLayoutHandle());
 
-        appendLayout(dxf, context.modelLayoutHandle(), context.modelSpaceBlockRecordHandle(), "Model", true);
-        appendLayout(dxf, context.paperLayoutHandle(), context.paperSpaceBlockRecordHandle(), "Layout1", false);
+        appendLayout(context, context.modelLayoutHandle(), context.modelSpaceBlockRecordHandle(), "Model", true);
+        appendLayout(context, context.paperLayoutHandle(), context.paperSpaceBlockRecordHandle(), "Layout1", false);
 
         appendPair(dxf, 0, "ENDSEC");
     }
 
-    private static void appendLayout(StringBuilder dxf, String handle, String blockRecordHandle, String layoutName, boolean modelSpace) {
+    private static void appendLayout(DxfWriteContext context, String handle, String blockRecordHandle, String layoutName, boolean modelSpace) {
+        StringBuilder dxf = context.dxf();
         appendPair(dxf, 0, "LAYOUT");
         appendPair(dxf, 5, handle);
-        appendPair(dxf, 330, blockRecordHandle);
+        appendPair(dxf, 330, context.layoutDictionaryHandle());
         appendPair(dxf, 100, "AcDbPlotSettings");
-        appendPair(dxf, 1, layoutName);
+        appendPair(dxf, 1, "");
+        appendPair(dxf, 4, modelSpace ? "" : "A3");
+        appendPair(dxf, 6, "");
+        appendPair(dxf, 40, 7.5);
+        appendPair(dxf, 41, 20.0);
+        appendPair(dxf, 42, 7.5);
+        appendPair(dxf, 43, 20.0);
+        appendPair(dxf, 44, 420.0);
+        appendPair(dxf, 45, 297.0);
+        appendPair(dxf, 46, 0.0);
+        appendPair(dxf, 47, 0.0);
+        appendPair(dxf, 48, 0.0);
+        appendPair(dxf, 49, 0.0);
+        appendPair(dxf, 140, 0.0);
+        appendPair(dxf, 141, 0.0);
+        appendPair(dxf, 142, 1.0);
+        appendPair(dxf, 143, 1.0);
+        appendPair(dxf, 70, 1024);
+        appendPair(dxf, 72, 1);
+        appendPair(dxf, 73, 0);
+        appendPair(dxf, 74, 5);
+        appendPair(dxf, 7, "");
+        appendPair(dxf, 75, 16);
+        appendPair(dxf, 76, 0);
+        appendPair(dxf, 77, 2);
+        appendPair(dxf, 78, 300);
+        appendPair(dxf, 147, 1.0);
+        appendPair(dxf, 148, 0.0);
+        appendPair(dxf, 149, 0.0);
         appendPair(dxf, 100, "AcDbLayout");
+        appendPair(dxf, 1, layoutName);
         appendPair(dxf, 70, modelSpace ? 1 : 0);
         appendPair(dxf, 71, 0);
         appendPair(dxf, 10, 0.0);
@@ -378,7 +418,10 @@ final class DxfDocumentSupport {
         appendPair(dxf, 17, 0.0);
         appendPair(dxf, 27, 0.0);
         appendPair(dxf, 37, 1.0);
-        appendPair(dxf, 76, 0);
+        appendPair(dxf, 13, 0.0);
+        appendPair(dxf, 23, 0.0);
+        appendPair(dxf, 33, 0.0);
+        appendPair(dxf, 146, 0.0);
         appendPair(dxf, 330, blockRecordHandle);
     }
 
@@ -443,6 +486,7 @@ final class DxfDocumentSupport {
     static final class DxfWriteContext {
         private final StringBuilder dxf;
         private final Set<String> layers = new LinkedHashSet<>();
+        private final Map<String, String> tableHandles = new LinkedHashMap<>();
         private final Map<String, String> blockRecordHandles = new LinkedHashMap<>();
         private int nextHandle = 0x100;
         private final String rootDictionaryHandle = nextHandle();
@@ -469,6 +513,14 @@ final class DxfDocumentSupport {
 
         Set<String> layers() {
             return layers;
+        }
+
+        void registerTable(String tableName) {
+            tableHandles.computeIfAbsent(tableName, ignored -> nextHandle());
+        }
+
+        String tableHandle(String tableName) {
+            return tableHandles.get(tableName);
         }
 
         void registerBlockRecord(String blockName) {

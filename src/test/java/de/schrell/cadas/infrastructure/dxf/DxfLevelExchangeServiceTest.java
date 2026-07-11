@@ -489,7 +489,8 @@ class DxfLevelExchangeServiceTest {
 
         assertTrue(dxf.contains("$INSUNITS\n70\n4"));
         assertTrue(dxf.contains("$MEASUREMENT\n70\n1"));
-        assertTrue(dxf.contains("\n67\n0\n410\nModel\n"));
+        assertFalse(dxf.contains("\n67\n"));
+        assertFalse(dxf.contains("\n410\n"));
         assertTrue(dxf.contains("\n2\nTABLES\n"));
         assertTrue(dxf.contains("\n2\nBLOCKS\n"));
         assertTrue(dxf.contains("\n2\nOBJECTS\n"));
@@ -501,6 +502,8 @@ class DxfLevelExchangeServiceTest {
         assertTrue(dxf.contains("\n2\nCADAS_STAIR\n"));
         assertTrue(dxf.contains("\n0\nDICTIONARY\n"));
         assertTrue(dxf.contains("\n0\nLAYOUT\n"));
+        assertTrue(dxf.matches("(?s).*0\\nTABLE\\n2\\nBLOCK_RECORD\\n5\\n[0-9A-F]+\\n330\\n0\\n100\\nAcDbSymbolTable\\n.*"));
+        assertTrue(dxf.matches("(?s).*0\\nLAYOUT\\n5\\n[0-9A-F]+\\n330\\n[0-9A-F]+\\n100\\nAcDbPlotSettings\\n.*100\\nAcDbLayout\\n1\\nModel\\n.*"));
     }
 
     @Test
