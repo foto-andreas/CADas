@@ -118,8 +118,14 @@ public final class DxfProjectExchangeService {
 
     public ProjectModel importProject(Path sourceFile, String projectName) throws IOException {
         List<String> lines = Files.readAllLines(sourceFile);
-        List<String> metadata = extractMetadata(lines);
+        List<DxfDocumentSupport.DxfEntity> entities = DxfDocumentSupport.parseEntities(lines);
+        List<String> metadata = extractMetadata(entities);
         if (metadata.isEmpty()) {
+            Map<String, Level> fallbackLevels = new LinkedHashMap<>();
+            importFallbackGeometry(fallbackLevels, entities);
+            if (!fallbackLevels.isEmpty()) {
+                return createProject(projectName, fallbackLevels.values().stream().toList());
+            }
             Level level = levelExchangeService.importLevel(sourceFile, "Erdgeschoss");
             ProjectModel fallback = ProjectModel.withDefaultLevel(projectName, level.name());
             copyLevelContents(level, fallback.primaryLevel());
@@ -330,6 +336,7 @@ public final class DxfProjectExchangeService {
 
         addValidOpenings(levels, pendingDoorsByLevel, pendingWindowsByLevel);
         addHydronicHeatings(levels, pendingHeatingsByLevel, pendingHeatingZones);
+        importFallbackGeometry(levels, entities);
 
         if (levels.isEmpty()) {
             ProjectModel project = ProjectModel.withDefaultLevel(importedProjectName, "Erdgeschoss");
@@ -338,13 +345,9 @@ public final class DxfProjectExchangeService {
             return project;
         }
         List<Level> importedLevels = new ArrayList<>(levels.values());
-        ProjectModel project = ProjectModel.withDefaultLevel(importedProjectName, importedLevels.getFirst().name());
+        ProjectModel project = createProject(importedProjectName, importedLevels);
         project.defineNorthAngle(importedNorthAngle);
         project.defineFrontAngle(importedFrontAngle);
-        copyLevelContents(importedLevels.getFirst(), project.primaryLevel());
-        for (int index = 1; index < importedLevels.size(); index++) {
-            project.addLevel(importedLevels.get(index).copy());
-        }
         if (importedRoof != null) {
             project.defineRoof(importedRoof);
         }
@@ -625,13 +628,48 @@ public final class DxfProjectExchangeService {
         return storedInDegrees ? value : value * 90.0;
     }
 
-    private List<String> extractMetadata(List<String> lines) {
-        return DxfDocumentSupport.parseEntities(lines).stream()
+    private List<String> extractMetadata(List<DxfDocumentSupport.DxfEntity> entities) {
+        return entities.stream()
                 .filter(entity -> entity.type().equals("TEXT"))
                 .filter(entity -> entity.layer().equals(DxfLayer.CADAS_META.name()))
                 .flatMap(entity -> entity.firstValue(1).stream())
                 .filter(text -> !text.isBlank())
                 .toList();
+    }
+
+    private ProjectModel createProject(String projectName, List<Level> levels) {
+        ProjectModel project = ProjectModel.withDefaultLevel(projectName, levels.getFirst().name());
+        copyLevelContents(levels.getFirst(), project.primaryLevel());
+        levels.stream().skip(1).map(Level::copy).forEach(project::addLevel);
+        return project;
+    }
+
+    private void importFallbackGeometry(
+            Map<String, Level> levels,
+            List<DxfDocumentSupport.DxfEntity> entities
+    ) {
+        Set<String> layerNames = entities.stream()
+                .map(DxfDocumentSupport.DxfEntity::layer)
+                .filter(layer -> layer.endsWith("_WALLS") || layer.endsWith("_ROOMS"))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        for (String layerName : layerNames) {
+            String suffix = layerName.endsWith("_WALLS") ? "_WALLS" : "_ROOMS";
+            String prefix = layerName.substring(0, layerName.length() - suffix.length());
+            Level level = levels.values().stream()
+                    .filter(candidate -> sanitizeLayerName(candidate.name()).equals(prefix))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        Level imported = new Level(prefix.isBlank() ? "Erdgeschoss" : prefix);
+                        levels.put(imported.name(), imported);
+                        return imported;
+                    });
+            levelExchangeService.importFallbackGeometry(
+                    level,
+                    entities,
+                    prefix + "_WALLS",
+                    prefix + "_ROOMS"
+            );
+        }
     }
 
     private void copyLevelContents(Level source, Level target) {

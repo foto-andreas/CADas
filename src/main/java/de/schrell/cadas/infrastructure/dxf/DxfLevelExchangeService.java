@@ -317,10 +317,8 @@ public final class DxfLevelExchangeService {
 
         if (!metadata.isEmpty()) {
             importFromMetadata(level, metadata);
-            return level;
         }
-
-        importFallbackGeometry(level, entities);
+        importFallbackGeometry(level, entities, DxfLayer.WALLS.name(), DxfLayer.ROOMS.name());
         return level;
     }
 
@@ -498,17 +496,19 @@ public final class DxfLevelExchangeService {
         return storedInDegrees ? value : value * 90.0;
     }
 
-    private void importFallbackGeometry(Level level, List<DxfEntity> entities) {
+    void importFallbackGeometry(Level level, List<DxfEntity> entities, String wallLayer, String roomLayer) {
         for (DxfEntity entity : entities) {
-            if (entity.type().equals("LINE") && entity.layer().equals(DxfLayer.WALLS.name())) {
-                fallbackLineSegment(entity).ifPresent(segment -> level.addWall(Wall.create(
-                        segment,
-                        DEFAULT_WALL_THICKNESS,
-                        DEFAULT_WALL_HEIGHT
-                )));
-            } else if (entity.type().equals("LWPOLYLINE") && entity.layer().equals(DxfLayer.ROOMS.name())) {
+            if (entity.type().equals("LINE") && entity.layer().equals(wallLayer)) {
+                fallbackLineSegment(entity)
+                        .filter(segment -> level.walls().stream().noneMatch(wall -> sameSegment(wall.axis(), segment)))
+                        .ifPresent(segment -> level.addWall(Wall.create(
+                                segment,
+                                DEFAULT_WALL_THICKNESS,
+                                DEFAULT_WALL_HEIGHT
+                        )));
+            } else if (entity.type().equals("LWPOLYLINE") && entity.layer().equals(roomLayer)) {
                 List<PlanPoint> points = fallbackPolylinePoints(entity);
-                if (points.size() >= 3) {
+                if (points.size() >= 3 && !hasKnownOutline(level, points)) {
                     level.addRoom(new Room(
                             UUID.randomUUID(),
                             "Importierter Raum",
@@ -521,6 +521,26 @@ public final class DxfLevelExchangeService {
                 }
             }
         }
+    }
+
+    private boolean sameSegment(PlanSegment first, PlanSegment second) {
+        return samePoint(first.start(), second.start()) && samePoint(first.end(), second.end())
+                || samePoint(first.start(), second.end()) && samePoint(first.end(), second.start());
+    }
+
+    private boolean hasKnownOutline(Level level, List<PlanPoint> points) {
+        return level.rooms().stream().anyMatch(room -> sameOutline(room.outline(), points))
+                || level.floorExtensions().stream().anyMatch(extension -> sameOutline(extension.outline(), points))
+                || level.heatingExclusionAreas().stream().anyMatch(area -> sameOutline(rectangle(area), points));
+    }
+
+    private boolean sameOutline(List<PlanPoint> first, List<PlanPoint> second) {
+        return first.size() == second.size()
+                && first.stream().allMatch(point -> second.stream().anyMatch(candidate -> samePoint(point, candidate)));
+    }
+
+    private boolean samePoint(PlanPoint first, PlanPoint second) {
+        return first.distanceTo(second).toMillimeters() < 0.001;
     }
 
     private Optional<PlanSegment> fallbackLineSegment(DxfEntity entity) {

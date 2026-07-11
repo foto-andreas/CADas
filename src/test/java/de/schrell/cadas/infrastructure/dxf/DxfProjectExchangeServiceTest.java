@@ -607,6 +607,138 @@ class DxfProjectExchangeServiceTest {
     }
 
     @Test
+    void erhaeltProjektgeometrieBeiBeschaedigtenMetadaten() throws Exception {
+        Path file = tempDir.resolve("projekt-geometrie-fallback.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                PROJECT|Haus
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                LEVEL|Erdgeschoss
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WALL|Erdgeschoss|beschädigt
+                0
+                LINE
+                8
+                Erdgeschoss_WALLS
+                10
+                0
+                20
+                0
+                11
+                5000
+                21
+                0
+                0
+                LWPOLYLINE
+                8
+                Erdgeschoss_ROOMS
+                90
+                4
+                70
+                1
+                10
+                0
+                20
+                0
+                10
+                5000
+                20
+                0
+                10
+                5000
+                20
+                4000
+                10
+                0
+                20
+                4000
+                0
+                ENDSEC
+                0
+                EOF
+                """);
+
+        ProjectModel imported = exchangeService.importProject(file, "Fallback");
+
+        assertEquals("Haus", imported.name());
+        assertEquals(1, imported.primaryLevel().walls().size());
+        assertEquals(1, imported.primaryLevel().rooms().size());
+    }
+
+    @Test
+    void rekonstruiertEtagenAusProjektlayernOhneMetadaten() throws Exception {
+        Path file = tempDir.resolve("projektlayer-ohne-metadaten.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                LINE
+                8
+                EG_WALLS
+                10
+                0
+                20
+                0
+                11
+                3000
+                21
+                0
+                0
+                LWPOLYLINE
+                8
+                OG_ROOMS
+                90
+                4
+                70
+                1
+                10
+                0
+                20
+                0
+                10
+                3000
+                20
+                0
+                10
+                3000
+                20
+                3000
+                10
+                0
+                20
+                3000
+                0
+                ENDSEC
+                0
+                EOF
+                """);
+
+        ProjectModel imported = exchangeService.importProject(file, "Fallback");
+
+        assertEquals(2, imported.levels().size());
+        assertEquals(1, imported.levels().stream().filter(level -> level.name().equals("EG")).findFirst().orElseThrow().walls().size());
+        assertEquals(1, imported.levels().stream().filter(level -> level.name().equals("OG")).findFirst().orElseThrow().rooms().size());
+    }
+
+    @Test
     void vollstaendigerRundlaufMitOberflaechenEbenen() throws Exception {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "EG");
         var room = Room.rectangular("Wohnzimmer",

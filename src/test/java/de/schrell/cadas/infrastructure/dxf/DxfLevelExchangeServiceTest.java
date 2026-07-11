@@ -630,6 +630,56 @@ class DxfLevelExchangeServiceTest {
     }
 
     @Test
+    void ergaenztBeschaedigteMetadatenAusSichtbarerGeometrieOhneDuplikate() throws Exception {
+        Path file = tempDir.resolve("teilweise-beschaedigt.dxf");
+        Files.writeString(file, """
+                0
+                SECTION
+                2
+                ENTITIES
+                0
+                TEXT
+                8
+                CADAS_META
+                1
+                WALL|beschädigt
+                0
+                LINE
+                8
+                WALLS
+                10
+                0
+                20
+                0
+                11
+                4000
+                21
+                0
+                0
+                LINE
+                8
+                WALLS
+                10
+                4000
+                20
+                0
+                11
+                0
+                21
+                0
+                0
+                ENDSEC
+                0
+                EOF
+                """);
+
+        Level imported = exchangeService.importLevel(file, "Import");
+
+        assertEquals(1, imported.walls().size());
+        assertEquals(4000.0, imported.walls().getFirst().axis().length().toMillimeters(), 0.001);
+    }
+
+    @Test
     void exportiertUndImportiertRaeumeMitDachschraege() throws Exception {
         Level level = new Level("Dachgeschoss");
         level.addRoom(Room.withSlopedCeilings(
