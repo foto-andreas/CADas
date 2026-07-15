@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 
+/** Verwaltet die eingebauten Belag-Presets und erzeugt daraus validierte Oberflächenschichten. */
 public final class SurfaceCoveringPresetService {
 
     public static final String VARIOTHERM_DRY_PANEL_SOURCE = "Standard: Variotherm Trockenbau-FBH-Platte";

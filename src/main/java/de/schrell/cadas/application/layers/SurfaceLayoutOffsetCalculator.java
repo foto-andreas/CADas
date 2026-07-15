@@ -2,6 +2,7 @@ package de.schrell.cadas.application.layers;
 
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
+/** Bestimmt aus Anker, Richtung, Drehung und Randabständen den lokalen Startversatz eines Belagsrasters. */
 final class SurfaceLayoutOffsetCalculator {
 
     private static final double EPSILON = 0.001;

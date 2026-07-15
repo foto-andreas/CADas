@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/** Zerlegt eine rechteckige Zielfläche gemäß Fuge, Rand, Anker und Zuschnittsregeln in Plattenpositionen. */
 public final class TileLayoutService {
 
     private static final int CACHE_SIZE = 128;

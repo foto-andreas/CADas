@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+/** Überführt analysierte DWG-Blockdefinitionen in auswählbare Oberflächenbelag-Presets. */
 public final class DwgBlockCatalogService {
 
     private DwgBlockCatalogService() {

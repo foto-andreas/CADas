@@ -13,6 +13,9 @@ import de.schrell.cadas.domain.model.Wall;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Berechnet die geometrische Wirkung von Schichtdicken auf lichte Raummaße und lokale Oberflächenlagen.
+ */
 public final class SurfaceLayerEffectService {
 
     private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();

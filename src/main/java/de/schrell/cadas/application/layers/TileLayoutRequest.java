@@ -5,6 +5,7 @@ import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 
+/** Vollständig validierte Eingabe für die Belegung einer rechteckigen Fläche mit einem Plattenraster. */
 public record TileLayoutRequest(
         Length surfaceWidth,
         Length surfaceHeight,

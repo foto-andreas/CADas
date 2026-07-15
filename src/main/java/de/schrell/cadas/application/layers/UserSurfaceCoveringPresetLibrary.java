@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Stream;
 
+/** Persistiert anwenderdefinierte Belag-Presets deterministisch und getrennt von den eingebauten Vorgaben. */
 public final class UserSurfaceCoveringPresetLibrary {
 
     private static final String PRESET_EXTENSION = ".cadasbelag";

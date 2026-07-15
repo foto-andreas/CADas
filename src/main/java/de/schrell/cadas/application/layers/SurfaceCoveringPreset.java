@@ -9,6 +9,9 @@ import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 
+/**
+ * Wiederverwendbare Material- und Verlegevorgabe für eine einzelne Oberflächenschicht.
+ */
 public record SurfaceCoveringPreset(
         String id,
         String name,

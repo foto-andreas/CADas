@@ -5,6 +5,7 @@ import de.schrell.cadas.domain.model.SurfaceLayerStack;
 
 import java.util.List;
 
+/** Prüft und bereinigt Schichtaufbauten, deren Zielobjekt im aktuellen Etagenmodell nicht mehr existiert. */
 public final class SurfaceLayerConsistencyService {
 
     public boolean haveEqualSequence(SurfaceLayerStack first, SurfaceLayerStack second) {

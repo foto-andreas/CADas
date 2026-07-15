@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+/** Kodiert und dekodiert den stabilen Zielschlüssel aus Wand-ID und optionaler Raumseite. */
 public final class WallSurfaceTargetKey {
 
     private static final String ROOM_SEPARATOR = "@";

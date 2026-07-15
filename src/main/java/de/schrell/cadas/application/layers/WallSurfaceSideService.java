@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/** Ordnet eine Wandseite anhand gerichteter Wandachse und Raumlage der Innen- oder Außenfläche zu. */
 public final class WallSurfaceSideService {
 
     private static final double ROOM_TEST_OFFSET = 5.0;
