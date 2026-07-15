@@ -3,6 +3,7 @@ package de.schrell.cadas.domain.model;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -233,22 +234,52 @@ public final class Room {
     }
 
     public double volumeCubicMeters() {
-        if (ceilingVertexHeights != null && !ceilingVertexHeights.isEmpty()) {
-            double centerHeight = ceilingHeightAt(centerPoint());
-            double volumeMillimeters = 0.0;
-            for (int index = 0; index < outline.size(); index++) {
-                PlanPoint current = outline.get(index);
-                PlanPoint next = outline.get((index + 1) % outline.size());
-                double triangleArea = triangleArea(centerPoint(), current, next);
-                double averageHeight = (centerHeight + ceilingVertexHeights.get(index).toMillimeters() + ceilingVertexHeights.get((index + 1) % ceilingVertexHeights.size()).toMillimeters()) / 3.0;
-                volumeMillimeters += triangleArea * averageHeight;
-            }
-            return volumeMillimeters / 1_000_000_000.0;
+        return volumeCubicMeters(outline, 0.0);
+    }
+
+    /**
+     * Integriert die lichte Raumhöhe über dem angegebenen Teil des Grundrisses.
+     * Dachschrägen werden dabei als untere Hülle ihrer Ebenen behandelt; eine pauschale Mittelhöhe wäre bei
+     * begrenzten oder aufeinandertreffenden Schrägen fachlich falsch. Die Höhenreduktion bildet sichtbare Boden-
+     * und Deckenlagen ab. Außerhalb des Raumumrisses liegende Teile der übergebenen Fläche bleiben unberücksichtigt.
+     */
+    public double volumeCubicMeters(List<PlanPoint> footprint, double heightReductionMillimeters) {
+        Objects.requireNonNull(footprint, "footprint darf nicht null sein.");
+        if (footprint.size() < 3) {
+            return 0.0;
         }
-        double averageHeight = slopedCeilings.isEmpty()
-                ? roomHeight.toMillimeters()
-                : ceilingHeightAt(areaCentroid());
-        return areaSquareMeters() * averageHeight / 1000.0;
+        double reduction = Math.max(0.0, heightReductionMillimeters);
+        List<HeightRegion> heightRegions = ceilingVertexHeights == null || ceilingVertexHeights.isEmpty()
+                ? slopeHeightRegions()
+                : vertexHeightRegions();
+        double volumeCubicMillimeters = 0.0;
+        List<List<PlanPoint>> roomTriangles = triangulate(outline);
+        for (List<PlanPoint> footprintTriangle : triangulate(footprint)) {
+            for (List<PlanPoint> roomTriangle : roomTriangles) {
+                // Das zusätzliche Schneiden am Raum verhindert Volumen außerhalb konkaver Grundrisse.
+                List<PlanPoint> footprintInsideRoom = intersectConvexPolygons(footprintTriangle, roomTriangle);
+                if (footprintInsideRoom.size() < 3) {
+                    continue;
+                }
+                for (HeightRegion region : heightRegions) {
+                    List<PlanPoint> intersection = region.bounds() == null
+                            ? footprintInsideRoom
+                            : intersectConvexPolygons(footprintInsideRoom, region.bounds());
+                    if (intersection.size() < 3) {
+                        continue;
+                    }
+                    List<PlanPoint> activeRegion = clipByPlane(intersection, region.height(), reduction, true);
+                    for (Plane competingPlane : region.lowerThan()) {
+                        activeRegion = clipByPlaneDifference(activeRegion, region.height(), competingPlane);
+                        if (activeRegion.size() < 3) {
+                            break;
+                        }
+                    }
+                    volumeCubicMillimeters += integrate(activeRegion, region.height(), reduction);
+                }
+            }
+        }
+        return volumeCubicMillimeters / 1_000_000_000.0;
     }
 
     public PlanPoint areaCentroid() {
@@ -465,6 +496,207 @@ public final class Room {
                         + b.xMillimeters() * (c.yMillimeters() - a.yMillimeters())
                         + c.xMillimeters() * (a.yMillimeters() - b.yMillimeters())
         ) / 2.0;
+    }
+
+    private List<HeightRegion> slopeHeightRegions() {
+        List<Plane> planes = new ArrayList<>();
+        planes.add(new Plane(0.0, 0.0, roomHeight.toMillimeters()));
+        for (SlopedCeilingProfile profile : slopedCeilings) {
+            double run = runMillimeters(profile);
+            double lowHeight = profile.kneeWallHeight().toMillimeters();
+            double rise = roomHeight.toMillimeters() - lowHeight;
+            if (run <= 1.0 || rise <= 0.0) {
+                continue;
+            }
+            double gradient = rise / run;
+            planes.add(switch (profile.lowSide()) {
+                case NORTH -> new Plane(0.0, gradient, lowHeight - gradient * minYMillimeters());
+                case SOUTH -> new Plane(0.0, -gradient, lowHeight + gradient * maxYMillimeters());
+                case WEST -> new Plane(gradient, 0.0, lowHeight - gradient * minXMillimeters());
+                case EAST -> new Plane(-gradient, 0.0, lowHeight + gradient * maxXMillimeters());
+            });
+        }
+        // Doppelte Profile dürfen keine deckungsgleichen Integrationsgebiete und damit doppeltes Volumen erzeugen.
+        List<Plane> distinctPlanes = planes.stream().distinct().toList();
+        List<HeightRegion> regions = new ArrayList<>();
+        for (Plane plane : distinctPlanes) {
+            regions.add(new HeightRegion(null, plane, distinctPlanes.stream().filter(candidate -> candidate != plane).toList()));
+        }
+        return regions;
+    }
+
+    private List<HeightRegion> vertexHeightRegions() {
+        PlanPoint center = centerPoint();
+        double centerHeight = ceilingVertexHeights.stream()
+                .mapToDouble(Length::toMillimeters)
+                .average()
+                .orElse(roomHeight.toMillimeters());
+        List<HeightRegion> regions = new ArrayList<>();
+        for (int index = 0; index < outline.size(); index++) {
+            PlanPoint first = outline.get(index);
+            PlanPoint second = outline.get((index + 1) % outline.size());
+            Plane plane = Plane.through(
+                    center, centerHeight,
+                    first, ceilingVertexHeights.get(index).toMillimeters(),
+                    second, ceilingVertexHeights.get((index + 1) % outline.size()).toMillimeters()
+            );
+            regions.add(new HeightRegion(List.of(center, first, second), plane, List.of()));
+        }
+        return regions;
+    }
+
+    private List<List<PlanPoint>> triangulate(List<PlanPoint> polygon) {
+        // Ear-Clipping zerlegt auch konkave, einfache Grundrisse ohne Flächen außerhalb des Polygons.
+        List<PlanPoint> remaining = new ArrayList<>(polygon);
+        List<List<PlanPoint>> triangles = new ArrayList<>();
+        double orientation = Math.signum(signedArea(remaining));
+        if (orientation == 0.0) {
+            return List.of();
+        }
+        while (remaining.size() > 3) {
+            boolean earFound = false;
+            for (int index = 0; index < remaining.size(); index++) {
+                PlanPoint previous = remaining.get((index - 1 + remaining.size()) % remaining.size());
+                PlanPoint current = remaining.get(index);
+                PlanPoint next = remaining.get((index + 1) % remaining.size());
+                if (cross(previous, current, next) * orientation <= 0.001) {
+                    continue;
+                }
+                boolean containsVertex = remaining.stream()
+                        .filter(point -> point != previous && point != current && point != next)
+                        .anyMatch(point -> pointInsideTriangle(point, previous, current, next));
+                if (containsVertex) {
+                    continue;
+                }
+                triangles.add(List.of(previous, current, next));
+                remaining.remove(index);
+                earFound = true;
+                break;
+            }
+            if (!earFound) {
+                return List.of();
+            }
+        }
+        triangles.add(List.copyOf(remaining));
+        return triangles;
+    }
+
+    private List<PlanPoint> intersectConvexPolygons(List<PlanPoint> subject, List<PlanPoint> clipPolygon) {
+        List<PlanPoint> result = List.copyOf(subject);
+        double orientation = Math.signum(signedArea(clipPolygon));
+        for (int index = 0; index < clipPolygon.size() && !result.isEmpty(); index++) {
+            PlanPoint edgeStart = clipPolygon.get(index);
+            PlanPoint edgeEnd = clipPolygon.get((index + 1) % clipPolygon.size());
+            result = clip(result, point -> orientation * cross(edgeStart, edgeEnd, point));
+        }
+        return result;
+    }
+
+    private List<PlanPoint> clipByPlaneDifference(List<PlanPoint> polygon, Plane ownPlane, Plane competingPlane) {
+        return clip(polygon, point -> competingPlane.valueAt(point) - ownPlane.valueAt(point));
+    }
+
+    private List<PlanPoint> clipByPlane(List<PlanPoint> polygon, Plane plane, double threshold, boolean keepAbove) {
+        return clip(polygon, point -> keepAbove ? plane.valueAt(point) - threshold : threshold - plane.valueAt(point));
+    }
+
+    private List<PlanPoint> clip(List<PlanPoint> polygon, SignedDistance signedDistance) {
+        // Sutherland-Hodgman: Nichtnegative Distanz bezeichnet stets die beizubehaltende Halbebene.
+        if (polygon.isEmpty()) {
+            return List.of();
+        }
+        List<PlanPoint> result = new ArrayList<>();
+        PlanPoint previous = polygon.getLast();
+        double previousDistance = signedDistance.at(previous);
+        for (PlanPoint current : polygon) {
+            double currentDistance = signedDistance.at(current);
+            boolean previousInside = previousDistance >= -0.000001;
+            boolean currentInside = currentDistance >= -0.000001;
+            if (previousInside != currentInside) {
+                double ratio = previousDistance / (previousDistance - currentDistance);
+                result.add(new PlanPoint(
+                        previous.xMillimeters() + ratio * (current.xMillimeters() - previous.xMillimeters()),
+                        previous.yMillimeters() + ratio * (current.yMillimeters() - previous.yMillimeters())
+                ));
+            }
+            if (currentInside) {
+                result.add(current);
+            }
+            previous = current;
+            previousDistance = currentDistance;
+        }
+        return List.copyOf(result);
+    }
+
+    private double integrate(List<PlanPoint> polygon, Plane plane, double reduction) {
+        if (polygon.size() < 3) {
+            return 0.0;
+        }
+        double volume = 0.0;
+        PlanPoint first = polygon.getFirst();
+        for (int index = 1; index < polygon.size() - 1; index++) {
+            PlanPoint second = polygon.get(index);
+            PlanPoint third = polygon.get(index + 1);
+            // Für eine affine Ebene ist der Mittelwert der drei Eckhöhen das exakte Dreiecksmittel.
+            double averageHeight = (plane.valueAt(first) + plane.valueAt(second) + plane.valueAt(third)) / 3.0 - reduction;
+            volume += triangleArea(first, second, third) * Math.max(0.0, averageHeight);
+        }
+        return volume;
+    }
+
+    private double signedArea(List<PlanPoint> polygon) {
+        double sum = 0.0;
+        for (int index = 0; index < polygon.size(); index++) {
+            PlanPoint current = polygon.get(index);
+            PlanPoint next = polygon.get((index + 1) % polygon.size());
+            sum += current.xMillimeters() * next.yMillimeters() - next.xMillimeters() * current.yMillimeters();
+        }
+        return sum / 2.0;
+    }
+
+    private double cross(PlanPoint first, PlanPoint second, PlanPoint third) {
+        return (second.xMillimeters() - first.xMillimeters()) * (third.yMillimeters() - first.yMillimeters())
+                - (second.yMillimeters() - first.yMillimeters()) * (third.xMillimeters() - first.xMillimeters());
+    }
+
+    @FunctionalInterface
+    private interface SignedDistance {
+
+        double at(PlanPoint point);
+    }
+
+    private record HeightRegion(List<PlanPoint> bounds, Plane height, List<Plane> lowerThan) {
+    }
+
+    private record Plane(double xFactor, double yFactor, double offset) {
+
+        private static Plane through(
+                PlanPoint first, double firstHeight,
+                PlanPoint second, double secondHeight,
+                PlanPoint third, double thirdHeight
+        ) {
+            double determinant = crossDeterminant(first, second, third);
+            if (Math.abs(determinant) < 0.001) {
+                return new Plane(0.0, 0.0, (firstHeight + secondHeight + thirdHeight) / 3.0);
+            }
+            double xFactor = (firstHeight * (second.yMillimeters() - third.yMillimeters())
+                    + secondHeight * (third.yMillimeters() - first.yMillimeters())
+                    + thirdHeight * (first.yMillimeters() - second.yMillimeters())) / determinant;
+            double yFactor = (firstHeight * (third.xMillimeters() - second.xMillimeters())
+                    + secondHeight * (first.xMillimeters() - third.xMillimeters())
+                    + thirdHeight * (second.xMillimeters() - first.xMillimeters())) / determinant;
+            return new Plane(xFactor, yFactor, firstHeight - xFactor * first.xMillimeters() - yFactor * first.yMillimeters());
+        }
+
+        private static double crossDeterminant(PlanPoint first, PlanPoint second, PlanPoint third) {
+            return first.xMillimeters() * (second.yMillimeters() - third.yMillimeters())
+                    + second.xMillimeters() * (third.yMillimeters() - first.yMillimeters())
+                    + third.xMillimeters() * (first.yMillimeters() - second.yMillimeters());
+        }
+
+        private double valueAt(PlanPoint point) {
+            return xFactor * point.xMillimeters() + yFactor * point.yMillimeters() + offset;
+        }
     }
 
     @Override

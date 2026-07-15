@@ -10,7 +10,6 @@ import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -103,26 +102,16 @@ public final class SurfaceLayerEffectService {
     }
 
     public double effectiveVolumeCubicMeters(Level level, Room room) {
-        if (room.ceilingVertexHeightsProfile().isPresent()) {
-            List<Double> heights = new ArrayList<>();
-            for (PlanPoint point : room.outline()) {
-                heights.add(effectiveHeightAt(level, room, point));
-            }
-            double centerHeight = effectiveHeightAt(level, room, room.centerPoint());
-            double volumeMillimeters = 0.0;
-            for (int index = 0; index < room.outline().size(); index++) {
-                PlanPoint current = room.outline().get(index);
-                PlanPoint next = room.outline().get((index + 1) % room.outline().size());
-                double triangleArea = triangleArea(room.centerPoint(), current, next);
-                double averageHeight = (centerHeight + heights.get(index) + heights.get((index + 1) % heights.size())) / 3.0;
-                volumeMillimeters += triangleArea * averageHeight;
-            }
-            return volumeMillimeters / 1_000_000_000.0;
-        }
-        double averageHeight = room.slopedCeilingProfile().isPresent()
-                ? (effectiveMinimumCeilingHeightMillimeters(level, room) + effectiveMaximumCeilingHeightMillimeters(level, room)) / 2.0
-                : effectiveMaximumCeilingHeightMillimeters(level, room);
-        return effectiveAreaSquareMeters(level, room) * averageHeight / 1000.0;
+        double heightReduction = floorLayerThicknessMillimeters(level, room)
+                + ceilingLayerThicknessMillimeters(level, room);
+        return floorOpeningGeometryService.floorRectangles(level, room).stream()
+                .mapToDouble(rectangle -> room.volumeCubicMeters(List.of(
+                        new PlanPoint(rectangle.minX(), rectangle.minY()),
+                        new PlanPoint(rectangle.maxX(), rectangle.minY()),
+                        new PlanPoint(rectangle.maxX(), rectangle.maxY()),
+                        new PlanPoint(rectangle.minX(), rectangle.maxY())
+                ), heightReduction))
+                .sum();
     }
 
     public Length effectiveFloorThickness(Level level, Room room) {
@@ -133,11 +122,4 @@ public final class SurfaceLayerEffectService {
         return floorOpeningGeometryService.floorAreaSquareMeters(level, room);
     }
 
-    private double triangleArea(PlanPoint a, PlanPoint b, PlanPoint c) {
-        return Math.abs(
-                a.xMillimeters() * (b.yMillimeters() - c.yMillimeters())
-                        + b.xMillimeters() * (c.yMillimeters() - a.yMillimeters())
-                        + c.xMillimeters() * (a.yMillimeters() - b.yMillimeters())
-        ) / 2.0;
-    }
 }

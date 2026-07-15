@@ -7,7 +7,11 @@ import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
+import de.schrell.cadas.domain.model.FloorOpening;
+import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.SlopedCeilingProfile;
+import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceType;
@@ -72,6 +76,43 @@ class SurfaceLayerEffectServiceTest {
         assertEquals(2757.5, effectService.effectiveMaximumCeilingHeightMillimeters(level, room), 0.001);
         assertEquals(33.09, effectService.effectiveVolumeCubicMeters(level, room), 0.001);
         assertEquals(room.areaSquareMeters(), effectService.effectiveAreaSquareMeters(level, room), 0.001);
+    }
+
+    @Test
+    void integriertDachschraegeBelagsstaerkeUndBodenoeffnungLokal() {
+        Level level = new Level("Dachgeschoss");
+        Room room = Room.rectangular(
+                "Studio",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 4_000),
+                Length.ofMillimeters(3_000),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200),
+                new SlopedCeilingProfile(
+                        SlopedCeilingSide.NORTH,
+                        Length.ofMillimeters(1_000),
+                        Length.ofMillimeters(1_000)
+                )
+        );
+        level.addRoom(room);
+        SurfaceLayerStack floor = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        floor.addLayer(SurfaceLayer.create(
+                "Aufbau",
+                Length.ofMillimeters(100),
+                Length.ofMillimeters(1_000),
+                Length.ofMillimeters(1_000),
+                Length.zero()
+        ));
+        level.addSurfaceLayerStack(floor);
+        level.addFloorOpening(FloorOpening.create(
+                room.id(),
+                FloorOpeningShape.RECTANGLE,
+                new PlanPoint(1_500, 2_500),
+                Length.ofMillimeters(1_000),
+                Length.ofMillimeters(1_000)
+        ));
+
+        assertEquals(39.5, effectService.effectiveVolumeCubicMeters(level, room), 0.000_001);
     }
 
     @Test

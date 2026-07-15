@@ -144,6 +144,50 @@ class RoomTest {
     }
 
     @Test
+    void integriertBegrenzteDachschraegeUeberDieTatsaechlicheTeilflaeche() {
+        Room room = Room.rectangular(
+                "Dachzimmer",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 4_000),
+                Length.ofMillimeters(3_000),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200),
+                new SlopedCeilingProfile(
+                        SlopedCeilingSide.NORTH,
+                        Length.ofMillimeters(1_000),
+                        Length.ofMillimeters(1_000)
+                )
+        );
+
+        assertEquals(44.0, room.volumeCubicMeters(), 0.000_001);
+    }
+
+    @Test
+    void integriertSichTreffendeDachschraegenAlsUntereHuellflaeche() {
+        Room room = Room.withSlopedCeilings(
+                UUID.randomUUID(),
+                "Dachzimmer",
+                List.of(
+                        new PlanPoint(0, 0),
+                        new PlanPoint(4_000, 0),
+                        new PlanPoint(4_000, 4_000),
+                        new PlanPoint(0, 4_000)
+                ),
+                Length.ofMillimeters(3_000),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(200),
+                List.of(
+                        new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.ofMillimeters(1_000), Length.ofMillimeters(2_000)),
+                        new SlopedCeilingProfile(SlopedCeilingSide.SOUTH, Length.ofMillimeters(1_000), Length.ofMillimeters(2_000)),
+                        new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.ofMillimeters(1_000), Length.ofMillimeters(2_000))
+                ),
+                null
+        );
+
+        assertEquals(32.0, room.volumeCubicMeters(), 0.000_001);
+    }
+
+    @Test
     void ändertBeimUmbenennenKeineRaummaße() {
         Room room = Room.rectangular(
                 "Alt", new PlanPoint(0, 0), new PlanPoint(4_000, 3_000),
