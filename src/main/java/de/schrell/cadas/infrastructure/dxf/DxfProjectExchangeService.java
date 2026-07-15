@@ -1,6 +1,15 @@
 package de.schrell.cadas.infrastructure.dxf;
 
 import static de.schrell.cadas.infrastructure.dxf.DxfDocumentSupport.appendPair;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.deserializeCeilingVertexHeights;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.deserializePoints;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.deserializeSlopedCeilings;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.deserializeWallProfile;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.isUuid;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.serializeCeilingVertexHeights;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.serializePoints;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.serializeSlopedCeiling;
+import static de.schrell.cadas.infrastructure.dxf.DxfMetadataCodec.serializeWallProfile;
 import de.schrell.cadas.application.heating.HeatingCircuitRoutingService;
 import de.schrell.cadas.domain.geometry.Angle;
 import de.schrell.cadas.domain.geometry.Length;
@@ -767,23 +776,7 @@ public final class DxfProjectExchangeService {
         appendPair(dxf, 7, "Standard");
     }
 
-    private String serializePoints(List<PlanPoint> points) {
-        return points.stream()
-                .map(point -> String.format(Locale.US, "%.3f,%.3f", point.xMillimeters(), point.yMillimeters()))
-                .reduce((left, right) -> left + ";" + right)
-                .orElse("");
-    }
-
-    private List<PlanPoint> deserializePoints(String text) {
-        List<PlanPoint> points = new ArrayList<>();
-        for (String pair : text.split(";")) {
-            String[] values = pair.split(",");
-            points.add(new PlanPoint(parseDouble(values[0]), parseDouble(values[1])));
-        }
-        return points;
-    }
-
-    private HydronicHeating deserializeProjectHeating(String[] parts) {
+   private HydronicHeating deserializeProjectHeating(String[] parts) {
         return new HydronicHeating(
                 UUID.fromString(parts[2]), UUID.fromString(parts[3]),
                 HeatingSurfacePosition.valueOf(parts[4]), HeatingLayoutPattern.valueOf(parts[5]),
@@ -912,107 +905,7 @@ public final class DxfProjectExchangeService {
         );
     }
 
-    private String serializeSlopedCeiling(Room room) {
-        if (room.slopedCeilingProfiles().isEmpty()) {
-            return "NONE";
-        }
-        return "SLOPES;" + room.slopedCeilingProfiles().stream()
-                .map(profile -> String.format(Locale.US, "%s,%.3f,%.3f",
-                        profile.lowSide().name(),
-                        profile.kneeWallHeight().toMillimeters(),
-                        profile.horizontalRun().toMillimeters()))
-                .reduce((left, right) -> left + ";" + right)
-                .orElseThrow();
-    }
-
-    private String serializeCeilingVertexHeights(Room room) {
-        return room.ceilingVertexHeightsProfile()
-                .map(heights -> heights.stream()
-                        .map(height -> String.format(Locale.US, "%.3f", height.toMillimeters()))
-                        .reduce((left, right) -> left + ";" + right)
-                        .orElse("NONE"))
-                .orElse("NONE");
-    }
-
-    private List<SlopedCeilingProfile> deserializeSlopedCeilings(String value) {
-        if (value == null || value.isBlank() || value.equals("NONE")) {
-            return List.of();
-        }
-        if (value.startsWith("SLOPES;")) {
-            return java.util.Arrays.stream(value.substring("SLOPES;".length()).split(";"))
-                    .map(this::deserializeSlopeValues)
-                    .toList();
-        }
-        String[] parts = value.split(",");
-        if ((parts.length != 3 && parts.length != 4) || !parts[0].equals("SLOPE")) {
-            return List.of();
-        }
-        return List.of(new SlopedCeilingProfile(
-                SlopedCeilingSide.valueOf(parts[1]),
-                Length.ofMillimeters(parseDouble(parts[2])),
-                parts.length == 4 ? Length.ofMillimeters(parseDouble(parts[3])) : Length.zero()
-        ));
-    }
-
-    private SlopedCeilingProfile deserializeSlopeValues(String value) {
-        String[] parts = value.split(",");
-        return new SlopedCeilingProfile(
-                SlopedCeilingSide.valueOf(parts[0]),
-                Length.ofMillimeters(parseDouble(parts[1])),
-                Length.ofMillimeters(parseDouble(parts[2]))
-        );
-    }
-
-    private List<Length> deserializeCeilingVertexHeights(String value) {
-        if (value == null || value.isBlank() || value.equals("NONE")) {
-            return null;
-        }
-        List<Length> heights = new ArrayList<>();
-        for (String part : value.split(";")) {
-            heights.add(Length.ofMillimeters(parseDouble(part)));
-        }
-        return List.copyOf(heights);
-    }
-
-    private String serializeWallProfile(Wall wall) {
-        if (!wall.hasPolygonalProfile()) {
-            return "NONE";
-        }
-        return wall.profile().stream()
-                .map(point -> String.format(Locale.US, "%.3f,%.3f", point.offset().toMillimeters(), point.height().toMillimeters()))
-                .reduce((left, right) -> left + ";" + right)
-                .orElse("NONE");
-    }
-
-    private List<WallProfilePoint> deserializeWallProfile(String value) {
-        if (value == null || value.isBlank() || value.equals("NONE")) {
-            return List.of();
-        }
-        List<WallProfilePoint> profile = new ArrayList<>();
-        for (String serializedPoint : value.split(";")) {
-            String[] coordinates = serializedPoint.split(",");
-            if (coordinates.length != 2) {
-                throw new IllegalArgumentException("Ungültiger Wandprofilpunkt: " + serializedPoint);
-            }
-            profile.add(new WallProfilePoint(
-                    Length.ofMillimeters(parseDouble(coordinates[0])),
-                    Length.ofMillimeters(parseDouble(coordinates[1]))
-            ));
-        }
-        return List.copyOf(profile);
-    }
-
-    private static boolean isUuid(String text) {
-        if (text == null || text.length() != 36) return false;
-        try {
-            UUID.fromString(text);
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-    }
-
-    private String stripDxfExtension(String name) {
+   private String stripDxfExtension(String name) {
         String result = name;
         while (result.toLowerCase().endsWith(".dxf")) {
             result = result.substring(0, result.length() - 4);
