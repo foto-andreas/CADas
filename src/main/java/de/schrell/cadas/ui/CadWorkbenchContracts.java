@@ -4,7 +4,6 @@ import de.schrell.cadas.application.drawing.DraftingConstraints;
 import de.schrell.cadas.application.drawing.DimensionLabelPlacementService;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
 import de.schrell.cadas.application.drawing.DimensionTextStyle;
-import de.schrell.cadas.application.drawing.DimensionStandard;
 import de.schrell.cadas.application.drawing.EdgeResizeService;
 import de.schrell.cadas.application.drawing.GuideSnapTargets;
 import de.schrell.cadas.application.drawing.WallIntersectionSplitService;

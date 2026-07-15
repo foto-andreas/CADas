@@ -3,7 +3,6 @@ package de.schrell.cadas.ui;
 import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.startsAtMaximumX;
 import static de.schrell.cadas.ui.CadWorkbenchSurfaceLayoutSupport.startsAtMaximumY;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
-import de.schrell.cadas.application.drawing.DimensionStandard;
 import de.schrell.cadas.application.drawing.EdgeResizeService;
 import de.schrell.cadas.application.drawing.TextBlockingBox;
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
@@ -1265,26 +1264,17 @@ abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
         double directionX = endX - startX;
         double directionY = endY - startY;
         double directionLength = Math.max(1.0, Math.hypot(directionX, directionY));
-        if (currentDimensionStandard() == DimensionStandard.DIN_EN_ISO_7519_2025_01) {
-            double isoOffset = Math.abs(normalOffset) < 0.001 ? 24.0 : normalOffset;
-            var layout = dimensionLineLayoutService.layout(startX, startY, endX, endY, isoOffset);
-            drawIsoDimensionLines(graphics, layout, directionX / directionLength, directionY / directionLength);
-            DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
-                    layout, -1.0, DIMENSION_TEXT_AWAY_DISTANCE
-            );
-            midX = layout.textX() + away.deltaX();
-            midY = layout.textY() + away.deltaY();
-        } else {
-            midX += -directionY / directionLength * normalOffset;
-            midY += directionX / directionLength * normalOffset;
-        }
+        double isoOffset = Math.abs(normalOffset) < 0.001 ? 24.0 : normalOffset;
+        var layout = dimensionLineLayoutService.layout(startX, startY, endX, endY, isoOffset);
+        drawIsoDimensionLines(graphics, layout, directionX / directionLength, directionY / directionLength);
+        DimensionLineLayoutService.TextDelta away = dimensionLineLayoutService.textOffsetAwayFromLine(
+                layout, -1.0, DIMENSION_TEXT_AWAY_DISTANCE
+        );
+        midX = layout.textX() + away.deltaX();
+        midY = layout.textY() + away.deltaY();
         graphics.setFill(CadColorPalette.DIMENSION_TEXT);
         graphics.setFont(DIMENSION_LABEL_FONT);
         graphics.fillText(text, midX, midY);
-    }
-
-    DimensionStandard currentDimensionStandard() {
-        return DimensionStandard.DIN_EN_ISO_7519_2025_01;
     }
 
     void drawIsoDimensionLines(

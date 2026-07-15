@@ -3,7 +3,6 @@ package de.schrell.cadas.ui;
 import de.schrell.cadas.application.drawing.DimensionLabelService;
 import de.schrell.cadas.application.drawing.DimensionLineLayoutService;
 import de.schrell.cadas.application.drawing.DimensionTextStyle;
-import de.schrell.cadas.application.drawing.DimensionStandard;
 import de.schrell.cadas.application.heating.HydronicHeatingLayoutService;
 import de.schrell.cadas.application.drawing.TextBlockingBox;
 import de.schrell.cadas.application.drawing.WallDimensionPlacementService;
@@ -510,7 +509,7 @@ abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
 
     void appendWallDimensionLabels(List<PendingWallDimensionLabel> pendingLabels, Wall wall, DimensionTextStyle textStyle) {
         WallDimensionService.WallDimensions dimensions = wallDimensionService.dimensions(activeLevel.get(), wall);
-        double isoExtra = self().currentDimensionStandard() == DimensionStandard.DIN_EN_ISO_7519_2025_01 ? 12.0 : 0.0;
+        double isoExtra = 12.0;
         double baseOffset = Math.max(wall.thickness().toMillimeters() * self().scale() / 2.0 + 16.0 + isoExtra, 28.0 + isoExtra);
         double stepOffset = 20.0 + isoExtra;
         for (WallDimensionPlacementService.PlacedDimension placement : wallDimensionPlacementService.place(
