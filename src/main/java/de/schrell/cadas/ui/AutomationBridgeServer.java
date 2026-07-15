@@ -11,7 +11,10 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -19,15 +22,33 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
+/**
+ * Stellt ausschließlich für ausdrücklich aktivierte Testläufe eine lokale HTTP-Brücke zur JavaFX-Oberfläche bereit.
+ * Lesende Zustandsabfragen und verändernde Aktionen sind methodisch getrennt. Bis auf den inhaltsarmen Health-Check
+ * benötigen alle Endpunkte ein starkes Sitzungstoken; Browseranfragen fremder Herkunft werden unabhängig davon
+ * abgewiesen. Dateiaktionen bleiben auf eine beim Start kanonisch festgelegte Wurzel begrenzt.
+ */
 public final class AutomationBridgeServer {
 
+    private static final Duration FX_ACTION_TIMEOUT = Duration.ofSeconds(30);
+    private static final int MINIMUM_TOKEN_LENGTH = 32;
+    private static final int MAXIMUM_QUERY_LENGTH = 65_536;
     private final CadWorkbench workbench;
     private final HttpServer server;
+    private final String bearerToken;
+    private final Path automationRoot;
+    private final String serverOrigin;
 
-    private AutomationBridgeServer(CadWorkbench workbench, HttpServer server) {
+    AutomationBridgeServer(CadWorkbench workbench, HttpServer server, String bearerToken, Path automationRoot) throws IOException {
         this.workbench = workbench;
         this.server = server;
+        this.bearerToken = validateToken(bearerToken);
+        this.automationRoot = automationRoot.toAbsolutePath().normalize().toRealPath();
+        this.serverOrigin = "http://127.0.0.1:" + server.getAddress().getPort();
     }
 
     public static Optional<AutomationBridgeServer> startIfEnabled(CadWorkbench workbench) {
@@ -39,11 +60,16 @@ public final class AutomationBridgeServer {
         int port = Integer.getInteger("cadas.automation.port", 17845);
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
-            AutomationBridgeServer bridge = new AutomationBridgeServer(workbench, server);
+            AutomationBridgeServer bridge = new AutomationBridgeServer(
+                    workbench,
+                    server,
+                    configuredToken(),
+                    configuredAutomationRoot()
+            );
             bridge.registerContexts();
             server.start();
             workbench.automationSetErrorDialogsEnabled(false);
-            workbench.automationSetStatusText("Automatisierungszugriff aktiv auf http://127.0.0.1:" + port);
+            workbench.automationSetStatusText("Geschützter Automatisierungszugriff aktiv auf http://127.0.0.1:" + port);
             return Optional.of(bridge);
         } catch (IOException exception) {
             throw new IllegalStateException("Automatisierungsserver konnte nicht gestartet werden.", exception);
@@ -54,9 +80,13 @@ public final class AutomationBridgeServer {
         server.stop(0);
     }
 
-    private void registerContexts() {
-        server.createContext("/health", exchange -> writeJson(exchange, 200, "{\"status\":\"ok\"}"));
-        server.createContext("/state", exchange -> writeJson(exchange, 200, snapshotJson(callOnFx(workbench::automationSnapshot))));
+    void registerContexts() {
+        server.createContext("/health", exchange -> handleRead(exchange, false, () -> "{\"status\":\"ok\"}"));
+        server.createContext("/state", exchange -> handleRead(
+                exchange,
+                true,
+                () -> snapshotJson(callOnFx(workbench::automationSnapshot))
+        ));
         server.createContext("/tool", exchange -> handleMutation(exchange, query -> {
             workbench.automationSetTool(required(query, "value"));
             return workbench.automationSnapshot();
@@ -124,13 +154,16 @@ public final class AutomationBridgeServer {
         server.createContext("/invoke", exchange -> handleMutation(exchange, query -> {
             WorkbenchAutomationSnapshot direct = workbench.automationInvoke(
                     required(query, "action"),
-                    Optional.ofNullable(query.get("path")).map(Path::of).orElse(null)
+                    Optional.ofNullable(query.get("path")).map(this::validatedAutomationPath).orElse(null)
             );
             return direct != null ? direct : workbench.automationSnapshot();
         }));
     }
 
     private void handleMutation(HttpExchange exchange, FxSnapshotAction action) throws IOException {
+        if (!acceptRequest(exchange, "POST", true)) {
+            return;
+        }
         try {
             WorkbenchAutomationSnapshot snapshot = callOnFx(() -> action.run(parseQuery(exchange.getRequestURI())));
             writeJson(exchange, 200, snapshotJson(snapshot));
@@ -139,6 +172,52 @@ public final class AutomationBridgeServer {
         } catch (Exception exception) {
             writeJson(exchange, 500, errorJson(exception.getMessage()));
         }
+    }
+
+    private void handleRead(HttpExchange exchange, boolean authenticationRequired, Supplier<String> response) throws IOException {
+        if (!acceptRequest(exchange, "GET", authenticationRequired)) {
+            return;
+        }
+        try {
+            writeJson(exchange, 200, response.get());
+        } catch (Exception exception) {
+            writeJson(exchange, 500, errorJson(exception.getMessage()));
+        }
+    }
+
+    private boolean acceptRequest(HttpExchange exchange, String expectedMethod, boolean authenticationRequired) throws IOException {
+        if (!expectedMethod.equals(exchange.getRequestMethod())) {
+            exchange.getResponseHeaders().set("Allow", expectedMethod);
+            writeJson(exchange, 405, errorJson("HTTP-Methode nicht erlaubt."));
+            return false;
+        }
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin != null && !MessageDigest.isEqual(
+                origin.getBytes(StandardCharsets.UTF_8),
+                serverOrigin.getBytes(StandardCharsets.UTF_8)
+        )) {
+            writeJson(exchange, 403, errorJson("Browser-Origin ist für die Automatisierung nicht zugelassen."));
+            return false;
+        }
+        if (authenticationRequired && !authorized(exchange.getRequestHeaders().getFirst("Authorization"))) {
+            exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
+            writeJson(exchange, 401, errorJson("Gültiges Automatisierungstoken erforderlich."));
+            return false;
+        }
+        String rawQuery = exchange.getRequestURI().getRawQuery();
+        if (rawQuery != null && rawQuery.length() > MAXIMUM_QUERY_LENGTH) {
+            writeJson(exchange, 414, errorJson("Abfrage ist zu lang."));
+            return false;
+        }
+        return true;
+    }
+
+    private boolean authorized(String authorizationHeader) {
+        String expected = "Bearer " + bearerToken;
+        return authorizationHeader != null && MessageDigest.isEqual(
+                authorizationHeader.getBytes(StandardCharsets.UTF_8),
+                expected.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     private <T> T callOnFx(Callable<T> action) {
@@ -161,8 +240,12 @@ public final class AutomationBridgeServer {
     }
 
     static <T> T awaitAutomationResult(CompletableFuture<T> future) {
+        return awaitAutomationResult(future, FX_ACTION_TIMEOUT);
+    }
+
+    static <T> T awaitAutomationResult(CompletableFuture<T> future, Duration timeout) {
         try {
-            return future.get();
+            return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Warten auf Automatisierungsaktion wurde unterbrochen.", exception);
@@ -175,6 +258,28 @@ public final class AutomationBridgeServer {
                 throw error;
             }
             throw new IllegalStateException("Automatisierungsaktion konnte nicht abgeschlossen werden.", cause);
+        } catch (TimeoutException exception) {
+            future.cancel(true);
+            throw new IllegalStateException("Automatisierungsaktion wurde nach " + timeout.toMillis() + " ms abgebrochen.", exception);
+        }
+    }
+
+    Path validatedAutomationPath(String value) {
+        Path candidate = Path.of(value).toAbsolutePath().normalize();
+        Path existingAncestor = candidate;
+        while (existingAncestor != null && !Files.exists(existingAncestor)) {
+            existingAncestor = existingAncestor.getParent();
+        }
+        try {
+            if (existingAncestor == null || !existingAncestor.toRealPath().startsWith(automationRoot)) {
+                throw new IllegalArgumentException("Dateipfad liegt außerhalb der Automatisierungswurzel.");
+            }
+            if (Files.exists(candidate) && !candidate.toRealPath().startsWith(automationRoot)) {
+                throw new IllegalArgumentException("Dateipfad verweist außerhalb der Automatisierungswurzel.");
+            }
+            return candidate;
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Dateipfad konnte nicht sicher geprüft werden.", exception);
         }
     }
 
@@ -212,6 +317,8 @@ public final class AutomationBridgeServer {
     private void writeJson(HttpExchange exchange, int status, String json) throws IOException {
         byte[] body = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         exchange.sendResponseHeaders(status, body.length);
         try (OutputStream outputStream = exchange.getResponseBody()) {
             outputStream.write(body);
@@ -274,6 +381,28 @@ public final class AutomationBridgeServer {
             }
         }
         return escaped.toString();
+    }
+
+    private static String configuredToken() {
+        return Optional.ofNullable(System.getProperty("cadas.automation.token"))
+                .or(() -> Optional.ofNullable(System.getenv("CADAS_AUTOMATION_TOKEN")))
+                .orElseThrow(() -> new IllegalStateException(
+                        "Für den Automatisierungsserver muss `cadas.automation.token` oder `CADAS_AUTOMATION_TOKEN` gesetzt sein."
+                ));
+    }
+
+    private static Path configuredAutomationRoot() {
+        String value = Optional.ofNullable(System.getProperty("cadas.automation.root"))
+                .or(() -> Optional.ofNullable(System.getenv("CADAS_AUTOMATION_ROOT")))
+                .orElse(System.getProperty("user.dir"));
+        return Path.of(value);
+    }
+
+    private static String validateToken(String token) {
+        if (token == null || token.length() < MINIMUM_TOKEN_LENGTH) {
+            throw new IllegalArgumentException("Das Automatisierungstoken muss mindestens 32 Zeichen lang sein.");
+        }
+        return token;
     }
 
     @FunctionalInterface

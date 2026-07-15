@@ -17,6 +17,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Comparator
+import java.util.UUID
 import java.util.zip.ZipFile
 
 plugins {
@@ -668,5 +669,11 @@ tasks.register<Exec>("runMitAutomatisierung") {
     description = "Startet CADas mit lokalem HTTP-Automatisierungszugriff für manuelle und agentische Tests."
     dependsOn(tasks.installDist)
     executable = layout.buildDirectory.file("install/CADas/bin/CADas").get().asFile.absolutePath
-    environment("JAVA_OPTS", "-Dcadas.automation.enabled=true")
+    doFirst {
+        val token = System.getenv("CADAS_AUTOMATION_TOKEN") ?: UUID.randomUUID().toString()
+        environment("JAVA_OPTS", "-Dcadas.automation.enabled=true")
+        environment("CADAS_AUTOMATION_TOKEN", token)
+        environment("CADAS_AUTOMATION_ROOT", project.layout.projectDirectory.asFile.absolutePath)
+        logger.lifecycle("Automatisierungstoken dieser Sitzung: $token")
+    }
 }
