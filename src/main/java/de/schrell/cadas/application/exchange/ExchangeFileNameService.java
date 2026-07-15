@@ -4,6 +4,9 @@ import java.nio.file.Path;
 
 public final class ExchangeFileNameService {
 
+    private ExchangeFileNameService() {
+    }
+
     public static Path ensureSingleExtension(Path path, String extension) {
         Path parent = path.getParent();
         String normalizedFilename = stripRepeatedExtension(path.getFileName().toString(), extension) + extension;
