@@ -12,6 +12,9 @@ import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
+/**
+ * JavaFX-Anwendungseinstieg, der die primäre Bühne und die CADas-Workbench im Lebenszyklus der UI aufbaut.
+ */
 public final class CadApplication extends Application {
 
     @Override
