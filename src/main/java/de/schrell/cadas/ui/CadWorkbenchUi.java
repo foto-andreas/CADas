@@ -1165,6 +1165,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         if (accelerator != null) {
             menuItem.setAccelerator(accelerator);
         }
+        attachMenuTooltip(menuItem, menuTooltip(label));
         return menuItem;
     }
 
@@ -1175,6 +1176,7 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
     CheckMenuItem checkMenuItem(String label, BooleanProperty property) {
         CheckMenuItem menuItem = new CheckMenuItem(label);
         menuItem.selectedProperty().bindBidirectional(property);
+        attachMenuTooltip(menuItem, optionTooltip(label));
         return menuItem;
     }
 
@@ -1185,7 +1187,115 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
                 property.set(Boolean.TRUE.equals(isSelected) ? checkedValue : uncheckedValue));
         property.addListener((obs, oldValue, newValue) ->
                 menuItem.setSelected(newValue == checkedValue));
+        attachMenuTooltip(menuItem, optionTooltip(label));
         return menuItem;
+    }
+
+    private void attachMenuTooltip(MenuItem menuItem, String tooltipText) {
+        Label information = new Label("ⓘ");
+        information.setStyle("-fx-text-fill: #5c6f82; -fx-font-size: 11px;");
+        self().applyTooltip(information, tooltipText);
+        menuItem.setGraphic(information);
+        // Die Eigenschaft macht den Hilfetext auch für Automation und Barrierefreiheitsprüfungen zugänglich.
+        menuItem.getProperties().put("cadas.tooltip", tooltipText);
+    }
+
+    private String menuTooltip(String label) {
+        return switch (label) {
+            case "Etage hinzufügen" -> "Fügt dem aktuellen Gebäude eine neue Etage hinzu und macht sie zur aktiven Bearbeitungsebene.";
+            case "Projekt leeren" -> "Entfernt nach Bestätigung alle Bauteile und Etageninhalte aus dem aktuellen Projekt und beginnt mit einem leeren Grundriss.";
+            case "Laden" -> "Lädt ein vollständiges CADas-Gebäude aus einer DXF- oder CADas-Datei und ersetzt nach der Sicherheitsabfrage das aktuelle Projekt.";
+            case "Sichern" -> "Speichert das vollständige Gebäude am zuletzt gewählten Projektpfad; ohne bekannten Pfad wird zuerst ein Ziel abgefragt.";
+            case "Sichern als ..." -> "Speichert eine neue Kopie des vollständigen Gebäudes unter einem frei gewählten Dateinamen und merkt sich dieses Ziel.";
+            case "Etage laden" -> "Importiert eine einzelne Etage aus einer unterstützten Austauschdatei in das aktuelle Gebäude.";
+            case "Etage sichern" -> "Speichert ausschließlich die aktive Etage am zuletzt dafür verwendeten Zielpfad.";
+            case "Etage sichern als ..." -> "Exportiert ausschließlich die aktive Etage unter einem neu gewählten Dateinamen.";
+            case "Teilebibliothek laden" -> "Registriert eine externe CAD-Teilebibliothek und stellt deren Bauteile für Beläge und Raumobjekte bereit.";
+            case "3D-Objekt aus DXF/IFC/RFA laden" -> "Importiert ein dreidimensionales Einzelobjekt aus DXF, IFC oder RFA und bereitet seine Geometrie für die Objektbibliothek auf.";
+            case "Beenden" -> "Beendet CADas; bei ungespeicherten Änderungen wird zuvor Sichern, Verwerfen oder Abbrechen angeboten.";
+            case "Rückgängig" -> "Stellt den vorherigen fachlichen Projektzustand aus der begrenzten Undo-Historie wieder her.";
+            case "Wiederherstellen" -> "Wendet den zuletzt rückgängig gemachten fachlichen Projektzustand erneut an.";
+            case "Eigenschaften auf Auswahl anwenden" -> "Übernimmt die sichtbaren, zum Bauteiltyp passenden Eigenschaftswerte auf alle ausgewählten Elemente.";
+            case "Auswahl löschen" -> "Entfernt alle aktuell ausgewählten und löschbaren Bauteile aus der aktiven Etage.";
+            case "Auswahl aufheben" -> "Leert die Auswahl, ohne Bauteile oder Projekteigenschaften zu verändern.";
+            case "2D-Arbeitsbereich" -> "Zeigt die Grundriss-Zeichenfläche als alleinigen großen Arbeitsbereich an.";
+            case "3D-Arbeitsbereich" -> "Zeigt die frei drehbare dreidimensionale Gebäudeansicht als großen Arbeitsbereich an.";
+            case "3D-Innenansicht" -> "Öffnet die begehbare Innenansicht im ausgewählten oder ersten Raum der aktiven Etage.";
+            case "2D-Ansicht zentrieren" -> "Setzt Zoom und Verschiebung der zweidimensionalen Zeichenfläche auf die Startansicht zurück.";
+            case "3D-Ansicht zentrieren" -> "Passt das sichtbare dreidimensionale Modell wieder vollständig in den Ansichtsbereich ein.";
+            case "Heizkreis-Router Vario testen" -> "Öffnet das technische Testfenster für die Vario- und Meander-Routingsprache, ohne das aktuelle Projekt automatisch zu verändern.";
+            case "Geländehöhen bearbeiten" -> "Erklärt und aktiviert den Arbeitsablauf zum Setzen von Geländehöhen im äußeren 2D-Geländeband.";
+            case "Heizlast" -> "Öffnet die Heizlasttabelle aller Räume und speichert validierte Wattwerte zurück in das Projekt.";
+            case "Bauzeichnung als PDF exportieren" -> "Erzeugt eine gerasterte Bauzeichnungs-PDF mit Ansichten, Bemaßung und konfigurierten Heizungsseiten.";
+            case "Räume und Materialien anzeigen" -> "Berechnet Raum-, Heizungs- und Materialdaten und zeigt den Bericht in einem eigenen Fenster an.";
+            case "Räume und Materialien als PDF exportieren" -> "Berechnet Raum-, Heizungs- und Materialdaten und schreibt sie mit Rasteransichten in eine PDF-Datei.";
+            case "Räume und Materialien als MD exportieren" -> "Berechnet Raum-, Heizungs- und Materialdaten und schreibt einen prüfbaren Markdown-Bericht.";
+            case "Über CADas" -> "Zeigt Version, Build-Zeitpunkt, Laufzeitumgebung und grundlegende Programminformationen an.";
+            case "Benutzerdokumentation" -> "Öffnet die vollständige integrierte Bedienungsanleitung mit Inhaltsverzeichnis und Suche.";
+            case "Keymap und Mausbedienung" -> "Öffnet die Übersicht der Tastaturkürzel, Mausaktionen und Zeichenwerkzeuge.";
+            case "Drittanbieter-Lizenzen" -> "Öffnet die beim Build automatisch erzeugte Liste aller eingebetteten Drittanbieter-Lizenzen.";
+            default -> dynamicMenuTooltip(label);
+        };
+    }
+
+    private String dynamicMenuTooltip(String label) {
+        if (label.startsWith("Zu ")) {
+            return "Schaltet die zweidimensionale Projektion unmittelbar auf „" + label.substring(3) + "“ um; die Gebäudegeometrie bleibt unverändert.";
+        }
+        if (label.contains("spiegeln")) {
+            return "Spiegelt die ausgewählten Heizkreise in der bezeichneten Richtung und aktualisiert Anschlüsse sowie Routing-Geometrie gemeinsam.";
+        }
+        if (label.contains("90°")) {
+            return "Dreht oder korrigiert die aktuelle Bauteilauswahl exakt um 90 Grad und übernimmt die Änderung in die Undo-Historie.";
+        }
+        if (label.equals(DrawingTool.EDIT.label())) {
+            return statusHintForTool(DrawingTool.EDIT);
+        }
+        for (DrawingTool tool : DrawingTool.values()) {
+            if (label.equals(tool.label())) {
+                return statusHintForTool(tool);
+            }
+        }
+        return "Führt die Aktion „" + label + "“ auf der aktuellen Auswahl oder dem aktiven Projekt aus und übernimmt fachliche Änderungen in die Undo-Historie.";
+    }
+
+    private String statusHintForTool(DrawingTool tool) {
+        return switch (tool) {
+            case EDIT -> "Aktiviert die Auswahl und Bearbeitung vorhandener Bauteile; Alt schaltet zwischen überdeckten Treffern um.";
+            case WALL -> "Aktiviert das Wandwerkzeug; zwei Klickpunkte erzeugen eine Wand mit den eingestellten Stärken und Höhen.";
+            case STAIR -> "Aktiviert das Treppenwerkzeug; ein aufgezogenes Rechteck platziert das gewählte Treppenpreset.";
+            case FLOOR_EXTENSION -> "Aktiviert das Werkzeug für Balkone und Emporen; ein Rechteck ergänzt eine innere oder äußere Bodenplatte.";
+            case FLOOR_OPENING_RECTANGLE -> "Aktiviert rechteckige Bodenöffnungen, die innerhalb eines Raums aufgezogen und aus Fläche sowie Volumen ausgespart werden.";
+            case FLOOR_OPENING_CIRCLE -> "Aktiviert runde Bodenöffnungen, deren Begrenzungsquadrat innerhalb eines Raums aufgezogen wird.";
+            case HEATING_ZONE_RECTANGLE -> "Aktiviert halbautomatische Heizkreise; ein Rechteck im Raum erzeugt eine anschließend bearbeitbare Verlegezone.";
+            case HEATING_MANIFOLD -> "Aktiviert Heizkreisverteiler; Klick oder Rechteck platziert Vorlauf- und Rücklaufanschlüsse im Grundriss.";
+            case HEATING_EXCLUSION_RECTANGLE -> "Aktiviert FBH-Sperrflächen, die beim automatischen Rohrlayout innerhalb eines Raums ausgespart werden.";
+            case DOOR -> "Aktiviert Türen; ein Klick auf eine geeignete Wand platziert die Tür mit den eingestellten Maßen.";
+            case WINDOW -> "Aktiviert Fenster; ein Klick auf eine geeignete Wand platziert das Fenster mit Breite, Höhe und Brüstung.";
+            case ROOF_WINDOW -> "Aktiviert Dachfenster; ein Klick in einen Raum mit Dachschräge platziert das Fenster in der Dachfläche.";
+            case OBJECT -> "Aktiviert Raumobjekte; ein Klick platziert das gewählte Preset mit den eingestellten Abmessungen und der Montageart.";
+        };
+    }
+
+    private String optionTooltip(String label) {
+        return switch (label) {
+            case "Raster anzeigen" -> "Blendet das sichtbare 2D-Raster ein oder aus, ohne die Einrastfunktion zu verändern.";
+            case "Auf Raster einrasten" -> "Lässt neue und verschobene Geometrie magnetisch auf der eingestellten Rasterweite einrasten.";
+            case "Auf Punkte einrasten" -> "Lässt den Mauszeiger magnetisch auf vorhandenen Linien- und Bauteilendpunkten einrasten.";
+            case "Hilfslinien anzeigen" -> "Blendet alle horizontalen und vertikalen Hilfslinien der 2D-Zeichenfläche ein oder aus.";
+            case "Hilfslinienabstände anzeigen" -> "Zeigt beim Bearbeiten die Abstände zwischen parallelen Hilfslinien an.";
+            case "An Hilfslinien einrasten" -> "Lässt Bauteilkanten und Mittellinien magnetisch an sichtbaren Hilfslinien einrasten.";
+            case "An anderen Wänden einrasten" -> "Lässt neue oder verschobene Wände an Achsen, Kanten und Enden vorhandener Wände einrasten.";
+            case "ISO-Bemaßung anzeigen" -> "Blendet die normorientierte 2D-Bemaßung ein oder aus, ohne gespeicherte Gebäudeabmessungen zu verändern.";
+            case "Erweiterte Maßtexte anzeigen" -> "Wechselt zwischen reinen Längen und ausführlichen Maßtexten mit Raum- und Außenmaßangaben.";
+            case "Objekte anzeigen" -> "Blendet platzierte Raumobjekte gemeinsam in den 2D-, 3D- und Innenansichten ein oder aus.";
+            case "Gelände in 2D anzeigen" -> "Blendet das Geländeband in der Grundrissansicht ein oder aus; 3D und Seitenansichten bleiben unverändert.";
+            case "Heizkreise anzeigen" -> "Blendet Heizflächen, Rohrwege und Anschlussmarker in der 2D-Ansicht ein oder aus, ohne die Planung zu löschen.";
+            case "Variotherm-Kreise anzeigen" -> "Blendet die Variotherm-Kreiskennzeichnung in der 2D-Ansicht ein oder aus.";
+            case "Fläche und Volumen anzeigen" -> "Blendet berechnete Raumflächen und Raumvolumen als prüfbare Beschriftung im Grundriss ein oder aus.";
+            case "Nordpfeil anzeigen" -> "Blendet den am gespeicherten Nordwinkel ausgerichteten Nordpfeil in der 2D-Ansicht ein oder aus.";
+            default -> "Schaltet die Darstellungsoption „" + label + "“ um, ohne die zugrunde liegende Gebäudegeometrie zu löschen.";
+        };
     }
 
     KeyCombination shortcutKey(KeyCode keyCode) {

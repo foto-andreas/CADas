@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.UUID;
 import javafx.geometry.Point2D;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Control;
 import javafx.scene.control.Alert;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
@@ -316,7 +317,11 @@ abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
         Tooltip tooltip = new Tooltip(text);
         tooltip.setWrapText(true);
         tooltip.setMaxWidth(320);
-        Tooltip.install(node, tooltip);
+        if (node instanceof Control control) {
+            control.setTooltip(tooltip);
+        } else {
+            Tooltip.install(node, tooltip);
+        }
     }
 
     void createLevel() {

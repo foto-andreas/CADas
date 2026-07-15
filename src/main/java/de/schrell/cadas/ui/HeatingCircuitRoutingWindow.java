@@ -34,6 +34,7 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
@@ -1088,7 +1089,11 @@ final class HeatingCircuitRoutingWindow {
         Tooltip tooltip = new Tooltip(text);
         tooltip.setWrapText(true);
         tooltip.setMaxWidth(360);
-        Tooltip.install(node, tooltip);
+        if (node instanceof Control control) {
+            control.setTooltip(tooltip);
+        } else {
+            Tooltip.install(node, tooltip);
+        }
     }
 
     private record AreaSize(double widthMillimeters, double heightMillimeters) {

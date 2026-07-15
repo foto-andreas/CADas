@@ -49,6 +49,7 @@ import javafx.scene.SubScene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
@@ -1334,7 +1335,11 @@ public final class ThreeDViewport extends BorderPane {
         Tooltip tooltip = new Tooltip(text);
         tooltip.setWrapText(true);
         tooltip.setMaxWidth(320);
-        Tooltip.install(node, tooltip);
+        if (node instanceof Control control) {
+            control.setTooltip(tooltip);
+        } else {
+            Tooltip.install(node, tooltip);
+        }
     }
 
     private ProjectionMode currentProjectionMode() {

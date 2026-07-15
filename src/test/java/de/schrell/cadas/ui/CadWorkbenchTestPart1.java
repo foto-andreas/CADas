@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.UUID;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.input.KeyCode;
 import javafx.scene.Scene;
 import javafx.scene.layout.VBox;
@@ -41,6 +42,32 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class CadWorkbenchTestPart1 extends CadWorkbenchTestBase {
+
+    @Test
+    void dokumentiertAlleMenüaktionenMitAusführlichenTooltips() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            VBox topArea = (VBox) workbench.getTop();
+            MenuBar menuBar = (MenuBar) topArea.getChildren().getFirst();
+            List<MenuItem> menuItems = menuBar.getMenus().stream()
+                    .flatMap(menu -> menu.getItems().stream())
+                    .filter(item -> !(item instanceof SeparatorMenuItem))
+                    .toList();
+            Assertions.assertFalse(menuItems.isEmpty());
+            for (MenuItem menuItem : menuItems) {
+                Object tooltipText = menuItem.getProperties().get("cadas.tooltip");
+                Assertions.assertInstanceOf(String.class, tooltipText, menuItem.getText());
+                Assertions.assertTrue(((String) tooltipText).length() >= 40, menuItem.getText());
+                Assertions.assertNotNull(menuItem.getGraphic(), menuItem.getText());
+            }
+            return null;
+        });
+    }
 
     @Test
     void startetMitEinemZentimeterRasterweite() throws Exception {
