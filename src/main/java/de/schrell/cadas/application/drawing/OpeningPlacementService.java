@@ -10,6 +10,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Projiziert Türen und Fenster auf eine Host-Wand und validiert ihre vollständige Lage im lokalen Wandprofil.
+ */
 public final class OpeningPlacementService {
 
     public Optional<Door> placeDoor(

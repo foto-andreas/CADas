@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Leitet Maßketten einer Wand aus Wandenden und Öffnungskanten ab und fasst numerisch gleiche Marken zusammen.
+ */
 public final class WallDimensionService {
 
     private static final double EPSILON = 0.001;

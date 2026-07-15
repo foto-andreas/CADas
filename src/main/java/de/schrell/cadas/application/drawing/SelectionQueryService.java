@@ -23,6 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Ermittelt Fachobjekte unter einem Klick oder vollständig innerhalb eines Auswahlrechtecks.
+ * Die Abfragen berücksichtigen sichtbare Geometrie statt nur Objektmittelpunkte.
+ */
 public final class SelectionQueryService {
 
     private final WallPlanOutlineService wallPlanOutlineService = new WallPlanOutlineService();

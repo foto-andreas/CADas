@@ -10,6 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Fängt einen Grundrisspunkt an horizontalen und vertikalen Hilfslinien innerhalb einer Millimetertoleranz.
+ */
 public final class GuideSnapService {
 
     private static final double EPSILON = 0.001;

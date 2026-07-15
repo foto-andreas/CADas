@@ -7,6 +7,10 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 
 import java.util.Optional;
 
+/**
+ * Berechnet aus Startpunkt, Zeigerposition und Eingabevorgaben den fachlich gültigen Endpunkt einer Wand.
+ * Manuelle Länge und Winkel haben Vorrang vor der orthogonalen Korrektur; alle Koordinaten sind Millimeter.
+ */
 public final class DraftingService {
 
     public PlanSegment createSegment(PlanPoint start, PlanPoint rawEnd, DraftingConstraints constraints) {

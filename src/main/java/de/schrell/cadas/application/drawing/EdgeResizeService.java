@@ -25,6 +25,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Verschiebt eine ausgewählte Polygonkante parallel und erzeugt daraus eine validierbare neue Kontur.
+ * Benachbarte Kanten werden an ihren Schnittpunkten angepasst, ohne die übrige Kontur frei zu verformen.
+ */
 public final class EdgeResizeService {
 
     private static final double MINIMUM_LENGTH = 1.0;

@@ -13,6 +13,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Bearbeitet Wandenden und propagiert gemeinsame Knoten auf verbundene Wände, ohne andere Endpunkte zu verändern.
+ */
 public final class WallEditingService {
 
     public Optional<WallEndpointSelection> findConnectedEndpoint(List<Wall> walls, PlanPoint clickPoint, Length tolerance) {

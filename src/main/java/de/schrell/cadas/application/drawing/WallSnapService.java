@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Ermittelt Fangpunkte an Wandenden und priorisiert den geometrisch nächsten gültigen Kandidaten.
+ */
 public final class WallSnapService {
 
     private static final double ORTHOGONAL_TOLERANCE = Math.tan(Math.toRadians(0.5));

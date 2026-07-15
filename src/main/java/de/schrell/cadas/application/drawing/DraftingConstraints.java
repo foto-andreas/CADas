@@ -6,6 +6,9 @@ import de.schrell.cadas.domain.geometry.Length;
 
 import java.util.Optional;
 
+/**
+ * Bündelt die optionalen Längen-, Winkel- und Orthogonalvorgaben eines einzelnen Zeichenschritts.
+ */
 public record DraftingConstraints(
         boolean orthogonalMode,
         boolean snapToGrid,

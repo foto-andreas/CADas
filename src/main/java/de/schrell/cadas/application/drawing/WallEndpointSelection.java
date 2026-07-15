@@ -5,6 +5,9 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Eindeutige Auswahl eines Anfangs- oder Endpunkts einer Wand einschließlich seiner aktuellen Weltposition.
+ */
 public record WallEndpointSelection(
         PlanPoint anchorPoint,
         List<UUID> startWallIds,

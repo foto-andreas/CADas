@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Korrigiert einen freien Zeigerpunkt auf die relativ zum Startpunkt nächstgelegene horizontale oder vertikale Achse.
+ */
 public final class OrthogonalCorrectionService {
 
     private static final double EPSILON = 0.001;

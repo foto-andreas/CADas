@@ -20,6 +20,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Verschiebt eine heterogene Auswahl gemeinsam und erhält dabei IDs sowie interne Objektbezüge.
+ */
 public final class SelectionTranslationService {
 
     private static final double EPSILON = 0.001;

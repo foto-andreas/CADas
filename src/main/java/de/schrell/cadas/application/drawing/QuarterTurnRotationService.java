@@ -16,6 +16,9 @@ import de.schrell.cadas.domain.model.Wall;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Dreht ausgewählte Fachobjekte in exakten 90-Grad-Schritten um den gemeinsamen Auswahlmittelpunkt.
+ */
 public final class QuarterTurnRotationService {
 
     public RotationResult rotate(Level level, Set<SelectionKey> selections, boolean clockwise) {

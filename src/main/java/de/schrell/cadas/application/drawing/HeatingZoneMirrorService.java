@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Spiegelt Heizungszonen samt manueller Routingsprache an einer horizontalen oder vertikalen Bezugsachse.
+ * Richtungsbefehle werden so übersetzt, dass die gespiegelte Rohrführung fachlich dieselbe Topologie behält.
+ */
 public final class HeatingZoneMirrorService {
 
     public MirrorResult mirror(Level level, Set<SelectionKey> selections, boolean horizontally) {

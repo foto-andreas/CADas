@@ -7,6 +7,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Wählt zwischen Raster- und Endpunktsnap den innerhalb der Toleranz nächstgelegenen Weltpunkt.
+ */
 public final class SnapService {
 
     private final GuideSnapService guideSnapService = new GuideSnapService();
