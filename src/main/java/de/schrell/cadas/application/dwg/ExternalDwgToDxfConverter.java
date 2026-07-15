@@ -1,6 +1,8 @@
 package de.schrell.cadas.application.dwg;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,10 +13,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class ExternalDwgToDxfConverter {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(90);
+    private static final int MAXIMUM_DIAGNOSTIC_OUTPUT_BYTES = 1_048_576;
     private static final List<Path> STANDARD_TOOL_DIRECTORIES = List.of(
             Path.of("/opt/homebrew/bin"),
             Path.of("/opt/homebrew/opt/libredwg/bin"),
@@ -65,24 +72,54 @@ public final class ExternalDwgToDxfConverter {
         Process process = new ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .start();
-        boolean finished = process.waitFor(timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
-        if (!finished) {
-            process.destroyForcibly();
-            process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
-            String output = readProcessOutput(process).trim();
-            String detail = output.isBlank() ? "" : ": " + output;
-            throw new IOException("DWG-Konverter wurde nach " + timeout.toMillis() + " ms abgebrochen: " + tool.displayName() + detail);
+        FutureTask<String> outputTask = new FutureTask<>(() -> readProcessOutput(process.getInputStream()));
+        Thread outputReader = Thread.ofVirtual().name("cadas-dwg-konverter-ausgabe").start(outputTask);
+        try {
+            boolean finished = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                process.waitFor(5, TimeUnit.SECONDS);
+                String output = completedOutput(outputTask).trim();
+                String detail = output.isBlank() ? "" : ": " + output;
+                throw new IOException("DWG-Konverter wurde nach " + timeout.toMillis() + " ms abgebrochen: " + tool.displayName() + detail);
+            }
+            String output = completedOutput(outputTask);
+            if (process.exitValue() != 0 || !Files.isRegularFile(targetDxfFile)) {
+                throw new IOException("DWG-Konvertierung fehlgeschlagen mit " + tool.displayName() + ": " + output.trim());
+            }
+            return new DwgConversionResult(targetDxfFile, tool.displayName(), output.isBlank() ? List.of() : List.of(output.trim()));
+        } finally {
+            if (process.isAlive()) {
+                process.destroyForcibly();
+            }
+            outputTask.cancel(true);
+            outputReader.interrupt();
         }
-        String output = readProcessOutput(process);
-        if (process.exitValue() != 0 || !Files.isRegularFile(targetDxfFile)) {
-            throw new IOException("DWG-Konvertierung fehlgeschlagen mit " + tool.displayName() + ": " + output.trim());
-        }
-        return new DwgConversionResult(targetDxfFile, tool.displayName(), output.isBlank() ? List.of() : List.of(output.trim()));
     }
 
-    private String readProcessOutput(Process process) {
+    private String completedOutput(FutureTask<String> outputTask) throws InterruptedException {
         try {
-            return new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            return outputTask.get(5, TimeUnit.SECONDS);
+        } catch (ExecutionException | TimeoutException exception) {
+            return "";
+        }
+    }
+
+    /**
+     * Leert die Prozess-Pipe vollständig, damit der Kindprozess nie an einem vollen Puffer blockiert. Für eine
+     * Fehlermeldung wird nur das erste MiB aufbewahrt; weitere Bytes werden verworfen, aber weiterhin gelesen.
+     */
+    private String readProcessOutput(InputStream input) {
+        try (input; ByteArrayOutputStream retainedOutput = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8_192];
+            int bytesRead;
+            while ((bytesRead = input.read(buffer)) >= 0) {
+                int retainedBytes = Math.min(bytesRead, MAXIMUM_DIAGNOSTIC_OUTPUT_BYTES - retainedOutput.size());
+                if (retainedBytes > 0) {
+                    retainedOutput.write(buffer, 0, retainedBytes);
+                }
+            }
+            return retainedOutput.toString(StandardCharsets.UTF_8);
         } catch (IOException exception) {
             return "";
         }

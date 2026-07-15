@@ -3,6 +3,7 @@ package de.schrell.cadas.application.dwg;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -83,5 +84,28 @@ class ExternalDwgToDxfConverterTest {
         );
 
         assertTrue(exception.getMessage().contains("100 ms"));
+    }
+
+    @Test
+    void leertGrosseProzessausgabeParallelOhnePipeDeadlock() throws Exception {
+        Path executable = tempDir.resolve("dwg2dxf");
+        Files.writeString(executable, """
+                #!/bin/sh
+                dd if=/dev/zero bs=1024 count=2048 2>/dev/null | tr '\\000' x
+                printf '0\\nEOF\\n' > "$5"
+                """);
+        assertTrue(executable.toFile().setExecutable(true));
+        ExternalDwgToDxfConverter converter = new ExternalDwgToDxfConverter(
+                new ExternalDwgToDxfConverter.Tool("Test dwg2dxf", executable, ExternalDwgToDxfConverter.ToolMode.DWG2DXF),
+                Duration.ofSeconds(10)
+        );
+
+        DwgConversionResult result = assertTimeoutPreemptively(
+                Duration.ofSeconds(5),
+                () -> converter.convert(tempDir.resolve("quelle.dwg"), tempDir.resolve("ziel.dxf"))
+        );
+
+        assertTrue(Files.isRegularFile(result.dxfFile()));
+        assertTrue(result.messages().getFirst().length() <= 1_048_576);
     }
 }
