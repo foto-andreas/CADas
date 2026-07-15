@@ -9,6 +9,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Raumaggregat aus geschlossener Grundrisskontur, Höhe, optionaler Dachschräge und stabiler Kennung.
+ * Flächen- und Volumenberechnungen verwenden Millimeter als Grundmaß und berücksichtigen Innenlöcher und Höhenprofile.
+ */
 public final class Room {
 
     private final UUID id;

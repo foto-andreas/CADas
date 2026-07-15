@@ -118,6 +118,10 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Window;
 
+/**
+ * Hält gemeinsame Dienste, Modellzustand, JavaFX-Knoten und Anzeigeparameter aller Workbench-Schichten.
+ * Die Klasse ist die zentrale Zustandsbasis; konkrete Ereignis- und Renderlogik bleibt in den Folgeschichten.
+ */
 abstract class CadWorkbenchBase extends CadWorkbenchContracts {
 
     static final double BASE_PIXELS_PER_MILLIMETER = 0.10;

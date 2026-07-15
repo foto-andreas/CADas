@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.drawing;
 
+/** Berechnet aus Maßmarken die gestaffelten Maßlinien, Hilfslinien und Textpositionen einer Zeichnung. */
 public final class DimensionLineLayoutService {
 
     private static final double PARALLEL_ANGLE_TOLERANCE = Math.tan(Math.toRadians(5.0));

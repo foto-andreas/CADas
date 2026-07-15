@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
+/** Wählt für eine Wandseite den lesbaren Abstand und die Richtung ihrer Maßkette relativ zur Kontur. */
 public final class WallDimensionPlacementService {
 
     private static final double EPSILON = 0.001;

@@ -12,6 +12,9 @@ import de.schrell.cadas.domain.model.HydronicHeating;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Validiert und kombiniert automatisch berechnete oder manuell kommandierte Vor- und Rücklaufrouten eines Heizkreises.
+ */
 public final class HeatingCircuitRoutingService {
 
     private static final double COORDINATE_EPSILON = 0.001;

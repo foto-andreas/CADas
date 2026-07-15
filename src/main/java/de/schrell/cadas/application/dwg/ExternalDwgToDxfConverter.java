@@ -18,6 +18,10 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+/**
+ * Führt einen verfügbaren externen DWG-Konverter ohne Shell aus und ermittelt dessen eindeutige DXF-Ausgabe.
+ * Prozessfehler, Zeitüberschreitung und mehrdeutige Ausgabedateien werden als kontrollierte Diagnose gemeldet.
+ */
 public final class ExternalDwgToDxfConverter {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(90);

@@ -46,6 +46,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+/**
+ * Ermittelt aus allen Etagen, Zielflächen und Schichtaufbauten die prüfbare Material- und Mengengliederung.
+ * Flächen, Zuschnitte, Fugen, Öffnungen, Verschnitt und gleiche Anzeigenamen werden fachlich getrennt behandelt.
+ */
 public final class SurfaceMaterialListService {
 
     private static final double EPSILON = 0.001;
