@@ -17,6 +17,40 @@ Das Review soll für jeden Befund eine der folgenden Aussagen ermöglichen:
 3. Der Befund verlangt eine Korrektur mit eigenem Test und eigenem Commit.
 4. Die vorgeschlagene Änderung wäre nur eine Geschmacksfrage und wird deshalb nicht umgesetzt.
 
+## Geprüfter Ist-Stand des automatisierten Audits
+
+Stand: 16. Juli 2026. `./gradlew clean check` ist erfolgreich. Der Lauf prüft sämtliche Tests,
+Compilerwarnungen, Dokumentationskonventionen und die in `build.gradle.kts` festgelegten
+90-Prozent-Grenzen der fachlichen Kernpakete.
+
+Die globale JaCoCo-Zeilenabdeckung beträgt 21.634 von 26.871 ausführbaren Zeilen, also 80,5 Prozent.
+Das Projektziel von 85 Prozent ist damit noch nicht erreicht. Die größten Lücken liegen in der stark
+zustandsbehafteten JavaFX-Workbench mit 69,2 Prozent, der Gelände-Anwendungslogik mit 67,4 Prozent und
+der Heizungs-Anwendungslogik mit 74,6 Prozent. Die beiden Startklassen werden im Unit-Test nicht
+gestartet. Diese Werte dürfen nicht durch Ausschlüsse oder niedrigere Grenzen beschönigt werden.
+Vorrang haben Charakterisierungstests der Workbench-Abläufe und weitere geometrische Grenzfälle für
+Heizung und Gelände; erst danach sind größere Strukturänderungen in diesen Bereichen vertretbar.
+
+Im automatisierten Audit wurden bereits folgende konkrete Fehler- und Wartbarkeitsklassen bearbeitet:
+
+- DXF-Struktur, vollständige Einheitenauswertung, rettender Import bei beschädigten Metadaten und
+  atomarer Projekt- beziehungsweise Etagenexport
+- exakte Raumvolumenintegration unter Dachschrägen und geometrische Wohnflächengewichtung nach WoFlV
+- vollständige Prüfung von Wandöffnungen gegen lokale Höhenprofile
+- Erhalt konkaver Konturen und von Innenlöchern beim IFC- sowie ACIS-Import
+- kollisionsfreie parallele DWG-Konverterausgaben
+- Begrenzung der Undo-Historie auf 100 Snapshots und endliche Wartezeiten in JavaFX-Tests
+- token-, methoden-, origin- und workspace-geschützte lokale Automatisierung
+- sichere JavaScript-Stringkodierung für Dokumentnavigation und -suche
+- vollständige Tooltips für Menü- und Bedienelemente sowie Beseitigung von Compilerwarnungen
+- Entfernung eines unerreichbaren SVG-Berichtsrenders, einer wirkungslosen Ein-Wert-Option und einer
+  doppelt deklarierten transitiven Abhängigkeit
+- Zusammenführung wiederholter DXF-Metadatenkonvertierung in `DxfMetadataCodec`
+
+Diese Liste ersetzt kein unabhängiges Review der geänderten Algorithmen. Sie markiert vielmehr die
+Stellen, an denen ein menschlicher Reviewer zuerst die neuen Tests gegen die fachliche Erwartung
+prüfen sollte.
+
 ## Vorbereitung
 
 1. Mit JDK 25 arbeiten und `./gradlew --version` prüfen.
