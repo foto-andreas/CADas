@@ -21,6 +21,15 @@ public record Door(
         Objects.requireNonNull(width, "width darf nicht null sein.");
         Objects.requireNonNull(height, "height darf nicht null sein.");
         Objects.requireNonNull(thresholdHeight, "thresholdHeight darf nicht null sein.");
+        if (offsetFromStart.toMillimeters() < 0.0) {
+            throw new IllegalArgumentException("Der Türabstand vom Wandanfang darf nicht negativ sein.");
+        }
+        if (width.toMillimeters() <= 0.0 || height.toMillimeters() <= 0.0) {
+            throw new IllegalArgumentException("Türbreite und Türhöhe müssen größer als 0 sein.");
+        }
+        if (thresholdHeight.toMillimeters() < 0.0) {
+            throw new IllegalArgumentException("Die Schwellenhöhe darf nicht negativ sein.");
+        }
     }
 
     public static Door create(UUID wallId, Length offsetFromStart, Length width, Length height, Length thresholdHeight) {

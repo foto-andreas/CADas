@@ -710,14 +710,17 @@ public final class DxfProjectExchangeService {
             Map<String, List<WindowElement>> pendingWindowsByLevel
     ) {
         for (Map.Entry<String, Level> entry : levels.entrySet()) {
-            Set<UUID> wallIds = entry.getValue().walls().stream()
-                    .map(Wall::id)
-                    .collect(Collectors.toSet());
+            Map<UUID, Wall> wallsById = entry.getValue().walls().stream()
+                    .collect(Collectors.toMap(Wall::id, wall -> wall));
             pendingDoorsByLevel.getOrDefault(entry.getKey(), List.of()).stream()
-                    .filter(door -> wallIds.contains(door.wallId()))
+                    .filter(door -> wallsById.containsKey(door.wallId()))
+                    .filter(door -> wallsById.get(door.wallId()).canContainOpening(
+                            door.offsetFromStart(), door.width(), door.thresholdHeight(), door.height()))
                     .forEach(entry.getValue()::addDoor);
             pendingWindowsByLevel.getOrDefault(entry.getKey(), List.of()).stream()
-                    .filter(window -> wallIds.contains(window.wallId()))
+                    .filter(window -> wallsById.containsKey(window.wallId()))
+                    .filter(window -> wallsById.get(window.wallId()).canContainOpening(
+                            window.offsetFromStart(), window.width(), window.sillHeight(), window.windowHeight()))
                     .forEach(entry.getValue()::addWindow);
         }
     }

@@ -84,6 +84,32 @@ public record Wall(
         return points.getLast().height().toMillimeters();
     }
 
+    /**
+     * Prüft, ob eine rechteckige Öffnung vollständig innerhalb der Wandachse und unterhalb des Wandprofils liegt.
+     * Bei polygonalen Wandköpfen werden neben beiden Öffnungskanten alle Profilknicke im Öffnungsbereich geprüft.
+     */
+    public boolean canContainOpening(Length offset, Length width, Length bottomHeight, Length openingHeight) {
+        Objects.requireNonNull(offset, "offset darf nicht null sein.");
+        Objects.requireNonNull(width, "width darf nicht null sein.");
+        Objects.requireNonNull(bottomHeight, "bottomHeight darf nicht null sein.");
+        Objects.requireNonNull(openingHeight, "openingHeight darf nicht null sein.");
+        double start = offset.toMillimeters();
+        double end = start + width.toMillimeters();
+        double top = bottomHeight.toMillimeters() + openingHeight.toMillimeters();
+        if (start < 0.0 || width.toMillimeters() <= 0.0 || bottomHeight.toMillimeters() < 0.0
+                || openingHeight.toMillimeters() <= 0.0 || end > axis.length().toMillimeters() + EPSILON) {
+            return false;
+        }
+        double minimumHeight = Math.min(heightAt(start), heightAt(end));
+        for (WallProfilePoint point : resolvedProfile()) {
+            double profileOffset = point.offset().toMillimeters();
+            if (profileOffset > start && profileOffset < end) {
+                minimumHeight = Math.min(minimumHeight, point.height().toMillimeters());
+            }
+        }
+        return top <= minimumHeight + EPSILON;
+    }
+
     public double heightAtStart() {
         return startHeight.toMillimeters();
     }

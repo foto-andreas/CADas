@@ -86,6 +86,60 @@ class LevelTest {
     }
 
     @Test
+    void lehntOeffnungenAusserhalbDerHostWandUndUnterNiedrigemWandprofilAb() {
+        Level level = new Level("Dachgeschoss");
+        Wall wall = new Wall(
+                UUID.randomUUID(),
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4_000, 0)),
+                Length.ofMillimeters(175),
+                Length.ofMillimeters(3_000),
+                Length.ofMillimeters(3_000),
+                Length.ofMillimeters(3_000),
+                java.util.List.of(
+                        new WallProfilePoint(Length.zero(), Length.ofMillimeters(3_000)),
+                        new WallProfilePoint(Length.ofMillimeters(2_000), Length.ofMillimeters(1_800)),
+                        new WallProfilePoint(Length.ofMillimeters(4_000), Length.ofMillimeters(3_000))
+                )
+        );
+        level.addWall(wall);
+
+        assertThrows(IllegalArgumentException.class, () -> level.addDoor(Door.create(
+                UUID.randomUUID(), Length.zero(), Length.ofMillimeters(900), Length.ofMillimeters(2_000), Length.zero()
+        )));
+        assertThrows(IllegalArgumentException.class, () -> level.addDoor(Door.create(
+                wall.id(), Length.ofMillimeters(3_500), Length.ofMillimeters(900), Length.ofMillimeters(2_000), Length.zero()
+        )));
+        assertThrows(IllegalArgumentException.class, () -> level.addWindow(WindowElement.create(
+                wall.id(), Length.ofMillimeters(1_500), Length.ofMillimeters(1_000),
+                Length.ofMillimeters(1_000), Length.ofMillimeters(900)
+        )));
+
+        level.addWindow(WindowElement.create(
+                wall.id(), Length.ofMillimeters(1_500), Length.ofMillimeters(1_000),
+                Length.ofMillimeters(900), Length.ofMillimeters(900)
+        ));
+        assertEquals(1, level.windows().size());
+    }
+
+    @Test
+    void lehntNegativeOderLeereOeffnungsmasseBereitsImDomaenenobjektAb() {
+        UUID wallId = UUID.randomUUID();
+
+        assertThrows(IllegalArgumentException.class, () -> Door.create(
+                wallId, Length.ofMillimeters(-1), Length.ofMillimeters(900), Length.ofMillimeters(2_000), Length.zero()
+        ));
+        assertThrows(IllegalArgumentException.class, () -> Door.create(
+                wallId, Length.zero(), Length.zero(), Length.ofMillimeters(2_000), Length.zero()
+        ));
+        assertThrows(IllegalArgumentException.class, () -> WindowElement.create(
+                wallId, Length.zero(), Length.ofMillimeters(900), Length.ofMillimeters(-1), Length.ofMillimeters(1_000)
+        ));
+        assertThrows(IllegalArgumentException.class, () -> WindowElement.create(
+                wallId, Length.zero(), Length.ofMillimeters(900), Length.zero(), Length.zero()
+        ));
+    }
+
+    @Test
     void entferntFußbodenerweiterungMitZugehörigemBelagsstapel() {
         Level level = new Level("Obergeschoss");
         FloorExtension floorExtension = FloorExtension.create(

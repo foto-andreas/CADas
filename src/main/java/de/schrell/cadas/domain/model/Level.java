@@ -70,8 +70,13 @@ public final class Level {
     }
 
     public void replaceWalls(List<Wall> updatedWalls) {
+        List<Wall> requiredWalls = List.copyOf(Objects.requireNonNull(updatedWalls, "updatedWalls darf nicht null sein."));
         walls.clear();
-        walls.addAll(Objects.requireNonNull(updatedWalls, "updatedWalls darf nicht null sein."));
+        walls.addAll(requiredWalls);
+        Map<UUID, Wall> wallsById = wallsById();
+        doors.removeIf(door -> !validDoor(wallsById, door));
+        windows.removeIf(window -> !validWindow(wallsById, window));
+        surfaceLayerStacks.removeIf(stack -> targetsMissingWall(stack, wallsById.keySet()));
     }
 
     public List<Room> rooms() {
@@ -137,7 +142,9 @@ public final class Level {
     }
 
     public void addDoor(Door door) {
-        doors.add(Objects.requireNonNull(door, "door darf nicht null sein."));
+        Door requiredDoor = Objects.requireNonNull(door, "door darf nicht null sein.");
+        validateDoor(requiredDoor);
+        doors.add(requiredDoor);
     }
 
     public boolean removeDoor(UUID doorId) {
@@ -146,8 +153,10 @@ public final class Level {
     }
 
     public void replaceDoors(List<Door> updatedDoors) {
+        List<Door> requiredDoors = List.copyOf(Objects.requireNonNull(updatedDoors, "updatedDoors darf nicht null sein."));
+        requiredDoors.forEach(this::validateDoor);
         doors.clear();
-        doors.addAll(Objects.requireNonNull(updatedDoors, "updatedDoors darf nicht null sein."));
+        doors.addAll(requiredDoors);
     }
 
     public List<WindowElement> windows() {
@@ -155,7 +164,9 @@ public final class Level {
     }
 
     public void addWindow(WindowElement window) {
-        windows.add(Objects.requireNonNull(window, "window darf nicht null sein."));
+        WindowElement requiredWindow = Objects.requireNonNull(window, "window darf nicht null sein.");
+        validateWindow(requiredWindow);
+        windows.add(requiredWindow);
     }
 
     public boolean removeWindow(UUID windowId) {
@@ -164,8 +175,55 @@ public final class Level {
     }
 
     public void replaceWindows(List<WindowElement> updatedWindows) {
+        List<WindowElement> requiredWindows = List.copyOf(Objects.requireNonNull(updatedWindows, "updatedWindows darf nicht null sein."));
+        requiredWindows.forEach(this::validateWindow);
         windows.clear();
-        windows.addAll(Objects.requireNonNull(updatedWindows, "updatedWindows darf nicht null sein."));
+        windows.addAll(requiredWindows);
+    }
+
+    private void validateDoor(Door door) {
+        Map<UUID, Wall> wallsById = wallsById();
+        if (!wallsById.containsKey(door.wallId())) {
+            throw new IllegalArgumentException("Die Host-Wand der Tür existiert nicht in dieser Etage.");
+        }
+        if (!validDoor(wallsById, door)) {
+            throw new IllegalArgumentException("Die Tür liegt nicht vollständig innerhalb der Host-Wand.");
+        }
+    }
+
+    private void validateWindow(WindowElement window) {
+        Map<UUID, Wall> wallsById = wallsById();
+        if (!wallsById.containsKey(window.wallId())) {
+            throw new IllegalArgumentException("Die Host-Wand des Fensters existiert nicht in dieser Etage.");
+        }
+        if (!validWindow(wallsById, window)) {
+            throw new IllegalArgumentException("Das Fenster liegt nicht vollständig innerhalb der Host-Wand.");
+        }
+    }
+
+    private Map<UUID, Wall> wallsById() {
+        Map<UUID, Wall> result = new LinkedHashMap<>();
+        walls.forEach(wall -> result.put(wall.id(), wall));
+        return result;
+    }
+
+    private boolean validDoor(Map<UUID, Wall> wallsById, Door door) {
+        Wall wall = wallsById.get(door.wallId());
+        return wall != null && wall.canContainOpening(
+                door.offsetFromStart(), door.width(), door.thresholdHeight(), door.height());
+    }
+
+    private boolean validWindow(Map<UUID, Wall> wallsById, WindowElement window) {
+        Wall wall = wallsById.get(window.wallId());
+        return wall != null && wall.canContainOpening(
+                window.offsetFromStart(), window.width(), window.sillHeight(), window.windowHeight());
+    }
+
+    private boolean targetsMissingWall(SurfaceLayerStack stack, Set<UUID> wallIds) {
+        if (stack.surfaceType() != SurfaceType.WALL_INTERIOR && stack.surfaceType() != SurfaceType.WALL_EXTERIOR) {
+            return false;
+        }
+        return wallIds.stream().noneMatch(wallId -> targetsWall(stack, wallId));
     }
 
     public List<RoofWindow> roofWindows() {

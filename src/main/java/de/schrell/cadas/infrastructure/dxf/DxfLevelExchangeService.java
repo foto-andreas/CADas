@@ -481,9 +481,13 @@ public final class DxfLevelExchangeService {
                 .toList());
         pendingDoors.stream()
                 .filter(door -> wallsById.containsKey(door.wallId()))
+                .filter(door -> wallsById.get(door.wallId()).canContainOpening(
+                        door.offsetFromStart(), door.width(), door.thresholdHeight(), door.height()))
                 .forEach(level::addDoor);
         pendingWindows.stream()
                 .filter(window -> wallsById.containsKey(window.wallId()))
+                .filter(window -> wallsById.get(window.wallId()).canContainOpening(
+                        window.offsetFromStart(), window.width(), window.sillHeight(), window.windowHeight()))
                 .forEach(level::addWindow);
     }
 

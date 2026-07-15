@@ -2,6 +2,7 @@ package de.schrell.cadas.application.drawing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
@@ -102,5 +103,25 @@ class OpeningPlacementServiceTest {
 
         assertTrue(window.isPresent());
         assertEquals(2800.0, window.orElseThrow().offsetFromStart().toMillimeters(), 1.0);
+    }
+
+    @Test
+    void platziertKeineZuBreiteOderZuHoheOeffnung() {
+        Wall wall = Wall.create(
+                new PlanSegment(new PlanPoint(0, 0), new PlanPoint(2_000, 0)),
+                Length.of(17.5, LengthUnit.CENTIMETER),
+                Length.of(2.50, LengthUnit.METER)
+        );
+
+        assertFalse(openingPlacementService.placeDoor(
+                new PlanPoint(1_000, 0), List.of(wall),
+                Length.ofMillimeters(2_001), Length.ofMillimeters(2_010), Length.zero(),
+                Length.ofMillimeters(100)
+        ).isPresent());
+        assertFalse(openingPlacementService.placeWindow(
+                new PlanPoint(1_000, 0), List.of(wall),
+                Length.ofMillimeters(1_000), Length.ofMillimeters(1_500), Length.ofMillimeters(1_001),
+                Length.ofMillimeters(100)
+        ).isPresent());
     }
 }

@@ -21,6 +21,15 @@ public record WindowElement(
         Objects.requireNonNull(width, "width darf nicht null sein.");
         Objects.requireNonNull(sillHeight, "sillHeight darf nicht null sein.");
         Objects.requireNonNull(windowHeight, "windowHeight darf nicht null sein.");
+        if (offsetFromStart.toMillimeters() < 0.0) {
+            throw new IllegalArgumentException("Der Fensterabstand vom Wandanfang darf nicht negativ sein.");
+        }
+        if (width.toMillimeters() <= 0.0 || windowHeight.toMillimeters() <= 0.0) {
+            throw new IllegalArgumentException("Fensterbreite und Fensterhöhe müssen größer als 0 sein.");
+        }
+        if (sillHeight.toMillimeters() < 0.0) {
+            throw new IllegalArgumentException("Die Brüstungshöhe darf nicht negativ sein.");
+        }
     }
 
     public static WindowElement create(

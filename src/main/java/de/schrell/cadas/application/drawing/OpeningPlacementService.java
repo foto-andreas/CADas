@@ -21,6 +21,7 @@ public final class OpeningPlacementService {
             Length snapTolerance
     ) {
         return findHostWall(clickPoint, walls, snapTolerance)
+                .filter(hostWall -> canPlace(hostWall, clickPoint, width, thresholdHeight, height))
                 .map(hostWall -> Door.create(
                         hostWall.id(),
                         centeredOffset(hostWall, clickPoint, width),
@@ -39,6 +40,7 @@ public final class OpeningPlacementService {
             Length snapTolerance
     ) {
         return findHostWall(clickPoint, walls, snapTolerance)
+                .filter(hostWall -> canPlace(hostWall, clickPoint, width, sillHeight, windowHeight))
                 .map(hostWall -> WindowElement.create(
                         hostWall.id(),
                         centeredOffset(hostWall, clickPoint, width),
@@ -46,6 +48,10 @@ public final class OpeningPlacementService {
                         sillHeight,
                         windowHeight
                 ));
+    }
+
+    private boolean canPlace(Wall wall, PlanPoint clickPoint, Length width, Length bottomHeight, Length height) {
+        return wall.canContainOpening(centeredOffset(wall, clickPoint, width), width, bottomHeight, height);
     }
 
     private Length centeredOffset(Wall wall, PlanPoint clickPoint, Length openingWidth) {
