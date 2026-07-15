@@ -10,6 +10,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Rekonstruiert aus der SAT-Topologie eines ACIS-3DSOLID ein Dreiecksnetz. Kanten werden anhand ihrer Kurven
+ * abgetastet, in den Parameterraum der jeweiligen Fläche projiziert und dort gemeinsam trianguliert. Mehrere
+ * Loops einer Fläche werden als Außenrand und Innenlöcher ausgewertet, bevor die Dreiecke wieder ihre räumlichen
+ * Koordinaten erhalten.
+ */
 final class AcisSatMeshTessellator {
 
     private static final int FULL_CURVE_SEGMENTS = 32;
@@ -53,25 +59,22 @@ final class AcisSatMeshTessellator {
         if (loops.isEmpty()) {
             return List.of();
         }
-        List<ProjectedPoint> polygon = loops.stream()
-                .map(loop -> project(loop, projection(surface.orElseThrow(), topology.transform(), loop)))
-                .max(Comparator.comparingDouble(points -> Math.abs(area(points))))
+        List<Vector3> largestLoop = loops.stream()
+                .max(Comparator.comparingDouble(this::spatialAreaEstimate))
                 .orElse(List.of());
-        if (polygon.size() < 3) {
+        Projection projection = projection(surface.orElseThrow(), topology.transform(), largestLoop);
+        List<List<ProjectedPoint>> projectedLoops = loops.stream()
+                .map(loop -> project(loop, projection))
+                .filter(loop -> loop.size() >= 3)
+                .toList();
+        if (projectedLoops.isEmpty()) {
             return List.of();
         }
-        List<Integer> indices = triangulate(polygon);
-        boolean reversed = face.tokens().contains("reversed");
-        List<Double> coordinates = new ArrayList<>(indices.size() * 3);
-        for (int index = 0; index < indices.size(); index += 3) {
-            int first = indices.get(index);
-            int second = indices.get(index + (reversed ? 2 : 1));
-            int third = indices.get(index + (reversed ? 1 : 2));
-            add(coordinates, polygon.get(first).point());
-            add(coordinates, polygon.get(second).point());
-            add(coordinates, polygon.get(third).point());
-        }
-        return coordinates;
+        return triangulateLoops(projectedLoops, face.tokens().contains("reversed"));
+    }
+
+    private double spatialAreaEstimate(List<Vector3> points) {
+        return Math.abs(area(project(points, Projection.dominantAxis(points))));
     }
 
     private List<ProjectedPoint> project(List<Vector3> points, Projection projection) {
@@ -111,75 +114,48 @@ final class AcisSatMeshTessellator {
         }
     }
 
-    private List<Integer> triangulate(List<ProjectedPoint> polygon) {
-        List<Integer> remaining = new ArrayList<>();
-        for (int index = 0; index < polygon.size(); index++) {
-            remaining.add(index);
-        }
-        if (area(polygon) < 0.0) {
-            java.util.Collections.reverse(remaining);
-        }
-        List<Integer> triangles = new ArrayList<>();
-        while (remaining.size() > 3) {
-            boolean earFound = false;
-            for (int index = 0; index < remaining.size(); index++) {
-                int previous = remaining.get(Math.floorMod(index - 1, remaining.size()));
-                int current = remaining.get(index);
-                int next = remaining.get((index + 1) % remaining.size());
-                if (!isEar(polygon, remaining, previous, current, next)) {
-                    continue;
+    /**
+     * Zerlegt alle Randkurven einer ACIS-Fläche gemeinsam. Die Gerade-Ungerade-Regel der sortierten
+     * Scanline-Schnittpunkte erhält konkave Außenkonturen und entfernt Innenlöcher.
+     */
+    private List<Double> triangulateLoops(List<List<ProjectedPoint>> loops, boolean reversed) {
+        List<ProjectedEdge> edges = new ArrayList<>();
+        List<Double> levels = new ArrayList<>();
+        for (List<ProjectedPoint> loop : loops) {
+            for (int index = 0; index < loop.size(); index++) {
+                ProjectedPoint start = loop.get(index);
+                ProjectedPoint end = loop.get((index + 1) % loop.size());
+                levels.add(start.projection().y());
+                if (Math.abs(end.projection().y() - start.projection().y()) > EPSILON) {
+                    edges.add(new ProjectedEdge(start, end));
                 }
-                triangles.add(previous);
-                triangles.add(current);
-                triangles.add(next);
-                remaining.remove(index);
-                earFound = true;
-                break;
-            }
-            if (!earFound) {
-                for (int index = 1; index + 1 < remaining.size(); index++) {
-                    triangles.add(remaining.getFirst());
-                    triangles.add(remaining.get(index));
-                    triangles.add(remaining.get(index + 1));
-                }
-                remaining.clear();
-                break;
             }
         }
-        if (remaining.size() == 3) {
-            triangles.addAll(remaining);
-        }
-        if (triangles.isEmpty() && polygon.size() >= 3) {
-            for (int index = 1; index + 1 < polygon.size(); index++) {
-                triangles.add(0);
-                triangles.add(index);
-                triangles.add(index + 1);
+        List<Double> sortedLevels = levels.stream().distinct().sorted().toList();
+        List<Double> coordinates = new ArrayList<>();
+        for (int levelIndex = 0; levelIndex + 1 < sortedLevels.size(); levelIndex++) {
+            double lowerY = sortedLevels.get(levelIndex);
+            double upperY = sortedLevels.get(levelIndex + 1);
+            if (upperY - lowerY <= EPSILON) {
+                continue;
+            }
+            double middleY = (lowerY + upperY) / 2.0;
+            List<ProjectedEdge> intersections = edges.stream()
+                    .filter(edge -> edge.crosses(middleY))
+                    .sorted(Comparator.comparingDouble(edge -> edge.xAt(middleY)))
+                    .toList();
+            for (int edgeIndex = 0; edgeIndex + 1 < intersections.size(); edgeIndex += 2) {
+                ProjectedEdge left = intersections.get(edgeIndex);
+                ProjectedEdge right = intersections.get(edgeIndex + 1);
+                Vector3 lowerLeft = left.pointAt(lowerY);
+                Vector3 lowerRight = right.pointAt(lowerY);
+                Vector3 upperRight = right.pointAt(upperY);
+                Vector3 upperLeft = left.pointAt(upperY);
+                addTriangle(coordinates, lowerLeft, reversed ? upperRight : lowerRight, reversed ? lowerRight : upperRight);
+                addTriangle(coordinates, lowerLeft, reversed ? upperLeft : upperRight, reversed ? upperRight : upperLeft);
             }
         }
-        return triangles;
-    }
-
-    private boolean isEar(List<ProjectedPoint> polygon, List<Integer> remaining, int previous, int current, int next) {
-        Point2 a = polygon.get(previous).projection();
-        Point2 b = polygon.get(current).projection();
-        Point2 c = polygon.get(next).projection();
-        if (cross(a, b, c) <= EPSILON) {
-            return false;
-        }
-        for (int candidate : remaining) {
-            if (candidate != previous && candidate != current && candidate != next
-                    && insideTriangle(polygon.get(candidate).projection(), a, b, c)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean insideTriangle(Point2 point, Point2 a, Point2 b, Point2 c) {
-        double first = cross(a, b, point);
-        double second = cross(b, c, point);
-        double third = cross(c, a, point);
-        return first >= -EPSILON && second >= -EPSILON && third >= -EPSILON;
+        return coordinates;
     }
 
     private double area(List<ProjectedPoint> points) {
@@ -296,6 +272,15 @@ final class AcisSatMeshTessellator {
         coordinates.add(point.x());
         coordinates.add(point.y());
         coordinates.add(point.z());
+    }
+
+    private void addTriangle(List<Double> coordinates, Vector3 first, Vector3 second, Vector3 third) {
+        if (second.subtract(first).cross(third.subtract(first)).length() <= EPSILON) {
+            return;
+        }
+        add(coordinates, first);
+        add(coordinates, second);
+        add(coordinates, third);
     }
 
     private record Topology(List<SatRecord> records, Map<Integer, SatRecord> recordsById, Transform3 transform) {
@@ -611,6 +596,27 @@ final class AcisSatMeshTessellator {
     }
 
     private record ProjectedPoint(Vector3 point, Point2 projection) {
+    }
+
+    private record ProjectedEdge(ProjectedPoint start, ProjectedPoint end) {
+
+        private boolean crosses(double y) {
+            return y > Math.min(start.projection().y(), end.projection().y())
+                    && y < Math.max(start.projection().y(), end.projection().y());
+        }
+
+        private double xAt(double y) {
+            double ratio = ratio(y);
+            return start.projection().x() + ratio * (end.projection().x() - start.projection().x());
+        }
+
+        private Vector3 pointAt(double y) {
+            return start.point().add(end.point().subtract(start.point()).multiply(ratio(y)));
+        }
+
+        private double ratio(double y) {
+            return (y - start.projection().y()) / (end.projection().y() - start.projection().y());
+        }
     }
 
     private interface Projection {

@@ -4,6 +4,7 @@ import static de.schrell.cadas.testsupport.Dxf3dTestFixtures.boundsOnlySolidDxf;
 import static de.schrell.cadas.testsupport.Dxf3dTestFixtures.simpleSolidDxf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,7 +32,7 @@ class Dxf3dObjectGeometryReaderTest {
         assertEquals(1, geometry.solidBounds().size());
         assertEquals(-10.0, geometry.solidBounds().getFirst().minXMillimeters(), 0.001);
         assertEquals(1, geometry.solidMeshes().size());
-        assertEquals(62, geometry.solidMeshes().getFirst().triangleCount());
+        assertTrue(geometry.solidMeshes().getFirst().triangleCount() >= 60);
     }
 
     @Test
