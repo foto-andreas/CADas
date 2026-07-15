@@ -6,6 +6,9 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Frei platzierbares Innen- oder Außenobjekt mit Grundfläche, Höhe, Drehung und optionaler Heizwirkung.
+ */
 public record RoomObject(
         UUID id,
         String presetId,

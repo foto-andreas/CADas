@@ -5,6 +5,10 @@ import de.schrell.cadas.domain.geometry.Length;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Einzelne Materialschicht eines Oberflächenaufbaus einschließlich Dicke und Verlegedaten.
+ * Konstruktion und Rekonfiguration validieren Maße, Fugen, Anker und Zuschnittsbeschränkungen gemeinsam.
+ */
 public record SurfaceLayer(
         UUID id,
         String name,

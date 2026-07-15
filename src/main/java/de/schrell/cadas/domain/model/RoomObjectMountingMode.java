@@ -2,6 +2,7 @@ package de.schrell.cadas.domain.model;
 
 import java.util.Locale;
 
+/** Beschreibt, ob ein Raumobjekt frei, bodengebunden oder an einer Wand montiert ist. */
 public enum RoomObjectMountingMode {
     STANDS_ON_COVERING("steht auf Bodenbelag", false),
     CUTS_FLOOR_COVERING("Bodenbelag wird ausgespart", true),

@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Legt fest, ob ein Belag automatisch, von einem Anker oder über eine manuelle Vorgabe angeordnet wird. */
 public enum SurfaceLayoutMode {
     NONE("Kein Versatz"),
     AUTOMATIC("Automatisch"),

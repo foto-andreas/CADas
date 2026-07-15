@@ -1,5 +1,9 @@
 package de.schrell.cadas.domain.geometry;
 
+/**
+ * Zweidimensionaler Weltpunkt eines Grundrisses; beide kartesischen Koordinaten sind Millimeterwerte.
+ * Der Typ enthält bewusst keine Darstellungs- oder Zoomkoordinaten.
+ */
 public record PlanPoint(double xMillimeters, double yMillimeters) {
 
     public Length distanceTo(PlanPoint other) {

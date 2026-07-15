@@ -5,6 +5,7 @@ import java.util.Locale;
 /**
  * Ordnet einem Objekt seine fachliche Heizart zu.
  */
+/** Fachliche Wärmeabgabe eines Raumobjekts, die in Heizlast und Darstellung einfließen kann. */
 public enum RoomObjectHeatingType {
     NONE("Keine Heizung"),
     HEATING_ELEMENT("Heizelement"),

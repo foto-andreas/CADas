@@ -5,6 +5,10 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Polygonaler Sperrbereich, in dem keine wassergeführten Heizrohre verlegt werden dürfen.
+ * Die Punkte liegen in Grundriss-Millimetern und bilden mindestens ein gültiges Flächenpolygon.
+ */
 public record HeatingExclusionArea(
         UUID id,
         UUID roomId,

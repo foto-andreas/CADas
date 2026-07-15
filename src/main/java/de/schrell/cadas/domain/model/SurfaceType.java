@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Identifiziert die bauliche Oberfläche, auf die ein Schichtaufbau oder Belag angewendet wird. */
 public enum SurfaceType {
     FLOOR("Boden"),
     CEILING("Decke"),

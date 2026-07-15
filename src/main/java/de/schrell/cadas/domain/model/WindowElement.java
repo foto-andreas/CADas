@@ -5,6 +5,9 @@ import de.schrell.cadas.domain.geometry.Length;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Beschreibt eine Fensteröffnung relativ zu ihrer Host-Wand einschließlich Brüstung, Breite und Höhe.
+ */
 public record WindowElement(
         UUID id,
         UUID wallId,

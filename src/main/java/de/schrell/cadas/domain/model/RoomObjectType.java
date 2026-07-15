@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Fachliche Nutzungsart eines frei platzierbaren Innen- oder Außenobjekts. */
 public enum RoomObjectType {
     SHOWER("Dusche"),
     TOILET("Toilette"),

@@ -4,6 +4,9 @@ import de.schrell.cadas.domain.geometry.Length;
 
 import java.util.Objects;
 
+/**
+ * Freizuhaltende Randabstände einer Belagsbelegung in lokaler Flächenorientierung und Millimetern.
+ */
 public record SurfaceLayoutMargins(
         Length left,
         Length right,

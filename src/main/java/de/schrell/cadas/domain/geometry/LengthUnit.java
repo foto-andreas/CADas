@@ -2,6 +2,9 @@ package de.schrell.cadas.domain.geometry;
 
 import java.math.BigDecimal;
 
+/**
+ * Unterstützte Anzeige- und Eingabeeinheiten mit ihrem exakten Faktor zur internen Einheit Millimeter.
+ */
 public enum LengthUnit {
     MILLIMETER("mm", BigDecimal.ONE),
     CENTIMETER("cm", BigDecimal.TEN),

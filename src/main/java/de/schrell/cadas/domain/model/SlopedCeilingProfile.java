@@ -4,6 +4,10 @@ import de.schrell.cadas.domain.geometry.Length;
 
 import java.util.Objects;
 
+/**
+ * Lineares Höhenprofil einer Dachschräge zwischen Kniestock und voller Raumhöhe.
+ * Alle Abstände werden in der lokalen Raumrichtung und in Millimetern angegeben.
+ */
 public record SlopedCeilingProfile(
         SlopedCeilingSide lowSide,
         Length kneeWallHeight,

@@ -9,6 +9,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Gerichtete Wandachse mit Dicke, Höhe, optionalem Höhenprofil und stabiler Kennung.
+ * Anfang und Ende bestimmen zugleich lokale Längsrichtung sowie Innen- und Außenseite.
+ */
 public record Wall(
         UUID id,
         PlanSegment axis,

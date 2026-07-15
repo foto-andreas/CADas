@@ -4,6 +4,9 @@ import de.schrell.cadas.domain.geometry.Length;
 
 import java.util.Objects;
 
+/**
+ * Stützpunkt eines Wandhöhenprofils aus Abstand vom Wandanfang und dortiger Oberkantenhöhe.
+ */
 public record WallProfilePoint(Length offset, Length height) {
 
     public WallProfilePoint {

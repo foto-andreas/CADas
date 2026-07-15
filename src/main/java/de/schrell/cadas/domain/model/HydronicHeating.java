@@ -7,6 +7,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Vollständige wassergeführte Heizung eines Raums beziehungsweise einer Fläche.
+ * Das Aggregat verbindet Verteiler, technische Parameter, Zonen und manuell bearbeitbare Rohrführung.
+ */
 public record HydronicHeating(
         UUID id,
         UUID roomId,

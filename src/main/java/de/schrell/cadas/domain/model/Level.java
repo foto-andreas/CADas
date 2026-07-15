@@ -8,6 +8,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Veränderliches Aggregat einer Gebäudeetage und Eigentümer ihrer Wände, Räume, Öffnungen und Aufbauten.
+ * Änderungsmethoden halten referenzielle Abhängigkeiten konsistent, etwa Öffnungen beim Entfernen einer Wand.
+ */
 public final class Level {
 
     private String name;

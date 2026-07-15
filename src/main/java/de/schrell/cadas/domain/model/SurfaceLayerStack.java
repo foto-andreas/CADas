@@ -5,6 +5,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Geordneter Schichtaufbau einer eindeutig bezeichneten Boden-, Decken- oder Wandfläche.
+ * Der Stapel schützt Reihenfolge und Zielbezug und stellt seine Schichten nur als Kopie bereit.
+ */
 public final class SurfaceLayerStack {
 
     private final UUID id;

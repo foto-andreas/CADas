@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Bestimmt das fachliche Verlegemuster, aus dem die wassergeführte Rohrführung abgeleitet wird. */
 public enum HeatingLayoutPattern {
     MEANDER("Meander"),
     SPIRAL("Schnecke"),

@@ -6,6 +6,9 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Beschreibt einen aus Boden und Decke auszuschneidenden Bereich einer Etage mit stabiler Objektkennung.
+ */
 public record FloorOpening(
         UUID id,
         UUID roomId,

@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Fachlich zusammenhängende Teilfläche einer Heizung mit eigener Belegung, Leistung und Routingvorgabe.
+ */
 public record HeatingZone(
         UUID id,
         String name,

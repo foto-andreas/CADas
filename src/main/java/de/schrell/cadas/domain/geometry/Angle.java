@@ -2,6 +2,10 @@ package de.schrell.cadas.domain.geometry;
 
 import java.util.Locale;
 
+/**
+ * Repräsentiert einen auf den Bereich von einschließlich 0 bis ausschließlich 360 Grad normierten Winkel.
+ * Negative und übervolle Eingaben bleiben dadurch für Drehungen äquivalent; die interne Einheit ist Grad.
+ */
 public final class Angle {
 
     private final double degrees;

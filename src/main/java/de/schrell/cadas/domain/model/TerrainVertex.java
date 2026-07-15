@@ -5,6 +5,9 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 
 import java.util.Objects;
 
+/**
+ * Höhenstützpunkt des Geländes an einer Grundrissposition, bezogen auf die niedrigste Etage.
+ */
 public record TerrainVertex(PlanPoint position, Length elevationAboveLowestFloor) {
 
     public TerrainVertex {

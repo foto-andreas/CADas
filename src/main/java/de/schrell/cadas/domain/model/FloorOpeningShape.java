@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Beschreibt die geometrische Grundform einer Bodenöffnung und damit ihre Parametrisierung. */
 public enum FloorOpeningShape {
     RECTANGLE("Rechteckig"),
     CIRCLE("Rund");

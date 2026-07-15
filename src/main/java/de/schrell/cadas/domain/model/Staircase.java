@@ -6,6 +6,9 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Fachmodell einer Treppe mit Laufgeometrie, Steigungen, Höhenlage und stabiler Objektkennung.
+ */
 public record Staircase(
         UUID id,
         StairType stairType,

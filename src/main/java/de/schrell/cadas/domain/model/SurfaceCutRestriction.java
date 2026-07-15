@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Schränkt Zuschnitte eines Oberflächenbelags an den Rändern der belegbaren Fläche fachlich ein. */
 public enum SurfaceCutRestriction {
     FREE("frei", true),
     OUTER_CUTS_ROTATABLE("Schnitt nur außen", true),

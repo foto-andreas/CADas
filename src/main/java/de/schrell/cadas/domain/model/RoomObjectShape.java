@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Geometrische Repräsentation eines Raumobjekts für Grundriss, Kollision und 3D-Ableitung. */
 public enum RoomObjectShape {
     RECTANGLE("Rechteck"),
     HALF_ROUND("halbrund"),

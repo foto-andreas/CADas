@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Bestimmt die Raumseite, von der aus eine Dachschräge in das Raumprofil hinein ansteigt. */
 public enum SlopedCeilingSide {
     NORTH("Nordkante"),
     EAST("Ostkante"),

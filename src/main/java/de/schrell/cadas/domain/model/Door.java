@@ -5,6 +5,10 @@ import de.schrell.cadas.domain.geometry.Length;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Beschreibt eine Türöffnung relativ zu ihrer Host-Wand. Versatz, Breite und Höhe sind Millimeterwerte;
+ * die ID bleibt über Bearbeitung, Persistenz und Auswahl stabil.
+ */
 public record Door(
         UUID id,
         UUID wallId,

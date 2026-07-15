@@ -6,6 +6,9 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Positioniert ein Dachfenster in der lokalen Fläche einer Dachseite; Maße und Versätze sind Millimeterwerte.
+ */
 public record RoofWindow(
         UUID id,
         UUID roomId,

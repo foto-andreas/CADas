@@ -5,6 +5,9 @@ import de.schrell.cadas.domain.geometry.Length;
 
 import java.util.Objects;
 
+/**
+ * Parametrisiert das projektweite Dach aus Grundform, Grundrissausdehnung, Höhen und Neigungswinkeln.
+ */
 public record Roof(
         RoofType roofType,
         Angle pitchAngle,

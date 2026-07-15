@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Diskrete Drehung eines Oberflächenbelags relativ zur lokalen Fläche. */
 public enum SurfaceLayoutRotation {
     DEGREES_0("0°", false, false),
     DEGREES_90("90°", true, false),

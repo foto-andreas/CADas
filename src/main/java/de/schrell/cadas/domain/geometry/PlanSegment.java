@@ -1,5 +1,9 @@
 package de.schrell.cadas.domain.geometry;
 
+/**
+ * Gerichtetes Grundrisssegment zwischen zwei Weltpunkten.
+ * Länge, Richtung und Projektion werden in Millimetern berechnet; ein Nullsegment ist nicht zulässig.
+ */
 public record PlanSegment(PlanPoint start, PlanPoint end) {
 
     public Length length() {

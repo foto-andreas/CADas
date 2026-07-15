@@ -1,5 +1,9 @@
 package de.schrell.cadas.domain.geometry;
 
+/**
+ * Beschreibt das gleichmäßige Zeichenraster durch seinen strikt positiven Abstand.
+ * Punkte werden in Millimetern auf das nächstgelegene ganzzahlige Vielfache dieses Abstands gerundet.
+ */
 public record Grid(Length spacing) {
 
     public Grid {

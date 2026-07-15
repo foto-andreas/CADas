@@ -1,5 +1,9 @@
 package de.schrell.cadas.domain.model;
 
+/**
+ * Definiert und normalisiert die kompakte Befehlssprache zur manuellen Bearbeitung einer Heizkreisroute.
+ * Groß- und Kleinbuchstaben unterscheiden Vor- und Rücklauf; ältere und gespiegelte Zeichen werden übersetzt.
+ */
 public final class HeatingRoutingLanguage {
 
     public static final char SUPPLY_LINE = '=';

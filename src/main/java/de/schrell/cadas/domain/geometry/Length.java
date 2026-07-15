@@ -5,6 +5,10 @@ import java.math.RoundingMode;
 import java.util.Locale;
 import java.util.Objects;
 
+/**
+ * Unveränderlicher Längenwert mit Millimeter als Basiseinheit und sechs dezimalen Nachkommastellen.
+ * Die dezimale Speicherung vermeidet kumulierende Binärkommafehler bei Einheitenwechseln und Maßketten.
+ */
 public final class Length implements Comparable<Length> {
 
     private static final int SCALE = 6;

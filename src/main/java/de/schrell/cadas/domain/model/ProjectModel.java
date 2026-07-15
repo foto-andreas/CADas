@@ -6,6 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Wurzelaggregat eines CADas-Projekts mit geordneten Etagen, Dach, Gelände und Projektorientierung.
+ * Es garantiert mindestens eine primäre Etage und koordiniert etagenübergreifende Benennung und Reihenfolge.
+ */
 public final class ProjectModel {
 
     private String name;

@@ -1,5 +1,6 @@
 package de.schrell.cadas.domain.model;
 
+/** Klassifiziert zusätzliche Bodenbereiche nach ihrer baulichen Funktion und späteren Darstellung. */
 public enum FloorExtensionType {
     BALCONY("Balkon"),
     GALLERY("Empore");

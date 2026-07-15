@@ -7,6 +7,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Projektweites Gelände aus Höhenstützpunkten und einer rein visuellen Darstellungsbreite.
+ * Die Stützpunkte werden unveränderlich übernommen und relativ zum niedrigsten Geschoss interpretiert.
+ */
 public record Terrain(List<TerrainVertex> vertices, Length displayWidth) {
 
     private static final Length DEFAULT_DISPLAY_WIDTH = Length.ofMillimeters(400.0);

@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Modelliert eine zusätzliche, an einer Bezugskante ausgerichtete Bodenfläche einschließlich Höhenlage.
+ */
 public record FloorExtension(
         UUID id,
         FloorExtensionType type,
