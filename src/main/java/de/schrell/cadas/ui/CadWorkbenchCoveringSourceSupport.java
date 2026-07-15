@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Optional;
 
+/** Erkennt unterstützte Belagquellen und liefert anzeigefertige Format- und Fehlermeldungen. */
 final class CadWorkbenchCoveringSourceSupport {
 
     private CadWorkbenchCoveringSourceSupport() {

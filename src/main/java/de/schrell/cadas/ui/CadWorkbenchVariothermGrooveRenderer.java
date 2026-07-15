@@ -10,6 +10,7 @@ import javafx.scene.paint.ImagePattern;
 
 import java.util.function.DoubleUnaryOperator;
 
+/** Zeichnet die aus Heizkreisdaten abgeleiteten Variotherm-Nuten als maßstäbliche 2D-Überlagerung. */
 final class CadWorkbenchVariothermGrooveRenderer {
 
     private Image patternImage;

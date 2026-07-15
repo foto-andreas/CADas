@@ -1,5 +1,6 @@
 package de.schrell.cadas.ui;
 
+/** Orthogonale Blickrichtung der 2D-Zeichenfläche relativ zum Gebäudemodell. */
 public enum ViewOrientation {
     TOP("Oben", "⤒ Oben", "Grundriss in Draufsicht mit orthogonaler Projektion", 0.0, 90.0),
     BOTTOM("Unten", "⤓ Unten", "Grundriss in Untersicht mit orthogonaler Projektion", 0.0, -90.0),

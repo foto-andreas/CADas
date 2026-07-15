@@ -17,6 +17,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
+/** Zeigt einheitliche deutsche Fehlerdialoge und unterdrückt blockierende Fenster im Automatisierungsmodus. */
 public final class UiErrorDialogs {
 
     private UiErrorDialogs() {

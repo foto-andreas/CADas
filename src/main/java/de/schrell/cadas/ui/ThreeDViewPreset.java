@@ -1,5 +1,6 @@
 package de.schrell.cadas.ui;
 
+/** Benannte Standardkamera für reproduzierbare Außen- und Innenansichten des 3D-Modells. */
 public enum ThreeDViewPreset {
     TOP("Oben", "Wechselt die 3D-Kamera auf eine Draufsicht.", 0.0, -90.0),
     BOTTOM("Unten", "Wechselt die 3D-Kamera auf eine Untersicht.", 0.0, 90.0),

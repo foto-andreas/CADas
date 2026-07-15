@@ -54,6 +54,9 @@ import javafx.scene.Cursor;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
+/**
+ * Kapselt Projekt- und Etagenlebenszyklus, Import, Export, Berichte, Hilfe sowie zugehörige Dialogabläufe.
+ */
 abstract class CadWorkbenchProject extends CadWorkbenchRenderDetails {
 
     double chooseRulerStep() {

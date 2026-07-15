@@ -71,6 +71,10 @@ import javafx.scene.Cursor;
 import javafx.scene.text.Text;
 import javafx.stage.Window;
 
+/**
+ * Baut Menüleiste, Werkzeugleisten, Status- und Eigenschaftsbereich der Workbench auf.
+ * Jede Bedienaktion erhält hier ihren ausführlichen Tooltip und delegiert fachliche Änderungen an Dienste.
+ */
 abstract class CadWorkbenchUi extends CadWorkbenchBase {
 
     static final double INITIAL_PROPERTY_PANE_DIVIDER_POSITION = 0.154;

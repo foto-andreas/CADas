@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/** Berechnet die sichtbaren 2D-Grenzen des Modells in der aktuell gewählten orthogonalen Ansicht. */
 public final class ProjectedModelBoundsService {
 
     public Optional<ProjectedBounds> bounds(Level level, ViewOrientation orientation) {

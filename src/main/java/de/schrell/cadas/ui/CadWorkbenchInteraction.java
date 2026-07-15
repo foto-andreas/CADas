@@ -31,6 +31,9 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.stage.WindowEvent;
 
+/**
+ * Verarbeitet Maus-, Tastatur-, Zoom-, Zeichen- und Bearbeitungsereignisse und übergibt nur gültige Modelländerungen.
+ */
 abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
 
     void handleMousePressed(MouseEvent event) {

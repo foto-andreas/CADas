@@ -49,6 +49,7 @@ import javafx.scene.Cursor;
 import javafx.scene.transform.Transform;
 import javafx.embed.swing.SwingFXUtils;
 
+/** Oberste Workbench-Schicht für kontrolliert aufrufbare Zustands-, Werkzeug- und Canvas-Automatisierung. */
 abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
 
     public WorkbenchAutomationSnapshot automationSnapshot() {

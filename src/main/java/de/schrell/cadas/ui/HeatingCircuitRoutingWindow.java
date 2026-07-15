@@ -51,6 +51,10 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
+/**
+ * Eigenständiges JavaFX-Fenster zur visuellen und textuellen Bearbeitung einer Heizkreisroute.
+ * Änderungen werden validiert und erst nach Bestätigung an die Workbench zurückgegeben.
+ */
 final class HeatingCircuitRoutingWindow {
 
     private static final double CANVAS_WIDTH = 980.0;

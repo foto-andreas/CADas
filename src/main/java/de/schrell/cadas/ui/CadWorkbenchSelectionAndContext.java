@@ -46,6 +46,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
+/** Koordiniert Auswahlzustand, Kontextmenüs und objektabhängige Bearbeitungsaktionen der Workbench. */
 abstract class CadWorkbenchSelectionAndContext extends CadWorkbenchSurfaceLayers {
 
     void resetTwoDView() {

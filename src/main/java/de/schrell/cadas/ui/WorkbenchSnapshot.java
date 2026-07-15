@@ -5,6 +5,9 @@ import de.schrell.cadas.domain.model.ProjectModel;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Vollständiger wiederherstellbarer Workbench-Zustand für Undo und Redo einschließlich Modell und UI-Auswahl.
+ */
 public record WorkbenchSnapshot(
         ProjectModel project,
         List<GuideLine> guideLines,

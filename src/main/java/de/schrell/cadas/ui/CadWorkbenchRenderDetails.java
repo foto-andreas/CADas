@@ -47,6 +47,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 
+/** Zeichnet detaillierte Fachsymbole, Beschriftungen, Maße, Beläge und Auswahlmarkierungen der 2D-Ansicht. */
 abstract class CadWorkbenchRenderDetails extends CadWorkbenchRender {
 
     void drawTerrainPlanArea(GraphicsContext graphics) {

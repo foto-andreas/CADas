@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+/** Ermittelt und formatiert die kürzesten Abstände eines Punkts zu sichtbaren Hilfslinien. */
 final class GuideDistanceService {
 
     static List<GuideDistance> distancesToParallelGuides(

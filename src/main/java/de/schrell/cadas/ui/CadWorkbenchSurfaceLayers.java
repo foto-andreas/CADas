@@ -40,6 +40,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.stage.Window;
 
+/** Verwaltet Auswahl, Reihenfolge, Konfiguration und Konsistenz der Oberflächenschichtstapel. */
 abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
 
     void refreshSurfaceLayerSection() {

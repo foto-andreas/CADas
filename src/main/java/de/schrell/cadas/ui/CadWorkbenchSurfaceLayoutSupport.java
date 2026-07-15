@@ -3,6 +3,7 @@ package de.schrell.cadas.ui;
 import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
 
+/** Übersetzt UI-Auswahlwerte in fachliche Belagsparameter und anzeigefertige Beschreibungen. */
 final class CadWorkbenchSurfaceLayoutSupport {
 
     private CadWorkbenchSurfaceLayoutSupport() {

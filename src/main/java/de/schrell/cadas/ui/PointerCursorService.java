@@ -1,5 +1,6 @@
 package de.schrell.cadas.ui;
 
+/** Wählt aus Werkzeug und aktuellem Treffer den verständlichen JavaFX-Mauszeiger der Zeichenfläche. */
 final class PointerCursorService {
 
     static CursorType cursor(PointerContext context) {

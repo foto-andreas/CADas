@@ -18,6 +18,7 @@ import javafx.scene.layout.Priority;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Window;
 
+/** Fragt vor dem Überschreiben eines bestehenden Ziels ausdrücklich nach Abbruch, Ersetzen oder neuem Pfad. */
 final class WriteTargetDialog {
 
     private WriteTargetDialog() {

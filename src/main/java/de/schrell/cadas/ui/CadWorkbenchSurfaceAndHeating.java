@@ -45,6 +45,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
 
+/** Stellt Dialogabläufe und Modelländerungen für Oberflächen, Beläge und wassergeführte Heizungen bereit. */
 abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
 
     void updateCadLibrarySummary() {

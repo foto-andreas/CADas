@@ -74,6 +74,9 @@ import javafx.scene.transform.Rotate;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
 
+/**
+ * JavaFX-3D-Viewport, der das renderunabhängige Szenenmodell in Nodes, Materialien, Kamera und Auswahl überführt.
+ */
 public final class ThreeDViewport extends BorderPane {
 
     private static final double WORLD_SCALE = 0.08;

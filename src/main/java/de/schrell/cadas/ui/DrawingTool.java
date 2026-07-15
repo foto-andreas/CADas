@@ -1,5 +1,6 @@
 package de.schrell.cadas.ui;
 
+/** Aktives Workbench-Werkzeug und damit die Bedeutung des nächsten Zeiger- oder Ziehereignisses. */
 public enum DrawingTool {
     EDIT("Bearbeiten", true),
     WALL("Wand", false),

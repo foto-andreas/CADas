@@ -6,6 +6,11 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyEvent;
 
+/**
+ * Öffentliche JavaFX-Gesamtkomponente der CADas-Arbeitsfläche.
+ * Die geerbten, paketinternen Schichten teilen den großen UI-Zustand nach Interaktion, Rendering,
+ * Projektaktionen, Oberflächen und Automatisierung auf; diese Klasse stellt den stabilen Einstieg bereit.
+ */
 public final class CadWorkbench extends CadWorkbenchAutomation {
 
     public CadWorkbench() {

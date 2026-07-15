@@ -94,6 +94,9 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 
+/**
+ * Definiert gemeinsame Datenträger und abstrakte Aktualisierungsverträge der Workbench-Vererbungskette.
+ */
 abstract class CadWorkbenchContracts extends BorderPane {
 
     static final double DIMENSION_LINE_BLOCKING_PADDING = 4.0;

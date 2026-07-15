@@ -48,6 +48,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 
+/** Rendert das aktuelle Fachmodell in die 2D-Zeichenfläche und hält Welt- und Bildschirmtransformation getrennt. */
 abstract class CadWorkbenchRender extends CadWorkbenchInteraction {
 
     void render() {

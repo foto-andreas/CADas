@@ -1,5 +1,6 @@
 package de.schrell.cadas.ui;
 
+/** Reduzierter, threadsicher lesbarer Zustandsabzug für die lokale HTTP-Automatisierung. */
 public record WorkbenchAutomationSnapshot(
         String projectName,
         String activeLevel,

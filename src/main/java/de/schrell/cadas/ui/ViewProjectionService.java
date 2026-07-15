@@ -2,6 +2,7 @@ package de.schrell.cadas.ui;
 
 import de.schrell.cadas.domain.geometry.PlanPoint;
 
+/** Projiziert Grundriss- und Höhenkoordinaten in die lokale Ebene einer orthogonalen 2D-Ansicht. */
 public final class ViewProjectionService {
 
     public static ProjectedPoint project(PlanPoint point, double heightMillimeters, ViewOrientation orientation) {
