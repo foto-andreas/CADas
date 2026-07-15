@@ -42,14 +42,27 @@ Diese Aufgaben laufen nur auf `macOS`. `packageMacOsInstallers` erzeugt DMG und 
 
 Damit startet `CADas` zusätzlich mit einem lokalen HTTP-Zugriff auf `127.0.0.1:17845`. Dieser Modus ist für agentische oder manuelle Funktionstests gedacht.
 
+Gradle gibt beim Start ein zufälliges Sitzungstoken aus. Alternativ kann vor dem Start ein eigenes,
+mindestens 32 Zeichen langes Token über `CADAS_AUTOMATION_TOKEN` gesetzt werden. Bis auf den
+Health-Check benötigen alle Aufrufe den Header `Authorization: Bearer <Token>`. Lesende Aufrufe
+verwenden `GET`, Änderungen ausschließlich `POST`. Dateiaktionen sind auf den beim Start
+festgelegten Workspace begrenzt und folgen keinen symbolischen Links.
+
 Beispiele:
 
 ```bash
+export CADAS_AUTOMATION_TOKEN='mindestens-32-Zeichen-langes-Testtoken'
+mkdir -p build/automation
+
 curl http://127.0.0.1:17845/health
-curl http://127.0.0.1:17845/state
-curl "http://127.0.0.1:17845/tool?value=WALL"
-curl "http://127.0.0.1:17845/canvas/drag?fromX=120&fromY=120&toX=320&toY=120&button=PRIMARY"
-curl "http://127.0.0.1:17845/invoke?action=exportProjectDxf&path=/tmp/haus.dxf"
+curl -H "Authorization: Bearer $CADAS_AUTOMATION_TOKEN" \
+  http://127.0.0.1:17845/state
+curl -X POST -H "Authorization: Bearer $CADAS_AUTOMATION_TOKEN" \
+  "http://127.0.0.1:17845/tool?value=WALL"
+curl -X POST -H "Authorization: Bearer $CADAS_AUTOMATION_TOKEN" \
+  "http://127.0.0.1:17845/canvas/drag?fromX=120&fromY=120&toX=320&toY=120&button=PRIMARY"
+curl -X POST -H "Authorization: Bearer $CADAS_AUTOMATION_TOKEN" \
+  "http://127.0.0.1:17845/invoke?action=exportProjectDxf&path=$PWD/build/automation/haus.dxf"
 ```
 
 ## Aufbau der Oberfläche
@@ -891,11 +904,12 @@ Aktuell verfügbar sind insbesondere:
 
 Damit kann ein Testablauf beispielsweise so aussehen:
 
-1. App mit `./gradlew runMitAutomatisierung` starten.
-2. Werkzeug per HTTP auf `WALL` setzen.
-3. Eine Wand per `/canvas/drag` anlegen.
-4. Projekt oder Etage per `/invoke` exportieren.
-5. Die erzeugte DXF-Datei fachlich prüfen.
+1. Ein mindestens 32 Zeichen langes `CADAS_AUTOMATION_TOKEN` setzen.
+2. App mit `./gradlew runMitAutomatisierung` starten.
+3. Werkzeug mit authentifiziertem `POST /tool` auf `WALL` setzen.
+4. Eine Wand mit authentifiziertem `POST /canvas/drag` anlegen.
+5. Projekt oder Etage per authentifiziertem `POST /invoke` innerhalb des Workspace exportieren.
+6. Die erzeugte DXF-Datei fachlich prüfen.
 
 ## Typischer Arbeitsablauf
 

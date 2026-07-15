@@ -5,7 +5,7 @@
 ## Technik
 
 * `JDK 25`
-* `Gradle Wrapper 9.5.0`
+* `Gradle Wrapper 9.6.0`
 * `JavaFX`
 * `JUnit 5`
 * `JaCoCo`
@@ -21,6 +21,11 @@ Für einen lokalen HTTP-Testzugriff auf die laufende Anwendung:
 ```bash
 ./gradlew runMitAutomatisierung
 ```
+
+Der Start gibt ein zufälliges Bearer-Token aus. Alternativ wird ein mindestens 32 Zeichen langes
+`CADAS_AUTOMATION_TOKEN` verwendet. Zustandsänderungen benötigen authentifizierte `POST`-Aufrufe;
+Dateizugriffe bleiben auf den Workspace begrenzt. Vollständige Beispiele stehen in der
+[Benutzerdokumentation](docs/benutzerdoku.md).
 
 ## Distribution
 
@@ -40,13 +45,19 @@ Hinweis: Die macOS-Paketierungsaufgaben laufen nur auf `macOS`, weil dafür `jpa
 ## Tests
 
 ```bash
-./gradlew test
+./gradlew check
 ```
+
+`check` führt die vollständigen fachlichen und technischen Tests, Compilerprüfungen und die paketbezogene
+JaCoCo-Mindestabdeckung aus. Der HTML-Abdeckungsbericht liegt anschließend unter
+`build/reports/jacoco/test/html/index.html`.
 
 ## Dokumentation
 
 * Systemdokumentation: [docs/systemdoku.md](docs/systemdoku.md)
 * Benutzerdokumentation: [docs/benutzerdoku.md](docs/benutzerdoku.md)
+* Leitfaden für menschliche Reviews: [REVIEW.md](REVIEW.md)
+* Paketdokumentation: jeweilige `README.md` direkt im Produktions- und Testpaket
 
 ## Aktueller Stand
 

@@ -7,14 +7,14 @@ flowchart LR
     Zeichensteuerung --> Editing[WallEditingService]
     Zeichensteuerung --> Openings[OpeningPlacementService]
     Zeichensteuerung --> Parts[StandardPartLibrary]
-    Zeichensteuerung --> Exchange[LevelExchangeService]
+    Zeichensteuerung --> Exchange[DXF-Projekt-/Etagen-Austausch]
     Zeichensteuerung --> Layers[TileLayoutService]
     Zeichensteuerung --> Modell[ProjectModel]
     Drafting --> Geometrie[Geometriekern]
     Snap --> Geometrie
     Editing --> Geometrie
     Openings --> Geometrie
-    Exchange --> Dxf[DxfLevelExchangeService]
+    Exchange --> Dxf[DxfProject-/LevelExchangeService]
     Modell --> Etage[Level]
     Etage --> Wand[Wall]
     Etage --> Raum[Room]

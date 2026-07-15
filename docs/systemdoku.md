@@ -11,7 +11,7 @@
 ### Technologien
 
 * `JDK 25`
-* `Gradle Wrapper 9.5.0`
+* `Gradle Wrapper 9.6.0`
 * `JavaFX` für die Desktop-Oberfläche
 * `JUnit 5 Jupiter` für Unit-Tests
 * `JaCoCo` für Testreports
@@ -106,7 +106,13 @@ Die Klasse `CadWorkbench` kapselt die aktuelle Workbench. Sie stellt bereit:
 
 `MarkdownNavigationService` extrahiert die Kapitelstruktur der eingebetteten Markdown-Dokumente. `MarkdownHtmlRenderer` versieht dieselben Überschriften mit stabilen Sprungmarken; die JavaFX-Hilfe kombiniert daraus Inhaltsverzeichnis, Volltextsuche und Druckfunktion.
 
-`AutomationBridgeServer` bindet lokal auf `127.0.0.1:17845` und reicht Werkzeuge, Felder, Canvas-Aktionen sowie Import-/Export-Kommandos kontrolliert an die Workbench weiter. Dadurch lassen sich End-to-End-Tests der laufenden Desktop-Anwendung auch ohne manuelle Bedienung durchführen.
+`AutomationBridgeServer` bindet ausschließlich lokal auf `127.0.0.1:17845` und reicht Werkzeuge,
+Felder, Canvas-Aktionen sowie Import-/Export-Kommandos kontrolliert an die Workbench weiter. Bis auf
+den Health-Check benötigen alle Endpunkte ein mindestens 32 Zeichen langes Bearer-Token. Lesende
+Aufrufe und Änderungen sind über `GET` und `POST` getrennt, fremde Browser-Origin wird abgewiesen,
+Dateipfade bleiben innerhalb einer kanonischen Workspace-Wurzel und JavaFX-Aufrufe besitzen eine
+Zeitgrenze. Dadurch lassen sich End-to-End-Tests der laufenden Desktop-Anwendung ohne ungeschützte
+lokale Steuerung durchführen.
 
 ### Domäne
 
@@ -141,7 +147,11 @@ Diese Teile sind inzwischen nicht nur im Modell abgesichert, sondern auch in der
 
 ## Dateiformatstrategie
 
-Die konkreten Austauschadapter sind `DxfProjectExchangeService` und `DxfLevelExchangeService`. Sie kapseln den DXF-Import und -Export bewusst hinter `ProjectExchangeService` und `LevelExchangeService`. DWG-Bibliotheken werden nicht direkt als Austauschformat geschrieben, sondern über eine separate externe Konverter-Schicht gelesen und anschließend als CADas-Presets genutzt.
+Die konkreten Austauschadapter sind `DxfProjectExchangeService` und `DxfLevelExchangeService`.
+Beide trennen vollständige Gebäude und einzelne Etagen auf API-Ebene und teilen die strukturellen
+DXF- sowie Metadatencodecs. DWG-Bibliotheken werden nicht direkt als Austauschformat geschrieben,
+sondern über eine separate externe Konverter-Schicht gelesen und anschließend als CADas-Presets
+genutzt.
 
 Für den aktuellen Stand gilt:
 
@@ -149,14 +159,15 @@ Für den aktuellen Stand gilt:
 * Wände, Räume, Türen, Fenster und Treppen werden sichtbar als DXF-Geometrie exportiert.
 * Zielversion für neue produktive DXF-Dateien ist `AutoCAD 2000` mit `$ACADVER = AC1015`.
 * Zusätzlich schreibt CADas eine eigene Layer-Spur `CADAS_META`, um fachliche Zusatzinformationen verlustarm wieder einzulesen.
-* Neue Exporte schreiben `CADAS_DXF|4` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben. Türen, Fenster, Raumobjekte und Heizflächen behalten in dieser Metadatenspur ihre Objekt-IDs; Heizparameter, Verteilerpunkte und polygonale Heizbereiche sowie Objektwinkel, positive oder negative Basishöhen, Objekt-Heizarten und Geländehöhen an den äußeren Gebäudeecken werden verlustfrei gespeichert.
-* Der Import bleibt zu älteren CADas-DXF-Metadaten ohne Versionsmarker kompatibel und überspringt einzelne beschädigte Metadatensätze sowie Öffnungen ohne gültige Host-Wand, statt den gesamten Import abzubrechen.
+* Neue Exporte schreiben `CADAS_DXF|5` als Metadatenmarker; textuelle Fachfelder werden UTF-8-kodiert, damit Umlaute, `/`, `|` und Leerzeichen im Rundlauf erhalten bleiben. Türen, Fenster, Raumobjekte und Heizflächen behalten in dieser Metadatenspur ihre Objekt-IDs; Heizparameter, Verteilerpunkte und polygonale Heizbereiche sowie Objektwinkel, positive oder negative Basishöhen, Objekt-Heizarten und Geländehöhen an den äußeren Gebäudeecken werden verlustfrei gespeichert.
+* Der Import bleibt zu älteren CADas-DXF-Metadaten ohne Versionsmarker kompatibel, überspringt einzelne beschädigte Metadatensätze sowie Öffnungen ohne gültige Host-Wand und ergänzt weiterhin rettbare sichtbare Geometrie, statt den gesamten Import abzubrechen.
 * Der Export schreibt aktuell metrische Kopfvariablen über `$INSUNITS = 4` und `$MEASUREMENT = 1`.
 * Exportierte Entities werden explizit als Model-Space-Elemente gekennzeichnet und mit eigenen Handles versehen.
 * `TABLES` für Layer-, Linientyp-, Textstil- und Block-Record-Grunddaten werden geschrieben.
 * `BLOCKS` und `INSERT` werden für wiederverwendbare Tür-, Fenster- und Treppenbausteine vorbereitet und exportiert.
 * `OBJECTS` enthält eine kleine Grundstruktur für Dictionaries und Layout-Metadaten.
 * Fällt diese Metadaten-Spur weg, importiert der Adapter zumindest einfache Wände und Räume aus der reinen Geometrie.
+* Projekt- und Etagenexport schreiben zunächst eine temporäre Datei im Zielverzeichnis und ersetzen das Ziel anschließend atomar, soweit das Dateisystem dies unterstützt.
 
 ## Teilebibliotheken
 
