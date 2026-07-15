@@ -18,6 +18,12 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Liest die von der Teilebibliothek unterstützte IFC-Teilmenge ohne externes IFC-Laufzeitsystem. Unterstützt
+ * werden facettierte BREP-Körper und extrudierte Profile einschließlich konkaver Außenkonturen und Innenlöcher.
+ * IFC-Längeneinheiten werden beim Import auf Millimeter normiert; zugewiesene Oberflächenfarben bleiben als
+ * Materialschlüssel am erzeugten Dreiecksnetz erhalten.
+ */
 public final class Ifc3dObjectGeometryReader {
 
     private static final Pattern ENTITY_PATTERN = Pattern.compile("#(\\d+)\\s*=\\s*([A-Z0-9_]+)\\((.*)\\)\\s*;", Pattern.DOTALL);
@@ -150,31 +156,37 @@ public final class Ifc3dObjectGeometryReader {
             if (face == null || !face.type().equals("IFCFACE")) {
                 continue;
             }
-            List<Integer> faceReferences = references(face.arguments());
-            if (faceReferences.isEmpty()) {
-                continue;
-            }
-            Entity bound = entities.get(faceReferences.getFirst());
-            if (bound == null) {
-                continue;
-            }
-            List<Integer> boundReferences = references(bound.arguments());
-            if (boundReferences.isEmpty()) {
-                continue;
-            }
-            Entity loop = entities.get(boundReferences.getFirst());
-            if (loop == null || !loop.type().equals("IFCPOLYLOOP")) {
-                continue;
-            }
-            List<Vector3> polygon = references(loop.arguments()).stream()
+            List<List<Vector3>> loops = references(face.arguments()).stream()
                     .map(entities::get)
-                    .filter(point -> point != null && point.type().equals("IFCCARTESIANPOINT"))
-                    .map(this::point)
+                    .filter(java.util.Objects::nonNull)
+                    .sorted(Comparator.comparing(bound -> !bound.type().equals("IFCFACEOUTERBOUND")))
+                    .map(bound -> faceLoop(bound, entities))
                     .flatMap(Optional::stream)
                     .toList();
-            appendPolygon(triangles, polygon);
+            appendFace(triangles, loops);
         }
         return triangles.isEmpty() ? Optional.empty() : Optional.of(toArray(triangles));
+    }
+
+    private Optional<List<Vector3>> faceLoop(Entity bound, Map<Integer, Entity> entities) {
+        List<Integer> boundReferences = references(bound.arguments());
+        if (boundReferences.isEmpty()) {
+            return Optional.empty();
+        }
+        Entity loop = entities.get(boundReferences.getFirst());
+        if (loop == null || !loop.type().equals("IFCPOLYLOOP")) {
+            return Optional.empty();
+        }
+        List<Vector3> points = new ArrayList<>(references(loop.arguments()).stream()
+                .map(entities::get)
+                .filter(point -> point != null && point.type().equals("IFCCARTESIANPOINT"))
+                .map(this::point)
+                .flatMap(Optional::stream)
+                .toList());
+        if (bound.arguments().contains(".F.")) {
+            java.util.Collections.reverse(points);
+        }
+        return points.size() < 3 ? Optional.empty() : Optional.of(List.copyOf(points));
     }
 
     private Optional<double[]> extrudedAreaSolid(Entity solid, Map<Integer, Entity> entities) {
@@ -189,57 +201,81 @@ public final class Ifc3dObjectGeometryReader {
         if (profile == null || placement == null || direction == null) {
             return Optional.empty();
         }
-        List<Vector2> profilePoints = profilePoints(profile, entities);
-        if (profilePoints.size() < 3) {
+        ProfileLoops profileLoops = profileLoops(profile, entities);
+        if (profileLoops.outer().size() < 3) {
             return Optional.empty();
         }
         Transform transform = transform(placement, entities);
         Vector3 localDirection = direction(direction).orElse(new Vector3(0.0, 0.0, 1.0));
         Vector3 extrusion = transform.vector(localDirection).normalize().multiply(solidNumbers.getLast());
-        List<Vector3> bottom = profilePoints.stream()
-                .map(point -> transform.point(new Vector3(point.x(), point.y(), 0.0)))
+        List<List<Vector3>> bottomLoops = profileLoops.all().stream()
+                .map(loop -> loop.stream()
+                        .map(point -> transform.point(new Vector3(point.x(), point.y(), 0.0)))
+                        .toList())
                 .toList();
-        List<Vector3> top = bottom.stream().map(point -> point.add(extrusion)).toList();
+        List<List<Vector3>> topLoops = bottomLoops.stream()
+                .map(loop -> loop.stream().map(point -> point.add(extrusion)).toList())
+                .toList();
         List<Double> triangles = new ArrayList<>();
-        appendPolygon(triangles, bottom);
-        List<Vector3> reversedTop = new ArrayList<>(top);
-        java.util.Collections.reverse(reversedTop);
-        appendPolygon(triangles, reversedTop);
-        for (int index = 0; index < bottom.size(); index++) {
-            int next = (index + 1) % bottom.size();
-            appendTriangle(triangles, bottom.get(index), bottom.get(next), top.get(next));
-            appendTriangle(triangles, bottom.get(index), top.get(next), top.get(index));
+        appendFace(triangles, reversedLoops(bottomLoops));
+        appendFace(triangles, topLoops);
+        for (int loopIndex = 0; loopIndex < bottomLoops.size(); loopIndex++) {
+            List<Vector3> bottom = bottomLoops.get(loopIndex);
+            List<Vector3> top = topLoops.get(loopIndex);
+            for (int index = 0; index < bottom.size(); index++) {
+                int next = (index + 1) % bottom.size();
+                appendTriangle(triangles, bottom.get(index), bottom.get(next), top.get(next));
+                appendTriangle(triangles, bottom.get(index), top.get(next), top.get(index));
+            }
         }
         return Optional.of(toArray(triangles));
     }
 
-    private List<Vector2> profilePoints(Entity profile, Map<Integer, Entity> entities) {
+    private ProfileLoops profileLoops(Entity profile, Map<Integer, Entity> entities) {
         if (profile.type().equals("IFCCIRCLEPROFILEDEF") || profile.type().equals("IFCCIRCLEHOLLOWPROFILEDEF")) {
             List<Double> values = numbers(profile.arguments());
             if (values.isEmpty()) {
-                return List.of();
+                return ProfileLoops.empty();
             }
             double radius = profile.type().equals("IFCCIRCLEHOLLOWPROFILEDEF") && values.size() >= 2
                     ? values.get(values.size() - 2)
                     : values.getLast();
             Vector2 center = profilePlacement(profile, entities);
-            List<Vector2> points = new ArrayList<>();
-            for (int index = 0; index < CIRCLE_SEGMENTS; index++) {
-                double angle = Math.PI * 2.0 * index / CIRCLE_SEGMENTS;
-                points.add(new Vector2(center.x() + Math.cos(angle) * radius, center.y() + Math.sin(angle) * radius));
+            List<Vector2> outer = circle(center, radius, true);
+            if (profile.type().equals("IFCCIRCLEHOLLOWPROFILEDEF") && values.size() >= 2) {
+                double innerRadius = radius - values.getLast();
+                if (innerRadius > 0.0) {
+                    return new ProfileLoops(outer, List.of(circle(center, innerRadius, false)));
+                }
             }
-            return points;
+            return new ProfileLoops(outer, List.of());
         }
         List<Integer> profileReferences = references(profile.arguments());
         if (profileReferences.isEmpty()) {
-            return List.of();
+            return ProfileLoops.empty();
         }
-        int curveReference = profileReferences.getLast();
+        List<Vector2> outer = curvePoints(profileReferences.getFirst(), entities, true);
+        List<List<Vector2>> holes = profile.type().equals("IFCARBITRARYPROFILEDEFWITHVOIDS")
+                ? profileReferences.stream().skip(1).map(reference -> curvePoints(reference, entities, false)).filter(loop -> loop.size() >= 3).toList()
+                : List.of();
+        return new ProfileLoops(outer, holes);
+    }
+
+    private List<Vector2> curvePoints(int curveReference, Map<Integer, Entity> entities, boolean counterClockwise) {
         List<Vector2> points = reachablePoints(curveReference, entities, new HashSet<>()).stream()
                 .map(point -> new Vector2(point.x(), point.y()))
                 .distinct()
                 .toList();
-        return convexHull(points);
+        return normalizedLoop(points, counterClockwise);
+    }
+
+    private List<Vector2> circle(Vector2 center, double radius, boolean counterClockwise) {
+        List<Vector2> points = new ArrayList<>();
+        for (int index = 0; index < CIRCLE_SEGMENTS; index++) {
+            double angle = Math.PI * 2.0 * index / CIRCLE_SEGMENTS;
+            points.add(new Vector2(center.x() + Math.cos(angle) * radius, center.y() + Math.sin(angle) * radius));
+        }
+        return normalizedLoop(points, counterClockwise);
     }
 
     private Vector2 profilePlacement(Entity profile, Map<Integer, Entity> entities) {
@@ -308,46 +344,116 @@ public final class Ifc3dObjectGeometryReader {
         return point(entity);
     }
 
-    private List<Vector2> convexHull(List<Vector2> input) {
-        List<Vector2> points = input.stream()
-                .sorted(Comparator.comparingDouble(Vector2::x).thenComparingDouble(Vector2::y))
-                .toList();
-        if (points.size() < 3) {
-            return points;
+    private List<Vector2> normalizedLoop(List<Vector2> input, boolean counterClockwise) {
+        if (input.size() < 3) {
+            return input;
         }
-        List<Vector2> lower = new ArrayList<>();
-        for (Vector2 point : points) {
-            while (lower.size() >= 2 && cross(lower.get(lower.size() - 2), lower.getLast(), point) <= 0.0) {
-                lower.removeLast();
-            }
-            lower.add(point);
+        List<Vector2> points = new ArrayList<>(input);
+        if (points.getFirst().equals(points.getLast())) {
+            points.removeLast();
         }
-        List<Vector2> upper = new ArrayList<>();
-        for (int index = points.size() - 1; index >= 0; index--) {
-            Vector2 point = points.get(index);
-            while (upper.size() >= 2 && cross(upper.get(upper.size() - 2), upper.getLast(), point) <= 0.0) {
-                upper.removeLast();
-            }
-            upper.add(point);
+        if ((signedArea(points) > 0.0) != counterClockwise) {
+            java.util.Collections.reverse(points);
         }
-        lower.removeLast();
-        upper.removeLast();
-        lower.addAll(upper);
-        return List.copyOf(lower);
+        return List.copyOf(points);
     }
 
-    private double cross(Vector2 first, Vector2 second, Vector2 third) {
-        return (second.x() - first.x()) * (third.y() - first.y())
-                - (second.y() - first.y()) * (third.x() - first.x());
+    private double signedArea(List<Vector2> points) {
+        double area = 0.0;
+        for (int index = 0; index < points.size(); index++) {
+            Vector2 current = points.get(index);
+            Vector2 next = points.get((index + 1) % points.size());
+            area += current.x() * next.y() - next.x() * current.y();
+        }
+        return area / 2.0;
     }
 
-    private void appendPolygon(List<Double> triangles, List<Vector3> polygon) {
-        if (polygon.size() < 3) {
+    private List<List<Vector3>> reversedLoops(List<List<Vector3>> loops) {
+        return loops.stream().map(loop -> {
+            List<Vector3> reversed = new ArrayList<>(loop);
+            java.util.Collections.reverse(reversed);
+            return List.copyOf(reversed);
+        }).toList();
+    }
+
+    /**
+     * Zerlegt eine ebene Fläche einschließlich konkaver Ränder und Innenlöcher in horizontale Trapeze. Anders als
+     * eine Dreiecksfächerung erzeugt das Verfahren weder Flächen über einer Einbuchtung noch über einem Loch.
+     */
+    private void appendFace(List<Double> triangles, List<List<Vector3>> loops) {
+        if (loops.isEmpty() || loops.getFirst().size() < 3) {
             return;
         }
-        Vector3 first = polygon.getFirst();
-        for (int index = 1; index + 1 < polygon.size(); index++) {
-            appendTriangle(triangles, first, polygon.get(index), polygon.get(index + 1));
+        Vector3 desiredNormal = normal(loops.getFirst());
+        ProjectionAxis projection = ProjectionAxis.forNormal(desiredNormal);
+        List<ProjectedEdge> edges = new ArrayList<>();
+        List<Double> scanLevels = new ArrayList<>();
+        for (List<Vector3> loop : loops) {
+            for (int index = 0; index < loop.size(); index++) {
+                Vector3 start = loop.get(index);
+                Vector3 end = loop.get((index + 1) % loop.size());
+                Vector2 projectedStart = projection.project(start);
+                Vector2 projectedEnd = projection.project(end);
+                scanLevels.add(projectedStart.y());
+                if (Math.abs(projectedEnd.y() - projectedStart.y()) > 0.000_000_1) {
+                    edges.add(new ProjectedEdge(start, end, projectedStart, projectedEnd));
+                }
+            }
+        }
+        List<Double> levels = scanLevels.stream().distinct().sorted().toList();
+        for (int levelIndex = 0; levelIndex + 1 < levels.size(); levelIndex++) {
+            double lowerY = levels.get(levelIndex);
+            double upperY = levels.get(levelIndex + 1);
+            if (upperY - lowerY <= 0.000_000_1) {
+                continue;
+            }
+            double middleY = (lowerY + upperY) / 2.0;
+            List<ProjectedEdge> intersections = edges.stream()
+                    .filter(edge -> edge.crosses(middleY))
+                    .sorted(Comparator.comparingDouble(edge -> edge.xAt(middleY)))
+                    .toList();
+            for (int edgeIndex = 0; edgeIndex + 1 < intersections.size(); edgeIndex += 2) {
+                ProjectedEdge left = intersections.get(edgeIndex);
+                ProjectedEdge right = intersections.get(edgeIndex + 1);
+                Vector3 lowerLeft = left.pointAt(lowerY);
+                Vector3 lowerRight = right.pointAt(lowerY);
+                Vector3 upperRight = right.pointAt(upperY);
+                Vector3 upperLeft = left.pointAt(upperY);
+                appendOrientedTriangle(triangles, lowerLeft, lowerRight, upperRight, desiredNormal);
+                appendOrientedTriangle(triangles, lowerLeft, upperRight, upperLeft, desiredNormal);
+            }
+        }
+    }
+
+    private Vector3 normal(List<Vector3> polygon) {
+        Vector3 normal = Vector3.ZERO;
+        for (int index = 0; index < polygon.size(); index++) {
+            Vector3 current = polygon.get(index);
+            Vector3 next = polygon.get((index + 1) % polygon.size());
+            normal = normal.add(new Vector3(
+                    (current.y() - next.y()) * (current.z() + next.z()),
+                    (current.z() - next.z()) * (current.x() + next.x()),
+                    (current.x() - next.x()) * (current.y() + next.y())
+            ));
+        }
+        return normal.normalize();
+    }
+
+    private void appendOrientedTriangle(
+            List<Double> triangles,
+            Vector3 first,
+            Vector3 second,
+            Vector3 third,
+            Vector3 desiredNormal
+    ) {
+        Vector3 actualNormal = second.subtract(first).cross(third.subtract(first));
+        if (actualNormal.length() <= 0.000_000_1) {
+            return;
+        }
+        if (actualNormal.dot(desiredNormal) < 0.0) {
+            appendTriangle(triangles, first, third, second);
+        } else {
+            appendTriangle(triangles, first, second, third);
         }
     }
 
@@ -407,7 +513,75 @@ public final class Ifc3dObjectGeometryReader {
     private record Entity(String type, String arguments) {
     }
 
+    private record ProfileLoops(List<Vector2> outer, List<List<Vector2>> holes) {
+
+        private static ProfileLoops empty() {
+            return new ProfileLoops(List.of(), List.of());
+        }
+
+        private List<List<Vector2>> all() {
+            List<List<Vector2>> loops = new ArrayList<>();
+            loops.add(outer);
+            loops.addAll(holes);
+            return List.copyOf(loops);
+        }
+    }
+
     private record Vector2(double x, double y) {
+    }
+
+    private record ProjectedEdge(Vector3 start, Vector3 end, Vector2 projectedStart, Vector2 projectedEnd) {
+
+        private boolean crosses(double y) {
+            return y > Math.min(projectedStart.y(), projectedEnd.y())
+                    && y < Math.max(projectedStart.y(), projectedEnd.y());
+        }
+
+        private double xAt(double y) {
+            double ratio = (y - projectedStart.y()) / (projectedEnd.y() - projectedStart.y());
+            return projectedStart.x() + ratio * (projectedEnd.x() - projectedStart.x());
+        }
+
+        private Vector3 pointAt(double y) {
+            double ratio = (y - projectedStart.y()) / (projectedEnd.y() - projectedStart.y());
+            return start.add(end.subtract(start).multiply(ratio));
+        }
+    }
+
+    private enum ProjectionAxis {
+        DROP_X {
+            @Override
+            Vector2 project(Vector3 point) {
+                return new Vector2(point.y(), point.z());
+            }
+        },
+        DROP_Y {
+            @Override
+            Vector2 project(Vector3 point) {
+                return new Vector2(point.x(), point.z());
+            }
+        },
+        DROP_Z {
+            @Override
+            Vector2 project(Vector3 point) {
+                return new Vector2(point.x(), point.y());
+            }
+        };
+
+        abstract Vector2 project(Vector3 point);
+
+        private static ProjectionAxis forNormal(Vector3 normal) {
+            double absoluteX = Math.abs(normal.x());
+            double absoluteY = Math.abs(normal.y());
+            double absoluteZ = Math.abs(normal.z());
+            if (absoluteX >= absoluteY && absoluteX >= absoluteZ) {
+                return DROP_X;
+            }
+            if (absoluteY >= absoluteZ) {
+                return DROP_Y;
+            }
+            return DROP_Z;
+        }
     }
 
     private record Vector3(double x, double y, double z) {
@@ -417,6 +591,10 @@ public final class Ifc3dObjectGeometryReader {
 
         private Vector3 add(Vector3 other) {
             return new Vector3(x + other.x, y + other.y, z + other.z);
+        }
+
+        private Vector3 subtract(Vector3 other) {
+            return new Vector3(x - other.x, y - other.y, z - other.z);
         }
 
         private Vector3 multiply(double factor) {
@@ -431,8 +609,16 @@ public final class Ifc3dObjectGeometryReader {
             );
         }
 
+        private double dot(Vector3 other) {
+            return x * other.x + y * other.y + z * other.z;
+        }
+
+        private double length() {
+            return Math.sqrt(x * x + y * y + z * z);
+        }
+
         private Vector3 normalize() {
-            double length = Math.sqrt(x * x + y * y + z * z);
+            double length = length();
             return length <= 0.000001 ? Z : new Vector3(x / length, y / length, z / length);
         }
     }
