@@ -11,6 +11,7 @@ import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import java.util.Comparator;
 import java.util.Optional;
 
+/** Projiziert und validiert Dachfenster vollständig innerhalb der gewählten geneigten Dachfläche. */
 public final class RoofWindowPlacementService {
 
     public Optional<RoofWindow> place(Level level, PlanPoint point, Length width, Length depth) {

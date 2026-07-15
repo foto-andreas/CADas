@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+/** Zerlegt ein orthogonales, gegebenenfalls konkaves Polygon über Scanlinien in disjunkte Rechtecke. */
 public final class OrthogonalPolygonDecompositionService {
 
     private static final double GRID_STEP = 200.0;

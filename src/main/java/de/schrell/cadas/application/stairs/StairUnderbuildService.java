@@ -16,6 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Erzeugt den baulich nutzbaren Unterbau einer Treppe und passt ihn an angrenzende Wand- und Höhenprofile an.
+ */
 public final class StairUnderbuildService {
 
     public UnderbuildResult synchronize(Level level, Staircase staircase) {

@@ -6,6 +6,7 @@ import de.schrell.cadas.domain.model.StairType;
 
 import java.util.List;
 
+/** Baut die mitgelieferte Grundbibliothek aus fachlich plausiblen Standardmaßen auf. */
 public final class StandardPartLibraryService {
 
     private StandardPartLibraryService() {

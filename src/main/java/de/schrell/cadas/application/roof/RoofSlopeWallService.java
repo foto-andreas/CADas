@@ -22,6 +22,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Leitet für eine Wand unter dem projektierten Dach ein stückweise lineares Oberkantenprofil ab.
+ */
 public final class RoofSlopeWallService {
 
     private static final double EPSILON = 0.001;

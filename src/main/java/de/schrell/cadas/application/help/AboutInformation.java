@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.util.Optional;
 import java.util.Properties;
 
+/** Unveränderliche, anzeigefertige Build- und Produktinformation für den Über-CADas-Dialog. */
 public record AboutInformation(String applicationName, String version, String buildTimestamp, String description) {
 
     public static AboutInformation current() {

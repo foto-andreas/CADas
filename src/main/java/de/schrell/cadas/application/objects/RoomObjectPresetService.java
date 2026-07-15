@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+/** Stellt Standardobjekte bereit und importiert referenzierte DXF-, DWG-, IFC- und RFA-Geometrie als Preset. */
 public final class RoomObjectPresetService {
 
     private final Path objectDirectory;

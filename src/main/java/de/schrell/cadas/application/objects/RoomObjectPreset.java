@@ -5,6 +5,7 @@ import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
 
+/** Wiederverwendbare Vorgabe für Typ, Geometrie, Montage und optionale 3D-Quelle eines Raumobjekts. */
 public record RoomObjectPreset(
         String id,
         String name,

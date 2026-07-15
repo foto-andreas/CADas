@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
+/** Lädt die eingebettete deutsche Benutzerhilfe und Build-Informationen aus dem Anwendungspaket. */
 public final class HelpContentService {
 
     private static final String BENUTZERDOKU_PFAD = "/docs/benutzerdoku.md";

@@ -3,6 +3,7 @@ package de.schrell.cadas.application.help;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Löst interne Markdown-Anker und relative Hilfelinks auf, ohne externe Navigation freizugeben. */
 public final class MarkdownNavigationService {
 
     private MarkdownNavigationService() {

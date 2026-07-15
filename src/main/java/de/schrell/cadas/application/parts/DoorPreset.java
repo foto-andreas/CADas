@@ -2,6 +2,7 @@ package de.schrell.cadas.application.parts;
 
 import de.schrell.cadas.domain.geometry.Length;
 
+/** Benannte Vorgabe für Türbreite, Türhöhe und Öffnungsdarstellung. */
 public record DoorPreset(
         String id,
         String name,

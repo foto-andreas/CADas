@@ -2,6 +2,7 @@ package de.schrell.cadas.application.exchange;
 
 import java.nio.file.Path;
 
+/** Leitet neben einer Quelldatei kollisionsarm benannte Exportdateien ab und erhält den Elternpfad. */
 public final class ExchangeFileNameService {
 
     private ExchangeFileNameService() {

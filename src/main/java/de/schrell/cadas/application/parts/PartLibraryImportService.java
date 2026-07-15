@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Importiert externe Bauteildefinitionen und verbindet sie mit den geprüften Standard-Presets. */
 public final class PartLibraryImportService {
 
     private PartLibraryImportService() {

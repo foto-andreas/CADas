@@ -22,6 +22,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Erkennt aus einem geschlossenen Wandnetz automatisch begrenzte Raumflächen und vermeidet Außen- und Doppelkonturen.
+ */
 public final class AutoRoomGenerationService {
 
     private static final double EPSILON = 0.001;

@@ -9,6 +9,7 @@ import de.schrell.cadas.domain.model.Room;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Erzeugt und transformiert die Grundrisskontur rechteckiger, runder und polygonaler Bodenöffnungen. */
 public final class FloorOpeningGeometryService {
 
     private static final int CIRCLE_SEGMENTS = 48;
