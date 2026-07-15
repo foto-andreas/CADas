@@ -13,6 +13,9 @@ import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectShape;
+import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
@@ -136,6 +139,27 @@ class SurfaceMaterialReportPdfServiceTest {
                 ""
         ));
         project.primaryLevel().addSurfaceLayerStack(stack);
+        SurfaceLayerStack ceilingStack = new SurfaceLayerStack(SurfaceType.CEILING, room.id().toString());
+        ceilingStack.addLayer(SurfaceLayer.create(
+                "Parkett",
+                Length.of(15, LengthUnit.MILLIMETER),
+                Length.of(80, LengthUnit.CENTIMETER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(2, LengthUnit.MILLIMETER)
+        ));
+        project.primaryLevel().addSurfaceLayerStack(ceilingStack);
+        project.primaryLevel().addRoomObject(RoomObject.create(
+                "konvektor",
+                "Konvektor",
+                RoomObjectType.CUBOID,
+                RoomObjectShape.RECTANGLE,
+                new PlanPoint(2_000, 1_500),
+                Length.of(1, LengthUnit.METER),
+                Length.of(20, LengthUnit.CENTIMETER),
+                Length.of(60, LengthUnit.CENTIMETER),
+                false,
+                ""
+        ).withHeatOutputWatts(500.0));
         project.primaryLevel().addHydronicHeating(HydronicHeating.create(
                 room.id(),
                 HeatingSurfacePosition.FLOOR,
@@ -165,8 +189,10 @@ class SurfaceMaterialReportPdfServiceTest {
             assertTrue(text.contains("Innenumfang"));
             assertTrue(text.contains("14,00 m"));
             assertTrue(text.contains("Zusammenfassung"));
+            assertTrue(text.contains("Trennmerkmale bei mehrfachen Materialnamen"));
             assertTrue(text.contains("Heizlast"));
             assertTrue(text.contains("Flächenheizungen"));
+            assertTrue(text.contains("Konvektor"));
             assertFalse(text.contains("Reststücke"));
             if (expectSvgText) {
                 assertTrue(text.contains("Heizplan Erdgeschoss / Wohnen"));
