@@ -41,7 +41,7 @@ class StairUnderbuildServiceTest {
         level.replaceWalls(initial.walls());
         Door door = Door.create(
                 service.wallId(staircase.id(), StairUnderbuildService.Side.LEFT),
-                Length.ofMillimeters(800), Length.ofMillimeters(900), Length.ofMillimeters(1_800), Length.zero()
+                Length.ofMillimeters(3_000), Length.ofMillimeters(800), Length.ofMillimeters(1_800), Length.zero()
         );
         level.addDoor(door);
 
