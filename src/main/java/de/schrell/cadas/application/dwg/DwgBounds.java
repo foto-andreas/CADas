@@ -2,6 +2,7 @@ package de.schrell.cadas.application.dwg;
 
 import java.util.Optional;
 
+/** Achsenparallele zweidimensionale Grenzen eines analysierten DWG-Bausteins in seiner Quelldateieinheit. */
 public record DwgBounds(
         double minXMillimeters,
         double minYMillimeters,

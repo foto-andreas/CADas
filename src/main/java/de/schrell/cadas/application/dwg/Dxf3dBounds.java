@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.dwg;
 
+/** Achsenparallele dreidimensionale Grenzen eines importierten Körpers in Millimetern. */
 public record Dxf3dBounds(
         double minXMillimeters,
         double minYMillimeters,

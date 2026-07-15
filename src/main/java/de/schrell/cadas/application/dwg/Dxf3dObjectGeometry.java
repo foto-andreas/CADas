@@ -2,6 +2,7 @@ package de.schrell.cadas.application.dwg;
 
 import java.util.List;
 
+/** Zusammengefasste 3D-Geometrie eines Bauteils mit Gesamtgrenzen, Teilmaschen und Importhinweisen. */
 public record Dxf3dObjectGeometry(
         Dxf3dBounds bounds,
         List<Dxf3dBounds> solidBounds,

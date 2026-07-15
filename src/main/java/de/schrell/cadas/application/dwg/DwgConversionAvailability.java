@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.dwg;
 
+/** Ergebnis der Konvertersuche mit Verfügbarkeit, gewähltem Programm und verständlicher Diagnose. */
 public record DwgConversionAvailability(
         boolean available,
         String converterName,

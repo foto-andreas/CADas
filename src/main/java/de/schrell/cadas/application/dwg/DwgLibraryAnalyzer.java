@@ -6,6 +6,9 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Objects;
 
+/**
+ * Orchestriert Konverter und DXF-Leser, um eine DWG-Datei ohne direkte native Bibliothek analysierbar zu machen.
+ */
 public final class DwgLibraryAnalyzer {
 
     private final ExternalDwgToDxfConverter converter;

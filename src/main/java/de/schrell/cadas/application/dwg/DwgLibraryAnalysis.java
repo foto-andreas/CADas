@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
+/** Gesamtergebnis der DWG-Bibliotheksanalyse aus Einheiten, Blöcken, Einfügungen und Diagnosemeldungen. */
 public record DwgLibraryAnalysis(
         Path sourceFile,
         boolean successful,

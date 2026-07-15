@@ -13,6 +13,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Liest die für Teilebibliotheken relevante zweidimensionale Block-, Einfüge- und Grenzgeometrie aus ASCII-DXF.
+ */
 public final class DwgDxfGeometryReader {
 
     private static final String MODEL_BLOCK_NAME = "Modellbereich";

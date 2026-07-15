@@ -2,6 +2,9 @@ package de.schrell.cadas.application.dwg;
 
 import java.util.Arrays;
 
+/**
+ * Triangulierte Teilmasche eines Quellkörpers; je neun aufeinanderfolgende Werte bilden ein Dreieck.
+ */
 public record Dxf3dMesh(int sourceSolidIndex, Dxf3dBounds bounds, double[] triangleCoordinates, String materialKey) {
 
     public Dxf3dMesh {

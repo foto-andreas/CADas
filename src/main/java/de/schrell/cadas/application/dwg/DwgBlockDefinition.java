@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
+/** Beschreibt einen aus DXF gelesenen DWG-Block mit Basispunkt, Grenzen und enthaltenen Entitäten. */
 public record DwgBlockDefinition(
         Path sourceFile,
         String name,

@@ -10,6 +10,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+/**
+ * Überführt eine zuvor extern konvertierte RFA-Datei über IFC in die gemeinsame dreidimensionale Objektgeometrie.
+ */
 public final class Rfa3dObjectGeometryReader {
 
     private final Dxf3dObjectGeometryReader dxfReader;

@@ -8,6 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Liest dreidimensionale DXF-Entitäten und ACIS-v1-Körper und normalisiert ihre Koordinaten auf Millimeter.
+ */
 public final class Dxf3dObjectGeometryReader {
 
     private static final Charset DXF_CHARSET = Charset.forName("windows-1252");
