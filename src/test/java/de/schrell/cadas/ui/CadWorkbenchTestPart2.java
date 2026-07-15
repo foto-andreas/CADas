@@ -153,6 +153,15 @@ class CadWorkbenchTestPart2 extends CadWorkbenchTestBase {
     }
 
     @Test
+    void kodiertSuchtexteAlsSichereJavaScriptStringliterale() {
+        Assertions.assertEquals("'Abschnitt'", CadWorkbenchDocumentSupport.javaScriptStringLiteral("Abschnitt"));
+        Assertions.assertEquals(
+                "'\\'\\\\\\n\\r\\t\\b\\f\\u0001\\u2028\\u2029'",
+                CadWorkbenchDocumentSupport.javaScriptStringLiteral("'\\\n\r\t\b\f\u0001\u2028\u2029")
+        );
+    }
+
+    @Test
     void projektexportUebernimmtOffeneHeizlastfelder() throws Exception {
         Path exportDatei = Files.createTempFile("cadas-heizlast-offen-", ".cadas");
         CadWorkbench workbench = aufFxThread(() -> {

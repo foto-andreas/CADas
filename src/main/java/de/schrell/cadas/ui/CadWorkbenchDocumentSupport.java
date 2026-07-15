@@ -308,9 +308,14 @@ final class CadWorkbenchDocumentSupport {
         sectionSelector.setPromptText("Inhaltsverzeichnis");
         sectionSelector.setPrefWidth(300);
         sectionSelector.setOnAction(event -> Optional.ofNullable(sectionSelector.getValue())
-                .ifPresent(section -> view.getEngine().executeScript(
-                        "document.getElementById('" + section.anchor() + "').scrollIntoView({behavior:'smooth',block:'start'});"
-                )));
+                .ifPresent(section -> {
+                    // Das Skript sucht ausschließlich die kodierte Überschriften-ID. Die Nullprüfung hält
+                    // Navigation auch dann stabil, wenn Dokument und Inhaltsverzeichnis kurzzeitig abweichen.
+                    String script = "const section = document.getElementById("
+                            + javaScriptStringLiteral(section.anchor())
+                            + "); if (section) { section.scrollIntoView({behavior:'smooth',block:'start'}); }";
+                    view.getEngine().executeScript(script);
+                }));
         owner.applyTooltip(sectionSelector, "Listet alle Kapitel und Unterkapitel auf und springt direkt zum gewählten Abschnitt der Dokumentation.");
         TextField searchField = new TextField();
         searchField.setPromptText("Dokumentation durchsuchen");
@@ -346,8 +351,40 @@ final class CadWorkbenchDocumentSupport {
         if (searchText == null || searchText.isBlank()) {
             return;
         }
-        String escaped = searchText.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
-        view.getEngine().executeScript("window.find('" + escaped + "',false," + backwards + ",true,false,true,false);");
+        // window.find(Suchtext, Groß-/Kleinschreibung, rückwärts, umbrechen, ganzes Wort,
+        // in Frames suchen, Dialog anzeigen) wird mit einem vollständig kodierten String aufgerufen.
+        view.getEngine().executeScript("window.find("
+                + javaScriptStringLiteral(searchText)
+                + ",false," + backwards + ",true,false,true,false);");
+    }
+
+    /**
+     * Kodiert beliebigen Java-Text als einzelnes JavaScript-Stringliteral. Neben Anführungszeichen
+     * werden alle Steuerzeichen sowie die von JavaScript als Zeilenende interpretierten Unicode-Zeichen
+     * U+2028 und U+2029 maskiert. Dadurch kann weder Suchtext noch Dokumentanker die Skriptstruktur ändern.
+     */
+    static String javaScriptStringLiteral(String value) {
+        StringBuilder literal = new StringBuilder(value.length() + 2).append('\'');
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            switch (character) {
+                case '\\' -> literal.append("\\\\");
+                case '\'' -> literal.append("\\'");
+                case '\b' -> literal.append("\\b");
+                case '\f' -> literal.append("\\f");
+                case '\n' -> literal.append("\\n");
+                case '\r' -> literal.append("\\r");
+                case '\t' -> literal.append("\\t");
+                default -> {
+                    if (character < 0x20 || character == '\u2028' || character == '\u2029') {
+                        literal.append(String.format("\\u%04x", (int) character));
+                    } else {
+                        literal.append(character);
+                    }
+                }
+            }
+        }
+        return literal.append('\'').toString();
     }
 
     void printSurfaceMaterialReport(WebView reportView) {
