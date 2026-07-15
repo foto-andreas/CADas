@@ -1,5 +1,8 @@
 package de.schrell.cadas.application.view;
 
+/**
+ * Verändert einen Kamerazustand durch begrenztes Drehen, Zoomen und Wechseln der Projektion.
+ */
 public final class ThreeDCameraController {
 
     public CameraPose orbit(CameraPose pose, double deltaAzimuthDegrees, double deltaElevationDegrees) {

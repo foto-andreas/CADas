@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.view;
 
+/** Fachliche Herkunft eines renderbaren Körpers für Farbe, Sichtbarkeit und Auswahlbehandlung. */
 public enum RenderableKind {
     WALL,
     ROOM_FLOOR,

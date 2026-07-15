@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.view;
 
+/** Berechnet Mittelpunkt und Kameradistanz, mit denen die gesamte Szene in den verfügbaren Viewport passt. */
 public final class ThreeDSceneFitService {
 
     public double calculateDistance(

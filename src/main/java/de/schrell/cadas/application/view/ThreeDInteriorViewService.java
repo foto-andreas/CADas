@@ -9,6 +9,9 @@ import de.schrell.cadas.domain.model.Wall;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Bestimmt eine in einen Raum gerichtete Innenkamera aus Raumkontur, Sichtziel und sicherem Wandabstand.
+ */
 public final class ThreeDInteriorViewService {
 
     private static final double DEFAULT_EYE_HEIGHT_MILLIMETERS = 1_600.0;

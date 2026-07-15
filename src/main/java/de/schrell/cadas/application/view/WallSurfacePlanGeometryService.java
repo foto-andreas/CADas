@@ -15,6 +15,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Projiziert lokale Abschnitte einer gerichteten Wandseite zurück in zweidimensionale Weltpolygone.
+ */
 public final class WallSurfacePlanGeometryService {
 
     private static final double EPSILON = 0.001;

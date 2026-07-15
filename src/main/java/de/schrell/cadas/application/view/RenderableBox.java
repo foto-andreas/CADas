@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.view;
 
+/** Achsenparalleler oder gedrehter Quader der 3D-Szene mit Material- und Auswahlbezug. */
 public record RenderableBox(
         SelectionKey selectionKey,
         String levelName,

@@ -1,5 +1,8 @@
 package de.schrell.cadas.application.view;
 
+/**
+ * Allgemeine triangulierte 3D-Fläche mit Weltkoordinaten, Material und optionalem Auswahlbezug.
+ */
 public record RenderableMesh(
         SelectionKey selectionKey,
         String levelName,

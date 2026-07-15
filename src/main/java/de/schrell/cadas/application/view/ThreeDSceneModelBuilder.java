@@ -53,6 +53,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Leitet aus dem vollständigen Projektmodell eine renderbare 3D-Szene ab.
+ * Der Aufbau berücksichtigt Etagenhöhen, Wandprofile und -öffnungen, Räume, Schichten, Treppen, Dach,
+ * Gelände, Heizungen und importierte Bauteilmaschen; alle Ausgaben verwenden Millimeter-Weltkoordinaten.
+ */
 public final class ThreeDSceneModelBuilder {
 
     private static final double ROOM_VOLUME_OPACITY = 0.16;

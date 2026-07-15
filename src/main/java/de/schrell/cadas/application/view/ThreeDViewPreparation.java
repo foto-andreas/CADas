@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.view;
 
+/** Bündelt Szenenableitung, Grenzberechnung und anfänglichen Kamera-Fit für den Wechsel in die 3D-Ansicht. */
 public final class ThreeDViewPreparation {
 
     public CameraPose defaultPose() {

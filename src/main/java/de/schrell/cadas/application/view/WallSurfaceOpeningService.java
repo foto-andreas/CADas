@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.TreeSet;
 import java.util.UUID;
 
+/**
+ * Zieht Tür- und Fensterintervalle aus einer lokalen Wandfläche ab und liefert die verbleibenden Flächenrechtecke.
+ */
 public final class WallSurfaceOpeningService {
 
     private static final double EPSILON = 0.001;

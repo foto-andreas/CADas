@@ -1,5 +1,6 @@
 package de.schrell.cadas.application.view;
 
+/** Achsenparallele Gesamtgrenzen aller sichtbaren 3D-Körper; leere Szenen besitzen einen definierten Ersatzbereich. */
 public record ThreeDSceneBounds(
         double centerX,
         double centerY,
