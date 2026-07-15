@@ -5,13 +5,32 @@ import java.util.Deque;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Verwaltet unveränderliche Zustandskopien für Rückgängig/Wiederherstellen. Ein neuer Bearbeitungsschritt löscht
+ * den Redo-Zweig. Die feste Obergrenze entfernt ausschließlich die ältesten Undo-Snapshots und verhindert dadurch
+ * einen vom Bearbeitungsumfang abhängigen, unbegrenzten Speicherverbrauch.
+ */
 public final class UndoRedoStack<T> {
 
+    private static final int DEFAULT_MAXIMUM_SNAPSHOTS = 100;
     private final Deque<T> undoStack = new ArrayDeque<>();
     private final Deque<T> redoStack = new ArrayDeque<>();
+    private final int maximumSnapshots;
+
+    public UndoRedoStack() {
+        this(DEFAULT_MAXIMUM_SNAPSHOTS);
+    }
+
+    public UndoRedoStack(int maximumSnapshots) {
+        if (maximumSnapshots < 1) {
+            throw new IllegalArgumentException("Die Historie muss mindestens einen Snapshot aufnehmen können.");
+        }
+        this.maximumSnapshots = maximumSnapshots;
+    }
 
     public void remember(T snapshot) {
         undoStack.push(Objects.requireNonNull(snapshot, "snapshot darf nicht null sein."));
+        trimOldest(undoStack);
         redoStack.clear();
     }
 
@@ -42,5 +61,11 @@ public final class UndoRedoStack<T> {
     public void clear() {
         undoStack.clear();
         redoStack.clear();
+    }
+
+    private void trimOldest(Deque<T> snapshots) {
+        while (snapshots.size() > maximumSnapshots) {
+            snapshots.removeLast();
+        }
     }
 }
