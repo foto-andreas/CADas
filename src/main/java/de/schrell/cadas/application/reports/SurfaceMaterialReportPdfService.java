@@ -112,7 +112,7 @@ public final class SurfaceMaterialReportPdfService {
             List<SurfaceMaterialListService.RoomSummary> rooms,
             Map<String, BufferedImage> levelPlanImages
     ) throws IOException {
-        writer.section("Räume und Mietflächen nach WoFlV");
+        writer.section("Räume und Wohnflächen nach WoFlV");
         if (rooms.isEmpty()) {
             writer.paragraph("Keine Räume vorhanden.");
             return;
@@ -131,7 +131,7 @@ public final class SurfaceMaterialReportPdfService {
                         new TableColumn("Lichte Höhe", 0.8f, TableAlignment.RIGHT),
                         new TableColumn("Grundfläche", 0.7f, TableAlignment.RIGHT),
                         new TableColumn("Innenumfang", 0.8f, TableAlignment.RIGHT),
-                        new TableColumn("Mietfläche", 0.7f, TableAlignment.RIGHT),
+                        new TableColumn("Wohnfläche", 0.7f, TableAlignment.RIGHT),
                         new TableColumn("Volumen", 0.7f, TableAlignment.RIGHT),
                         new TableColumn("FBH", 0.45f, TableAlignment.RIGHT),
                         new TableColumn("DH", 0.45f, TableAlignment.RIGHT),
@@ -169,7 +169,7 @@ public final class SurfaceMaterialReportPdfService {
             }
             writer.table(roomTable, rows);
         }
-        writer.paragraph("Mietflächen nach WoFlV: ab 2 m volle Anrechnung, zwischen 1 m und 2 m halbe Anrechnung, darunter keine Anrechnung.");
+        writer.paragraph("Wohnflächen nach WoFlV: ab 2 m volle Anrechnung, zwischen 1 m und 2 m halbe Anrechnung, darunter keine Anrechnung. Außenbalkone werden regulär zu 25 % angerechnet.");
     }
 
     private void appendHeatingLoads(
@@ -581,6 +581,9 @@ public final class SurfaceMaterialReportPdfService {
     }
 
     private String roomHeightText(SurfaceMaterialListService.RoomSummary room) {
+        if (!Double.isFinite(room.minimumHeightMillimeters())) {
+            return "-";
+        }
         StringBuilder height = new StringBuilder(decimal(room.minimumHeightMillimeters() / 1000.0, 2));
         if (Math.abs(room.maximumHeightMillimeters() - room.minimumHeightMillimeters()) > 0.001) {
             height.append("-").append(decimal(room.maximumHeightMillimeters() / 1000.0, 2));

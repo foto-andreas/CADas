@@ -282,6 +282,45 @@ public final class Room {
         return volumeCubicMillimeters / 1_000_000_000.0;
     }
 
+    /**
+     * Ermittelt den Anteil einer Grundrissfläche, über dem mindestens die angegebene lichte Höhe vorhanden ist.
+     * Die Methode dient insbesondere den stufenweisen Anrechnungsgrenzen der Wohnflächenverordnung und vermeidet
+     * rasterabhängige Rundungsfehler unmittelbar an der Ein- und Zwei-Meter-Grenze.
+     */
+    public double areaSquareMetersAtMinimumHeight(List<PlanPoint> footprint, double minimumHeightMillimeters) {
+        Objects.requireNonNull(footprint, "footprint darf nicht null sein.");
+        if (footprint.size() < 3) {
+            return 0.0;
+        }
+        List<HeightRegion> heightRegions = ceilingVertexHeights == null || ceilingVertexHeights.isEmpty()
+                ? slopeHeightRegions()
+                : vertexHeightRegions();
+        double areaSquareMillimeters = 0.0;
+        List<List<PlanPoint>> roomTriangles = triangulate(outline);
+        for (List<PlanPoint> footprintTriangle : triangulate(footprint)) {
+            for (List<PlanPoint> roomTriangle : roomTriangles) {
+                List<PlanPoint> footprintInsideRoom = intersectConvexPolygons(footprintTriangle, roomTriangle);
+                if (footprintInsideRoom.size() < 3) {
+                    continue;
+                }
+                for (HeightRegion region : heightRegions) {
+                    List<PlanPoint> activeRegion = region.bounds() == null
+                            ? footprintInsideRoom
+                            : intersectConvexPolygons(footprintInsideRoom, region.bounds());
+                    activeRegion = clipByPlane(activeRegion, region.height(), minimumHeightMillimeters, true);
+                    for (Plane competingPlane : region.lowerThan()) {
+                        activeRegion = clipByPlaneDifference(activeRegion, region.height(), competingPlane);
+                        if (activeRegion.size() < 3) {
+                            break;
+                        }
+                    }
+                    areaSquareMillimeters += polygonArea(activeRegion);
+                }
+            }
+        }
+        return areaSquareMillimeters / 1_000_000.0;
+    }
+
     public PlanPoint areaCentroid() {
         double crossSum = 0.0;
         double weightedX = 0.0;
@@ -642,6 +681,10 @@ public final class Room {
             volume += triangleArea(first, second, third) * Math.max(0.0, averageHeight);
         }
         return volume;
+    }
+
+    private double polygonArea(List<PlanPoint> polygon) {
+        return polygon.size() < 3 ? 0.0 : Math.abs(signedArea(polygon));
     }
 
     private double signedArea(List<PlanPoint> polygon) {

@@ -14,6 +14,9 @@ import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.FloorExtension;
+import de.schrell.cadas.domain.model.FloorExtensionPlacement;
+import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
@@ -43,6 +46,27 @@ class SurfaceMaterialListServiceTest {
     private final SurfaceMaterialListService service = new SurfaceMaterialListService();
 
     @Test
+    void fuehrtAussenbalkonMitWohnflaechenanteilImBerichtAuf() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.primaryLevel().addFloorExtension(FloorExtension.create(
+                FloorExtensionType.BALCONY,
+                FloorExtensionPlacement.EXTERIOR,
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 2_000),
+                Length.ofMillimeters(180)
+        ));
+
+        SurfaceMaterialReport report = service.create(project);
+
+        assertEquals(1, report.rooms().size());
+        assertEquals("Balkon", report.rooms().getFirst().roomName());
+        assertEquals(8.0, report.rooms().getFirst().areaSquareMeters(), 0.001);
+        assertEquals(2.0, report.rooms().getFirst().residentialAreaSquareMeters(), 0.001);
+        assertTrue(report.toMarkdown().contains("Außenbalkone werden regulär zu 25 % angerechnet"));
+        assertFalse(report.toMarkdown().contains("NaN"));
+    }
+
+    @Test
     void listetRaeumeMitHoehenMassenFlaechenUndVolumenAuchOhneBelaege() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         project.primaryLevel().addRoom(Room.rectangular(
@@ -63,7 +87,7 @@ class SurfaceMaterialListServiceTest {
         assertEquals(12.0, report.rooms().getFirst().residentialAreaSquareMeters(), 0.001);
         assertEquals(900.0, report.rooms().getFirst().heatLoadWatts(), 0.001);
         assertEquals(-900.0, report.heatingLoads().getFirst().surplusWatts(), 0.001);
-        assertTrue(report.toMarkdown().contains("Räume und Mietflächen nach WoFlV"));
+        assertTrue(report.toMarkdown().contains("Räume und Wohnflächen nach WoFlV"));
         assertTrue(report.toMarkdown().contains("## Heizlast"));
         assertTrue(report.toMarkdown().contains("Keine"));
         assertTrue(report.toMarkdown().contains("-900 W"));

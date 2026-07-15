@@ -6,6 +6,9 @@ import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.model.Level;
+import de.schrell.cadas.domain.model.FloorExtension;
+import de.schrell.cadas.domain.model.FloorExtensionPlacement;
+import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
 import de.schrell.cadas.domain.model.Room;
@@ -92,6 +95,40 @@ class ResidentialAreaServiceTest {
         ));
 
         assertEquals(12.0, service.residentialAreaSquareMeters(level, room), 0.03);
+    }
+
+    @Test
+    void berechnetHoehengrenzenAuchBeiGrossenFlaechenOhneRasterfehler() {
+        Level level = new Level("Dachgeschoss");
+        Room room = Room.rectangular(
+                "Langer Dachraum",
+                new PlanPoint(0, 0),
+                new PlanPoint(100_000, 1_000),
+                Length.ofMillimeters(3_000),
+                Length.zero(),
+                Length.zero(),
+                new SlopedCeilingProfile(
+                        SlopedCeilingSide.WEST,
+                        Length.zero(),
+                        Length.ofMillimeters(97_300)
+                )
+        );
+        level.addRoom(room);
+
+        assertEquals(51.35, service.residentialAreaSquareMeters(level, room), 0.000_001);
+    }
+
+    @Test
+    void rechnetAussenbalkonRegulaerZuEinViertelAn() {
+        FloorExtension balcony = FloorExtension.create(
+                FloorExtensionType.BALCONY,
+                FloorExtensionPlacement.EXTERIOR,
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 2_000),
+                Length.ofMillimeters(180)
+        );
+
+        assertEquals(2.0, service.residentialAreaSquareMeters(balcony), 0.000_001);
     }
 
     private SurfaceLayerStack stack(Room room, SurfaceType type, Length thickness) {

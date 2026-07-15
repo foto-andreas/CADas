@@ -44,6 +44,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 public final class SurfaceMaterialListService {
 
@@ -94,7 +95,12 @@ public final class SurfaceMaterialListService {
                 materialSummaries,
                 rooms.values().stream().map(RoomAccumulator::toSummary).toList(),
                 project.levels().stream()
-                        .flatMap(level -> level.rooms().stream().map(room -> roomSummary(level, room)))
+                        .flatMap(level -> Stream.concat(
+                                level.rooms().stream().map(room -> roomSummary(level, room)),
+                                level.floorExtensions().stream()
+                                        .filter(extension -> residentialAreaService.residentialAreaSquareMeters(extension) > 0.0)
+                                        .map(extension -> floorExtensionSummary(level, extension))
+                        ))
                         .toList(),
                 heatingLoads(project),
                 heatingPlans(project),
@@ -333,6 +339,30 @@ public final class SurfaceMaterialListService {
                 roomHeatTotals.totalHeatOutputWatts(),
                 room.heatLoadWatts(),
                 roomHeatTotals.totalHeatOutputWatts() - room.heatLoadWatts()
+        );
+    }
+
+    private RoomSummary floorExtensionSummary(Level level, FloorExtension extension) {
+        double areaSquareMeters = extension.widthMillimeters() * extension.depthMillimeters() / 1_000_000.0;
+        return new RoomSummary(
+                level.name(),
+                extension.type().toString(),
+                extension.widthMillimeters(),
+                extension.depthMillimeters(),
+                Double.NaN,
+                Double.NaN,
+                areaSquareMeters,
+                2.0 * (extension.widthMillimeters() + extension.depthMillimeters()),
+                0.0,
+                residentialAreaService.residentialAreaSquareMeters(extension),
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
         );
     }
 
@@ -1412,7 +1442,7 @@ public final class SurfaceMaterialListService {
         }
 
         private void appendRooms(StringBuilder markdown) {
-            markdown.append("## Räume und Mietflächen nach WoFlV\n\n");
+            markdown.append("## Räume und Wohnflächen nach WoFlV\n\n");
             if (rooms.isEmpty()) {
                 markdown.append("Keine Räume vorhanden.\n\n");
                 return;
@@ -1425,7 +1455,7 @@ public final class SurfaceMaterialListService {
                     ))
                     .forEach((levelName, levelRooms) -> {
                         markdown.append("### ").append(levelName).append("\n\n");
-                        markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Innenumfang | Mietfläche | Volumen | FBH | DH | Flächenheizung | Heizelemente | Gesamtwärme | Heizlast | Überschuss |\n");
+                        markdown.append("| Raum | Maße | Lichte Höhe | Grundfläche | Innenumfang | Wohnfläche | Volumen | FBH | DH | Flächenheizung | Heizelemente | Gesamtwärme | Heizlast | Überschuss |\n");
                         markdown.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
                         for (RoomSummary room : levelRooms) {
                             markdown.append("| ")
@@ -1433,12 +1463,17 @@ public final class SurfaceMaterialListService {
                                     .append(" | ")
                                     .append(decimal(room.widthMillimeters() / 1000.0, 2)).append(" × ")
                                     .append(decimal(room.depthMillimeters() / 1000.0, 2)).append(" m")
-                                    .append(" | ")
-                                    .append(decimal(room.minimumHeightMillimeters() / 1000.0, 2));
-                            if (Math.abs(room.maximumHeightMillimeters() - room.minimumHeightMillimeters()) > EPSILON) {
-                                markdown.append("–").append(decimal(room.maximumHeightMillimeters() / 1000.0, 2));
+                                    .append(" | ");
+                            if (Double.isFinite(room.minimumHeightMillimeters())) {
+                                markdown.append(decimal(room.minimumHeightMillimeters() / 1000.0, 2));
+                                if (Math.abs(room.maximumHeightMillimeters() - room.minimumHeightMillimeters()) > EPSILON) {
+                                    markdown.append("–").append(decimal(room.maximumHeightMillimeters() / 1000.0, 2));
+                                }
+                                markdown.append(" m");
+                            } else {
+                                markdown.append("–");
                             }
-                            markdown.append(" m | ")
+                            markdown.append(" | ")
                                     .append(decimal(room.areaSquareMeters(), 2)).append(" m²")
                                     .append(" | ")
                                     .append(decimal(room.innerPerimeterMillimeters() / 1000.0, 2)).append(" m")
@@ -1464,7 +1499,7 @@ public final class SurfaceMaterialListService {
                         }
                         markdown.append('\n');
                     });
-            markdown.append("Die Mietfläche gewichtet lichte Höhen ab 2 m vollständig, zwischen 1 m und 2 m zur Hälfte und unter 1 m nicht. Sichtbare Boden- und Deckenbeläge reduzieren die lichte Höhe.\n\n");
+            markdown.append("Die Wohnfläche gewichtet lichte Höhen ab 2 m vollständig, zwischen 1 m und 2 m zur Hälfte und unter 1 m nicht. Sichtbare Boden- und Deckenbeläge reduzieren die lichte Höhe. Außenbalkone werden regulär zu 25 % angerechnet.\n\n");
         }
 
         private void appendHeatingLoads(StringBuilder markdown) {
