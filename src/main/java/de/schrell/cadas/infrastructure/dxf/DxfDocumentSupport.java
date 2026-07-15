@@ -16,6 +16,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Schreibt gemeinsame DXF-Dokumentsektionen, Handles und atomare Zieldateien für Projekt- und Etagenexport.
+ */
 final class DxfDocumentSupport {
 
     static final String BLOCK_DOOR = "CADAS_DOOR";

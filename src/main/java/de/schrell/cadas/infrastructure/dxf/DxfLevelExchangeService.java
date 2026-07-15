@@ -57,6 +57,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Importiert und exportiert eine einzelne Etage als ASCII-DXF einschließlich CADas-Metadaten und Geometriefallback.
+ */
 public final class DxfLevelExchangeService {
 
     private static final Length DEFAULT_WALL_THICKNESS = Length.ofMillimeters(175.0);

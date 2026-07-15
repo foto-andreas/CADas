@@ -17,6 +17,10 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Kodiert und dekodiert wiederkehrende Metadatenwerte wie Punkte, Profile, Zahlen und UUIDs konsistent.
+ * Ungültige optionale Werte werden lokal verworfen, damit andere rettbare DXF-Datensätze erhalten bleiben.
+ */
 final class DxfMetadataCodec {
 
     static final String MARKER_TYPE = "CADAS_DXF";

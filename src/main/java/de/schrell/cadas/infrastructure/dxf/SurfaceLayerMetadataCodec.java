@@ -10,6 +10,9 @@ import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * Übersetzt Oberflächenschichten einschließlich Verlegedaten in die versionierte CADas-DXF-Metadatenspur.
+ */
 final class SurfaceLayerMetadataCodec {
 
     private static final int ID_INDEX = 0;

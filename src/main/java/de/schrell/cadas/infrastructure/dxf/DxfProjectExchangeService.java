@@ -62,6 +62,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Importiert und exportiert vollständige Gebäudeprojekte mit Etagen, Dach, Gelände und projektweiten Metadaten.
+ */
 public final class DxfProjectExchangeService {
 
     private final DxfLevelExchangeService levelExchangeService = new DxfLevelExchangeService();
