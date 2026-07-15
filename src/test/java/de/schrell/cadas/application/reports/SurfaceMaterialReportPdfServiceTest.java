@@ -46,6 +46,26 @@ class SurfaceMaterialReportPdfServiceTest {
     }
 
     @Test
+    void exportiertAuchEinProjektOhneRäumeUndAusstattung() throws Exception {
+        SurfaceMaterialListService.SurfaceMaterialReport report = reportService.create(
+                ProjectModel.withDefaultLevel("Leerprojekt", "Erdgeschoss")
+        );
+        Path targetFile = Files.createTempFile("materialbericht-leer-", ".pdf");
+
+        pdfService.export(report, targetFile);
+
+        try (var document = Loader.loadPDF(targetFile.toFile())) {
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("Räume und Materialien - Leerprojekt"));
+            assertTrue(text.contains("Keine Räume vorhanden."));
+            assertTrue(text.contains("Keine Beläge vorhanden."));
+            assertTrue(text.contains("Keine Flächenheizungen vorhanden."));
+            assertTrue(text.contains("Keine Heizelemente vorhanden."));
+        }
+        Files.deleteIfExists(targetFile);
+    }
+
+    @Test
     void exportiertMaterialberichtMitRastergrafikenUndEtagenbild() throws Exception {
         SurfaceMaterialListService.SurfaceMaterialReport report = reportService.create(beispielProjekt());
         Path targetFile = Files.createTempFile("materialbericht-raster-", ".pdf");
