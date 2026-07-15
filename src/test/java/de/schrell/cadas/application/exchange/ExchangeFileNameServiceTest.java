@@ -22,6 +22,10 @@ class ExchangeFileNameServiceTest {
                 Path.of("Materialliste.md"),
                 ExchangeFileNameService.ensureSingleExtension(Path.of("Materialliste.md.md"), ".md")
         );
+        assertEquals(
+                Path.of("export", "Haus.dxf"),
+                ExchangeFileNameService.ensureSingleExtension(Path.of("export", "Haus.DXF.DXF"), ".dxf")
+        );
     }
 
     @Test
