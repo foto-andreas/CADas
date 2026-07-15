@@ -554,12 +554,22 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
     }
 
     public void automationSetUnit(String fieldName, String unitName) {
-        unitSelectorByName(fieldName).setValue(LengthUnit.valueOf(unitName.trim().toUpperCase(Locale.ROOT)));
+        ComboBox<?> selector = unitSelectorByName(fieldName);
+        LengthUnit unit = LengthUnit.valueOf(unitName.trim().toUpperCase(Locale.ROOT));
+        int unitIndex = selector.getItems().indexOf(unit);
+        if (unitIndex < 0) {
+            throw new IllegalArgumentException("Einheit `" + unitName + "` ist für `" + fieldName + "` nicht verfügbar.");
+        }
+        selector.getSelectionModel().select(unitIndex);
         render();
     }
 
     public String automationUnit(String fieldName) {
-        return unitSelectorByName(fieldName).getValue().name();
+        Object value = unitSelectorByName(fieldName).getValue();
+        if (value instanceof LengthUnit unit) {
+            return unit.name();
+        }
+        throw new IllegalStateException("Einheitenselektor `" + fieldName + "` enthält keine Längeneinheit.");
     }
 
     public void automationPlaceGuide(String orientationName, double worldMillimeters) {
@@ -860,8 +870,8 @@ abstract class CadWorkbenchAutomation extends CadWorkbenchSelectionAndContext {
         return uiMember(fieldName + "Field", TextField.class, "Eingabefeld");
     }
 
-    ComboBox<LengthUnit> unitSelectorByName(String fieldName) {
-        return (ComboBox<LengthUnit>) uiMember(fieldName + "Unit", ComboBox.class, "Einheitenselektor");
+    ComboBox<?> unitSelectorByName(String fieldName) {
+        return uiMember(fieldName + "Unit", ComboBox.class, "Einheitenselektor");
     }
 
     <T> T uiMember(String memberName, Class<T> expectedType, String label) {

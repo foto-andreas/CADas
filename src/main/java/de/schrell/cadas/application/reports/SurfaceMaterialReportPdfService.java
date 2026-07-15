@@ -926,13 +926,11 @@ public final class SurfaceMaterialReportPdfService {
         }
 
         private void rectangle(double x, double y, double width, double height, float lineWidth, Color stroke, Color fill) throws IOException {
-            stream.saveGraphicsState();
-            stream.addRect((float) x, (float) y, (float) width, (float) height);
             if (fill == null && stroke == null) {
-                stream.appendRawCommands("n\n");
-                stream.restoreGraphicsState();
                 return;
             }
+            stream.saveGraphicsState();
+            stream.addRect((float) x, (float) y, (float) width, (float) height);
             stream.setLineWidth(lineWidth);
             if (fill != null) {
                 stream.setNonStrokingColor(fill);
@@ -950,16 +948,11 @@ public final class SurfaceMaterialReportPdfService {
         }
 
         private void polygon(List<PdfPoint> points, float lineWidth, Color stroke, Color fill, float[] dashPattern) throws IOException {
-            if (points.isEmpty()) {
+            if (points.isEmpty() || fill == null && stroke == null) {
                 return;
             }
             stream.saveGraphicsState();
             beginPolygonPath(points);
-            if (fill == null && stroke == null) {
-                stream.appendRawCommands("n\n");
-                stream.restoreGraphicsState();
-                return;
-            }
             stream.setLineWidth(lineWidth);
             if (dashPattern != null) {
                 stream.setLineDashPattern(dashPattern, 0.0f);
@@ -1000,13 +993,11 @@ public final class SurfaceMaterialReportPdfService {
         }
 
         private void circle(double centerX, double centerY, double radius, float lineWidth, Color stroke, Color fill) throws IOException {
-            stream.saveGraphicsState();
-            appendCirclePath(centerX, centerY, radius);
             if (fill == null && stroke == null) {
-                stream.appendRawCommands("n\n");
-                stream.restoreGraphicsState();
                 return;
             }
+            stream.saveGraphicsState();
+            appendCirclePath(centerX, centerY, radius);
             stream.setLineWidth(lineWidth);
             if (fill != null) {
                 stream.setNonStrokingColor(fill);
@@ -1029,8 +1020,8 @@ public final class SurfaceMaterialReportPdfService {
                 return;
             }
             beginPolygonPath(points);
+            // PDFBox 3 beendet den Pfad bereits innerhalb von clip() mit dem PDF-Operator „n“.
             stream.clip();
-            stream.appendRawCommands("n\n");
         }
 
         private void text(double x, double y, float fontSize, String text, Color color, boolean bold) throws IOException {

@@ -43,6 +43,10 @@ java {
     }
 }
 
+tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("-Xlint:deprecation", "-Xlint:unchecked"))
+}
+
 javafx {
     version = "25"
     modules("javafx.controls", "javafx.swing", "javafx.web")
