@@ -9,10 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
-import javafx.application.Platform;
-import javafx.embed.swing.JFXPanel;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -21,7 +17,7 @@ class HeatingCircuitRoutingWindowTest {
 
     @BeforeAll
     static void initialisiertJavaFxToolkit() {
-        new JFXPanel();
+        JavaFxTestSupport.initialisieren();
     }
 
     @Test
@@ -285,24 +281,7 @@ class HeatingCircuitRoutingWindowTest {
     }
 
     private static <T> T aufFxThread(Callable<T> aufgabe) throws Exception {
-        FutureTask<T> task = new FutureTask<>(aufgabe);
-        if (Platform.isFxApplicationThread()) {
-            task.run();
-        } else {
-            Platform.runLater(task);
-        }
-        try {
-            return task.get();
-        } catch (ExecutionException exception) {
-            Throwable ursache = exception.getCause();
-            if (ursache instanceof Exception bekannteException) {
-                throw bekannteException;
-            }
-            if (ursache instanceof Error fehler) {
-                throw fehler;
-            }
-            throw new RuntimeException(ursache);
-        }
+        return JavaFxTestSupport.aufFxThread(aufgabe);
     }
 
 }

@@ -8,10 +8,6 @@ import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Wall;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
-import javafx.application.Platform;
-import javafx.embed.swing.JFXPanel;
 import javafx.scene.Scene;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,7 +17,7 @@ class ThreeDViewportTest {
 
     @BeforeAll
     static void initialisiertJavaFxToolkit() {
-        new JFXPanel();
+        JavaFxTestSupport.initialisieren();
     }
 
     @Test
@@ -56,9 +52,7 @@ class ThreeDViewportTest {
         Assertions.assertNotNull(viewport);
     }
 
-    private static <T> T aufFxThread(Callable<T> supplier) throws ExecutionException, InterruptedException {
-        FutureTask<T> task = new FutureTask<>(supplier);
-        Platform.runLater(task);
-        return task.get();
+    private static <T> T aufFxThread(Callable<T> aufgabe) throws Exception {
+        return JavaFxTestSupport.aufFxThread(aufgabe);
     }
 }
