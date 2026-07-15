@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Interpretiert die kompakte Heizkreisbefehlssprache und erzeugt daraus getrennte Vor- und Rücklaufpolylinien.
+ */
 public final class HeatingCircuitCommandRouter {
 
     private static final char SUPPLY_LINE = HeatingRoutingLanguage.SUPPLY_LINE;

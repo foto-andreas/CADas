@@ -28,6 +28,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Ermittelt belegbare Heizflächen, Verlegegitter, Kreisaufteilung und Rohrführung einer wassergeführten Heizung.
+ * Die Berechnung berücksichtigt Raumkontur, Sperrflächen, Randabstände, Verteiler und technische Grenzwerte.
+ */
 public final class HydronicHeatingLayoutService {
 
     private static final double EPSILON = 0.001;

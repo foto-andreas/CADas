@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** Rendert vertrauenswürdige interne Markdown-Berichte mit Tabellen-Erweiterung zu darstellbarem HTML. */
 public final class MarkdownHtmlRenderer {
 
     private static final Pattern NAVIGABLE_HEADING = Pattern.compile("<h([2-4])>(.*?)</h\\1>", Pattern.DOTALL);

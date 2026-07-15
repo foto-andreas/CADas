@@ -65,6 +65,10 @@ import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Scene;
 
+/**
+ * Erzeugt maßstäbliche PDF-Bauzeichnungen aus dem Projektmodell und den gewählten Darstellungsoptionen.
+ * Seitengröße, Skalierung, Linien, Beschriftungen und Ansichten werden direkt als PDF-Vektorgrafik geschrieben.
+ */
 public final class ConstructionDrawingPdfService {
 
     static final String STANDARD = "DIN EN ISO 7519 | 2025-01";
