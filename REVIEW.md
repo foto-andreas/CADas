@@ -21,15 +21,16 @@ Das Review soll für jeden Befund eine der folgenden Aussagen ermöglichen:
 
 Stand: 16. Juli 2026. `./gradlew clean check` ist erfolgreich. Der Lauf prüft sämtliche Tests,
 Compilerwarnungen, Dokumentationskonventionen und die in `build.gradle.kts` festgelegten
-90-Prozent-Grenzen der fachlichen Kernpakete.
+90-Prozent-Grenzen der fachlichen Kernpakete sowie die globale 85-Prozent-Grenze.
 
-Die globale JaCoCo-Zeilenabdeckung beträgt 21.634 von 26.871 ausführbaren Zeilen, also 80,5 Prozent.
-Das Projektziel von 85 Prozent ist damit noch nicht erreicht. Die größten Lücken liegen in der stark
-zustandsbehafteten JavaFX-Workbench mit 69,2 Prozent, der Gelände-Anwendungslogik mit 67,4 Prozent und
-der Heizungs-Anwendungslogik mit 74,6 Prozent. Die beiden Startklassen werden im Unit-Test nicht
-gestartet. Diese Werte dürfen nicht durch Ausschlüsse oder niedrigere Grenzen beschönigt werden.
-Vorrang haben Charakterisierungstests der Workbench-Abläufe und weitere geometrische Grenzfälle für
-Heizung und Gelände; erst danach sind größere Strukturänderungen in diesen Bereichen vertretbar.
+Die globale JaCoCo-Zeilenabdeckung beträgt 22.694 von 26.678 ausführbaren Zeilen, also 85,1 Prozent.
+Der Build erzwingt dieses Projektziel ohne Dateiausschlüsse. Die zuvor benannten Schulden wurden
+gezielt bearbeitet: Die Gelände-Anwendungslogik erreicht nach Entfernung der unerreichbaren
+Konturableitung 93,4 Prozent, die Heizungs-Anwendungslogik nach den Rasterrouting-Grenzfällen
+80,4 Prozent und die JavaFX-Workbench nach den realen Bedien-, Automatisierungs-, Export- und
+3D-Abläufen 77,3 Prozent. Die Bereichswerte sind keine Ersatzgrenzen für das globale Ziel; sie dienen
+Reviewern als Hinweis auf die weiterhin unterschiedlich hohen Testkosten von Fachlogik und
+plattformgebundenen Dialogen. Die beiden Startklassen werden im Unit-Test weiterhin nicht gestartet.
 
 Im automatisierten Audit wurden bereits folgende konkrete Fehler- und Wartbarkeitsklassen bearbeitet:
 
@@ -45,6 +46,12 @@ Im automatisierten Audit wurden bereits folgende konkrete Fehler- und Wartbarkei
 - vollständige Tooltips für Menü- und Bedienelemente sowie Beseitigung von Compilerwarnungen
 - Entfernung eines unerreichbaren SVG-Berichtsrenders, einer wirkungslosen Ein-Wert-Option und einer
   doppelt deklarierten transitiven Abhängigkeit
+- Entfernung der unerreichbaren, parallelen Gelände-Konturableitung zugunsten des aktiven
+  Rasterverfahrens
+- geometrische Charakterisierung des Heizungs-Rasterroutings einschließlich Sperrknoten, Umwegen,
+  Lücken und leerer Geometrie
+- reale Workbench-Prüfung von Automatisierungsendpunkten, Heizkreisfenster, Belagsebenen,
+  Etagen-Rundlauf, Bauteildrehung, PDF- und 3D-Snapshot-Export
 - Zusammenführung wiederholter DXF-Metadatenkonvertierung in `DxfMetadataCodec`
 
 Diese Liste ersetzt kein unabhängiges Review der geänderten Algorithmen. Sie markiert vielmehr die
@@ -55,7 +62,8 @@ prüfen sollte.
 
 1. Mit JDK 25 arbeiten und `./gradlew --version` prüfen.
 2. `./gradlew clean check` ausführen. Der Lauf umfasst Kompilierung, Tests, JaCoCo-Bericht und die
-   paketbezogene Mindestabdeckung von 90 Prozent für die in `build.gradle.kts` festgelegten Kernpakete.
+   globale Mindestabdeckung von 85 Prozent sowie die paketbezogene Mindestabdeckung von 90 Prozent
+   für die in `build.gradle.kts` festgelegten Kernpakete.
 3. Den HTML-Bericht unter `build/reports/jacoco/test/html/index.html` öffnen. Grüne Zeilen allein sind
    kein Qualitätsnachweis; entscheidend sind fachlich relevante Eingaben und geprüfte Ergebnisse.
 4. `git status --short` prüfen und vorhandene Anwenderdateien nicht in Review-Commits aufnehmen.
