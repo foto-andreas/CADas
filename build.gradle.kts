@@ -205,6 +205,14 @@ tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.test)
     violationRules {
         rule {
+            element = "BUNDLE"
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.85".toBigDecimal()
+            }
+        }
+        rule {
             element = "PACKAGE"
             includes = listOf(
                 "de.schrell.cadas.domain.*",
