@@ -6,12 +6,16 @@ import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
 import de.schrell.cadas.domain.model.ProjectModel;
 import de.schrell.cadas.domain.model.Wall;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import javafx.scene.paint.Color;
 import javafx.scene.Scene;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ThreeDViewportTest {
 
@@ -50,6 +54,37 @@ class ThreeDViewportTest {
         });
 
         Assertions.assertNotNull(viewport);
+    }
+
+    @Test
+    void exportiertVollständigeUndFreigestellteDreidimensionaleSnapshots(@TempDir Path tempDir) throws Exception {
+        Path completeSnapshot = tempDir.resolve("vollständig.png");
+        Path sceneSnapshot = tempDir.resolve("szene.png");
+
+        aufFxThread(() -> {
+            ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+            project.primaryLevel().addWall(Wall.create(
+                    new PlanSegment(new PlanPoint(0, 0), new PlanPoint(4_000, 0)),
+                    Length.of(20, LengthUnit.CENTIMETER),
+                    Length.of(2.6, LengthUnit.METER)
+            ));
+            ThreeDViewport viewport = new ThreeDViewport(ignored -> { }, () -> { });
+            new Scene(viewport, 900, 640);
+            viewport.applyCss();
+            viewport.layout();
+            viewport.syncLevels(project.levels(), project.primaryLevel().name());
+            viewport.refresh(project);
+
+            Assertions.assertThrows(IllegalArgumentException.class, () -> viewport.exportSnapshot(null));
+            Assertions.assertThrows(IllegalArgumentException.class, () -> viewport.exportSubSceneSnapshot(null));
+            viewport.exportSnapshot(completeSnapshot);
+            viewport.exportSubSceneSnapshot(sceneSnapshot);
+            Assertions.assertTrue(viewport.snapshotSceneOnly(Color.TRANSPARENT).getWidth() > 0);
+            return null;
+        });
+
+        Assertions.assertTrue(Files.size(completeSnapshot) > 1_000);
+        Assertions.assertTrue(Files.size(sceneSnapshot) > 1_000);
     }
 
     private static <T> T aufFxThread(Callable<T> aufgabe) throws Exception {
