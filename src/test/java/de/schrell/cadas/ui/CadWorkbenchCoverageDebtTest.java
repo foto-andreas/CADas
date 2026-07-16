@@ -1,6 +1,7 @@
 package de.schrell.cadas.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.schrell.cadas.domain.geometry.Length;
@@ -246,6 +247,66 @@ class CadWorkbenchCoverageDebtTest extends CadWorkbenchTestBase {
         });
         assertEquals(originalStair, aufFxThread(() -> workbench.project.primaryLevel().staircases().getFirst()));
         assertEquals(originalObject, aufFxThread(() -> workbench.project.primaryLevel().roomObjects().getFirst()));
+    }
+
+    @Test
+    void verwaltetSichtbarkeitReihenfolgeUndEntfernungVonBelagsebenen() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instance = new CadWorkbench();
+            new Scene(instance, 1_200, 800);
+            Room room = Room.rectangular(
+                    "Bad",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(4_000, 3_000),
+                    Length.ofMillimeters(2_600),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(200)
+            );
+            instance.project.primaryLevel().addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Fliese",
+                    Length.ofMillimeters(12),
+                    Length.ofMillimeters(600),
+                    Length.ofMillimeters(300),
+                    Length.ofMillimeters(2)
+            ));
+            stack.addLayer(SurfaceLayer.create(
+                    "Entkopplung",
+                    Length.ofMillimeters(5),
+                    Length.ofMillimeters(1_000),
+                    Length.ofMillimeters(1_000),
+                    Length.zero()
+            ));
+            instance.project.primaryLevel().addSurfaceLayerStack(stack);
+            instance.applyCss();
+            instance.layout();
+            instance.automationSetTool("EDIT");
+            instance.automationSelect("ROOM", 0, false);
+            instance.automationSetSurfaceType("FLOOR");
+            instance.automationSelectSurfaceLayer(0);
+            return instance;
+        });
+        SurfaceLayerStack stack = aufFxThread(() -> workbench.project.primaryLevel().surfaceLayerStacks().getFirst());
+        SurfaceLayer tile = stack.layers().getFirst();
+        SurfaceLayer decoupling = stack.layers().get(1);
+
+        aufFxThread(() -> {
+            workbench.toggleSurfaceLayerVisibility();
+            workbench.moveSurfaceLayer(1);
+            return null;
+        });
+        assertEquals(decoupling.id(), stack.layers().getFirst().id());
+        assertEquals(tile.id(), stack.layers().get(1).id());
+        assertFalse(stack.layers().get(1).visible());
+
+        aufFxThread(() -> {
+            workbench.removeSurfaceLayer();
+            workbench.automationSelectSurfaceLayer(0);
+            workbench.removeSurfaceLayer();
+            return null;
+        });
+        assertTrue(aufFxThread(() -> workbench.project.primaryLevel().surfaceLayerStacks().isEmpty()));
     }
 
     private Wall addWall(Level level, double x1, double y1, double x2, double y2) {
