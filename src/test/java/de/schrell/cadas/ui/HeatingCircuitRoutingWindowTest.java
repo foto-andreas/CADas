@@ -9,6 +9,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
+import javafx.event.Event;
+import javafx.scene.Parent;
+import javafx.scene.control.Button;
+import javafx.scene.control.Control;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.stage.Stage;
+import javafx.stage.Window;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -274,6 +282,68 @@ class HeatingCircuitRoutingWindowTest {
             Assertions.assertTrue(Math.abs(after.xMillimeters()) > 0.001);
             return null;
         });
+    }
+
+    @Test
+    void bautBedienoberflächeMitTooltipsUndFunktionsfähigenAktionenAuf() throws Exception {
+        HeatingCircuitRoutingWindow window = aufFxThread(HeatingCircuitRoutingWindow::new);
+
+        aufFxThread(() -> {
+            window.show(null);
+            Stage stage = Window.getWindows().stream()
+                    .filter(candidate -> candidate instanceof Stage)
+                    .map(Stage.class::cast)
+                    .filter(candidate -> "Heizkreis-Router Vario".equals(candidate.getTitle()))
+                    .findFirst()
+                    .orElseThrow();
+            try {
+                Parent root = stage.getScene().getRoot();
+                Assertions.assertEquals(900.0, stage.getMinWidth(), 0.001);
+                Assertions.assertEquals(700.0, stage.getMinHeight(), 0.001);
+                Assertions.assertTrue(root.lookupAll(".button, .check-box, .text-field, .text-area").stream()
+                        .map(Control.class::cast)
+                        .allMatch(control -> control.getTooltip() != null
+                                && !control.getTooltip().getText().isBlank()));
+
+                double startZoom = window.automationZoomFactor();
+                Event.fireEvent(root, steuerungsTastendruck(KeyCode.PLUS));
+                Assertions.assertTrue(window.automationZoomFactor() > startZoom);
+                Event.fireEvent(root, steuerungsTastendruck(KeyCode.MINUS));
+                Assertions.assertEquals(startZoom, window.automationZoomFactor(), 0.001);
+
+                button(root, "Vario erzeugen").fire();
+                String generated = window.automationCommands();
+                Assertions.assertFalse(generated.isBlank());
+                button(root, "VL +").fire();
+                Assertions.assertTrue(window.automationCommands().endsWith("="));
+                button(root, "VL -").fire();
+                Assertions.assertEquals(generated, window.automationCommands());
+                button(root, "90° drehen").fire();
+                Assertions.assertEquals("300x200", window.automationAreaSizeText());
+                button(root, "Kommandos löschen").fire();
+                Assertions.assertTrue(window.automationCommands().isBlank());
+                button(root, "Rückgängig").fire();
+                Assertions.assertEquals(generated, window.automationCommands());
+                button(root, "Wiederherstellen").fire();
+                Assertions.assertTrue(window.automationCommands().isBlank());
+                button(root, "Rendern").fire();
+            } finally {
+                stage.hide();
+            }
+            return null;
+        });
+    }
+
+    private static Button button(Parent root, String text) {
+        return root.lookupAll(".button").stream()
+                .map(Button.class::cast)
+                .filter(button -> text.equals(button.getText()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private static KeyEvent steuerungsTastendruck(KeyCode code) {
+        return new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, true, false, false);
     }
 
     private String modern(String legacyCommands) {
