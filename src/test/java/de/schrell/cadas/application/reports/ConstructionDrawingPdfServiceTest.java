@@ -13,6 +13,7 @@ import de.schrell.cadas.domain.model.FloorExtensionPlacement;
 import de.schrell.cadas.domain.model.FloorExtensionType;
 import de.schrell.cadas.domain.model.FloorOpening;
 import de.schrell.cadas.domain.model.FloorOpeningShape;
+import de.schrell.cadas.domain.model.HeatingExclusionArea;
 import de.schrell.cadas.domain.model.HeatingLayoutPattern;
 import de.schrell.cadas.domain.model.HeatingSurfacePosition;
 import de.schrell.cadas.domain.model.HeatingZone;
@@ -65,6 +66,34 @@ class ConstructionDrawingPdfServiceTest {
             assertTrue(text.contains("3D-ISO"));
             assertTrue(text.contains(ConstructionDrawingPdfService.STANDARD));
             assertTrue(text.contains("M 1:"));
+        }
+    }
+
+    @Test
+    void exportiertRundeBodenöffnungUndBeschrifteteHeizsperrfläche() throws Exception {
+        ProjectModel project = sampleProject();
+        Room room = project.primaryLevel().rooms().getFirst();
+        project.primaryLevel().addFloorOpening(FloorOpening.create(
+                room.id(),
+                FloorOpeningShape.CIRCLE,
+                new PlanPoint(3_000, 2_000),
+                Length.ofMillimeters(800),
+                Length.ofMillimeters(800)
+        ));
+        project.primaryLevel().addHeatingExclusionArea(HeatingExclusionArea.create(
+                room.id(),
+                "Einbauschrank",
+                new PlanPoint(300, 3_500),
+                new PlanPoint(1_500, 4_500)
+        ));
+        Path target = tempDir.resolve("bauzeichnung-mit-sperrflächen.pdf");
+
+        new ConstructionDrawingPdfService().export(project, target);
+
+        try (var document = Loader.loadPDF(target.toFile())) {
+            String text = new PDFTextStripper().getText(document);
+            assertEquals(3, document.getNumberOfPages());
+            assertTrue(text.contains("Einbauschrank"));
         }
     }
 
