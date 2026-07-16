@@ -214,17 +214,17 @@ final class CadWorkbenchDocumentSupport {
 
     void exportConstructionDrawingPdf() {
         String projectName = ExchangeFileNameService.stripRepeatedExtension(Path.of(owner.project.name().replace(' ', '_')), ".cadas");
-        Optional<Path> selectedTarget = WriteTargetDialog.choose(
+        WriteTargetDialog.choose(
                 owner,
                 "Gerasterte Bauzeichnung als PDF speichern",
                 "Exportziel festlegen",
                 projectName + "_Bauzeichnung_Raster"
-        ).map(path -> ExchangeFileNameService.ensureSingleExtension(path, ".pdf"));
-        if (selectedTarget.isEmpty()) {
-            return;
-        }
+        ).ifPresent(this::exportConstructionDrawingPdf);
+    }
+
+    void exportConstructionDrawingPdf(Path targetFile) {
         try {
-            Path target = selectedTarget.orElseThrow();
+            Path target = ExchangeFileNameService.ensureSingleExtension(targetFile, ".pdf");
             if (!WriteTargetDialog.confirmOverwrite(owner, target, "Bauzeichnung")) {
                 return;
             }
