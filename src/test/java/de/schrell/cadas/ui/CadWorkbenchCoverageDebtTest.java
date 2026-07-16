@@ -13,6 +13,9 @@ import de.schrell.cadas.domain.model.HeatingZone;
 import de.schrell.cadas.domain.model.HydronicHeating;
 import de.schrell.cadas.domain.model.Level;
 import de.schrell.cadas.domain.model.Room;
+import de.schrell.cadas.domain.model.RoomObject;
+import de.schrell.cadas.domain.model.RoomObjectShape;
+import de.schrell.cadas.domain.model.RoomObjectType;
 import de.schrell.cadas.domain.model.SlopedCeilingProfile;
 import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.StairType;
@@ -198,6 +201,51 @@ class CadWorkbenchCoverageDebtTest extends CadWorkbenchTestBase {
         assertEquals(3, levelNames.stream().map(String::toLowerCase).distinct().count());
         assertEquals(1, aufFxThread(() -> workbench.project.levels().get(1).walls().size()));
         assertEquals(1, aufFxThread(() -> workbench.project.levels().get(2).walls().size()));
+    }
+
+    @Test
+    void drehtGemeinsamAusgewählteTreppenUndRaumobjekteReversibel() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instance = new CadWorkbench();
+            new Scene(instance, 1_200, 800);
+            Level level = instance.project.primaryLevel();
+            level.addStaircase(stair(StairType.STRAIGHT, 500, 800));
+            level.addRoomObject(RoomObject.create(
+                    "schrank",
+                    "Schrank",
+                    RoomObjectType.CUBOID,
+                    RoomObjectShape.RECTANGLE,
+                    new PlanPoint(4_000, 2_000),
+                    Length.ofMillimeters(1_200),
+                    Length.ofMillimeters(600),
+                    Length.ofMillimeters(2_000),
+                    false,
+                    ""
+            ));
+            instance.applyCss();
+            instance.layout();
+            instance.automationSelect("STAIR", 0, false);
+            instance.automationSelect("OBJECT", 0, true);
+            return instance;
+        });
+        Staircase originalStair = aufFxThread(() -> workbench.project.primaryLevel().staircases().getFirst());
+        RoomObject originalObject = aufFxThread(() -> workbench.project.primaryLevel().roomObjects().getFirst());
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("rotateSelectedComponentsClockwise", null);
+            return null;
+        });
+        Staircase clockwiseStair = aufFxThread(() -> workbench.project.primaryLevel().staircases().getFirst());
+        RoomObject clockwiseObject = aufFxThread(() -> workbench.project.primaryLevel().roomObjects().getFirst());
+        assertEquals(1, clockwiseStair.rotationQuarterTurns());
+        assertEquals(90.0, clockwiseObject.rotationDegrees(), 0.001);
+
+        aufFxThread(() -> {
+            workbench.automationInvoke("rotateSelectedComponentsCounterClockwise", null);
+            return null;
+        });
+        assertEquals(originalStair, aufFxThread(() -> workbench.project.primaryLevel().staircases().getFirst()));
+        assertEquals(originalObject, aufFxThread(() -> workbench.project.primaryLevel().roomObjects().getFirst()));
     }
 
     private Wall addWall(Level level, double x1, double y1, double x2, double y2) {
