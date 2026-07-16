@@ -170,6 +170,36 @@ class CadWorkbenchCoverageDebtTest extends CadWorkbenchTestBase {
         }
     }
 
+    @Test
+    void exportiertUndImportiertEineEtageMitEindeutigenFolgenamen() throws Exception {
+        Path levelFile = Files.createTempFile("cadas-etage-rundlauf-", ".cadas");
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instance = new CadWorkbench();
+            new Scene(instance, 1_200, 800);
+            addWall(instance.project.primaryLevel(), 0, 0, 4_000, 0);
+            instance.automationSetErrorDialogsEnabled(false);
+            instance.applyCss();
+            instance.layout();
+            instance.automationInvoke("exportLevelDxf", levelFile);
+            return instance;
+        });
+
+        assertTrue(Files.size(levelFile) > 100);
+        aufFxThread(() -> {
+            workbench.automationInvoke("importLevelDxf", levelFile);
+            workbench.automationInvoke("importLevelDxf", levelFile);
+            return null;
+        });
+
+        List<String> levelNames = aufFxThread(() -> workbench.project.levels().stream()
+                .map(Level::name)
+                .toList());
+        assertEquals(3, levelNames.size());
+        assertEquals(3, levelNames.stream().map(String::toLowerCase).distinct().count());
+        assertEquals(1, aufFxThread(() -> workbench.project.levels().get(1).walls().size()));
+        assertEquals(1, aufFxThread(() -> workbench.project.levels().get(2).walls().size()));
+    }
+
     private Wall addWall(Level level, double x1, double y1, double x2, double y2) {
         Wall wall = Wall.create(
                 new PlanSegment(new PlanPoint(x1, y1), new PlanPoint(x2, y2)),
