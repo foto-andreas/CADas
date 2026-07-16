@@ -86,6 +86,75 @@ class ThreeDSceneModelBuilderTest {
         assertEquals(1_500, box.depth(), 0.001);
     }
 
+    @Test
+    void bautGewendelteTreppenUndBalkonbelagAlsEigenständigeDreidimensionaleKörper() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Obergeschoss");
+        var level = project.primaryLevel();
+        List<Staircase> staircases = List.of(
+                staircase(StairType.HALF_TURN, 0),
+                staircase(StairType.SWITCHBACK, 2_000),
+                staircase(StairType.SPIRAL, 4_000)
+        );
+        staircases.forEach(level::addStaircase);
+        FloorExtension balcony = FloorExtension.create(
+                FloorExtensionType.BALCONY,
+                FloorExtensionPlacement.EXTERIOR,
+                new PlanPoint(0, 5_000),
+                new PlanPoint(3_000, 6_500),
+                Length.ofMillimeters(180)
+        );
+        level.addFloorExtension(balcony);
+        SurfaceLayerStack balconyLayers = new SurfaceLayerStack(SurfaceType.FLOOR, balcony.surfaceTargetKey());
+        SurfaceLayer visibleLayer = SurfaceLayer.create(
+                "Balkonplatte",
+                Length.ofMillimeters(20),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(300),
+                Length.ofMillimeters(2)
+        );
+        balconyLayers.addLayer(visibleLayer);
+        balconyLayers.addLayer(SurfaceLayer.create(
+                "Ausgeblendete Reserve",
+                Length.ofMillimeters(10),
+                Length.ofMillimeters(600),
+                Length.ofMillimeters(300),
+                Length.ofMillimeters(2)
+        ).withVisibility(false));
+        level.addSurfaceLayerStack(balconyLayers);
+
+        ThreeDSceneModel model = builder.build(project, Set.of(level.name()), true);
+
+        for (Staircase staircase : staircases) {
+            List<RenderableBox> steps = model.boxes().stream()
+                    .filter(box -> box.kind() == RenderableKind.STAIR)
+                    .filter(box -> box.selectionKey().elementId().equals(staircase.id().toString()))
+                    .toList();
+            assertTrue(steps.size() >= staircase.stepCount());
+            assertTrue(steps.stream().map(RenderableBox::centerY).distinct().count() > 1);
+        }
+        RenderableBox covering = model.boxes().stream()
+                .filter(box -> box.kind() == RenderableKind.SURFACE_LAYER)
+                .filter(box -> box.selectionKey().elementId().equals(visibleLayer.id().toString()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(20.0, covering.height(), 0.001);
+        assertEquals(10.0, covering.centerY(), 0.001);
+        assertFalse(model.boxes().stream()
+                .anyMatch(box -> box.selectionKey().elementId().equals(
+                        balconyLayers.layers().get(1).id().toString()
+                )));
+    }
+
+    private Staircase staircase(StairType type, double x) {
+        return Staircase.create(
+                type,
+                new PlanPoint(x, 0),
+                new PlanPoint(x + 1_600, 4_000),
+                Length.ofMillimeters(2_800),
+                14
+        );
+    }
+
     private final ThreeDSceneModelBuilder builder = new ThreeDSceneModelBuilder();
     private final AutoRoomGenerationService roomGenerationService = new AutoRoomGenerationService();
 
