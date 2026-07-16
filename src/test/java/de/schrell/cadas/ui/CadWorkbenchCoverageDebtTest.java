@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.schrell.cadas.application.view.RenderableKind;
+import de.schrell.cadas.application.view.SelectionKey;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.PlanPoint;
 import de.schrell.cadas.domain.geometry.PlanSegment;
@@ -307,6 +309,31 @@ class CadWorkbenchCoverageDebtTest extends CadWorkbenchTestBase {
             return null;
         });
         assertTrue(aufFxThread(() -> workbench.project.primaryLevel().surfaceLayerStacks().isEmpty()));
+    }
+
+    @Test
+    void übernimmtDreidimensionaleAuswahlInEtageUndEigenschaftskontext() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instance = new CadWorkbench();
+            new Scene(instance, 1_200, 800);
+            Level upper = instance.project.createLevel("Obergeschoss");
+            Wall wall = addWall(upper, 1_000, 1_000, 5_000, 1_000);
+            instance.availableLevels.setAll(instance.project.levels());
+            instance.applyCss();
+            instance.layout();
+
+            instance.handleThreeDSelection(null);
+            instance.handleThreeDSelection(new SelectionKey(
+                    RenderableKind.WALL,
+                    upper.name(),
+                    wall.id().toString()
+            ));
+            return instance;
+        });
+
+        assertEquals("Obergeschoss", aufFxThread(() -> workbench.activeLevel.get().name()));
+        assertTrue(aufFxThread(workbench::automationSelectionContextMenuItems)
+                .contains("Diese Wand als Vorderseite setzen"));
     }
 
     private Wall addWall(Level level, double x1, double y1, double x2, double y2) {
