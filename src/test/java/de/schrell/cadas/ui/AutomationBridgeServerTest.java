@@ -16,6 +16,8 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javafx.scene.Scene;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -25,6 +27,11 @@ class AutomationBridgeServerTest {
 
     @TempDir
     Path tempDir;
+
+    @BeforeAll
+    static void initialisiertJavaFxToolkit() {
+        JavaFxTestSupport.initialisieren();
+    }
 
     @Test
     void maskiertAlleJsonSteuerzeichen() {
@@ -134,6 +141,43 @@ class AutomationBridgeServerTest {
             );
         } finally {
             httpServer.stop(0);
+        }
+    }
+
+    @Test
+    void bedientAlleHttpEndpunktartenMitEinerEchtenWorkbench() throws Exception {
+        CadWorkbench workbench = JavaFxTestSupport.aufFxThread(() -> {
+            CadWorkbench instance = new CadWorkbench();
+            new Scene(instance, 1_200, 800);
+            instance.applyCss();
+            instance.layout();
+            return instance;
+        });
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AutomationBridgeServer bridge = new AutomationBridgeServer(workbench, httpServer, TOKEN, tempDir);
+        bridge.registerContexts();
+        httpServer.start();
+        URI baseUri = URI.create("http://127.0.0.1:" + httpServer.getAddress().getPort());
+        Map<String, String> authorization = Map.of("Authorization", "Bearer " + TOKEN);
+        try {
+            assertEquals(200, request(baseUri.resolve("/state"), "GET", authorization));
+            assertEquals(200, request(baseUri.resolve("/tool?value=WALL"), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve("/level?value=Erdgeschoss"), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve("/workspace?value=TWO_D"), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve("/field?name=grid&value=25"), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve("/unit?name=grid&value=CENTIMETER"), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve("/guide?orientation=VERTICAL&millimeters=500"), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve("/canvas/click?x=100&y=100&button=PRIMARY"), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve(
+                    "/canvas/drag?fromX=100&fromY=100&toX=300&toY=100&button=PRIMARY&shift=true"
+            ), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve("/select?kind=WALL&index=0&toggle=false"), "POST", authorization));
+            assertEquals(200, request(baseUri.resolve("/invoke?action=clearSelection"), "POST", authorization));
+            assertEquals(400, request(baseUri.resolve("/surfaceLayer?index=99"), "POST", authorization));
+            assertEquals(400, request(baseUri.resolve("/field?name=unbekannt&value=1"), "POST", authorization));
+            assertEquals(400, request(baseUri.resolve("/tool"), "POST", authorization));
+        } finally {
+            bridge.stop();
         }
     }
 
