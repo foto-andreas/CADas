@@ -38,6 +38,7 @@ public final class SurfaceMaterialReportPdfService {
     private static final float BODY_FONT_SIZE = 8.2f;
     private static final float SECTION_TOP_GAP = 18.0f;
     private static final float SUBSECTION_TOP_GAP = 12.0f;
+    private static final float CAPTION_TOP_GAP = 8.0f;
     private static final float TABLE_PADDING = 3.5f;
     private static final float TABLE_LINE_WIDTH = 0.55f;
     private static final Color TABLE_HEADER_FILL = new Color(232, 236, 240);
@@ -717,7 +718,7 @@ public final class SurfaceMaterialReportPdfService {
         }
 
         private void caption(String text) throws IOException {
-            writeWrappedText(normalize(text), FONT_BOLD, BODY_FONT_SIZE, PAGE_MARGIN, availableWidth(), 1.5f);
+            writeHeading(normalize(text), BODY_FONT_SIZE, 1.5f, CAPTION_TOP_GAP);
         }
 
         private void paragraph(String text) throws IOException {
