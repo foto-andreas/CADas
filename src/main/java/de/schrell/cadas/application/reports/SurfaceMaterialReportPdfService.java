@@ -36,6 +36,8 @@ public final class SurfaceMaterialReportPdfService {
     private static final float SECTION_FONT_SIZE = 12.5f;
     private static final float SUBSECTION_FONT_SIZE = 10.5f;
     private static final float BODY_FONT_SIZE = 8.2f;
+    private static final float SECTION_TOP_GAP = 18.0f;
+    private static final float SUBSECTION_TOP_GAP = 12.0f;
     private static final float TABLE_PADDING = 3.5f;
     private static final float TABLE_LINE_WIDTH = 0.55f;
     private static final Color TABLE_HEADER_FILL = new Color(232, 236, 240);
@@ -694,6 +696,7 @@ public final class SurfaceMaterialReportPdfService {
         private float y;
         private String documentTitle;
         private int pageNumber;
+        private boolean pageHasContent;
 
         private PdfWriter(PDDocument document) throws IOException {
             this.document = document;
@@ -706,13 +709,11 @@ public final class SurfaceMaterialReportPdfService {
         }
 
         private void section(String text) throws IOException {
-            gap(14.0f);
-            writeWrappedText(normalize(text), FONT_BOLD, SECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 5.0f);
+            writeHeading(normalize(text), SECTION_FONT_SIZE, 5.0f, SECTION_TOP_GAP);
         }
 
         private void subsection(String text) throws IOException {
-            gap(8.0f);
-            writeWrappedText(normalize(text), FONT_BOLD, SUBSECTION_FONT_SIZE, PAGE_MARGIN, availableWidth(), 3.0f);
+            writeHeading(normalize(text), SUBSECTION_FONT_SIZE, 3.0f, SUBSECTION_TOP_GAP);
         }
 
         private void caption(String text) throws IOException {
@@ -837,6 +838,7 @@ public final class SurfaceMaterialReportPdfService {
                 currentX += cell.width();
             }
             y = rowBottom;
+            pageHasContent = true;
         }
 
         private void writeWrappedText(String text, PDType1Font font, float fontSize, float x, float width, float afterGap) throws IOException {
@@ -850,6 +852,18 @@ public final class SurfaceMaterialReportPdfService {
                 y -= fontSize * 1.3f;
             }
             y -= afterGap;
+            pageHasContent = true;
+        }
+
+        private void writeHeading(String text, float fontSize, float afterGap, float topGap) throws IOException {
+            float headingHeight = estimateWrappedHeight(text, FONT_BOLD, fontSize, availableWidth()) + afterGap + 2.0f;
+            float requiredHeight = headingHeight + (pageHasContent ? topGap : 0.0f);
+            if (!hasSpace(requiredHeight)) {
+                newPage();
+            } else if (pageHasContent) {
+                y -= topGap;
+            }
+            writeWrappedText(text, FONT_BOLD, fontSize, PAGE_MARGIN, availableWidth(), afterGap);
         }
 
         private float estimateWrappedHeight(String text, PDType1Font font, float fontSize, float width) throws IOException {
@@ -915,6 +929,7 @@ public final class SurfaceMaterialReportPdfService {
             document.addPage(page);
             canvas = new PageCanvas(document, page);
             y = PAGE_SIZE.getHeight() - PAGE_MARGIN;
+            pageHasContent = false;
             if (documentTitle != null && pageNumber > 1) {
                 canvas.text(PAGE_MARGIN, y, 8.0f, documentTitle, new Color(80, 84, 89), false);
                 canvas.text(PAGE_SIZE.getWidth() - PAGE_MARGIN - 38.0f, y, 8.0f, "Seite " + pageNumber, new Color(80, 84, 89), false);
