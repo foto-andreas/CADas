@@ -448,6 +448,17 @@ public final class SurfaceMaterialReportPdfService {
                         new TableColumn("Komplexität", 0.75f, TableAlignment.RIGHT)
                 )
         );
+        TableDefinition levelSummaryTable = new TableDefinition(
+                BODY_FONT_SIZE,
+                List.of(
+                        new TableColumn("Etage", 1.8f, TableAlignment.LEFT),
+                        new TableColumn("Fläche", 0.7f, TableAlignment.RIGHT),
+                        new TableColumn("Stückzahl", 0.7f, TableAlignment.RIGHT),
+                        new TableColumn("Materialfläche", 0.85f, TableAlignment.RIGHT),
+                        new TableColumn("Schnitte", 0.65f, TableAlignment.RIGHT),
+                        new TableColumn("Komplexität", 0.75f, TableAlignment.RIGHT)
+                )
+        );
         TableDefinition propertyUsageTable = new TableDefinition(
                 BODY_FONT_SIZE,
                 List.of(
@@ -486,6 +497,7 @@ public final class SurfaceMaterialReportPdfService {
                                 .toList()
                 );
             }
+            appendMaterialLevelSummaries(writer, levelSummaryTable, material.roomEntries());
             writer.caption("Belegte Flächen");
             writer.table(
                     roomEntryTable,
@@ -501,6 +513,44 @@ public final class SurfaceMaterialReportPdfService {
                             .toList()
             );
         }
+    }
+
+    private void appendMaterialLevelSummaries(
+            PdfWriter writer,
+            TableDefinition table,
+            List<SurfaceMaterialListService.MaterialRoomEntry> roomEntries
+    ) throws IOException {
+        writer.caption("Summen pro Etage");
+        writer.table(
+                table,
+                roomEntries.stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                SurfaceMaterialListService.MaterialRoomEntry::levelName,
+                                LinkedHashMap::new,
+                                java.util.stream.Collectors.toList()
+                        ))
+                        .entrySet()
+                        .stream()
+                        .map(entry -> materialLevelSummaryRow(entry.getKey(), entry.getValue()))
+                        .toList()
+        );
+    }
+
+    private List<String> materialLevelSummaryRow(
+            String levelName,
+            List<SurfaceMaterialListService.MaterialRoomEntry> entries
+    ) {
+        int placedPieces = entries.stream().mapToInt(entry -> entry.fullPieces() + entry.cutPieces()).sum();
+        int cutCount = entries.stream().mapToInt(SurfaceMaterialListService.MaterialRoomEntry::cutCount).sum();
+        return List.of(
+                levelName,
+                decimal(entries.stream().mapToDouble(SurfaceMaterialListService.MaterialRoomEntry::coveredAreaSquareMeters).sum(), 2) + " m²",
+                Integer.toString(entries.stream().mapToInt(SurfaceMaterialListService.MaterialRoomEntry::requiredPieces).sum()),
+                decimal(entries.stream().mapToDouble(SurfaceMaterialListService.MaterialRoomEntry::requiredMaterialAreaSquareMeters).sum(), 2) + " m²",
+                Integer.toString(cutCount),
+                decimal(SurfaceMaterialListService.complexity(placedPieces, cutCount,
+                        entries.stream().mapToDouble(SurfaceMaterialListService.MaterialRoomEntry::cutPenaltySum).sum()), 1)
+        );
     }
 
     public static String materialLevelImageKey(SurfaceMaterialListService.MaterialSummary material, String levelName) {

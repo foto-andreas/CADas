@@ -1113,7 +1113,7 @@ public final class SurfaceMaterialListService {
         }
     }
 
-    private static double complexity(int pieceCount, int cutCount, double cutPenaltySum) {
+    static double complexity(int pieceCount, int cutCount, double cutPenaltySum) {
         if (pieceCount <= 0 || cutCount <= 0) {
             return 0.0;
         }

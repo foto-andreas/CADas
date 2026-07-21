@@ -831,11 +831,16 @@ class SurfaceMaterialListServiceTest {
             level.addSurfaceLayerStack(stack);
         }
 
-        String markdown = service.create(project).toMarkdown();
+        SurfaceMaterialReport report = service.create(project);
+        String markdown = report.toMarkdown();
+        String displayMarkdown = report.toDisplayMarkdown();
 
         assertTrue(markdown.contains("#### Summen pro Etage"));
         assertTrue(markdown.contains("| Erdgeschoss | 1,00 m² | 1 | 1,00 m² | 0 | 0,0 |"));
         assertTrue(markdown.contains("| Obergeschoss | 1,00 m² | 1 | 1,00 m² | 0 | 0,0 |"));
+        assertTrue(displayMarkdown.contains("#### Summen pro Etage"));
+        assertTrue(displayMarkdown.contains("| Erdgeschoss | 1,00 m² | 1 | 1,00 m² | 0 | 0,0 |"));
+        assertTrue(displayMarkdown.contains("| Obergeschoss | 1,00 m² | 1 | 1,00 m² | 0 | 0,0 |"));
     }
 
     private ProjectModel projektMitZweiZuschnittRaeumen(SurfaceCutRestriction cutRestriction) {

@@ -113,6 +113,49 @@ class SurfaceMaterialReportPdfServiceTest {
         Files.deleteIfExists(targetFile);
     }
 
+    @Test
+    void exportiertMaterialzusammenfassungProEtage() throws Exception {
+        ProjectModel project = beispielProjekt();
+        var upperLevel = project.createLevel("Obergeschoss");
+        Room room = Room.rectangular(
+                "Schlafen",
+                new PlanPoint(0, 0),
+                new PlanPoint(1_000, 1_000),
+                Length.ofMillimeters(2_500),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(10)
+        );
+        upperLevel.addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+        stack.addLayer(SurfaceLayer.create(
+                "Parkett",
+                Length.ofMillimeters(12),
+                Length.ofMillimeters(1_200),
+                Length.ofMillimeters(200),
+                SurfaceLayoutMode.NONE,
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.zero(),
+                Length.ofMillimeters(2),
+                ""
+        ));
+        upperLevel.addSurfaceLayerStack(stack);
+        Path targetFile = Files.createTempFile("materialbericht-etagen-", ".pdf");
+
+        pdfService.export(reportService.create(project), targetFile);
+
+        try (var document = Loader.loadPDF(targetFile.toFile())) {
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(text.contains("Summen pro Etage"));
+            assertTrue(text.contains("Erdgeschoss"));
+            assertTrue(text.contains("Obergeschoss"));
+            assertTrue(text.contains("Stückzahl"));
+            assertTrue(text.contains("Materialfläche"));
+        }
+        Files.deleteIfExists(targetFile);
+    }
+
     private ProjectModel beispielProjekt() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
         Room room = Room.rectangular(
