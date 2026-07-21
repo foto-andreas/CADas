@@ -39,8 +39,10 @@ als sichtbare Geometrie; zusätzlich liegen versionierte, URL-kodierte `CADAS_ME
 * `$INSUNITS` wird für alle definierten DXF-Einheiten korrekt in Millimeter umgerechnet.
 * Fremde Texte, IDs und Zahlen werden validiert; Querverweise werden erst nach vorhandenen Hosts
   eingesetzt.
-* Metadatenversionen bleiben rückwärts lesbar. Eine Formatänderung benötigt Roundtrip- und
-  Altformat-Testdaten.
+* Metadatenversionen bleiben rückwärts lesbar. Die aktuelle Version 6 speichert zusätzlich die
+  Material-ID einer Oberflächenlage. Beim Import werden fehlende IDs aus älteren Dateien anhand
+  von Quelle beziehungsweise Name und den am häufigsten verwendeten Materialwerten zusammengefasst.
+  Eine Formatänderung benötigt Roundtrip- und Altformat-Testdaten.
 
 ## Review
 

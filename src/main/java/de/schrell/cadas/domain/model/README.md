@@ -12,6 +12,7 @@ geprüft.
 ```mermaid
 flowchart TD
     P[ProjectModel] --> L[Level]
+    P --> Sm[SurfaceMaterial]
     P --> Rf[Roof]
     P --> Tn[Terrain]
     L --> W[Wall]
@@ -23,9 +24,10 @@ flowchart TD
     L --> H[HydronicHeating / HeatingZone]
 ```
 
-`ProjectModel` ist die Gebäude-Wurzel. `Level` besitzt die etagenbezogenen Bauteile. Öffnungen
-referenzieren ihre Host-Wand über stabile UUIDs, Oberflächenstapel ihre Trägerfläche über Typ und
-Fachschlüssel, Heizungen ihren Raum.
+`ProjectModel` ist die Gebäude-Wurzel. `Level` besitzt die etagenbezogenen Bauteile.
+`SurfaceMaterial` ist der zentrale Katalog für gemeinsam verwendete Beläge. Öffnungen referenzieren
+ihre Host-Wand über stabile UUIDs, Oberflächenstapel ihre Trägerfläche über Typ und Fachschlüssel
+sowie ihr Material über eine stabile UUID, Heizungen ihren Raum.
 
 ## Wesentliche Invarianten
 

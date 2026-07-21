@@ -46,6 +46,10 @@ public final class SurfaceLayerStack {
         layers.add(Objects.requireNonNull(layer, "layer darf nicht null sein."));
     }
 
+    public void insertLayer(int index, SurfaceLayer layer) {
+        layers.add(index, Objects.requireNonNull(layer, "layer darf nicht null sein."));
+    }
+
     public void removeLayer(UUID layerId) {
         layers.removeIf(layer -> layer.id().equals(layerId));
     }

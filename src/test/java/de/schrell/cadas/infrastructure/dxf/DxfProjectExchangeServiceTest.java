@@ -551,7 +551,7 @@ class DxfProjectExchangeServiceTest {
         String dxf = Files.readString(file);
         ProjectModel imported = exchangeService.importProject(file, "Fallback");
 
-        assertTrue(dxf.contains("CADAS_DXF|5"));
+        assertTrue(dxf.contains("CADAS_DXF|6"));
         assertFalse(dxf.contains("Haus | Süd/West"));
         assertEquals("Haus | Süd/West", imported.name());
         assertEquals("EG | Wohnen/Kochen", imported.primaryLevel().name());
@@ -769,5 +769,41 @@ class DxfProjectExchangeServiceTest {
         assertFalse(importedStack.layers().isEmpty());
         assertEquals("Dielen", importedStack.layers().getFirst().name());
         assertTrue(importedStack.layers().getFirst().layoutRotatedQuarterTurn());
+    }
+
+    @Test
+    void erhaeltGemeinsameMaterialreferenzenBeimProjektrundlauf() throws Exception {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        Room firstRoom = Room.rectangular(
+                "Wohnen", new PlanPoint(0, 0), new PlanPoint(2_000, 2_000),
+                Length.ofMillimeters(2_600), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        Room secondRoom = Room.rectangular(
+                "Schlafen", new PlanPoint(2_000, 0), new PlanPoint(4_000, 2_000),
+                Length.ofMillimeters(2_600), Length.ofMillimeters(180), Length.ofMillimeters(200)
+        );
+        project.primaryLevel().addRoom(firstRoom);
+        project.primaryLevel().addRoom(secondRoom);
+        for (Room room : java.util.List.of(firstRoom, secondRoom)) {
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(SurfaceLayer.create(
+                    "Parkett", Length.ofMillimeters(14), Length.ofMillimeters(1_200), Length.ofMillimeters(200),
+                    SurfaceLayoutMode.NONE, Length.zero(), Length.zero(), Length.zero(), Length.zero(),
+                    Length.ofMillimeters(2), "Eigene Bibliothek"
+            ));
+            project.primaryLevel().addSurfaceLayerStack(stack);
+        }
+        project.normalizeSurfaceMaterials();
+        java.util.UUID materialId = project.primaryLevel().surfaceLayerStacks().getFirst().layers().getFirst().materialId();
+
+        Path file = tempDir.resolve("materialreferenzen.dxf");
+        exchangeService.exportProject(project, file);
+        ProjectModel imported = exchangeService.importProject(file, "Import");
+
+        assertEquals(1, imported.surfaceMaterials().size());
+        assertEquals(materialId, imported.surfaceMaterials().getFirst().id());
+        assertTrue(imported.primaryLevel().surfaceLayerStacks().stream()
+                .flatMap(stack -> stack.layers().stream())
+                .allMatch(layer -> materialId.equals(layer.materialId())));
     }
 }

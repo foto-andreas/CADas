@@ -71,6 +71,7 @@ public final class DxfProjectExchangeService {
     private final HeatingCircuitRoutingService heatingCircuitRoutingService = new HeatingCircuitRoutingService();
 
     public void exportProject(ProjectModel project, Path targetFile) throws IOException {
+        project.normalizeSurfaceMaterials();
         StringBuilder dxf = new StringBuilder();
         DxfDocumentSupport.DxfWriteContext context = DxfDocumentSupport.startDocument(
                 dxf,
@@ -137,6 +138,7 @@ public final class DxfProjectExchangeService {
             Level level = levelExchangeService.importLevel(sourceFile, "Erdgeschoss");
             ProjectModel fallback = ProjectModel.withDefaultLevel(projectName, level.name());
             copyLevelContents(level, fallback.primaryLevel());
+            fallback.normalizeSurfaceMaterials();
             return fallback;
         }
 
@@ -649,6 +651,7 @@ public final class DxfProjectExchangeService {
         ProjectModel project = ProjectModel.withDefaultLevel(projectName, levels.getFirst().name());
         copyLevelContents(levels.getFirst(), project.primaryLevel());
         levels.stream().skip(1).map(Level::copy).forEach(project::addLevel);
+        project.normalizeSurfaceMaterials();
         return project;
     }
 

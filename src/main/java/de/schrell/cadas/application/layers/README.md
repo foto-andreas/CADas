@@ -7,10 +7,13 @@ Platten unter Versatz-, Rand-, Fugen- und Schnittbedingungen aus.
 
 ## Persistente und abgeleitete Daten
 
-`SurfaceLayer` speichert Materialparameter und Verlegevorgaben. Einzelne `TilePlacement`-Ergebnisse
-sind abgeleitet und werden neu berechnet. `UserSurfaceCoveringPresetLibrary` liest und schreibt
-benutzerdefinierte Presets; DWG-Kataloge liefern ergänzende Blockmaße, aber keine verdeckte
-Geometrieänderung.
+`SurfaceMaterial` ist der zentrale Materialkatalog der Zeichnung. `SurfaceLayer` referenziert ihn
+über eine stabile ID und hält nur die nutzungsspezifischen Verlegewerte. Die Materialwerte werden
+zusätzlich an der Nutzung gespeichert, damit ältere DXF-Dateien weiterhin lesbar bleiben.
+`SurfaceMaterialUsageService` ersetzt, ergänzt oder entfernt Nutzungen projektweit oder für einen
+einzelnen Raum. Einzelne `TilePlacement`-Ergebnisse sind abgeleitet und werden neu berechnet.
+`UserSurfaceCoveringPresetLibrary` liest und schreibt benutzerdefinierte Presets; DWG-Kataloge
+liefern ergänzende Blockmaße, aber keine verdeckte Geometrieänderung.
 
 ## Invarianten
 

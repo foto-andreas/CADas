@@ -444,7 +444,7 @@ class DxfLevelExchangeServiceTest {
         String dxf = Files.readString(file);
         Level imported = exchangeService.importLevel(file, "Import");
 
-        assertTrue(dxf.contains("CADAS_DXF|5"));
+        assertTrue(dxf.contains("CADAS_DXF|6"));
         assertFalse(dxf.contains("Bad | Küche/Flur"));
         assertEquals("Bad | Küche/Flur ä\nNord", imported.rooms().getFirst().name());
         assertEquals("Raum/" + room.id() + "|Boden", imported.surfaceLayerStacks().getFirst().targetKey());

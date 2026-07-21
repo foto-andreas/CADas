@@ -3,8 +3,13 @@ package de.schrell.cadas.domain.model;
 import de.schrell.cadas.domain.geometry.Angle;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Wurzelaggregat eines CADas-Projekts mit geordneten Etagen, Dach, Gelände und Projektorientierung.
@@ -14,6 +19,7 @@ public final class ProjectModel {
 
     private String name;
     private final List<Level> levels = new ArrayList<>();
+    private final List<SurfaceMaterial> surfaceMaterials = new ArrayList<>();
     private Roof roof;
     private Terrain terrain = Terrain.empty();
     private Angle northAngle = Angle.ofDegrees(0.0);
@@ -46,6 +52,86 @@ public final class ProjectModel {
 
     public Level primaryLevel() {
         return levels.getFirst();
+    }
+
+    public List<SurfaceMaterial> surfaceMaterials() {
+        return List.copyOf(surfaceMaterials);
+    }
+
+    public Optional<SurfaceMaterial> findSurfaceMaterial(UUID materialId) {
+        return surfaceMaterials.stream().filter(material -> material.id().equals(materialId)).findFirst();
+    }
+
+    public SurfaceMaterial registerSurfaceMaterial(SurfaceMaterial material) {
+        SurfaceMaterial requiredMaterial = Objects.requireNonNull(material, "material darf nicht null sein.");
+        for (int index = 0; index < surfaceMaterials.size(); index++) {
+            if (surfaceMaterials.get(index).id().equals(requiredMaterial.id())) {
+                surfaceMaterials.set(index, requiredMaterial);
+                return requiredMaterial;
+            }
+        }
+        surfaceMaterials.add(requiredMaterial);
+        return requiredMaterial;
+    }
+
+    public void replaceSurfaceMaterial(SurfaceMaterial replacement) {
+        SurfaceMaterial requiredReplacement = registerSurfaceMaterial(replacement);
+        for (Level level : levels) {
+            for (SurfaceLayerStack stack : level.surfaceLayerStacks()) {
+                for (SurfaceLayer layer : stack.layers()) {
+                    if (requiredReplacement.id().equals(layer.materialId())) {
+                        stack.replaceLayer(layer.id(), requiredReplacement.applyTo(layer));
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Überführt ältere, flächenkopierte Beläge in gemeinsame Materialreferenzen.
+     * Bei widersprüchlichen Altwerten wird die häufigste Werteausprägung als zentraler Materialstand gewählt.
+     */
+    public void normalizeSurfaceMaterials() {
+        Map<String, List<LayerUsage>> usagesByReference = new LinkedHashMap<>();
+        for (Level level : levels) {
+            for (SurfaceLayerStack stack : level.surfaceLayerStacks()) {
+                for (SurfaceLayer layer : stack.layers()) {
+                    SurfaceMaterial material = SurfaceMaterial.fromLayer(layer);
+                    String key = layer.materialId() == null
+                            ? "legacy:" + material.legacyMigrationKey()
+                            : "material:" + layer.materialId();
+                    usagesByReference.computeIfAbsent(key, ignored -> new ArrayList<>())
+                            .add(new LayerUsage(stack, layer, material));
+                }
+            }
+        }
+        for (Map.Entry<String, List<LayerUsage>> entry : usagesByReference.entrySet()) {
+            List<LayerUsage> usages = entry.getValue();
+            UUID materialId = entry.getKey().startsWith("material:")
+                    ? UUID.fromString(entry.getKey().substring("material:".length()))
+                    : UUID.randomUUID();
+            SurfaceMaterial canonical = findSurfaceMaterial(materialId)
+                    .orElseGet(() -> mostFrequentMaterial(usages).withId(materialId));
+            registerSurfaceMaterial(canonical);
+            for (LayerUsage usage : usages) {
+                usage.stack().replaceLayer(usage.layer().id(), canonical.applyTo(usage.layer()));
+            }
+        }
+    }
+
+    private SurfaceMaterial mostFrequentMaterial(List<LayerUsage> usages) {
+        return usages.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        usage -> usage.material().valueSignature(),
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.toList()
+                ))
+                .values()
+                .stream()
+                .max(Comparator.comparingInt(List::size))
+                .orElseThrow()
+                .getFirst()
+                .material();
     }
 
     public void addLevel(Level level) {
@@ -126,6 +212,7 @@ public final class ProjectModel {
         levels.stream()
                 .map(Level::copy)
                 .forEach(copy.levels::add);
+        copy.surfaceMaterials.addAll(surfaceMaterials);
         copy.roof = roof;
         copy.terrain = terrain;
         copy.northAngle = northAngle;
@@ -140,6 +227,8 @@ public final class ProjectModel {
         snapshot.levels.stream()
                 .map(Level::copy)
                 .forEach(levels::add);
+        surfaceMaterials.clear();
+        surfaceMaterials.addAll(snapshot.surfaceMaterials);
         roof = snapshot.roof;
         terrain = snapshot.terrain;
         northAngle = snapshot.northAngle;
@@ -148,6 +237,7 @@ public final class ProjectModel {
 
     public Level resetToSingleLevel(String levelName) {
         levels.clear();
+        surfaceMaterials.clear();
         roof = null;
         terrain = Terrain.empty();
         northAngle = Angle.ofDegrees(0.0);
@@ -155,5 +245,8 @@ public final class ProjectModel {
         Level level = new Level(levelName);
         levels.add(level);
         return level;
+    }
+
+    private record LayerUsage(SurfaceLayerStack stack, SurfaceLayer layer, SurfaceMaterial material) {
     }
 }

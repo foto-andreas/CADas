@@ -37,6 +37,7 @@ final class SurfaceLayerMetadataCodec {
     private static final int FREE_MARGIN_RIGHT_INDEX = 19;
     private static final int FREE_MARGIN_TOP_INDEX = 20;
     private static final int FREE_MARGIN_BOTTOM_INDEX = 21;
+    private static final int MATERIAL_ID_INDEX = 22;
 
     private SurfaceLayerMetadataCodec() {
     }
@@ -65,7 +66,7 @@ final class SurfaceLayerMetadataCodec {
     private static String serializedFields(SurfaceLayer layer) {
         return String.format(
                 Locale.US,
-                "%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f",
+                "%s|%s|%.3f|%s|%.3f|%.3f|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s",
                 layer.id(),
                 DxfMetadataCodec.encode(layer.name()),
                 layer.thickness().toMillimeters(),
@@ -87,7 +88,8 @@ final class SurfaceLayerMetadataCodec {
                 layer.freeMargins().left().toMillimeters(),
                 layer.freeMargins().right().toMillimeters(),
                 layer.freeMargins().top().toMillimeters(),
-                layer.freeMargins().bottom().toMillimeters()
+                layer.freeMargins().bottom().toMillimeters(),
+                layer.materialId() == null ? "" : layer.materialId()
         );
     }
 
@@ -98,7 +100,8 @@ final class SurfaceLayerMetadataCodec {
         boolean hasLayoutRotatedQuarterTurn = relativeLength >= 15;
         boolean hasLayoutAnchor = relativeLength >= 18;
         boolean hasFreeMargins = relativeLength >= 22;
-        return new SurfaceLayer(
+        boolean hasMaterialId = relativeLength >= 23 && !parts[startIndex + MATERIAL_ID_INDEX].isBlank();
+        SurfaceLayer layer = new SurfaceLayer(
                 UUID.fromString(parts[startIndex + ID_INDEX]),
                 DxfMetadataCodec.decode(parts[startIndex + NAME_INDEX], encodedFields),
                 Length.ofMillimeters(parseDouble(parts[startIndex + THICKNESS_INDEX])),
@@ -124,6 +127,7 @@ final class SurfaceLayerMetadataCodec {
                 DxfMetadataCodec.decode(parts[startIndex + (hasMinimumStartEndMargin ? COVERING_SOURCE_INDEX : JOINT_WIDTH_INDEX)], encodedFields),
                 hasLayoutRotatedQuarterTurn && Boolean.parseBoolean(parts[startIndex + LAYOUT_ROTATED_INDEX])
         );
+        return hasMaterialId ? layer.withMaterialId(UUID.fromString(parts[startIndex + MATERIAL_ID_INDEX])) : layer;
     }
 
     private static double parseDouble(String value) {

@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 final class DxfMetadataCodec {
 
     static final String MARKER_TYPE = "CADAS_DXF";
-    static final String CURRENT_VERSION = "5";
+    static final String CURRENT_VERSION = "6";
     static final String CURRENT_MARKER = MARKER_TYPE + "|" + CURRENT_VERSION;
 
     private DxfMetadataCodec() {

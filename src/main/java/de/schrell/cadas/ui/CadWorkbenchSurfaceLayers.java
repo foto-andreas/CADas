@@ -9,6 +9,8 @@ import static de.schrell.cadas.ui.CadWorkbenchCoveringSourceSupport.formatCoveri
 import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.application.layers.SurfaceCoveringPreset;
 import de.schrell.cadas.application.layers.SurfaceCoveringPresetService;
+import de.schrell.cadas.application.layers.SurfaceMaterialUsageScope;
+import de.schrell.cadas.application.layers.SurfaceMaterialUsageService;
 import de.schrell.cadas.application.layers.TileLayoutRequest;
 import de.schrell.cadas.application.layers.WallSurfaceTargetKey;
 import de.schrell.cadas.application.view.RenderableKind;
@@ -27,6 +29,7 @@ import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
 import de.schrell.cadas.domain.model.SurfaceLayoutMargins;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
+import de.schrell.cadas.domain.model.SurfaceMaterial;
 import de.schrell.cadas.domain.model.SurfaceType;
 import de.schrell.cadas.domain.model.Wall;
 import java.nio.file.Path;
@@ -128,6 +131,10 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
             updateActionButtons();
             return;
         }
+        availableSurfacePresets.stream()
+                .filter(preset -> preset.coveringSource().equals(selectedLayer.coveringSource()))
+                .findFirst()
+                .ifPresentOrElse(surfacePresetSelector::setValue, () -> surfacePresetSelector.setValue(null));
         surfaceLayerNameField.setText(selectedLayer.name());
         self().syncLengthInput(surfaceLayerThicknessField, surfaceLayerThicknessUnit, selectedLayer.thickness(), LengthUnit.CENTIMETER);
         self().syncLengthInput(surfaceTileWidthField, surfaceTileWidthUnit, selectedLayer.tileWidth(), LengthUnit.CENTIMETER);
@@ -160,13 +167,17 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
             return;
         }
         self().rememberStateForUndo();
+        SurfaceMaterial material = surfaceMaterialUsageService.registerMatchingMaterial(
+                project,
+                currentSurfaceMaterial(UUID.randomUUID())
+        );
         for (String targetKey : selectionContext.get().targetKeys()) {
             SurfaceLayerStack stack = activeLevel.get().findSurfaceLayerStack(selectionContext.get().surfaceType(), targetKey);
             if (stack == null) {
                 stack = new SurfaceLayerStack(selectionContext.get().surfaceType(), targetKey);
                 activeLevel.get().addSurfaceLayerStack(stack);
             }
-            stack.addLayer(buildSurfaceLayerFromInputs());
+            stack.addLayer(material.applyTo(buildSurfaceLayerFromInputs()));
         }
         afterSurfaceLayerMutation(selectionContext.get().targetKeys().size() > 1
                 ? "Belag auf ausgewählte Wände angewendet."
@@ -179,9 +190,14 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         if (stacks.isEmpty() || selectedIndex < 0) {
             return;
         }
+        project.normalizeSurfaceMaterials();
+        SurfaceLayer selectedLayer = stacks.getFirst().layers().get(selectedIndex);
+        UUID materialId = selectedLayer.materialId() == null ? UUID.randomUUID() : selectedLayer.materialId();
+        SurfaceMaterial updatedMaterial = currentSurfaceMaterial(materialId);
         self().rememberStateForUndo();
+        project.replaceSurfaceMaterial(updatedMaterial);
         for (SurfaceLayerStack stack : stacks) {
-            SurfaceLayer selectedLayer = stack.layers().get(selectedIndex);
+            selectedLayer = stack.layers().get(selectedIndex);
             replaceSurfaceLayer(stack, selectedLayer.id(), new SurfaceLayer(
                     selectedLayer.id(),
                     currentSurfaceLayerName(),
@@ -202,9 +218,9 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
                     currentSurfaceCutRestriction(),
                     currentSurfaceCoveringSource(),
                     currentSurfaceLayoutRotatedQuarterTurn()
-            ));
+            ).withMaterialId(updatedMaterial.id()));
         }
-        afterSurfaceLayerMutation("Ebene aktualisiert.");
+        afterMaterialUsageMutation("Material aktualisiert: " + updatedMaterial.name());
     }
 
     void removeSurfaceLayer() {
@@ -222,6 +238,104 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
             }
         }
         afterSurfaceLayerMutation("Ebene entfernt.");
+    }
+
+    void replaceSelectedMaterialUsages() {
+        mutateSelectedMaterialUsages("Material ersetzt", (materialId, target, scope, roomId) ->
+                surfaceMaterialUsageService.replace(project, materialId, target, scope, activeLevel.get(), roomId));
+    }
+
+    void insertSurfaceMaterialBeforeSelectedUsages() {
+        mutateSelectedMaterialUsages("Material davor ergänzt", (materialId, target, scope, roomId) ->
+                surfaceMaterialUsageService.insert(project, materialId, target, SurfaceMaterialUsageService.InsertionPosition.BEFORE,
+                        scope, activeLevel.get(), roomId));
+    }
+
+    void insertSurfaceMaterialAfterSelectedUsages() {
+        mutateSelectedMaterialUsages("Material danach ergänzt", (materialId, target, scope, roomId) ->
+                surfaceMaterialUsageService.insert(project, materialId, target, SurfaceMaterialUsageService.InsertionPosition.AFTER,
+                        scope, activeLevel.get(), roomId));
+    }
+
+    void removeSelectedMaterialUsages() {
+        project.normalizeSurfaceMaterials();
+        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
+        if (selectedLayer == null || selectedLayer.materialId() == null) {
+            return;
+        }
+        SurfaceMaterialUsageScope scope = currentSurfaceMaterialUsageScope();
+        UUID roomId = selectedRoomIdForMaterialScope(scope);
+        if (scope == SurfaceMaterialUsageScope.SELECTED_ROOM && roomId == null) {
+            showSurfaceLayerError("Material kann nicht raumweise entfernt werden.", "Bitte genau einen Raum auswählen.");
+            return;
+        }
+        self().rememberStateForUndo();
+        int removals = surfaceMaterialUsageService.remove(project, selectedLayer.materialId(), scope, activeLevel.get(), roomId);
+        if (removals == 0) {
+            draftLabel.setText("Keine passende Materialnutzung gefunden.");
+            return;
+        }
+        afterMaterialUsageMutation(removals + " Materialnutzung(en) entfernt.");
+    }
+
+    private void mutateSelectedMaterialUsages(String action, MaterialUsageMutation mutation) {
+        project.normalizeSurfaceMaterials();
+        SurfaceLayer selectedLayer = selectedSurfaceLayer().orElse(null);
+        if (selectedLayer == null || selectedLayer.materialId() == null) {
+            return;
+        }
+        SurfaceMaterialUsageScope scope = currentSurfaceMaterialUsageScope();
+        UUID roomId = selectedRoomIdForMaterialScope(scope);
+        if (scope == SurfaceMaterialUsageScope.SELECTED_ROOM && roomId == null) {
+            showSurfaceLayerError("Material kann nicht raumweise bearbeitet werden.", "Bitte genau einen Raum auswählen.");
+            return;
+        }
+        self().rememberStateForUndo();
+        int changes = mutation.apply(selectedLayer.materialId(), currentSurfaceMaterial(UUID.randomUUID()), scope, roomId);
+        if (changes == 0) {
+            draftLabel.setText("Keine passende Materialnutzung gefunden.");
+            return;
+        }
+        afterMaterialUsageMutation(action + ": " + changes + " Nutzung(en).");
+    }
+
+    private SurfaceMaterialUsageScope currentSurfaceMaterialUsageScope() {
+        return Optional.ofNullable(surfaceMaterialUsageScopeSelector.getValue())
+                .orElse(SurfaceMaterialUsageScope.ENTIRE_PROJECT);
+    }
+
+    private UUID selectedRoomIdForMaterialScope(SurfaceMaterialUsageScope scope) {
+        if (scope != SurfaceMaterialUsageScope.SELECTED_ROOM) {
+            return null;
+        }
+        return selectedSurfaceRoom().map(Room::id).orElse(null);
+    }
+
+    SurfaceMaterial currentSurfaceMaterial(UUID materialId) {
+        SurfaceLayer layer = buildSurfaceLayerFromInputs();
+        return new SurfaceMaterial(
+                materialId,
+                layer.name(),
+                layer.thickness(),
+                layer.tileWidth(),
+                layer.tileHeight(),
+                layer.layoutMode(),
+                layer.layoutOffset(),
+                layer.minimumOffset(),
+                layer.minimumEdgeWidth(),
+                layer.minimumStartEndMargin(),
+                layer.freeMargins(),
+                layer.jointWidth(),
+                layer.cutRestriction(),
+                layer.coveringSource()
+        );
+    }
+
+    private void afterMaterialUsageMutation(String message) {
+        self().markThreeDDirty();
+        refreshSurfaceLayerSection();
+        draftLabel.setText(message);
+        render();
     }
 
     void toggleSurfaceLayerVisibility() {
@@ -348,6 +462,11 @@ abstract class CadWorkbenchSurfaceLayers extends CadWorkbenchSurfaceAndHeating {
         ).withFreeMargins(currentSurfaceFreeMargins())
                 .withLayoutAnchor(currentSurfaceLayoutAnchor())
                 .withLayoutRotatedQuarterTurn(currentSurfaceLayoutRotatedQuarterTurn());
+    }
+
+    @FunctionalInterface
+    private interface MaterialUsageMutation {
+        int apply(UUID materialId, SurfaceMaterial target, SurfaceMaterialUsageScope scope, UUID roomId);
     }
 
     String currentSurfaceLayerName() {

@@ -467,6 +467,13 @@ Ebenen werden immer auf der aktuell ausgewählten Wand- oder Raumfläche gepfleg
 * `Speichern` neben dem Namen legt die aktuell eingetragenen Belagswerte als eigenes Preset ab.
 * `Ebene hinzufügen` legt den Belag auf der gewählten Fläche an.
 * `Ebene aktualisieren`, `ausblenden`, `nach oben` und `nach unten` ändern Bestand und Reihenfolge.
+* Beläge mit derselben Quelle nutzen in der Zeichnung ein gemeinsames Material. Änderst du dessen
+  Werte und speicherst es unter demselben Preset, werden alle Nutzungen dieses Materials angepasst.
+* Mit `Materialwirkung` wählst du, ob eine Materialaktion die gesamte Zeichnung oder nur den genau
+  ausgewählten Raum betrifft. `Ersetzen` ersetzt den markierten Belag durch die aktuell
+  eingetragenen Werte. `Davor ergänzen` und `Danach ergänzen` fügen diese Werte vor beziehungsweise
+  hinter jeder Nutzung des markierten Belags ein. `Nutzungen entfernen` entfernt ihn im gewählten
+  Bereich vollständig.
 
 Für Anwender wichtig:
 
@@ -475,6 +482,9 @@ Für Anwender wichtig:
 * Sichtbare Boden- und Deckenlagen verändern die lichte Raumhöhe und damit das Volumen.
 * Die 3D-Ansicht zeigt diese Ebenen auf Wunsch als gestapelte Schichten an.
 * Registrierte `DWG`-Bibliotheken erscheinen zusätzlich als auswählbare Referenz-Presets für Ebenen.
+
+Im raumweisen Bereich gehören Boden, Decke und die Innenwandseiten des ausgewählten Raums dazu.
+Außenwandseiten bleiben davon ausgenommen, weil sie keinem einzelnen Raum zugeordnet sind.
 
 Die Schnittbeschränkung wirkt auf die Materialliste:
 
@@ -488,6 +498,8 @@ Eigene Beläge werden unter `~/.config/CADas/Belag` gespeichert und beim Start a
 
 * Gespeichert werden Name, Schichtdicke, Modulmaß, Verlegemodus, Versatz, Mindestbreiten, Fugenbreite und Quelle.
 * Existiert ein Preset mit gleichem Namen bereits, fragt CADas vor dem Überschreiben nach.
+* Ein überschriebenes Preset aktualisiert in der geöffneten Zeichnung alle Belagsnutzungen mit
+  derselben Quelle.
 * Geladene `DWG`-Bibliotheken werden ebenfalls in dieses Verzeichnis übernommen; vorhandene `.blocks`-Katalogdateien werden mitkopiert.
 
 ### Materialliste für Beläge

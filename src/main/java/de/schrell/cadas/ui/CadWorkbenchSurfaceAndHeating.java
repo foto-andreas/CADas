@@ -25,6 +25,7 @@ import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectMountingMode;
 import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
+import de.schrell.cadas.domain.model.SurfaceMaterial;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -358,6 +359,7 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
             SurfaceCoveringPreset savedPreset = userSurfacePresetLibrary.savePreset(preset, overwrite);
             registerSurfacePreset(savedPreset);
             surfacePresetSelector.setValue(savedPreset);
+            synchronizeProjectMaterialsFromPreset(savedPreset);
             draftLabel.setText("Belagspreset gespeichert: " + savedPreset.name());
         } catch (FileAlreadyExistsException exception) {
             showOperationException("Belagspreset existiert bereits und wurde nicht überschrieben", exception);
@@ -386,6 +388,38 @@ abstract class CadWorkbenchSurfaceAndHeating extends CadWorkbenchProject {
                 self().currentSurfaceJointWidth(),
                 self().currentSurfaceCutRestriction(),
                 self().currentSurfaceCoveringSource()
+        );
+    }
+
+    private void synchronizeProjectMaterialsFromPreset(SurfaceCoveringPreset preset) {
+        project.normalizeSurfaceMaterials();
+        project.surfaceMaterials().stream()
+                .filter(material -> material.coveringSource().equals(preset.coveringSource())
+                        || material.coveringSource().isBlank() && material.name().equalsIgnoreCase(preset.name()))
+                .map(material -> surfaceMaterialFromPreset(preset, material.id()))
+                .toList()
+                .forEach(project::replaceSurfaceMaterial);
+        self().markThreeDDirty();
+        self().refreshSurfaceLayerSection();
+        self().render();
+    }
+
+    private SurfaceMaterial surfaceMaterialFromPreset(SurfaceCoveringPreset preset, UUID materialId) {
+        return new SurfaceMaterial(
+                materialId,
+                preset.name().replace("DWG-Referenz: ", "").replace("DWG-Block: ", ""),
+                preset.thickness(),
+                preset.tileWidth(),
+                preset.tileHeight(),
+                preset.layoutMode(),
+                preset.offset(),
+                preset.minimumOffset(),
+                preset.minimumEdgeWidth(),
+                preset.minimumStartEndMargin(),
+                preset.freeMargins(),
+                preset.jointWidth(),
+                preset.cutRestriction(),
+                preset.coveringSource()
         );
     }
 

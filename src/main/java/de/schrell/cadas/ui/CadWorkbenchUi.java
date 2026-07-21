@@ -4,6 +4,7 @@ import de.schrell.cadas.application.drawing.DimensionTextStyle;
 import de.schrell.cadas.application.dwg.DwgBlockDefinition;
 import de.schrell.cadas.application.dwg.DwgConversionAvailability;
 import de.schrell.cadas.application.layers.DwgBlockCatalogService;
+import de.schrell.cadas.application.layers.SurfaceMaterialUsageScope;
 import de.schrell.cadas.application.terrain.TerrainEditService;
 import de.schrell.cadas.application.terrain.TerrainProfileService;
 import de.schrell.cadas.application.view.RenderableKind;
@@ -865,6 +866,9 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
                         new HBox(6.0, addSurfaceLayerButton, updateSurfaceLayerButton),
                         new HBox(6.0, removeSurfaceLayerButton, toggleSurfaceLayerVisibilityButton),
                         new HBox(6.0, moveSurfaceLayerUpButton, moveSurfaceLayerDownButton),
+                        propertyRow("Materialwirkung", surfaceMaterialUsageScopeSelector),
+                        new HBox(6.0, replaceSurfaceMaterialButton, removeSurfaceMaterialUsagesButton),
+                        new HBox(6.0, insertSurfaceMaterialBeforeButton, insertSurfaceMaterialAfterButton),
                         addDwgBlockPresetButton
                 ),
                 createPropertySection(
@@ -968,6 +972,10 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         addSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene hinzufügen", self()::addSurfaceLayer));
         updateSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene aktualisieren", self()::updateSurfaceLayer));
         removeSurfaceLayerButton.setOnAction(event -> runGuardedAction("Ebene entfernen", self()::removeSurfaceLayer));
+        replaceSurfaceMaterialButton.setOnAction(event -> runGuardedAction("Material ersetzen", self()::replaceSelectedMaterialUsages));
+        insertSurfaceMaterialBeforeButton.setOnAction(event -> runGuardedAction("Material davor ergänzen", self()::insertSurfaceMaterialBeforeSelectedUsages));
+        insertSurfaceMaterialAfterButton.setOnAction(event -> runGuardedAction("Material danach ergänzen", self()::insertSurfaceMaterialAfterSelectedUsages));
+        removeSurfaceMaterialUsagesButton.setOnAction(event -> runGuardedAction("Materialnutzungen entfernen", self()::removeSelectedMaterialUsages));
         toggleSurfaceLayerVisibilityButton.setOnAction(event -> runGuardedAction("Sichtbarkeit umschalten", self()::toggleSurfaceLayerVisibility));
         surfaceLayoutCornerPreviousButton.setOnAction(event -> self().cycleSurfaceLayoutCorner(false));
         surfaceLayoutCornerNextButton.setOnAction(event -> self().cycleSurfaceLayoutCorner(true));
@@ -992,6 +1000,11 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         self().applyTooltip(addSurfaceLayerButton, "Legt auf der aktuell ausgewählten Wand- oder Raumfläche eine neue Ebene mit den eingetragenen Maßen an.");
         self().applyTooltip(updateSurfaceLayerButton, "Übernimmt die aktuellen Ebenenwerte auf den in der Liste markierten Belag.");
         self().applyTooltip(removeSurfaceLayerButton, "Entfernt den in der Liste markierten Belag von der aktuell ausgewählten Fläche.");
+        self().applyTooltip(surfaceMaterialUsageScopeSelector, "Bestimmt, ob die folgende Materialaktion alle Nutzungen der Zeichnung oder nur die Nutzungen des genau ausgewählten Raums betrifft.");
+        self().applyTooltip(replaceSurfaceMaterialButton, "Ersetzt alle Nutzungen des markierten Materials im gewählten Bereich durch die aktuell eingetragenen Materialwerte.");
+        self().applyTooltip(insertSurfaceMaterialBeforeButton, "Ergänzt vor jeder Nutzung des markierten Materials im gewählten Bereich eine neue Schicht mit den aktuell eingetragenen Materialwerten.");
+        self().applyTooltip(insertSurfaceMaterialAfterButton, "Ergänzt hinter jeder Nutzung des markierten Materials im gewählten Bereich eine neue Schicht mit den aktuell eingetragenen Materialwerten.");
+        self().applyTooltip(removeSurfaceMaterialUsagesButton, "Entfernt alle Nutzungen des markierten Materials im gewählten Bereich; leere Oberflächenstapel werden dabei entfernt.");
         self().applyTooltip(toggleSurfaceLayerVisibilityButton, "Schaltet die Sichtbarkeit des markierten Belags um und passt Raumwirkung sowie 3D-Darstellung direkt an.");
         self().applyTooltip(surfaceLayoutCornerPreviousButton, "Schaltet die Startecke des Belags gegen den Uhrzeigersinn zur vorherigen Raumecke weiter. Die Verlegerichtung wird dabei passend auf die neue Ecke mitgeführt.");
         self().applyTooltip(surfaceLayoutCornerNextButton, "Schaltet die Startecke des Belags im Uhrzeigersinn zur nächsten Raumecke weiter. Die Verlegerichtung wird dabei passend auf die neue Ecke mitgeführt.");
@@ -1140,6 +1153,10 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         addSurfaceLayerButton.setDisable(!hasSurfaceTarget);
         updateSurfaceLayerButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
         removeSurfaceLayerButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
+        replaceSurfaceMaterialButton.setDisable(!hasSurfaceSelection);
+        insertSurfaceMaterialBeforeButton.setDisable(!hasSurfaceSelection);
+        insertSurfaceMaterialAfterButton.setDisable(!hasSurfaceSelection);
+        removeSurfaceMaterialUsagesButton.setDisable(!hasSurfaceSelection);
         toggleSurfaceLayerVisibilityButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection);
         moveSurfaceLayerUpButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection || surfaceLayerList.getSelectionModel().getSelectedIndex() <= 0);
         moveSurfaceLayerDownButton.setDisable(!hasSurfaceTarget || !hasSurfaceSelection || surfaceLayerList.getSelectionModel().getSelectedIndex() >= surfaceLayerList.getItems().size() - 1);
@@ -1449,6 +1466,8 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         availableSurfacePresets.setAll(surfaceCoveringPresetService.defaults());
         loadUserSurfacePresets();
         surfacePresetSelector.setItems(availableSurfacePresets);
+        surfaceMaterialUsageScopeSelector.getItems().setAll(SurfaceMaterialUsageScope.values());
+        surfaceMaterialUsageScopeSelector.setValue(SurfaceMaterialUsageScope.ENTIRE_PROJECT);
         if (!availableSurfacePresets.isEmpty()) {
             surfacePresetSelector.setValue(availableSurfacePresets.getFirst());
         }

@@ -28,8 +28,38 @@ public record SurfaceLayer(
         Length jointWidth,
         SurfaceCutRestriction cutRestriction,
         String coveringSource,
-        boolean layoutRotatedQuarterTurn
+        boolean layoutRotatedQuarterTurn,
+        UUID materialId
 ) {
+
+    /**
+     * Liest einen älteren, noch nicht referenzierten Belag ein. Die Projektmigration weist ihm später ein Material zu.
+     */
+    public SurfaceLayer(
+            UUID id,
+            String name,
+            Length thickness,
+            boolean visible,
+            Length tileWidth,
+            Length tileHeight,
+            SurfaceLayoutMode layoutMode,
+            Length layoutOffset,
+            Length minimumOffset,
+            Length minimumEdgeWidth,
+            Length minimumStartEndMargin,
+            SurfaceLayoutMargins freeMargins,
+            SurfaceLayoutAnchor layoutAnchor,
+            Length startRowTrim,
+            Length startRowWidth,
+            Length jointWidth,
+            SurfaceCutRestriction cutRestriction,
+            String coveringSource,
+            boolean layoutRotatedQuarterTurn
+    ) {
+        this(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset,
+                minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim, startRowWidth,
+                jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn, null);
+    }
 
     public SurfaceLayer(
             UUID id,
@@ -207,6 +237,12 @@ public record SurfaceLayer(
         Objects.requireNonNull(coveringSource, "coveringSource darf nicht null sein.");
     }
 
+    public SurfaceLayer withMaterialId(UUID newMaterialId) {
+        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset,
+                minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim,
+                startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn, newMaterialId);
+    }
+
     public static SurfaceLayer create(
             String name,
             Length thickness,
@@ -251,23 +287,23 @@ public record SurfaceLayer(
     }
 
     public SurfaceLayer rename(String newName) {
-        return new SurfaceLayer(id, newName, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn);
+        return new SurfaceLayer(id, newName, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn, materialId);
     }
 
     public SurfaceLayer withVisibility(boolean newVisibility) {
-        return new SurfaceLayer(id, name, thickness, newVisibility, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn);
+        return new SurfaceLayer(id, name, thickness, newVisibility, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn, materialId);
     }
 
     public SurfaceLayer withFreeMargins(SurfaceLayoutMargins newFreeMargins) {
-        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, newFreeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn);
+        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, newFreeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn, materialId);
     }
 
     public SurfaceLayer withLayoutRotatedQuarterTurn(boolean newLayoutRotatedQuarterTurn) {
-        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, newLayoutRotatedQuarterTurn);
+        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, layoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, newLayoutRotatedQuarterTurn, materialId);
     }
 
     public SurfaceLayer withLayoutAnchor(SurfaceLayoutAnchor newLayoutAnchor) {
-        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, newLayoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn);
+        return new SurfaceLayer(id, name, thickness, visible, tileWidth, tileHeight, layoutMode, layoutOffset, minimumOffset, minimumEdgeWidth, minimumStartEndMargin, freeMargins, newLayoutAnchor, startRowTrim, startRowWidth, jointWidth, cutRestriction, coveringSource, layoutRotatedQuarterTurn, materialId);
     }
 
     public Length effectiveTileWidth() {
@@ -309,7 +345,8 @@ public record SurfaceLayer(
                 jointWidth,
                 cutRestriction,
                 coveringSource,
-                rotation.rotatedQuarterTurn()
+                rotation.rotatedQuarterTurn(),
+                materialId
         );
     }
 
@@ -351,7 +388,8 @@ public record SurfaceLayer(
                 newJointWidth,
                 newCutRestriction,
                 newCoveringSource,
-                newLayoutRotatedQuarterTurn
+                newLayoutRotatedQuarterTurn,
+                materialId
         );
     }
 
