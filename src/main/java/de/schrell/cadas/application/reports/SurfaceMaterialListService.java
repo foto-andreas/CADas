@@ -61,6 +61,7 @@ public final class SurfaceMaterialListService {
     private final SurfaceLayerEffectService surfaceLayerEffectService = new SurfaceLayerEffectService();
     private final ResidentialAreaService residentialAreaService = new ResidentialAreaService();
     private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
+    private final SlopedCeilingSurfaceService slopedCeilingSurfaceService = new SlopedCeilingSurfaceService();
     private final HydronicHeatingLayoutService hydronicHeatingLayoutService = new HydronicHeatingLayoutService();
     private final RoomHeatingOutputService roomHeatingOutputService = new RoomHeatingOutputService();
     private final RoomObjectPresetService roomObjectPresetService = new RoomObjectPresetService();
@@ -418,10 +419,40 @@ public final class SurfaceMaterialListService {
                 continue;
             }
             List<SurfaceRectangle> rectangles = roomSurfaceRectangles(level, room, stack.surfaceType(), openingsAbove);
-            String surface = stack.surfaceType() == SurfaceType.FLOOR ? "Boden" : "Decke";
-            coverages.add(new SurfaceCoverage(level.name(), room.name(), surface, rectangles, true));
+            if (stack.surfaceType() == SurfaceType.CEILING) {
+                coverages.addAll(ceilingCoverages(level, room, rectangles));
+            } else {
+                coverages.add(new SurfaceCoverage(level.name(), room.name(), "Boden", rectangles, true));
+            }
         }
         return coverages;
+    }
+
+    private List<SurfaceCoverage> ceilingCoverages(Level level, Room room, List<SurfaceRectangle> rectangles) {
+        return slopedCeilingSurfaceService.coverages(room, rectangles.stream()
+                        .map(rectangle -> new SlopedCeilingSurfaceService.SurfaceRectangle(
+                                rectangle.minXMillimeters(),
+                                rectangle.minYMillimeters(),
+                                rectangle.widthMillimeters(),
+                                rectangle.heightMillimeters()
+                        ))
+                        .toList())
+                .stream()
+                .map(coverage -> new SurfaceCoverage(
+                        level.name(),
+                        room.name(),
+                        coverage.description(),
+                        coverage.rectangles().stream()
+                                .map(rectangle -> new SurfaceRectangle(
+                                        rectangle.minXMillimeters(),
+                                        rectangle.minYMillimeters(),
+                                        rectangle.widthMillimeters(),
+                                        rectangle.heightMillimeters()
+                                ))
+                                .toList(),
+                        true
+                ))
+                .toList();
     }
 
     private SurfaceCoverage floorExtensionCoverage(Level level, FloorExtension extension) {
@@ -513,28 +544,18 @@ public final class SurfaceMaterialListService {
             return List.of(new SurfaceCoverage(level.name(), roomName, baseDescription, rectangles, false));
         }
         List<SurfaceRectangle> sockelRectangles = new ArrayList<>();
-        List<SurfaceRectangle> slopeRectangles = new ArrayList<>();
         for (de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle rectangle : visibleRectangles) {
-            splitVariableWallRectangle(wall, rectangle, sockelRectangles, slopeRectangles);
+            splitVariableWallRectangle(wall, rectangle, sockelRectangles);
         }
-        List<SurfaceCoverage> coverages = new ArrayList<>();
-        if (!sockelRectangles.isEmpty()) {
-            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription + " Sockel", List.copyOf(sockelRectangles), false));
-        }
-        if (!slopeRectangles.isEmpty()) {
-            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription + " Schräge", List.copyOf(slopeRectangles), false));
-        }
-        if (coverages.isEmpty()) {
-            coverages.add(new SurfaceCoverage(level.name(), roomName, baseDescription, rectangles, false));
-        }
-        return List.copyOf(coverages);
+        return sockelRectangles.isEmpty()
+                ? List.of()
+                : List.of(new SurfaceCoverage(level.name(), roomName, baseDescription + " Sockel", List.copyOf(sockelRectangles), false));
     }
 
     private void splitVariableWallRectangle(
             Wall wall,
             de.schrell.cadas.application.view.WallSurfaceOpeningService.WallSurfaceRectangle rectangle,
-            List<SurfaceRectangle> sockelRectangles,
-            List<SurfaceRectangle> slopeRectangles
+            List<SurfaceRectangle> sockelRectangles
     ) {
         List<Double> cuts = wallSegmentCuts(wall, rectangle.startMillimeters(), rectangle.endMillimeters());
         for (int index = 0; index < cuts.size() - 1; index++) {
@@ -551,10 +572,6 @@ public final class SurfaceMaterialListService {
             double minimumTop = Math.min(startTop, endTop);
             if (minimumTop > lowerHeight + EPSILON) {
                 sockelRectangles.add(new SurfaceRectangle(0.0, 0.0, width, minimumTop - lowerHeight));
-            }
-            double slopeHeight = Math.abs(endTop - startTop) / 2.0;
-            if (slopeHeight > EPSILON) {
-                slopeRectangles.add(new SurfaceRectangle(0.0, 0.0, width, slopeHeight));
             }
         }
     }
@@ -1713,6 +1730,7 @@ public final class SurfaceMaterialListService {
                         .append(", Zuschnitte: ").append(material.cutPieces())
                         .append(", notwendige Schnitte: ").append(material.cutCount()).append("\n\n");
                 appendRestPieces(markdown, material.restPieces());
+                appendMaterialLevelSummaries(markdown, material.roomEntries());
                 markdown.append("| Raum/Fläche | Fläche | Stückzahl | Materialfläche | Schnitte | Komplexität |\n");
                 markdown.append("|---|---:|---:|---:|---:|---:|\n");
                 for (MaterialRoomEntry entry : material.roomEntries()) {
@@ -1732,6 +1750,39 @@ public final class SurfaceMaterialListService {
                 }
                 markdown.append('\n');
             }
+        }
+
+        private void appendMaterialLevelSummaries(StringBuilder markdown, List<MaterialRoomEntry> roomEntries) {
+            markdown.append("#### Summen pro Etage\n\n");
+            markdown.append("| Etage | Fläche | Stückzahl | Materialfläche | Schnitte | Komplexität |\n");
+            markdown.append("|---|---:|---:|---:|---:|---:|\n");
+            roomEntries.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            MaterialRoomEntry::levelName,
+                            LinkedHashMap::new,
+                            java.util.stream.Collectors.toList()
+                    ))
+                    .forEach((levelName, entries) -> {
+                        int placedPieces = entries.stream().mapToInt(entry -> entry.fullPieces() + entry.cutPieces()).sum();
+                        markdown.append("| ")
+                                .append(markdownCell(levelName))
+                                .append(" | ")
+                                .append(decimal(entries.stream().mapToDouble(MaterialRoomEntry::coveredAreaSquareMeters).sum(), 2)).append(" m²")
+                                .append(" | ")
+                                .append(entries.stream().mapToInt(MaterialRoomEntry::requiredPieces).sum())
+                                .append(" | ")
+                                .append(decimal(entries.stream().mapToDouble(MaterialRoomEntry::requiredMaterialAreaSquareMeters).sum(), 2)).append(" m²")
+                                .append(" | ")
+                                .append(entries.stream().mapToInt(MaterialRoomEntry::cutCount).sum())
+                                .append(" | ")
+                                .append(decimal(complexity(
+                                        placedPieces,
+                                        entries.stream().mapToInt(MaterialRoomEntry::cutCount).sum(),
+                                        entries.stream().mapToDouble(MaterialRoomEntry::cutPenaltySum).sum()
+                                ), 1))
+                                .append(" |\n");
+                    });
+            markdown.append('\n');
         }
 
         private void appendMaterialPropertyUsages(StringBuilder markdown, List<MaterialPropertyUsage> usages) {

@@ -27,6 +27,8 @@ import de.schrell.cadas.domain.model.RoomObject;
 import de.schrell.cadas.domain.model.RoomObjectHeatingType;
 import de.schrell.cadas.domain.model.RoomObjectShape;
 import de.schrell.cadas.domain.model.RoomObjectType;
+import de.schrell.cadas.domain.model.SlopedCeilingProfile;
+import de.schrell.cadas.domain.model.SlopedCeilingSide;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
 import de.schrell.cadas.domain.model.SurfaceLayerStack;
@@ -743,7 +745,7 @@ class SurfaceMaterialListServiceTest {
     }
 
     @Test
-    void trenntSockelUndSchraegeEinerInnenwandInMaterialUndRaumliste() {
+    void beruecksichtigtBeiDachschraegenNurDenWandsockel() {
         ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
         Wall wall = new Wall(
                 UUID.randomUUID(),
@@ -774,15 +776,66 @@ class SurfaceMaterialListServiceTest {
         SurfaceMaterialReport report = service.create(project);
 
         MaterialSummary material = report.materials().getFirst();
-        assertEquals(6.0, material.coveredAreaSquareMeters(), 0.001);
+        assertEquals(4.0, material.coveredAreaSquareMeters(), 0.001);
         assertTrue(material.roomEntries().stream().anyMatch(entry ->
                 entry.surfaceDescription().contains("Sockel") && Math.abs(entry.coveredAreaSquareMeters() - 4.0) < 0.001));
-        assertTrue(material.roomEntries().stream().anyMatch(entry ->
-                entry.surfaceDescription().contains("Schräge") && Math.abs(entry.coveredAreaSquareMeters() - 2.0) < 0.001));
         assertTrue(report.roomComplexities().stream().anyMatch(entry -> entry.surfaceDescription().contains("Sockel")));
-        assertTrue(report.roomComplexities().stream().anyMatch(entry -> entry.surfaceDescription().contains("Schräge")));
         assertTrue(report.toMarkdown().contains("Sockel"));
-        assertTrue(report.toMarkdown().contains("Schräge"));
+        assertFalse(report.toMarkdown().contains("Wand " + wall.id().toString().substring(0, 8) + " Seite + Schräge"));
+    }
+
+    @Test
+    void berechnetSchraegeUndWaagerechteRestdeckeGetrennt() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Dachgeschoss");
+        Room room = Room.rectangular(
+                "Studio",
+                new PlanPoint(0, 0),
+                new PlanPoint(4_000, 4_000),
+                Length.ofMillimeters(3_000),
+                Length.ofMillimeters(180),
+                Length.ofMillimeters(10),
+                new SlopedCeilingProfile(SlopedCeilingSide.NORTH, Length.ofMillimeters(1_000), Length.ofMillimeters(2_000))
+        );
+        project.primaryLevel().addRoom(room);
+        SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.CEILING, room.id().toString());
+        stack.addLayer(layer("Deckenfarbe", Length.ofMillimeters(1_000), Length.ofMillimeters(1_000)));
+        project.primaryLevel().addSurfaceLayerStack(stack);
+
+        MaterialSummary material = service.create(project).materials().getFirst();
+
+        assertEquals(8.0 + 8.0 * Math.sqrt(2.0), material.coveredAreaSquareMeters(), 0.001);
+        assertTrue(material.roomEntries().stream().anyMatch(entry ->
+                entry.surfaceDescription().equals("Decke waagerecht")
+                        && Math.abs(entry.coveredAreaSquareMeters() - 8.0) < 0.001));
+        assertTrue(material.roomEntries().stream().anyMatch(entry ->
+                entry.surfaceDescription().equals("Decke Schräge Nordkante")
+                        && Math.abs(entry.coveredAreaSquareMeters() - 8.0 * Math.sqrt(2.0)) < 0.001));
+    }
+
+    @Test
+    void fasstJedesMaterialProEtageZusammen() {
+        ProjectModel project = ProjectModel.withDefaultLevel("Haus", "Erdgeschoss");
+        project.createLevel("Obergeschoss");
+        for (var level : project.levels()) {
+            Room room = Room.rectangular(
+                    "Zimmer",
+                    new PlanPoint(0, 0),
+                    new PlanPoint(1_000, 1_000),
+                    Length.ofMillimeters(2_500),
+                    Length.ofMillimeters(180),
+                    Length.ofMillimeters(10)
+            );
+            level.addRoom(room);
+            SurfaceLayerStack stack = new SurfaceLayerStack(SurfaceType.FLOOR, room.id().toString());
+            stack.addLayer(layer("Parkett", Length.ofMillimeters(1_000), Length.ofMillimeters(1_000)));
+            level.addSurfaceLayerStack(stack);
+        }
+
+        String markdown = service.create(project).toMarkdown();
+
+        assertTrue(markdown.contains("#### Summen pro Etage"));
+        assertTrue(markdown.contains("| Erdgeschoss | 1,00 m² | 1 | 1,00 m² | 0 | 0,0 |"));
+        assertTrue(markdown.contains("| Obergeschoss | 1,00 m² | 1 | 1,00 m² | 0 | 0,0 |"));
     }
 
     private ProjectModel projektMitZweiZuschnittRaeumen(SurfaceCutRestriction cutRestriction) {
