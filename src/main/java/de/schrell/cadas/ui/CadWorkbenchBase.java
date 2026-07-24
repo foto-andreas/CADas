@@ -130,6 +130,7 @@ abstract class CadWorkbenchBase extends CadWorkbenchContracts {
     static final double BASE_PIXELS_PER_MILLIMETER = 0.10;
     static final double MINIMUM_TWO_D_ZOOM = 0.25;
     static final double MAXIMUM_TWO_D_ZOOM = 40.0;
+    static final double TWO_D_ZOOM_STEP = 1.1;
     static final double RULER_SIZE = 32.0;
     static final Length DEFAULT_GRID = Length.of(1, LengthUnit.CENTIMETER);
     static final Length DEFAULT_WALL_THICKNESS = Length.of(17.5, LengthUnit.CENTIMETER);

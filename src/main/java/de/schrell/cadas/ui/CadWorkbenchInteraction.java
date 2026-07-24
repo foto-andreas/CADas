@@ -625,6 +625,19 @@ abstract class CadWorkbenchInteraction extends CadWorkbenchUi {
             event.consume();
             return;
         }
+        boolean zoomShortcutDown = event.isShortcutDown() || event.isControlDown();
+        if (zoomShortcutDown && (event.getCode() == KeyCode.PLUS
+                || event.getCode() == KeyCode.ADD
+                || event.getCode() == KeyCode.EQUALS)) {
+            self().zoomTwoDIn();
+            event.consume();
+            return;
+        }
+        if (zoomShortcutDown && (event.getCode() == KeyCode.MINUS || event.getCode() == KeyCode.SUBTRACT)) {
+            self().zoomTwoDOut();
+            event.consume();
+            return;
+        }
         if (!event.isShortcutDown()) {
             return;
         }

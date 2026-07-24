@@ -41,6 +41,8 @@ public final class HelpContentService {
                 | ⌘/Strg+Umschalt+← | Auswahl 90° links drehen |
                 | Entf | Auswahl löschen |
                 | Esc | Auswahl aufheben oder Aktion abbrechen |
+                | ⌘/Strg++ | 2D-Ansicht vergrößern |
+                | ⌘/Strg+- | 2D-Ansicht verkleinern |
                 | ⌘/Strg+0 | 2D-Ansicht zentrieren |
                 | ⌘/Strg+Umschalt+0 | 3D-Ansicht zentrieren |
                 | E | Werkzeug Bearbeiten |
@@ -59,7 +61,7 @@ public final class HelpContentService {
                 | Rechte Maustaste + Ziehen | 2D-Ansicht verschieben |
                 | Mittlere Maustaste + Ziehen | 2D-Ansicht verschieben |
                 | Leertaste + Ziehen | 2D-Ansicht verschieben, auch über Bauteilen |
-                | Mausrad | 2D zoomen |
+                | Mausrad oder Zwei-Finger-Geste | 2D zoomen |
                 | Umschalt beim Wandzeichnen | Freien Winkel zulassen |
                 | Alt + Linksklick | Zwischen übereinanderliegenden Treffern wechseln |
                 | Alt + rechte Maustaste | Nahe Hilfslinie entfernen |

@@ -666,6 +666,8 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
             ));
         }
         ansichtMenu.getItems().addAll(
+                menuItem("2D vergrößern", self()::zoomTwoDIn, shortcutKey(KeyCode.PLUS)),
+                menuItem("2D verkleinern", self()::zoomTwoDOut, shortcutKey(KeyCode.MINUS)),
                 menuItem("2D-Ansicht zentrieren", self()::resetTwoDView, shortcutKey(KeyCode.DIGIT0)),
                 menuItem("3D-Ansicht zentrieren", threeDViewport::centerCurrentView, shortcutShiftKey(KeyCode.DIGIT0))
         );
@@ -1242,6 +1244,8 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
             case "2D-Arbeitsbereich" -> "Zeigt die Grundriss-Zeichenfläche als alleinigen großen Arbeitsbereich an.";
             case "3D-Arbeitsbereich" -> "Zeigt die frei drehbare dreidimensionale Gebäudeansicht als großen Arbeitsbereich an.";
             case "3D-Innenansicht" -> "Öffnet die begehbare Innenansicht im ausgewählten oder ersten Raum der aktiven Etage.";
+            case "2D vergrößern" -> "Vergrößert die zweidimensionale Zeichenfläche um eine Zoomstufe und hält deren Mitte an derselben Position.";
+            case "2D verkleinern" -> "Verkleinert die zweidimensionale Zeichenfläche um eine Zoomstufe und hält deren Mitte an derselben Position.";
             case "2D-Ansicht zentrieren" -> "Setzt Zoom und Verschiebung der zweidimensionalen Zeichenfläche auf die Startansicht zurück.";
             case "3D-Ansicht zentrieren" -> "Passt das sichtbare dreidimensionale Modell wieder vollständig in den Ansichtsbereich ein.";
             case "Heizkreis-Router Vario testen" -> "Öffnet das technische Testfenster für die Vario- und Meander-Routingsprache, ohne das aktuelle Projekt automatisch zu verändern.";
@@ -1772,14 +1776,31 @@ abstract class CadWorkbenchUi extends CadWorkbenchBase {
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, self()::handleMouseDragged);
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_RELEASED, self()::handleMouseReleased);
         drawingCanvas.addEventHandler(MouseEvent.MOUSE_EXITED, event -> drawingCanvas.setCursor(Cursor.DEFAULT));
-        drawingCanvas.setOnScroll(event -> {
-            double oldScale = self().scale();
-            double zoomFactor = event.getDeltaY() > 0 ? 1.1 : 0.9;
-            zoom = Math.clamp(zoom * zoomFactor, MINIMUM_TWO_D_ZOOM, MAXIMUM_TWO_D_ZOOM);
-            double newScale = self().scale();
-            offsetX = event.getX() - ((event.getX() - offsetX) / oldScale) * newScale;
-            offsetY = event.getY() - ((event.getY() - offsetY) / oldScale) * newScale;
-            self().render();
+        drawingCanvas.setOnScroll(event -> self().zoomTwoDAt(
+                event.getDeltaY() > 0 ? TWO_D_ZOOM_STEP : 1.0 / TWO_D_ZOOM_STEP,
+                event.getX(),
+                event.getY()
+        ));
+        drawingCanvas.setOnZoom(event -> {
+            self().zoomTwoDAt(event.getZoomFactor(), event.getX(), event.getY());
+            event.consume();
         });
+    }
+
+    void zoomTwoDIn() {
+        zoomTwoDAt(TWO_D_ZOOM_STEP, drawingCanvas.getWidth() / 2.0, drawingCanvas.getHeight() / 2.0);
+    }
+
+    void zoomTwoDOut() {
+        zoomTwoDAt(1.0 / TWO_D_ZOOM_STEP, drawingCanvas.getWidth() / 2.0, drawingCanvas.getHeight() / 2.0);
+    }
+
+    void zoomTwoDAt(double factor, double centerX, double centerY) {
+        double oldZoom = zoom;
+        zoom = Math.clamp(zoom * factor, MINIMUM_TWO_D_ZOOM, MAXIMUM_TWO_D_ZOOM);
+        double effectiveFactor = zoom / oldZoom;
+        offsetX = centerX + (offsetX - centerX) * effectiveFactor;
+        offsetY = centerY + (offsetY - centerY) * effectiveFactor;
+        self().render();
     }
 }

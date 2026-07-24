@@ -36,6 +36,9 @@ import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.PickResult;
+import javafx.scene.input.ZoomEvent;
 import javafx.scene.Scene;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Assertions;
@@ -1243,6 +1246,85 @@ class CadWorkbenchTestPart1 extends CadWorkbenchTestBase {
         Assertions.assertEquals(new PlanPoint(800, 1_325), heating.returnPoint());
         Assertions.assertEquals(600.0, heating.manifoldFreeAreaWidth().toMillimeters(), 0.001);
         Assertions.assertEquals(1_200.0, heating.manifoldFreeAreaDepth().toMillimeters(), 0.001);
+    }
+
+    @Test
+    void zweifingergesteZoomtUmGestenposition() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetViewport(1.0, 100.0, 80.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.drawingCanvas.getOnZoom().handle(new ZoomEvent(
+                    ZoomEvent.ZOOM,
+                    300.0,
+                    250.0,
+                    300.0,
+                    250.0,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    1.5,
+                    1.5,
+                    new PickResult(workbench.drawingCanvas, 300.0, 250.0)
+            ));
+            return null;
+        });
+
+        WorkbenchAutomationSnapshot snapshot = aufFxThread(workbench::automationSnapshot);
+        Assertions.assertEquals(1.5, snapshot.zoom(), 0.0001);
+        Assertions.assertEquals(0.0, snapshot.offsetX(), 0.0001);
+        Assertions.assertEquals(-5.0, snapshot.offsetY(), 0.0001);
+    }
+
+    @Test
+    void zoomShortcutsGreifenAuchVomTextfeldAus() throws Exception {
+        CadWorkbench workbench = aufFxThread(() -> {
+            CadWorkbench instanz = new CadWorkbench();
+            new Scene(instanz, 1200, 800);
+            instanz.applyCss();
+            instanz.layout();
+            instanz.automationSetViewport(1.0, 100.0, 80.0);
+            return instanz;
+        });
+
+        aufFxThread(() -> {
+            workbench.roomNameField.fireEvent(new KeyEvent(
+                    KeyEvent.KEY_PRESSED,
+                    "",
+                    "+",
+                    KeyCode.EQUALS,
+                    true,
+                    true,
+                    false,
+                    false
+            ));
+            return null;
+        });
+        Assertions.assertEquals(1.1, aufFxThread(workbench::automationSnapshot).zoom(), 0.0001);
+
+        aufFxThread(() -> {
+            workbench.roomNameField.fireEvent(new KeyEvent(
+                    KeyEvent.KEY_PRESSED,
+                    "",
+                    "-",
+                    KeyCode.MINUS,
+                    false,
+                    true,
+                    false,
+                    false
+            ));
+            return null;
+        });
+        Assertions.assertEquals(1.0, aufFxThread(workbench::automationSnapshot).zoom(), 0.0001);
     }
 
     @Test

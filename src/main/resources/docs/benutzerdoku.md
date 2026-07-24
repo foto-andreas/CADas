@@ -272,7 +272,7 @@ Derzeit gilt:
 
 ### Navigation in 2D
 
-* Mit dem Mausrad zoomst du in die Zeichnung hinein oder heraus.
+* Mit dem Mausrad oder einer Zwei-Finger-Geste zoomst du in die Zeichnung hinein oder heraus.
 * Mit der rechten Maustaste verschiebst du die Zeichenfläche.
 * `2D zentrieren` setzt Zoom und Position der 2D-Ansicht zurück.
 * Über die Etagenauswahl wechselst du zwischen vorhandenen Geschossen.
@@ -341,6 +341,8 @@ Wichtige Kürzel der aktuellen Oberfläche:
 * `Cmd+Shift+←` oder `Strg+Shift+←`: Auswahl 90° links drehen
 * `Entf`: Auswahl löschen
 * `Esc`: Auswahl aufheben
+* `Cmd++` oder `Strg++`: 2D-Ansicht vergrößern
+* `Cmd+-` oder `Strg+-`: 2D-Ansicht verkleinern
 * `Cmd+0` oder `Strg+0`: 2D-Ansicht zentrieren
 * `Cmd+Shift+0` oder `Strg+Shift+0`: 3D-Ansicht zentrieren
 * `Cmd+E`, `Cmd+W`, `Cmd+T`, `Cmd+G`, `Cmd+D`, `Cmd+F`, `Cmd+O`: Werkzeuge `Bearbeiten`, `Wand`, `Treppe`, `Zusatzfläche`, `Tür`, `Fenster`, `Objekt`
