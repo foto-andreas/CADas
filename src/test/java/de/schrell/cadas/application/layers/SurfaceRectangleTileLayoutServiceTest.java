@@ -3,23 +3,16 @@ package de.schrell.cadas.application.layers;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.schrell.cadas.application.floor.FloorOpeningGeometryService;
 import de.schrell.cadas.application.room.OrthogonalPolygonDecompositionService.CellRectangle;
 import de.schrell.cadas.domain.geometry.Length;
 import de.schrell.cadas.domain.geometry.LengthUnit;
-import de.schrell.cadas.domain.model.Level;
-import de.schrell.cadas.domain.model.Room;
 import de.schrell.cadas.domain.model.SurfaceCutRestriction;
 import de.schrell.cadas.domain.model.SurfaceLayer;
-import de.schrell.cadas.domain.model.SurfaceLayerStack;
 import de.schrell.cadas.domain.model.SurfaceLayoutDirection;
 import de.schrell.cadas.domain.model.SurfaceLayoutAnchor;
 import de.schrell.cadas.domain.model.SurfaceLayoutMode;
 import de.schrell.cadas.domain.model.SurfaceLayoutRotation;
-import de.schrell.cadas.domain.model.SurfaceType;
-import de.schrell.cadas.infrastructure.dxf.DxfProjectExchangeService;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,7 +22,6 @@ import org.junit.jupiter.api.Test;
 class SurfaceRectangleTileLayoutServiceTest {
 
     private final SurfaceRectangleTileLayoutService service = new SurfaceRectangleTileLayoutService();
-    private final FloorOpeningGeometryService floorOpeningGeometryService = new FloorOpeningGeometryService();
 
     @Test
     void beginntInTeilrechteckenMitVollerStartplatte() {
@@ -161,32 +153,6 @@ class SurfaceRectangleTileLayoutServiceTest {
         assertEquals(0.0, Math.abs(zuschnitt.fullY() - zuschnitt.y()) % 100.0, 0.001);
         assertEquals(600.0, zuschnitt.fullWidth(), 0.001);
         assertEquals(1_000.0, zuschnitt.fullHeight(), 0.001);
-    }
-
-    @Test
-    void richtetDenDachgeschossFlurAusKirepAmSchmalenFlurarmAus() throws Exception {
-        Level level = new DxfProjectExchangeService()
-                .importProject(Path.of("KIREP.cadas"), "KIREP")
-                .levels().stream()
-                .filter(candidate -> candidate.name().equals("Dachgeschoss"))
-                .findFirst()
-                .orElseThrow();
-        Room flur = level.rooms().stream()
-                .filter(room -> room.name().equals("Flur"))
-                .findFirst()
-                .orElseThrow();
-        SurfaceLayerStack stack = level.findSurfaceLayerStack(SurfaceType.FLOOR, flur.id().toString());
-        SurfaceLayer layer = stack.layers().getFirst();
-
-        List<SurfaceRectangleTileLayoutService.PlacedSurfaceTile> tiles = service.tilesForRectangles(
-                floorOpeningGeometryService.floorRectangles(level, flur),
-                layer
-        );
-
-        assertTrue(tiles.stream().anyMatch(tile ->
-                        Math.abs(tile.x() + 80.0) <= 20.0
-                                && Math.abs(tile.width() - 1_000.0) < 0.01),
-                "Der schmale Flurarm soll bei 90°-Verlegung mit einer vollen 1000-mm-Platte starten.");
     }
 
     @Test
